@@ -7,6 +7,10 @@
     python -m qccd.debug PROG.tsir.json --arch DEV.arch.json trace q0 [--from 0] [--to 99]
     python -m qccd.debug PROG.tsir.json --arch DEV.arch.json find 'occupancy("C0", t) > 1' [--from 0] [--backward]
     python -m qccd.debug PROG.tsir.json --arch DEV.arch.json value 'heat("q0", t)' 12
+    python -m qccd.debug PROG.tsir.json --arch DEV.arch.json rules_at 12 [--rules standard] [--assert TEXT|@FILE]
+    python -m qccd.debug PROG.tsir.json --arch DEV.arch.json inspect R7 12 [--rules ...] [--assert ...]
+    python -m qccd.debug PROG.tsir.json --arch DEV.arch.json closest R13 [--rules ...] [--assert ...]
+    python -m qccd.debug PROG.tsir.json --arch DEV.arch.json guide R7
 
 Every command prints JSON (one object).  Steps count from 1, as the Studio's status line does
 ("Step 12 / 340" is step 12); rules, conditions and expressions are the rule language.
@@ -57,9 +61,33 @@ def main(argv=None) -> int:
     v = sub.add_parser("value")
     v.add_argument("expr")
     v.add_argument("step", type=int)
+    # a rule at work, step by step (the Debug page's Why tab)
+    r = sub.add_parser("rules_at")
+    r.add_argument("step", type=int)
+    i = sub.add_parser("inspect")
+    i.add_argument("rule")
+    i.add_argument("step", type=int)
+    i.add_argument("--limit", type=int, default=40, help="cases to show")
+    n = sub.add_parser("closest")
+    n.add_argument("rule")
+    for p in (r, i, n):
+        p.add_argument("--rules", default="standard", help="a shipped rule set, a .rules file, or 'none'")
+        p.add_argument("--assert", dest="assertions", default=None, help="your assertions, or @file")
+    g = sub.add_parser("guide")
+    g.add_argument("rule")
     a = ap.parse_args(argv)
+    if a.cmd == "guide":                           # the guide needs no programme
+        from .guide import guide
+        row = guide().get(a.rule)
+        print(json.dumps({"rule": a.rule, **row} if row else {"ok": False, "error": f"the guide has no row for {a.rule!r}"}))
+        return 0 if row else 2
     try:
         sess = open_files(a.arch, a.programme, a.model, a.cert)
+        if a.cmd in ("rules_at", "inspect", "closest"):
+            rules = _text(a.rules)
+            if rules and rules.endswith(".rules") and Path(rules).exists():
+                rules = Path(rules).read_text(encoding="utf-8")
+            rules = None if rules == "none" else rules
         if a.cmd == "summary":
             out = sess.summary()
         elif a.cmd == "check":
@@ -76,6 +104,12 @@ def main(argv=None) -> int:
             out = sess.trace(a.entity, a.start, a.end)
         elif a.cmd == "find":
             out = sess.find(a.condition, a.start, backward=a.backward)
+        elif a.cmd == "rules_at":
+            out = sess.rules_at(a.step, rules, _text(a.assertions))
+        elif a.cmd == "inspect":
+            out = sess.inspect(a.rule, a.step, rules, _text(a.assertions), limit=a.limit)
+        elif a.cmd == "closest":
+            out = sess.closest(a.rule, rules, _text(a.assertions))
         else:
             out = sess.value(a.expr, a.step)
     except DebugError as exc:

@@ -36,7 +36,9 @@ everywhere: the page, the agent's verbs, `python -m qccd.debug` and `qccd_debug`
 | state | the State tab: the instruction, what moved, places over capacity, the hottest ions' n̄, what fails here, what you watch |
 | watch | the Watch tab: ions, sites, junctions, rails by id, from the Studio's selection, or picked on the picture; each gets a colour, ions a trail; **Isolate** fades every other ion; ◆◀ ▶◆ jump to the steps where anything watched changes |
 | expressions | the Watch tab: terms of the rule language evaluated at every step you visit, with `t` the instant after it: `occupancy("C0", t)`, `position("q3", t)` |
-| rules | the Rules tab: a rule set the website ships (standard, one per paper) and/or your own assertions; **Check** judges the program and crosses out every failure; ✗◀ ▶✗ jump between failures |
+| rules | the Rules tab: a rule set the website ships (standard, one per paper) and/or your own assertions; **Check** judges the program and crosses out every failure; ✗◀ ▶✗ jump between failures; an open rule shows what its failure usually means and the fix, **Why, at this step** and **Closest case** |
+| why | the Why tab: every rule at the step shown (how many cases it judges here, how many fail), and one rule's cases there, each with its variables, the places it names and the value of every part of the rule; it follows the step |
+| notes | what an agent reviewing the program pinned to a step: in State at that step, beside the rule, as purple diamonds on the timeline and in the report; × removes one |
 | breakpoints | the Breakpoints tab: steps, conditions in the rule language over `t` (`occupancy("J0", t) > 0`), a rule starting to fail, something watched changing; **Continue ▶▶** runs to the next, ◀◀ to the previous |
 | report | the Report tab: what the page shows as Markdown (program, rules, failures with places, this step, the watch list) and the link that reopens it exactly here |
 
@@ -74,6 +76,44 @@ On the picture a place gets a cross labelled with the rule ids (bold at the step
 starts, lighter while it lasts); an ion standing in a place the same failure names gets a red
 ring.  Crosses within 16 px are one cross.
 
+## Reviewing a program, rule by rule
+
+A check says which rules fail and where.  A review also says why, and how close the rules that
+hold came.  It happens in the same panel, for the person and for their agent alike.
+
+* **The runtime error.**  At the step where a shown rule starts failing, the head of the panel says
+  so, the way a debugger stops on an exception: the rule, the step, the comparison that broke
+  (both numbers and a gauge), the case's variables, **Why?** and **How to fix it**.  Continue ▶▶
+  stops there when "stop where a shown rule starts failing" is on.
+* **Why** (`Session.rules_at`, `Session.inspect`).  `check` walks only the cases that can fail,
+  which is what a verdict needs.  To show a rule at work, these walk every binding of its `for all`s
+  (through `and`s, and an `implies` whose condition holds) with the variables that range over time
+  -- instants, operations, steps -- held to the step shown.  A case that names no moment (a corner,
+  a rail) is the same at every step and says so.  Each case carries the value of every part of the
+  rule's body: a comparison with both sides and the **room** left (its limit minus its value, for
+  `<=`), the false part of a failing case in red.  The failing cases come first, then the closest
+  to failing.  A budget (`CASES_PER_STEP`) keeps one step's walk bounded.
+* **Gauges.**  The comparison that decides a case -- the false one if it fails, else the one with
+  the least room -- is drawn beside the ion or place it names: the value as a bar, the limit as a
+  tick.  Failures carry theirs (`Failure.gauge`), so the error and the picture show it at once.
+* **The closest case** (`Session.closest`): of every case a rule judges in the whole program, the
+  one that holds with the least room -- the hottest gate under the heat budget, the fullest site
+  under its capacity.  It searches up to `CLOSEST_BUDGET` cases and says when it stopped early.
+* **The review guide** (`qccd/debug/guide.md`, `qccd.debug.guide()`): what a rule's failure usually
+  means and what to change, one row for every rule of every shipped set (a test fails until a new
+  rule has one).  It is written for a person and read the same way by their agent: the panel shows
+  a rule's row beside its failure, and the workspace skill carries the whole file.  Rows name no
+  file of the repository.
+* **The only verdict is the grader's.**  The review explains the grader's verdicts; it adds none.
+
+**With your own agent.**  **Review with my agent** (Rules tab) writes a review request into the
+chat to the person's own agent (Codex, Claude Code or Cursor) -- in their workspace's Studio, on a
+run's page, or on a website page opened through their workspace (`qccd web`).  The person sends it;
+a page never sends for them (on the website mirror the page is another, untrusted origin).  On
+qccd.academy itself, the button says how to open the page with their agent.  The agent then works
+in the same panel, through the declared verbs below, while the person watches its cursor: every
+verb shows what it returns.
+
 ## For agents
 
 **On the page** (the person watches): `qccd_page_act` with `action: "debug"`, `verb` and
@@ -86,14 +126,24 @@ one object in `args`:
     {"action": "debug", "verb": "watch",  "args": [{"add": ["q3", "J1"], "isolate": true}]}
     {"action": "debug", "verb": "find",   "args": [{"condition": "occupancy(\"J1\", t) > 1"}]}
 
+A review:
+
+    {"action": "debug", "verb": "review",  "args": [{}]}                          every rule, its first failing step, the guide's row
+    {"action": "debug", "verb": "inspect", "args": [{"rule": "R7", "step": 41}]}  the cases there, shown in Why
+    {"action": "debug", "verb": "note",    "args": [{"step": 41, "rule": "R7", "text": "q3 reaches the gate after three junction crossings: cool it at C4"}]}
+    {"action": "debug", "verb": "closest", "args": [{"rule": "R1"}]}              a near miss of a rule that holds
+
 The verbs are declared in `qccd/site/debug/debug_api.json` (verb `verbs` lists them); the
 controls are declared with `data-hint` and `window.QCCD_HINTS`, so `click`/`fill` work too.
+A note is signed with the agent's name (`pageact.js` adds it).  A Studio page built before a verb
+existed carries a stand-in without it; the page action opens the panel first, which loads the
+debugger with every verb.
 
 **Headless** (`qccd_debug`, `POST /api/debug`): the same session on a finished run (`run_id`,
 which brings its certificate, so R24/R25 are judged) or on two workspace files (`arch`,
 `program`, optional `certificate`).  Actions: summary, check, state, step, trace, find, value,
-diff.  A compiler bug hunt is usually: `check`, then `state` and `trace` at the first failing
-step, then `find` for the condition that led there.
+diff, rules_at, inspect, closest.  A compiler bug hunt is usually: `check`, then `inspect`,
+`state` and `trace` at the first failing step, then `find` for the condition that led there.
 
 **At a terminal**: `python -m qccd.debug PROG.tsir.json --arch DEV.arch.json check --assert '...'`
 (also summary, state, step, trace, find, value; `--cert` for the circuit rules).
@@ -110,6 +160,8 @@ step, then `find` for the condition that led there.
 | the worker (Pyodide, a module worker) | `qccd/site/debug/worker.js` |
 | the agent verbs | `qccd/site/debug/debug_api.json` (+ `qccd/workspace/interface.py`, `web/pageact.js`) |
 | the headless tool | `qccd/workspace/debugging.py`, `features.py` (`qccd_debug`) |
+| the review guide | `qccd/debug/guide.md` (hand-written), `qccd/debug/guide.py`; the page gets it in `config.json`, the skill as `references/review-guide.md` |
+| the panel in the person's workspace | `debugpage.workspace_inject` (the Studio and every run's page, `service.py`), its Python behind `POST /api/debug/web` |
 
 * **In a Studio page**, the site build appends `LOADER` (after the hash router): a Debug button in
   `#stagebar .ctrl` and a listener on the bar's Debug link, both of which load `debug/inpage.js`
@@ -139,6 +191,11 @@ step, then `find` for the condition that led there.
   match exactly once.  `tests/debug_page.mjs` serves both untyped, as the droplet does.  Under the
   workspace mirror's CSP the page needs `'wasm-unsafe-eval'` (added to `mirror_csp`); without it the
   page says the policy refuses WebAssembly rather than hanging.
+* **In the person's workspace** (their Studio, a run's page) the panel's code is on the page itself
+  (the workspace's pages load nothing from elsewhere) and its rule language is the workspace's own
+  Python: `CFG.python.backend` is `service`, and the worker's calls go to `POST /api/debug/web`,
+  which runs the same `qccd.debug.web` functions.  Nothing is downloaded, and the answers are the
+  ones the site's pages compute in the browser.
 * **Limits**: a page shows at most 20,000 frames; a longer program's failures past the last frame
   are drawn on it.  The first check loads the runtime (a few seconds); a 5,000-step program takes
   about as long to check as the grader natively, two to three times over.
@@ -147,6 +204,9 @@ step, then `find` for the condition that led there.
 
 `tests/test_debug.py` (the model against the grader, placement, quoted names, the glue, the
 CLI, the headless tool, the page section, the runtime under Pyodide, the page in Chrome with and
-without the mirror's policy) and `tests/test_agent_interface.py` (verbs and controls declared).
+without the mirror's policy; a rule at each step, its cases and their gauges, the closest case,
+the guide's row for every rule, a review in Chrome on both hosts, and the workspace Studio's
+panel handing a review to the agent's chat) and `tests/test_agent_interface.py` (verbs and
+controls declared).
 `node tests/debug_page.mjs <site> <studio page> [--csp ...] [--shots dir]` drives a built page.
 `python -m qccd.site.debugpage -o DIR --pages SITE` builds the section alone over a site build.

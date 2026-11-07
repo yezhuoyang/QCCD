@@ -2530,8 +2530,24 @@ function listenToPage() {
     var m = e.data || {};
     if (m.qccd === 'result' && parentCalls[m.id]) { var f = parentCalls[m.id]; delete parentCalls[m.id]; f(m); }
     else if (m.qccd === 'page' && m.context) { setPage(m.context); }
+    else if (m.qccd === 'draft' && typeof m.text === 'string') { draftForAgent(m.text); }
   });
 }
+// The Debug panel's "Review with my agent" (qccd/site/debug/debug.js): its request is written into
+// the composer, unfolded and focused, and the person sends it.  A page never sends for them -- on
+// the website mirror the page is another, untrusted origin.
+function draftForAgent(text) {
+  var dock = document.getElementById('qcl-dock'), ta = document.getElementById('qcl-text');
+  if (!ta) return false;
+  if (dock && dock.classList.contains('qcl-min')) {
+    dock.classList.remove('qcl-min'); localSet('qccd.live.min', '0');
+    if (CFG.framed) toParent({ qccd: 'size', min: false });
+  }
+  ta.value = String(text || '').slice(0, 4000); S.textCache = ta.value;
+  grow(ta); renderSendButton(); ta.focus();
+  return true;
+}
+if (!CFG.framed) window.QCCD_AGENT_DRAFT = draftForAgent;
 function setPage(ctx) {
   var before = J(S.page || {});
   S.page = { url: ctx.url || (S.page || {}).url, title: ctx.title, kind: ctx.kind, selection: ctx.selection,

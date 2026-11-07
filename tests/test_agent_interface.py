@@ -165,7 +165,9 @@ def test_every_control_in_the_studio_is_declared(tmp_path, monkeypatch):
         probe = ("(function(){ var PRIV = '#qcl-dock, #qcl-menu, .qcl-modal, #qcl-notice, #qcl-unpaired, #qccd-chat, "
                  "[data-qccd-private], #qccd-agent-cursor, #qcl-runpanel';"
                  "var nohint = []; document.querySelectorAll('[data-hint]').forEach(function(e){ if (e.closest(PRIV)) return;"
-                 " var k = e.getAttribute('data-hint'); if (!EDITOR.hintFor(k) && nohint.indexOf(k) < 0) nohint.push(k); });"
+                 # the Studio's own HINTS, or the debugger's window.QCCD_HINTS beside it: pageact's declared()
+                 " var k = e.getAttribute('data-hint'); if (!EDITOR.hintFor(k) && !(window.QCCD_HINTS || {})[k]"
+                 " && nohint.indexOf(k) < 0) nohint.push(k); });"
                  "var stale = " + json.dumps(studio_sel) + ".filter(function(s){ return !document.querySelector(s); });"
                  # the gate bites: a control added without a declaration is reported
                  "var b = document.createElement('button'); b.id = 'gateProbe'; b.textContent = 'New feature';"

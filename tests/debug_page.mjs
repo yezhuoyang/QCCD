@@ -101,6 +101,40 @@ if (INPAGE) {
     expect(nf.step !== null && out.crosses > 0, 'the failure is crossed out on the Studio\'s own picture');
     expect(/#debug&step=/.test(await ev('QCCD_DEBUG.link().link')), 'the link reopens this page in debug mode');
     await shot('debug_inpage.png');
+    // a review, as an agent does one: the rules, the first failure's cases, a note, a near miss
+    const rv = await ev('QCCD_DEBUG.review()');
+    const r7 = rv.rules.find((r) => r.id === 'R7');
+    expect(r7 && r7.verdict === 'fails' && r7.first_step === 7 && !!r7.fix, 'review gives R7, the step it first fails at and the guide\'s fix');
+    await ev('QCCD_DEBUG.goto({step: 7})');
+    await sleep(250);
+    out.banner = await ev("(document.getElementById('dErr') || {}).textContent || ''");
+    expect(/R7 broken at step 7/.test(out.banner) && !(await ev("document.getElementById('dErr').hidden")), 'stepping onto the failure stops on it, as on an exception');
+    const ins = await ev("QCCD_DEBUG.inspect({rule: 'R7', step: 7})");
+    expect(ins && ins.failing === 1 && ins.shown.length === 2, 'inspect gives both cases of R7 at step 7');
+    expect(await until("document.querySelectorAll('#pWhy .q-case').length === 2", 10000), 'the Why tab shows the person the same two cases');
+    out.gauges = await ev("document.querySelectorAll('#qdbg .qdbg-gauge').length");
+    expect(out.gauges >= 1, 'a gauge of heat against its budget is drawn on the picture');
+    const nt = await ev("QCCD_DEBUG.note({step: 7, rule: 'R7', text: 'q0 enters the MS gate hot: cool it first', by: 'Test agent'})");
+    expect(nt.note && nt.note.step === 7, 'a note is pinned to step 7');
+    await sleep(200);
+    await shot('debug_review_step7.png');
+    expect(await ev("QCCD_DEBUG.report().markdown.indexOf('q0 enters the MS gate hot') >= 0"), 'the note is in the report');
+    const cl = await ev("QCCD_DEBUG.closest({rule: 'R13'})");
+    expect(cl.found && cl.room === 13, 'the closest case of R13 has room 13');
+    const why = await ev("QCCD_DEBUG.rules_at({step: 6})");
+    expect(why.rules.some((r) => r.id === 'R7' && r.here === 'nothing to judge'), 'every rule at step 6: R7 judges nothing there');
+    await shot('debug_review.png');
+    // on the website itself there is no chat: the button says how to open this page with one's agent
+    await ev("document.querySelector('#dTabs [data-tab=rules]').click(), document.getElementById('rAgent').click(), true");
+    const help = await ev("(document.querySelector('.q-agenthelp a') || {}).href || ''");
+    out.agent_link = help;
+    expect(help.indexOf('http://127.0.0.1:47100/web/' + page) === 0,
+           'without a chat, Review with my agent links this page through the person\'s workspace');
+    await ev('QCCD_DEBUG.goto({step: 7})');
+    await ev("document.querySelector('[data-rule=R7].q-rbtn').click(), document.getElementById('eFix').click(), true");
+    await sleep(200);
+    expect(await ev("!!document.querySelector('#dErr .q-guide')"), 'How to fix it shows the guide\'s row in the error');
+    await shot('debug_rules_agent.png');
     await ev("document.getElementById('qdbgBtn').click()");
     expect(await until("!document.getElementById('dbg') && !document.getElementById('qdbg')", 5000), 'the Debug button closes the panel and its marks');
     expect(await ev("document.querySelector('main').getBoundingClientRect().width") === w0, 'the Studio has its width back');
@@ -145,6 +179,15 @@ try {
   expect(f.found === true || f.found === false, 'a conditional breakpoint is answered');
   const rep = await ev('QCCD_DEBUG.report()');
   expect(/src=/.test(rep.link) && /step=/.test(rep.link) && rep.markdown.indexOf('A1') >= 0, 'the report links back to exactly here');
+  // a review on the Debug page: the same verbs, the same panels, the gauges on the framed picture
+  const ins = await ev("QCCD_DEBUG.inspect({rule: 'R7', step: 7})");
+  expect(ins && ins.failing === 1, 'inspect gives R7\'s failing case at step 7');
+  expect(await until("document.querySelectorAll('#pWhy .q-case').length === 2", 10000), 'the Why tab shows both cases');
+  out.banner = await ev("(document.getElementById('dErr') || {}).textContent || ''");
+  expect(/R7 broken at step 7/.test(out.banner), 'the error is said over the stage');
+  out.gauges = await ev("document.getElementById('dFrame').contentDocument.querySelectorAll('#qdbg .qdbg-gauge').length");
+  expect(out.gauges >= 1, 'a gauge is drawn on the framed picture');
+  await shot('debug_review_page.png');
 } catch (e) { fails.push('error: ' + e.message); }
 out.errors = errors.slice(0, 5);
 if (errors.length) fails.push('page errors: ' + errors[0]);

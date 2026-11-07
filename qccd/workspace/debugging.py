@@ -21,7 +21,7 @@ from .core import WorkspaceError
 
 __all__ = ["ACTIONS", "debug_call"]
 
-ACTIONS = ("summary", "check", "state", "step", "trace", "find", "value", "diff")
+ACTIONS = ("summary", "check", "state", "step", "trace", "find", "value", "diff", "rules_at", "inspect", "closest")
 _KEEP = 4
 _SESSIONS: dict[str, Any] = {}
 _ORDER: list[str] = []
@@ -100,6 +100,15 @@ def debug_call(ws, b: dict) -> dict:
             out = s.find(str(b.get("condition") or ""), b.get("from", 1), backward=bool(b.get("backward")))
         elif act == "value":
             out = {"values": [s.value(x, b.get("step", 1)) for x in (b.get("exprs") or [])]}
+        elif act in ("rules_at", "inspect", "closest"):
+            rules = b.get("rules", "standard") if b.get("rules") != "none" else None
+            if act == "rules_at":
+                out = s.rules_at(b.get("step", 1), rules, b.get("assertions"))
+            elif act == "inspect":
+                out = s.inspect(str(b.get("rule") or ""), b.get("step", 1), rules, b.get("assertions"),
+                                limit=int(b.get("limit") or 20))
+            else:
+                out = s.closest(str(b.get("rule") or ""), rules, b.get("assertions"))
         else:
             out = s.diff(b.get("from", 1), b.get("to", s.n))
     except DebugError as exc:

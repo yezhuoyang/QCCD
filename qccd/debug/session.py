@@ -38,11 +38,12 @@ from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from ..ruleset import RuleSet, RuleSyntaxError, catalogue
 from ..ruleset import load as load_rules
-from ..ruleset.evaluate import FAILS, HOLDS, NOT_APPLICABLE, UNCHECKED, Evaluator, _brief, _has_quant
+from ..ruleset.evaluate import (FAILS, HOLDS, NOT_APPLICABLE, UNCHECKED, Evaluator, _brief, _has_quant,
+                                _split_and)
 from ..ruleset.model import CircuitOp, Entity, Hop, Instant, Ion, Loop, Op, Rail, Site
 from ..ruleset.model import Step as StepEntity
 from ..ruleset.programme import programme_execution
-from ..ruleset.syntax import BinOp, Call, Quant, Rule, Str, free_names, parse, parse_formula, show, walk
+from ..ruleset.syntax import BinOp, Call, Not, Quant, Rule, Str, free_names, parse, parse_formula, show, walk
 from ..ruleset.vocabulary import TERMS, EvalError, NotApplicable
 
 __all__ = ["Session", "Failure", "model_from", "open_files", "open_documents", "assertion_rules",
@@ -55,11 +56,20 @@ _STEP_WORD = re.compile(r"\bstep (\d+)\b")
 FAILURES_PER_RULE = 400
 #: evaluations a rule may spend measuring how long its failures last
 SPAN_BUDGET = 60_000
+#: bindings a rule may try at one step (`rules_at`, `inspect`)
+CASES_PER_STEP = 20_000
+#: bindings `closest` may try over the whole programme
+CLOSEST_BUDGET = 200_000
 _TRANSPORT = ("move", "split", "merge", "shuttle", "hop", "junction_enter", "junction_exit")
+_COMPARE = ("<", "<=", ">", ">=", "=", "!=", "in", "notin")
 
 
 class DebugError(ValueError):
     """Something the person asked for cannot be done, said in their words."""
+
+
+class _OutOfCases(Exception):
+    """A walk over a rule's cases used up its budget."""
 
 
 # ------------------------------------------------------------------ inputs
@@ -176,12 +186,15 @@ class Failure:
     where: list[dict]           # the places it names: site, junction, rail, ion, loop
     message: str                # the grader's own sentence, renumbered
     values: dict[str, str] = field(default_factory=dict)
+    gauge: dict | None = None   # the number the rule compares with its limit, when it compares one
 
     def to_json(self) -> dict:
         d = {"rule": self.rule, "step": self.step, "until": self.until, "phase": self.phase,
              "instant": self.instant, "where": self.where, "message": self.message}
         if self.values:
             d["values"] = self.values
+        if self.gauge:
+            d["gauge"] = self.gauge
         return d
 
 
@@ -266,6 +279,7 @@ class Session:
             self.steps_of.setdefault(p, []).append(k)
         self._ion_ids = {str(x.id) for x in self.exe.ions}
         self._ev: Evaluator | None = None
+        self._at_cache: dict[tuple, tuple] = {}
 
     # ---------------------------------------------------------------- numbering
 
@@ -524,13 +538,11 @@ class Session:
 
     # ---------------------------------------------------------------- rules
 
-    def check(self, rules: Any = "standard", assertions: str | None = None, *,
-              only: Iterable[str] | None = None, limit: int = FAILURES_PER_RULE) -> dict:
-        """Judge the programme by a rule set and your own assertions, and locate every failure.
-
-        `rules`: a rule set the website ships, by name (`standard`, `cyclone`, ...), the text of
-        a rule set, or None for none.  `assertions`: your own rules (`assertion_rules`)."""
-        out: dict[str, Any] = {"programme": self.name, "steps": self.n, "rules": []}
+    def _rules(self, rules: Any, assertions: str | None, only: Iterable[str] | None = None
+               ) -> tuple[RuleSet | None, Evaluator, list[Rule]]:
+        """(the rule set, an evaluator with its parameters, the rules to judge): a rule set the
+        website ships by name (`standard`, `cyclone`, ...), the text of one, or None; and your
+        own assertions (`assertion_rules`)."""
         rs: RuleSet | None = None
         if rules:
             spec = rules if isinstance(rules, RuleSet) else str(rules)
@@ -540,8 +552,6 @@ class Session:
                 rs = spec if isinstance(spec, RuleSet) else load_rules(spec)
             except (RuleSyntaxError, KeyError) as exc:
                 raise DebugError(f"those rules cannot be read: {exc}") from None
-            out["ruleset"] = rs.name
-            out["title"] = rs.title
         params = dict(catalogue().params)
         if rs is not None:
             params.update(rs.params)
@@ -566,11 +576,300 @@ class Session:
                                      "binds, a parameter, nor a word of the vocabulary")
                 if want is None or r.id in want:
                     todo.append(r)
+        return rs, ev, todo
+
+    def _rule(self, rule: str, rules: Any, assertions: str | None) -> tuple[Evaluator, Rule]:
+        rs, ev, todo = self._rules(rules, assertions, only=[str(rule)])
+        if not todo:
+            where = f"the rule set {rs.name!r}" if rs is not None else "your assertions"
+            raise DebugError(f"{rule!r} is not a rule of {where}")
+        return ev, todo[0]
+
+    def check(self, rules: Any = "standard", assertions: str | None = None, *,
+              only: Iterable[str] | None = None, limit: int = FAILURES_PER_RULE) -> dict:
+        """Judge the programme by a rule set and your own assertions, and locate every failure.
+
+        `rules`: a rule set the website ships, by name (`standard`, `cyclone`, ...), the text of
+        a rule set, or None for none.  `assertions`: your own rules (`assertion_rules`)."""
+        out: dict[str, Any] = {"programme": self.name, "steps": self.n, "rules": []}
+        rs, ev, todo = self._rules(rules, assertions, only)
+        if rs is not None:
+            out["ruleset"] = rs.name
+            out["title"] = rs.title
         for r in todo:
             out["rules"].append(self._judge(ev, r, limit))
         out["ok"] = not any(x["verdict"] in (FAILS, UNCHECKED) for x in out["rules"])
         out["failing"] = [x["id"] for x in out["rules"] if x["verdict"] == FAILS]
         return out
+
+    # ---------------------------------------------------------------- one step, case by case
+    #
+    # `check` walks only the cases that can fail (the evaluator skips the rest), which is what a
+    # verdict needs.  To show a rule at work at one step -- every case it judges there, each with
+    # the values it compares -- these walk every binding, with the variables that range over
+    # time (instants, operations, steps) held to that step.
+
+    def rules_at(self, step: Any, rules: Any = "standard", assertions: str | None = None, *,
+                 budget: int = CASES_PER_STEP) -> dict:
+        """Every rule at step k: how many cases it judges there and how many of them fail.  A rule
+        whose cases name no moment (a corner of the device, a rail) judges them at every step."""
+        p = self._in(step)
+        rs, ev, todo = self._rules(rules, assertions)
+        out = {"step": p + 1, "instruction": _instr_text(self.prog.instructions[p]), "rules": []}
+        if rs is not None:
+            out["ruleset"] = rs.name
+        for r in todo:
+            rec: dict[str, Any] = {"id": r.id, "title": r.title}
+            try:
+                if r.when is not None and not ev.ev(r.when, {}):
+                    rec["here"] = NOT_APPLICABLE
+                    out["rules"].append(rec)
+                    continue
+                n = bad = 0
+                timed = False
+                left = [budget]
+                for e, body in self._cases(ev, r.formula, {}, p, left):
+                    n += 1
+                    timed = timed or any(self._pos(v) is not None for v in e.values())
+                    if not ev.ev(body, e):
+                        bad += 1
+                rec.update(cases=n, failing=bad, every_step=bool(n) and not timed,
+                           here=FAILS if bad else (HOLDS if n else "nothing to judge"))
+            except _OutOfCases:
+                rec.update(here="too many cases", note=f"more than {budget} cases at this step")
+            except NotApplicable as exc:
+                rec.update(here=NOT_APPLICABLE, note=self.renumber(str(exc)))
+            except EvalError as exc:
+                rec.update(here=UNCHECKED, note=self.renumber(str(exc)))
+            out["rules"].append(rec)
+        return out
+
+    def inspect(self, rule: str, step: Any, rules: Any = "standard", assertions: str | None = None, *,
+                limit: int = 40, budget: int = CASES_PER_STEP) -> dict:
+        """One rule at step k: every case it judges there (failing first, then the closest to
+        failing), each with its variables, the places it names and the value of every part of
+        the rule's body -- the comparisons with both sides and how much room is left."""
+        p = self._in(step)
+        ev, r = self._rule(rule, rules, assertions)
+        out: dict[str, Any] = {"rule": r.id, "title": r.title, "text": r.text or show(r.formula),
+                               "step": p + 1, "instruction": _instr_text(self.prog.instructions[p])}
+        if r.when is not None:
+            out["when"] = r.when_text or show(r.when)
+            if not ev.ev(r.when, {}):
+                out.update(here=NOT_APPLICABLE, cases=0, shown=[])
+                return out
+        cases: list[dict] = []
+        n = bad = 0
+        try:
+            for e, body in self._cases(ev, r.formula, {}, p, [budget]):
+                n += 1
+                holds = bool(ev.ev(body, e))
+                bad += not holds
+                cases.append({"env": dict(e), "body": body, "holds": holds,
+                              "slack": None if not holds else self._slack(ev, body, e)})
+        except _OutOfCases:
+            out["truncated"] = f"more than {budget} cases at this step: the first {budget} are shown"
+        except NotApplicable as exc:
+            out.update(here=NOT_APPLICABLE, note=self.renumber(str(exc)), cases=0, shown=[])
+            return out
+        except EvalError as exc:
+            out.update(here=UNCHECKED, note=self.renumber(str(exc)), cases=0, shown=[])
+            return out
+        cases.sort(key=lambda c: (c["holds"], c["slack"] if c["slack"] is not None else float("inf")))
+        out.update(cases=n, failing=bad, here=FAILS if bad else (HOLDS if n else "nothing to judge"),
+                   shown=[self._case(ev, c["env"], c["body"], c["holds"]) for c in cases[:limit]])
+        out["every_step"] = bool(n) and not any(self._pos(v) is not None for c in cases for v in c["env"].values())
+        if not n:
+            out["note"] = "this rule judges nothing at this step"
+        return out
+
+    def closest(self, rule: str, rules: Any = "standard", assertions: str | None = None, *,
+                budget: int = CLOSEST_BUDGET) -> dict:
+        """Of every case a rule judges, the one that holds with the least room: the hottest gate
+        under the heat budget, the fullest site under its capacity.  Only the rule's numeric
+        comparisons have a room; the search stops after `budget` cases and says so."""
+        ev, r = self._rule(rule, rules, assertions)
+        out: dict[str, Any] = {"rule": r.id, "title": r.title}
+        if r.when is not None and not ev.ev(r.when, {}):
+            out.update(found=False, note=f"it applies only when {r.when_text or show(r.when)}")
+            return out
+        best = None
+        n = bad = 0
+        try:
+            for e, body in self._cases(ev, r.formula, {}, None, [budget]):
+                n += 1
+                if not ev.ev(body, e):
+                    bad += 1
+                    continue
+                s = self._slack(ev, body, e)
+                if s is not None and (best is None or s < best[0]):
+                    best = (s, dict(e), body)
+            out["complete"] = True
+        except _OutOfCases:
+            out["complete"] = False
+        except (NotApplicable, EvalError) as exc:
+            out.update(found=False, note=self.renumber(str(exc)))
+            return out
+        out.update(searched=n, failing=bad)
+        if not out["complete"]:
+            out["note"] = f"searched the first {n} cases of a rule with more"
+        if best is None:
+            out.update(found=False, note=out.get("note") or "no case compares a number with a limit")
+            return out
+        out.update(found=True, room=_num(best[0]), case=self._case(ev, best[1], best[2], True))
+        return out
+
+    def _pos(self, v: Any) -> int | None:
+        """The position (0-based) a value belongs to, or None for one that names no moment."""
+        if isinstance(v, Instant):
+            return self.instant_at[v.id][0] if 0 <= v.id < len(self.instant_at) else None
+        o = v.op if isinstance(v, Hop) else v
+        if isinstance(o, Op):
+            return self.step_pos[o.step] if o.step is not None and 0 <= o.step < len(self.step_pos) else None
+        if isinstance(v, StepEntity):
+            return self.step_pos[v.id] if 0 <= v.id < len(self.step_pos) else None
+        return None
+
+    def _cases(self, ev: Evaluator, n, env: dict, p: int | None, left: list) -> Iterator[tuple[dict, Any]]:
+        """Every (binding, body) a formula judges -- through its `for all`s, its `and`s and an
+        `implies` whose condition holds -- with the time-like variables held to position p
+        (every position, for None).  `left` counts down the bindings it may still try."""
+        if isinstance(n, BinOp) and n.op == "and":
+            yield from self._cases(ev, n.left, env, p, left)
+            yield from self._cases(ev, n.right, env, p, left)
+        elif isinstance(n, BinOp) and n.op == "implies" and _has_quant(n.right):
+            if ev.ev(n.left, env):
+                yield from self._cases(ev, n.right, env, p, left)
+        elif isinstance(n, Quant) and n.kind == "all":
+            for e in self._bindings(ev, n, env, p, left):
+                if _has_quant(n.body) and not (isinstance(n.body, BinOp) and n.body.op == "or"):
+                    yield from self._cases(ev, n.body, e, p, left)
+                else:
+                    yield e, n.body
+        else:
+            yield dict(env), n
+
+    def _bindings(self, ev: Evaluator, q: Quant, env: dict, p: int | None, left: list) -> Iterator[dict]:
+        """`Evaluator.bindings` without its pruning (a case that holds is wanted too), and with
+        every time-like value outside position p left out."""
+        vars_ = [(nm, b.domain) for b in q.binders for nm in b.names]
+        names = [v for v, _ in vars_]
+        nameset = set(names)
+        at: dict[int, list] = {}
+        for c in _split_and(q.where):
+            used = free_names(c) & nameset
+            if not used:
+                if not ev.ev(c, env):
+                    return
+            else:
+                at.setdefault(max(names.index(u) for u in used), []).append(c)
+        e = dict(env)
+
+        def walk(i: int) -> Iterator[dict]:
+            if i == len(vars_):
+                yield dict(e)
+                return
+            name, dom = vars_[i]
+            for v in self._domain_at(ev, dom, e, nameset, p):
+                left[0] -= 1
+                if left[0] < 0:
+                    raise _OutOfCases
+                e[name] = v
+                if all(ev.ev(c, e) for c in at.get(i, ())):
+                    yield from walk(i + 1)
+            e.pop(name, None)
+
+        yield from walk(0)
+
+    def _domain_at(self, ev: Evaluator, dom, env: dict, bound: set, p: int | None) -> list:
+        full = ev.domain(dom, env, bound)
+        if p is None:
+            return full
+        if free_names(dom) & (bound | set(env)):
+            return [v for v in full if self._pos(v) in (None, p)]
+        key = (id(dom), p)
+        hit = self._at_cache.get(key)
+        if hit is None or hit[0] is not full:
+            hit = (full, [v for v in full if self._pos(v) in (None, p)])
+            self._at_cache[key] = hit
+        return hit[1]
+
+    def _slack(self, ev: Evaluator, n, env: dict) -> float | None:
+        """How much room a body that holds has: the least, over the numeric comparisons that
+        decide it, of the distance to their limit.  None when no number decides it."""
+        try:
+            if isinstance(n, BinOp) and n.op == "and":
+                xs = [x for x in (self._slack(ev, n.left, env), self._slack(ev, n.right, env)) if x is not None]
+                return min(xs) if xs else None
+            if isinstance(n, BinOp) and n.op == "or":
+                xs = [self._slack(ev, s, env) for s in (n.left, n.right) if ev.ev(s, env)]
+                xs = [x for x in xs if x is not None]
+                return max(xs) if xs else None
+            if isinstance(n, BinOp) and n.op == "implies":
+                return self._slack(ev, n.right, env) if ev.ev(n.left, env) else None
+            if isinstance(n, BinOp) and n.op in ("<", "<=", ">", ">="):
+                a, b = ev.ev(n.left, env), ev.ev(n.right, env)
+                if _numeric(a) and _numeric(b):
+                    return float(b - a) if n.op in ("<", "<=") else float(a - b)
+        except (EvalError, NotApplicable):
+            return None
+        return None
+
+    def _case(self, ev: Evaluator, e: dict, body, holds: bool) -> dict:
+        """One case as the page shows it: its variables, when and where, and the body's values."""
+        p, phase, inst, _ = self._when(e)
+        rec: dict[str, Any] = {"holds": holds, "values": {nm: self._brief(ev, v) for nm, v in e.items()},
+                               "step": None if p is None else p + 1, "phase": phase,
+                               "where": self._where(e, inst), "why": self._explain(ev, body, e)}
+        g = _gauge(rec["why"])
+        if g is not None:
+            rec["gauge"] = g
+        if not holds:
+            rec["message"] = self.renumber(ev.why(body, e))
+        return rec
+
+    def _explain(self, ev: Evaluator, n, env: dict, depth: int = 0) -> dict:
+        """The value of every part of a formula under one binding: a tree the page lays out as
+        the rule's body with each part green or red."""
+        rec: dict[str, Any] = {"text": show(n)}
+        try:
+            if isinstance(n, BinOp) and n.op in ("and", "or", "implies"):
+                left = self._explain(ev, n.left, env, depth + 1)
+                rec["op"] = n.op
+                if n.op == "implies" and left.get("value") is False:
+                    rec.update(value=True, parts=[left], vacuous=True)
+                    return rec
+                right = self._explain(ev, n.right, env, depth + 1)
+                rec["parts"] = [left, right]
+                rec["value"] = bool(ev.ev(n, env))
+                return rec
+            if isinstance(n, BinOp) and n.op in _COMPARE:
+                a, b = ev.ev(n.left, env), ev.ev(n.right, env)
+                v = bool(ev.binop(n.op, a, b, n))
+                rec.update(op=n.op, value=v, left={"text": show(n.left), "value": self._brief(ev, a)},
+                           right={"text": show(n.right), "value": self._brief(ev, b)})
+                if n.op in ("<", "<=", ">", ">=") and _numeric(a) and _numeric(b):
+                    rec["left"]["number"], rec["right"]["number"] = _num(a), _num(b)
+                    rec["room"] = _num(b - a if n.op in ("<", "<=") else a - b)
+                return rec
+            if isinstance(n, Not):
+                inner = self._explain(ev, n.arg, env, depth + 1)
+                rec.update(op="not", parts=[inner], value=None if inner.get("value") is None else not inner["value"])
+                return rec
+            if isinstance(n, Quant):
+                rec["value"] = bool(ev.ev(n, env))
+                if n.kind == "all" and not rec["value"] and depth < 4:
+                    first = next(iter(ev.counterexamples(n, env)), None)
+                    if first is not None:
+                        rec["fails_at"] = self.renumber(ev.describe(n, first))
+                return rec
+            v = ev.ev(n, env)
+            rec["value"] = v if isinstance(v, bool) else self._brief(ev, v)
+        except NotApplicable as exc:
+            rec.update(value=None, error="does not apply: " + self.renumber(str(exc)))
+        except EvalError as exc:
+            rec.update(value=None, error=self.renumber(str(exc)))
+        return rec
 
     def _judge(self, ev: Evaluator, rule: Rule, limit: int) -> dict:
         rec: dict[str, Any] = {"id": rule.id, "title": rule.title, "verdict": HOLDS, "core": rule.core,
@@ -638,23 +937,7 @@ class Session:
                 inner = None
             if inner:
                 full.update(inner)
-        p, phase, inst, tvar = None, None, None, None
-        for nm, v in full.items():
-            if isinstance(v, Instant) and 0 <= v.id < len(self.instant_at):
-                p, phase = self.instant_at[v.id]
-                inst, tvar = v.id, nm
-                break
-        if p is None:
-            for v in full.values():
-                o = v.op if isinstance(v, Hop) else v
-                if isinstance(o, Op) and o.step is not None and o.step < len(self.step_pos):
-                    p = self.step_pos[o.step]
-                    phase = "during" if o.kind in _TRANSPORT else "at"
-                    inst = o.start
-                    break
-                if isinstance(v, StepEntity) and 0 <= v.id < len(self.step_pos):
-                    p, phase = self.step_pos[v.id], "at"
-                    break
+        p, phase, inst, tvar = self._when(full)
         where = self._where(full, inst)
         if not where:
             # `occupancy("C0", t) <= 1` binds only t: the place is the one the formula names
@@ -664,9 +947,27 @@ class Session:
         if tvar is not None and q is not None and inst is not None:
             last = self._span(ev, q, e, tvar, inst, budget)
         values = {nm: self._brief(ev, v) for nm, v in full.items()}
+        body = rule.formula if q is None else q.body
+        if q is not None and isinstance(q.body, Quant) and q.body.kind == "all" and len(full) > len(e):
+            body = q.body.body                   # the nested culprit's own body
         return Failure(rule.id, None if p is None else p + 1, None if last is None else last + 1, phase,
                        self.labels[inst] if inst is not None and 0 <= inst < len(self.labels) else None,
-                       where, self.renumber(msg), values)
+                       where, self.renumber(msg), values, _gauge(self._explain(ev, body, full)))
+
+    def _when(self, full: dict) -> tuple[int | None, str | None, int | None, str | None]:
+        """(position, phase, instant, the variable holding it) a binding happens at: its instant,
+        else its operation's step, else its step; all None for one that names no moment."""
+        for nm, v in full.items():
+            if isinstance(v, Instant) and 0 <= v.id < len(self.instant_at):
+                p, phase = self.instant_at[v.id]
+                return p, phase, v.id, nm
+        for v in full.values():
+            o = v.op if isinstance(v, Hop) else v
+            if isinstance(o, Op) and o.step is not None and o.step < len(self.step_pos):
+                return self.step_pos[o.step], ("during" if o.kind in _TRANSPORT else "at"), o.start, None
+            if isinstance(v, StepEntity) and 0 <= v.id < len(self.step_pos):
+                return self.step_pos[v.id], "at", None, None
+        return None, None, None, None
 
     def _span(self, ev: Evaluator, q: Quant, e: dict, tvar: str, i0: int, budget: list) -> int:
         """The last position a failure at instant i0 still fails at.  The rule language reports
@@ -752,6 +1053,41 @@ def _known_words(n, what: str) -> None:
     if bad:
         raise DebugError(f"{what} uses {', '.join(w + '(...)' for w in bad)}, which is not a word of the "
                          "vocabulary (the Rules page lists every word)")
+
+
+def _numeric(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf")
+
+
+def _num(v: Any) -> Any:
+    """A number as the page shows it: six significant figures, an integer as an integer."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return v
+    if isinstance(v, int) or float(v).is_integer() and abs(v) < 1e15:
+        return int(v)
+    return float(f"{v:.6g}")
+
+
+def _gauge(tree: dict) -> dict | None:
+    """The comparison that decides a case, for the page's gauge: the false one if the case
+    fails, else the one with the least room.  None when no number is compared."""
+    best = None
+
+    def visit(t: dict) -> None:
+        nonlocal best
+        if "room" in t:
+            key = (t.get("value") is not False, t["room"])
+            if best is None or key < best[0]:
+                best = (key, t)
+        for c in t.get("parts", ()):
+            visit(c)
+
+    visit(tree)
+    if best is None:
+        return None
+    t = best[1]
+    return {"text": t["text"], "op": t["op"], "value": t["left"]["number"], "limit": t["right"]["number"],
+            "left": t["left"]["text"], "right": t["right"]["text"], "holds": bool(t["value"]), "room": t["room"]}
 
 
 def _names_in(n) -> list[str]:

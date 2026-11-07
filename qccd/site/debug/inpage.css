@@ -9,7 +9,7 @@ body[data-qdbg="1"] main{margin-right:var(--qdbg-w)!important}
  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
  --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Charter,Cambria,Georgia,serif;
- position:fixed;top:40px;right:0;bottom:0;width:var(--qdbg-w);z-index:45;background:var(--paper);
+ position:fixed;top:var(--qdbg-top,40px);right:0;bottom:0;width:var(--qdbg-w);z-index:45;background:var(--paper);
  border-left:1px solid var(--line);box-shadow:-6px 0 18px rgba(18,16,28,.07);box-sizing:border-box}
 #dbg.inpage *{box-sizing:border-box}
 #dbg.inpage .q-ihead{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);flex:0 0 auto}
@@ -24,6 +24,7 @@ body[data-qdbg="1"] main{margin-right:var(--qdbg-w)!important}
 #dbg.inpage #dMsg{flex:0 0 auto;font-size:12.5px;color:var(--ink2);padding:4px 10px;background:#f7f6f2;border-bottom:1px solid var(--line)}
 #dbg.inpage #dMsg:empty{display:none}
 #dbg.inpage #dbgSide{flex:1 1 auto}
+#dbg.inpage #dErr{flex:0 0 auto;border-width:0 0 1px 4px;max-height:40vh;overflow:auto}
 @media (max-width:800px){
  :root{--qdbg-w:100vw}
  body[data-qdbg="1"] main{margin-right:0!important}

@@ -76,3 +76,53 @@
 /* the timeline */
 #dTime{flex:0 0 46px;background:var(--paper);border-top:1px solid var(--line);padding:1px 0;cursor:pointer}
 #dTimeSvg{width:100%;height:44px;display:block;background:transparent}
+
+/* the runtime error: where a shown rule starts failing, said as a debugger stops on an exception */
+#dErr{background:#fff6f5;border:1px solid #f0c9c6;border-left:4px solid #e0201b;color:var(--ink);padding:8px 11px;font-size:13px}
+#dErr[hidden]{display:none}
+#dErr .q-errh b{color:#b4231e}
+#dErr .q-errm{margin:3px 0;font-family:var(--mono);font-size:12px;color:#7a1d19;word-break:break-word}
+#dErr .q-errv{color:var(--ink2);font-size:12px;margin:2px 0;word-break:break-word}
+#dErr .q-row{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+
+/* a rule's number against its limit, and the review guide's row */
+#dbg .q-gauge{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;flex-wrap:wrap}
+#dbg .q-gbar{position:relative;width:110px;height:8px;border-radius:4px;background:#ebeae5;flex:0 0 auto}
+#dbg .q-gbar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#127a4a}
+#dbg .q-gauge.q-gbad .q-gbar i{background:#e0201b}
+#dbg .q-gbar b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--ink)}
+#dbg .q-guide{background:#f7f6f2;border:1px solid var(--line);border-radius:6px;padding:6px 9px;margin:6px 0;font-size:12.5px}
+#dbg .q-guide p{margin:3px 0}
+
+/* Why: every rule at the step shown, and one rule's cases */
+#dbgSide ul.q-wr li{border-bottom:1px solid #f0efea;padding:5px 0}
+#dbgSide ul.q-wr li.q-f{background:linear-gradient(90deg,#fff5f4,transparent 60%)}
+#dbgSide ul.q-wr li.q-sel{background:linear-gradient(90deg,var(--soft),transparent 80%)}
+#dbgSide ul.q-stale{opacity:.55}
+#dbgSide .q-cases{padding:2px 0 6px 10px;border-left:2px solid #d6d4cc;margin:4px 0 2px 4px}
+#dbgSide .q-case{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:6px 0;background:#fff}
+#dbgSide .q-case.q-fail{border-color:#f0c9c6;background:#fffafa}
+#dbgSide .q-caseh{font-size:12.5px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+#dbgSide .q-bind{font-family:var(--mono);font-size:11.5px;background:#f2f1ec;border-radius:3px;padding:0 5px;word-break:break-word}
+#dbgSide .q-bind i{font-style:normal;color:#3d5a80}
+#dbgSide .q-tree{font-size:12px;margin:4px 0 0}
+#dbgSide .q-node{border-left:2px solid #cfceca;padding-left:8px;margin:2px 0}
+#dbgSide .q-node.q-t{border-left-color:#7cc59f}
+#dbgSide .q-node.q-fz{border-left-color:#e0201b}
+#dbgSide .q-op{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3)}
+#dbgSide .q-leaf{padding:1px 3px;word-break:break-word}
+#dbgSide .q-leaf.q-t b{color:#127a4a}
+#dbgSide .q-leaf.q-fz{background:#fff1f0;border-radius:3px}
+#dbgSide .q-leaf.q-fz b{color:#b4231e}
+#dbgSide .q-at{margin-top:4px}
+#dbgSide .q-closest{margin:6px 0}
+
+/* notes an agent pinned to a step, in its cursor's colour */
+#dbgSide ul.q-notes li{border-left:3px solid #7c3aed;background:#f7f3fe;border-radius:0 6px 6px 0;padding:5px 8px;margin:5px 0}
+#dbgSide .q-noteh{display:flex;align-items:center;gap:4px;font-size:12px}
+#dbgSide .q-by{color:#5b21b6;font-weight:600}
+#dbgSide .q-notet{font-size:13px;margin-top:2px;word-break:break-word}
+
+/* the person's own agent */
+#dbgSide .q-agenthelp{background:#eef4fc;border:1px solid #bcd4f2;border-radius:8px;padding:8px 11px;margin:6px 0;font-size:12.5px}
+#dbgSide .q-agenthelp .q-go{display:inline-block;padding:6px 12px;border-radius:6px;background:var(--accent);color:#fff;font-weight:600;text-decoration:none}

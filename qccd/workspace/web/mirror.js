@@ -10,6 +10,8 @@
 //                   {qccd:'size', min}              the chat was folded or unfolded
 //   page -> frame   {qccd:'result', id, ...}        the answer
 //                   {qccd:'page', context}          the selection changed
+//                   {qccd:'draft', text}            text for the person to send (the Debug
+//                                                   panel's "Review with my agent"); never sent
 // Messages are accepted only from that frame's window and origin.
 
 (function () {
@@ -57,6 +59,12 @@ if (nav && CFG.studio_url) {
 }
 
 function reply(msg) { if (frame.contentWindow) frame.contentWindow.postMessage(msg, CHAT); }
+// the Debug panel's "Review with my agent": the chat shows the request, and the person sends it
+window.QCCD_AGENT_DRAFT = function (text) {
+  if (box.classList.contains('min')) { box.classList.remove('min'); set(MIN_KEY, '0'); }
+  reply({ qccd: 'draft', text: String(text || '').slice(0, 4000) });
+  return true;
+};
 window.addEventListener('message', function (e) {
   if (e.origin !== CHAT || e.source !== frame.contentWindow) return;
   var m = e.data || {};

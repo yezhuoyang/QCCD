@@ -121,6 +121,7 @@ def _cursor_rule() -> str:
 
 def _skill_files() -> dict[str, bytes]:
     """Every file of the skill, static and generated, as it would be installed."""
+    from ..debug.guide import GUIDE
     from ..verify.rules import RULE_STATEMENTS
     from . import evaluator as ev
     from .features import tools_json, tools_markdown
@@ -130,6 +131,8 @@ def _skill_files() -> dict[str, bytes]:
         "SKILL.md": (SKILL_SRC / "SKILL.md").read_bytes(),
         "references/workflow.md": (SKILL_SRC / "references" / "workflow.md").read_bytes(),
         "references/design.md": (SKILL_SRC / "references" / "design.md").read_bytes(),
+        # what a rule's failure usually means and how to fix it: the words the Debug panel shows
+        "references/review-guide.md": GUIDE.read_bytes(),
         # every tool of this build, from the one table that declares them (features.py)
         "references/tools.md": tools_markdown().encode(),
         "references/tools.json": json.dumps(tools_json(), indent=1).encode(),

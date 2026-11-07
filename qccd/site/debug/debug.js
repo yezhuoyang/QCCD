@@ -48,6 +48,10 @@ var S = {
   F: null,                             // the located failures, indexed by frame
   bps: { steps: [], conds: [], onFail: true, onWatch: false },
   exprs: [], exprVals: {},
+  // Why: every rule at the step shown, and the cases of one of them (`rules_at`, `inspect`)
+  why: { rule: null, at: null, key: '', list: null, cases: null, busy: false, error: '', closest: {}, guide: {} },
+  notes: [], noteSeq: 0,               // what an agent reviewing the program pinned to a step
+  fixOpen: {}, agentHelp: false,
   tab: 'state', pending: null, picking: false, flash: null,
   active: HOST === 'frame'             // in a Studio page: whether the panel is open
 };
@@ -78,11 +82,13 @@ var SIDE_HTML =
   '<button type="button" role="tab" data-tab="state" data-hint="debug:tab:state" aria-selected="true">State</button>' +
   '<button type="button" role="tab" data-tab="watch" data-hint="debug:tab:watch">Watch</button>' +
   '<button type="button" role="tab" data-tab="rules" data-hint="debug:tab:rules">Rules</button>' +
+  '<button type="button" role="tab" data-tab="why" data-hint="debug:tab:why">Why</button>' +
   '<button type="button" role="tab" data-tab="breaks" data-hint="debug:tab:breaks">Breakpoints</button>' +
   '<button type="button" role="tab" data-tab="report" data-hint="debug:tab:report">Report</button></div>' +
   '<div class="q-pane" id="pState" data-pane="state"></div>' +
   '<div class="q-pane" id="pWatch" data-pane="watch" hidden></div>' +
   '<div class="q-pane" id="pRules" data-pane="rules" hidden></div>' +
+  '<div class="q-pane" id="pWhy" data-pane="why" hidden></div>' +
   '<div class="q-pane" id="pBreaks" data-pane="breaks" hidden></div>' +
   '<div class="q-pane" id="pReport" data-pane="report" hidden></div>';
 var TIME_HTML = '<svg id="dTimeSvg" aria-label="timeline: every step, the steps where rules fail and where what you watch changes"></svg>';
@@ -94,6 +100,7 @@ var INPAGE_HTML =
   '<div id="dbgBar"><span id="dTools" class="q-tools">' + TOOLS_HTML + '</span></div>' +
   '<div id="dTime" data-hint="debug:timeline">' + TIME_HTML + '</div>' +
   '<div id="dMsg" role="status"></div>' +
+  '<div id="dErr" role="alert" hidden></div>' +
   '<div id="dbgSide">' + SIDE_HTML + '</div>';
 
 // ------------------------------------------------------------------ the bridge
@@ -498,11 +505,59 @@ function paint() {
     }
     spots.forEach(function (sp) { cross(doc, g, sp, k); });
   }
+  // gauges: beside what a case names, the number its rule compares with its limit -- for every
+  // failure that starts at this step, and every case Why shows at this step
+  var gs = [], wc = S.why.cases;
+  var whyHere = S.tab === 'why' && wc && wc.step === i + 1 && !wc.every_step;
+  if (S.crosses && S.F) here().forEach(function (x) {
+    if (x.gauge && x.f0 === i && !(whyHere && x.rule === wc.rule)) gs.push({ g: x.gauge, where: x.where, values: x.values });   // Why draws its own
+  });
+  if (whyHere) (wc.shown || []).forEach(function (c) { if (c.gauge && c.step) gs.push({ g: c.gauge, where: c.where, values: c.values }); });
+  drawGauges(doc, g, gs, k);
   if (S.flash && S.flash.until > Date.now()) {
     var fx = whereXY(S.flash.where);
     if (fx) g.appendChild(svgEl(doc, 'circle', { cx: fx[0], cy: fx[1], r: 22 * k, fill: 'none', stroke: '#111827',
       'stroke-width': (2 * k).toFixed(2), 'stroke-dasharray': (4 * k) + ' ' + (3 * k), 'pointer-events': 'none' }));
   }
+}
+
+function drawGauges(doc, g, list, k) {
+  var spots = [], drawn = 0;
+  list.forEach(function (it) {
+    if (drawn >= 12) return;
+    // the ion the case is about (its `i = ion q1`), else the first ion or place it names
+    var mine = Object.keys(it.values || {}).map(function (n) { return (/^ion (\S+)$/.exec(String(it.values[n])) || [])[1]; }).filter(Boolean);
+    var ws = (it.where || []).filter(function (q) { return q.kind !== 'circuit' && q.kind !== 'loop'; });
+    var w = ws.filter(function (q) { return q.kind === 'ion' && mine.indexOf(q.id) >= 0; })[0] ||
+            ws.filter(function (q) { return q.kind === 'ion'; })[0] || ws[0];
+    var xy = w && whereXY(w); if (!xy) return;
+    // gauges of things close together stack under the first, each naming its own
+    var sp = spots.filter(function (s) { return Math.hypot(s.x - xy[0], s.y - xy[1]) < 48 * k; })[0];
+    if (!sp) { sp = { x: xy[0], y: xy[1], r: xy[2] || 6, n: 0 }; spots.push(sp); }
+    var stack = sp.n++;
+    if (stack >= 4) return;
+    drawn++;
+    xy = [sp.x, sp.y, sp.r];
+    var G = it.g, top = Math.max(Math.abs(G.value), Math.abs(G.limit)) * 1.25 || 1, W = 62 * k, H = 6 * k;
+    // under the place's own label (a site's name is drawn just below it), stacked when several share a spot
+    var x0 = xy[0] - W / 2, y0 = xy[1] + (xy[2] || 6) + (76 + stack * 22) * k, ink = G.holds ? '#127a4a' : RED;
+    if (!stack) g.appendChild(svgEl(doc, 'line', { x1: xy[0], y1: xy[1] + (xy[2] || 6), x2: xy[0], y2: y0 - 13 * k, stroke: ink,
+      'stroke-width': (1 * k).toFixed(2), 'stroke-dasharray': (2 * k) + ' ' + (2 * k), 'pointer-events': 'none' }));
+    g.appendChild(svgEl(doc, 'rect', { 'class': 'qdbg-gauge', x: x0 - 2 * k, y: y0 - 13 * k, width: W + 4 * k, height: H + 17 * k, rx: 3 * k, fill: '#ffffff',
+      'fill-opacity': '0.88', stroke: ink, 'stroke-width': (0.8 * k).toFixed(2), 'pointer-events': 'none' }));
+    g.appendChild(svgEl(doc, 'rect', { x: x0, y: y0, width: W, height: H, rx: 2 * k, fill: '#ebeae5', 'pointer-events': 'none' }));
+    g.appendChild(svgEl(doc, 'rect', { x: x0, y: y0, width: (W * Math.max(0, Math.min(1, G.value / top))).toFixed(2), height: H, rx: 2 * k,
+      fill: ink, 'fill-opacity': '0.85', 'pointer-events': 'none' }));
+    var lx = x0 + W * Math.max(0, Math.min(1, G.limit / top));
+    g.appendChild(svgEl(doc, 'line', { x1: lx, y1: y0 - 2 * k, x2: lx, y2: y0 + H + 2 * k, stroke: '#15141a', 'stroke-width': (1.6 * k).toFixed(2),
+      'pointer-events': 'none' }));
+    var t = svgEl(doc, 'text', { x: x0, y: y0 - 3 * k, 'font-size': (9.5 * k).toFixed(2), 'font-weight': '700', fill: ink,
+      'font-family': 'ui-sans-serif,system-ui,sans-serif', 'pointer-events': 'none' });
+    t.textContent = (w.kind === 'ion' ? w.id + ': ' : '') + num(G.value) + ' ' + (OPS[G.op] || G.op) + ' ' + num(G.limit);
+    var tt = svgEl(doc, 'title', {}); tt.textContent = G.text + ' (room ' + num(G.room) + ')';
+    t.appendChild(tt);
+    g.appendChild(t);
+  });
 }
 
 function label(doc, g, x, y, text, color, k) {
@@ -636,8 +691,12 @@ function trace(id, from, to, limit) {
 // ------------------------------------------------------------------ Python (the rule language)
 
 var PY = { w: null, seq: 0, wait: {}, state: 'off', note: '', ready: null, key: null, digest: null };
+// in the person's workspace the same module runs in the workspace's own Python, behind its service
+// (POST /api/debug/web): nothing to download, and the answers are the ones this page's worker gives
+var VIA_SERVICE = !!(CFG.python && CFG.python.backend === 'service' && CFG.python.endpoint);
 function pyStart() {
   if (PY.ready) return PY.ready;
+  if (VIA_SERVICE) { PY.state = 'ready'; PY.ready = Promise.resolve(); return PY.ready; }
   if (typeof Worker === 'undefined') return Promise.reject(new Error('this browser cannot run the rule language (no workers)'));
   PY.state = 'loading';
   // the smallest WebAssembly module there is: a page whose policy refuses WebAssembly says so here,
@@ -674,6 +733,15 @@ function pyStart() {
   return PY.ready;
 }
 function send(fn, args) {
+  if (VIA_SERVICE) {
+    return fetch(CFG.python.endpoint, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ fn: fn, args: args }) }).then(function (r) {
+      return r.json().then(function (j) {
+        if (!r.ok) throw new Error(((j || {}).error || {}).message || 'the workspace answered ' + r.status);
+        return j.text;
+      });
+    });
+  }
   return new Promise(function (res, rej) {
     var id = ++PY.seq;
     PY.wait[id] = [res, rej];
@@ -744,7 +812,7 @@ function indexFailures() {
   r.rules.forEach(function (x) {
     (x.failures || []).forEach(function (f) {
       var e = { rule: x.id, title: x.title, message: f.message, where: f.where || [], instant: f.instant, phase: f.phase,
-                step: f.step, until: f.until, values: f.values };
+                step: f.step, until: f.until, values: f.values, gauge: f.gauge || null };
       if (f.step === null || f.step === undefined) { e.f0 = 0; e.f1 = S.n - 1; e.always = true; always.push(e); }
       else { e.f0 = Math.max(0, Math.min(S.n - 1, f.step - 1)); e.f1 = Math.max(e.f0, Math.min(S.n - 1, (f.until || f.step) - 1)); }
       list.push(e);
@@ -776,9 +844,11 @@ function refresh() {
   if (document.activeElement !== inp) inp.value = String(S.cur + 1);
   paint();
   renderPane();
+  renderErr();
   drawTimeline();
   writeUrl();
   if (S.exprs.length && S.tab === 'watch') evalExprs();
+  if (S.tab === 'why' && (S.why.at !== S.cur || S.why.key !== whyKey())) whySoon();
 }
 
 function showTab(t) {
@@ -798,6 +868,7 @@ function renderPane() {
   if (t === 'state') renderState();
   else if (t === 'watch') renderWatch();
   else if (t === 'rules') renderRules();
+  else if (t === 'why') renderWhy();
   else if (t === 'breaks') renderBreaks();
   else if (t === 'report') renderReport();
 }
@@ -817,7 +888,7 @@ function stateOf(i) {
   var watched = {};
   S.watch.forEach(function (w) { watched[w.id] = lookAt(w, i); });
   return { step: i + 1, of: S.n, type: f.type, class: f.cls || null, instruction: describe(f, i), moved: movedIn(i),
-           over_capacity: over, hottest: hot, watch: watched, failures: fails,
+           over_capacity: over, hottest: hot, watch: watched, failures: fails, notes: notesAt(i + 1),
            checked: !!S.rules.result, stale: !!S.rules.stale };
 }
 
@@ -846,6 +917,7 @@ function renderState() {
   } else {
     h += '<p class="q-mut">Rules: not checked yet. Open <b>Rules</b> and press Check to see what fails here.</p>';
   }
+  if (st.notes.length) h += '<h4>Notes at this step</h4>' + notesHTML(st.notes);
   if (st.over_capacity.length) h += '<p class="q-bad"><b>Over capacity:</b> ' + st.over_capacity.map(function (o) { return ent(o.place) + ' ' + o.ions + '/' + o.capacity; }).join(', ') + '</p>';
   if (S.watch.length) {
     h += '<h4>Watched</h4><ul class="q-kv">' + S.watch.map(function (w) {
@@ -861,6 +933,7 @@ function renderState() {
     b.onclick = function () { var x = here()[+b.getAttribute('data-fi')]; if (x) selectFailure(x); };
   });
   wireEnts(el);
+  wireNotes(el);
 }
 function wireEnts(el) {
   Array.prototype.forEach.call(el.querySelectorAll('.q-ent'), function (b) {
@@ -953,7 +1026,7 @@ function evalExprs() {
 
 function renderPy() {
   var el = $('pyState'); if (!el) return;
-  el.textContent = PY.state === 'off' ? 'The rule language loads the first time you check (about 13 MB, once).'
+  el.textContent = VIA_SERVICE ? '' : PY.state === 'off' ? 'The rule language loads the first time you check (about 13 MB, once).'
     : PY.state === 'loading' ? (PY.note || 'loading the rule language…')
     : PY.state === 'failed' ? PY.note : '';
 }
@@ -980,7 +1053,10 @@ function renderRules() {
           CFG.examples.map(function (x, j) { return '<option value="' + j + '">' + esc(x.t) + '</option>'; }).join('') + '</select></label>' +
           '<textarea id="rAs" rows="5" spellcheck="false" data-hint="debug:rules:assertions" placeholder="for all s in sites, t in instants: occupancy(s, t) <= 1\n\nassert &quot;q0 stays out of C3&quot;:\nfor all t in instants: position(&quot;q0&quot;, t) != &quot;C3&quot;">' + esc(S.rules.assertions) + '</textarea>' +
           '<div class="q-row"><button type="button" id="rCheck" class="q-p" data-hint="debug:rules:check"' + (S.rules.running ? ' disabled' : '') + '>' +
-          (S.rules.running ? 'Checking…' : 'Check') + '</button><span id="pyState" class="q-mut"></span></div>';
+          (S.rules.running ? 'Checking…' : 'Check') + '</button><span id="pyState" class="q-mut"></span></div>' +
+          '<div class="q-row"><button type="button" id="rAgent" class="q-tgl' + (S.agentHelp ? ' q-on' : '') + '" aria-pressed="' + S.agentHelp +
+          '" data-hint="debug:rules:agent">Review with my agent</button><span class="q-mut">your own Codex, Claude Code or Cursor, working in this panel while you watch</span></div>' +
+          (S.agentHelp ? agentHelpHTML() : '');
   if (S.rules.error) h += '<p class="q-bad">' + esc(S.rules.error) + '</p>';
   var r = S.rules.result;
   if (r) {
@@ -1001,6 +1077,13 @@ function renderRules() {
       if (open) {
         s += '<pre class="q-code">' + esc((x.when ? 'when ' + x.when + ':\n' : '') + x.text) + '</pre>';
         if (x.reason) s += '<p class="q-mut">' + esc(x.reason) + '</p>';
+        if (x.verdict === 'fails' || S.why.guide[x.id]) s += guideHTML(x.id);
+        s += '<div class="q-row"><button type="button" class="q-mini" data-hint="debug:rules:why" data-why="' + esc(x.id) + '">Why, at this step</button>' +
+             (x.verdict === 'holds' ? '<button type="button" class="q-mini" data-hint="debug:rules:closest" data-closest="' + esc(x.id) + '">Closest case</button>' : '') +
+             (x.failures && x.failures[0] && x.failures[0].step ? '<span class="q-mut">first fails at step ' + x.failures[0].step + '</span>' : '') + '</div>';
+        if (S.why.closest[x.id]) s += closestHTML(S.why.closest[x.id]);
+        var rn = S.notes.filter(function (n) { return n.rule === x.id; });
+        if (rn.length) s += notesHTML(rn);
         if (x.failures) {
           s += '<ul class="q-fails">' + x.failures.slice(0, 60).map(function (f, j) {
             var steps = f.step === null || f.step === undefined ? 'every step' : 'step ' + f.step + (f.until && f.until > f.step ? '–' + f.until : '');
@@ -1025,6 +1108,16 @@ function renderRules() {
   $('rAs').oninput = function () { S.rules.assertions = this.value; };
   $('rAs').onchange = function () { writeUrl(); };
   $('rCheck').onclick = function () { runCheck({}).catch(function () { /* said */ }); };
+  $('rAgent').onclick = function () { reviewWithAgent(); };
+  Array.prototype.forEach.call(el.querySelectorAll('[data-why]'), function (b) {
+    b.onclick = function () { showWhy(b.getAttribute('data-why')).catch(function () { /* said */ }); };
+  });
+  Array.prototype.forEach.call(el.querySelectorAll('[data-closest]'), function (b) {
+    b.onclick = function () { loadClosest(b.getAttribute('data-closest')).catch(function (e) { say(String(e.message || e)); }); };
+  });
+  wireGo(el);
+  wireNotes(el);
+  wireEnts(el);
   Array.prototype.forEach.call(el.querySelectorAll('[data-rule].q-rbtn'), function (b) {
     b.onclick = function () { var id = b.getAttribute('data-rule'); S.rules.open[id] = !S.rules.open[id]; renderRules(); };
   });
@@ -1042,6 +1135,274 @@ function renderRules() {
 function rulesetText(name) {
   var r = CFG.rulesets.filter(function (x) { return x.name === name; })[0];
   return r ? r.text : (name === 'none' ? '(no rule set: only your assertions are checked)' : '');
+}
+
+// ------------------------------------------------------------------ explaining a rule
+//
+// The review guide (qccd/debug/guide.md, CFG.guide): what a rule's failure usually means and what
+// to change -- the same words an agent reviewing the program reads.  A gauge: the number a rule
+// compares with its limit, both drawn, so a near miss looks like one.
+
+var OPS = { '<=': '≤', '>=': '≥', '!=': '≠', 'in': '∈', 'notin': '∉', '<': '<', '>': '>', '=': '=' };
+function num(v) { return typeof v === 'number' ? String(+v.toPrecision(6)) : String(v); }
+function md(s) {
+  return esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+}
+function guideHTML(id) {
+  var g = CFG.guide && CFG.guide[id];
+  if (!g) return '';
+  return '<div class="q-guide"><p><b>Usually means</b> ' + md(g.means) + '</p><p><b>Fix</b> ' + md(g.fix) + '</p></div>';
+}
+function gaugeHTML(g) {
+  if (!g || typeof g.value !== 'number' || typeof g.limit !== 'number') return '';
+  var top = Math.max(Math.abs(g.value), Math.abs(g.limit)) * 1.25 || 1;
+  var pv = Math.max(0, Math.min(100, 100 * g.value / top)), pl = Math.max(0, Math.min(100, 100 * g.limit / top));
+  return '<div class="q-gauge' + (g.holds ? '' : ' q-gbad') + '"><div class="q-gbar" title="' + esc(g.text) + '"><i style="width:' + pv.toFixed(1) +
+    '%"></i><b style="left:' + pl.toFixed(1) + '%"></b></div><span><code>' + esc(g.left) + '</code> ' + num(g.value) + ' ' + (OPS[g.op] || esc(g.op)) +
+    ' <code>' + esc(g.right) + '</code> ' + num(g.limit) + ' <span class="q-mut">room ' + num(g.room) + '</span></span></div>';
+}
+
+// the runtime error: where a shown rule starts failing, the page stops on it the way a debugger
+// stops on an exception -- which rule, at which step, the values that broke it, the fix
+function errorsHere() { return here().filter(function (x) { return x.f0 === S.cur && !x.always; }); }
+function renderErr() {
+  var el = $('dErr'); if (!el) return;
+  var xs = S.active && S.B ? errorsHere() : [];
+  if (!xs.length) { el.hidden = true; el.innerHTML = ''; return; }
+  var x = xs[0], fix = !!S.fixOpen[x.rule], g = CFG.guide && CFG.guide[x.rule];
+  var vals = Object.keys(x.values || {}).slice(0, 4).map(function (k) { return k + ' = ' + x.values[k]; }).join(' · ');
+  // the comparison that broke, drawn (its sentence otherwise), and the case's variables once
+  el.innerHTML = '<div class="q-errh"><b>✗ ' + esc(x.rule) + ' broken at step ' + (x.f0 + 1) + '</b> ' + esc(x.title || '') +
+    (xs.length > 1 ? ' <span class="q-mut">and ' + plural(xs.length - 1, 'more failure') + ' here</span>' : '') + '</div>' +
+    (x.gauge ? gaugeHTML(x.gauge) : '<div class="q-errm">' + esc(x.message) + '</div>') +
+    (vals ? '<div class="q-errv">' + esc(vals) + '</div>' : '') +
+    '<div class="q-row"><button type="button" id="eWhy" data-hint="debug:error:why">Why? Every case here</button>' +
+    (g ? '<button type="button" id="eFix" class="q-tgl' + (fix ? ' q-on' : '') + '" aria-pressed="' + fix + '" data-hint="debug:error:fix">How to fix it</button>' : '') +
+    '</div>' + (fix ? guideHTML(x.rule) : '');
+  el.hidden = false;
+  $('eWhy').onclick = function () { showWhy(x.rule).catch(function () { /* said */ }); };
+  if ($('eFix')) $('eFix').onclick = function () { S.fixOpen[x.rule] = !fix; renderErr(); };
+}
+
+// ------------------------------------------------------------------ why: the rules at this step
+
+function whyKey() { return S.rules.set + '\u0000' + S.rules.assertions; }
+function whyArgs() {
+  return { step: S.cur + 1, rules: S.rules.set === 'none' ? null : S.rules.set, assertions: S.rules.assertions || null };
+}
+var whyTimer = null;
+function whySoon() { clearTimeout(whyTimer); whyTimer = setTimeout(function () { loadWhy().catch(function () { /* shown */ }); }, 160); }
+function loadWhy() {
+  if (!S.B) return Promise.resolve(null);
+  var at = S.cur, key = whyKey(), rule = S.why.rule, args = whyArgs();
+  S.why.busy = true; S.why.error = '';
+  if (S.tab === 'why') renderWhy();
+  var jobs = [pyCall('rules_at', args)];
+  if (rule) jobs.push(pyCall('inspect', Object.assign({ rule: rule, limit: 30 }, args)));
+  return Promise.all(jobs).then(function (rs) {
+    if (S.cur !== at || whyKey() !== key || S.why.rule !== rule) return null;   // stepped on meanwhile
+    S.why.busy = false; S.why.at = at; S.why.key = key; S.why.list = rs[0]; S.why.cases = rs[1] || null;
+    if (S.tab === 'why') renderWhy();
+    paint();
+    return { rules: rs[0], inspect: rs[1] || null };
+  }, function (e) {
+    S.why.busy = false; S.why.error = String(e.message || e);
+    if (S.tab === 'why') renderWhy();
+    throw e;
+  });
+}
+// the Why tab, on one rule (or on the one already chosen, for undefined)
+function showWhy(rule) {
+  if (rule !== undefined && rule !== S.why.rule) { S.why.rule = rule; S.why.cases = null; }
+  if (S.tab !== 'why') showTab('why'); else renderWhy();
+  return loadWhy();
+}
+var HERE_RANK = { 'fails': 0, 'holds': 1, 'too many cases': 2, 'could not be checked': 3, 'nothing to judge': 4, 'does not apply': 5 };
+function hereBadge(r) {
+  if (r.here === 'fails') return '<span class="q-vb q-bad">✗ ' + r.failing + ' of ' + plural(r.cases, 'case') + '</span>';
+  if (r.here === 'holds') return '<span class="q-vb q-ok">✓ ' + plural(r.cases, 'case') + (r.every_step ? ', every step' : '') + '</span>';
+  if (r.here === 'nothing to judge') return '<span class="q-vb q-na">nothing here</span>';
+  return '<span class="q-vb q-na" title="' + esc(r.note || '') + '">' + esc(r.here) + '</span>';
+}
+function renderWhy() {
+  var el = $('pWhy'); if (!el) return;
+  if (!S.B) { el.innerHTML = '<p class="q-mut">Open a program to see its rules at work, step by step.</p>'; return; }
+  var L = S.why.list, fresh = !!L && S.why.at === S.cur && S.why.key === whyKey();
+  var h = '<p class="q-mut">Every rule of ' + (S.rules.set === 'none' ? 'your assertions' : 'the <b>' + esc(S.rules.set) + '</b> set') +
+          ' at this step: how many cases it judges here and whether they hold. Choose a rule to see each case with the values it compares. ' +
+          'Step, and the list follows.</p>' +
+          '<h3>Step ' + (S.cur + 1) + ' <span class="q-mut">/ ' + S.n + '</span></h3><p class="q-what">' + esc(describe(frameAt(S.cur), S.cur)) + '</p>';
+  if (S.why.error) h += '<p class="q-bad">' + esc(S.why.error) + '</p>';
+  if (!fresh) h += '<p class="q-mut">' + (S.why.busy ? 'judging this step…' : 'loading…') + ' <span id="pyState"></span></p>';
+  if (L) {
+    var rank = function (r) { return own(HERE_RANK, r.here) ? HERE_RANK[r.here] : 9; };
+    var rows = L.rules.slice().sort(function (a, b) { return rank(a) - rank(b); });
+    h += '<ul class="q-wr' + (fresh ? '' : ' q-stale') + '">' + rows.map(function (r) {
+      var sel = r.id === S.why.rule;
+      return '<li class="' + (r.here === 'fails' ? 'q-f' : '') + (sel ? ' q-sel' : '') + '"><div class="q-rh"><button type="button" class="q-rbtn" data-hint="debug:why:rule" data-wr="' +
+        esc(r.id) + '" aria-expanded="' + sel + '"><b>' + esc(r.id) + '</b> ' + esc(r.title) + '</button>' + hereBadge(r) + '</div>' + (sel ? casesHTML() : '') + '</li>';
+    }).join('') + '</ul>';
+  }
+  el.innerHTML = h;
+  renderPy();
+  Array.prototype.forEach.call(el.querySelectorAll('[data-wr]'), function (b) {
+    b.onclick = function () {
+      var id = b.getAttribute('data-wr');
+      S.why.rule = S.why.rule === id ? null : id; S.why.cases = null;
+      renderWhy();
+      if (S.why.rule) loadWhy().catch(function () { /* shown */ });
+      else paint();
+    };
+  });
+  var gd = el.querySelector('details.q-gd');
+  if (gd) gd.addEventListener('toggle', function () { S.why.guide[S.why.rule] = gd.open; });
+  if ($('wyClosest')) $('wyClosest').onclick = function () { loadClosest(S.why.rule).catch(function (e) { say(String(e.message || e)); }); };
+  wireGo(el);
+  wireEnts(el);
+}
+function casesHTML() {
+  var id = S.why.rule, c = S.why.cases;
+  var h = '<div class="q-cases">';
+  if (CFG.guide && CFG.guide[id]) h += '<details class="q-gd"' + (S.why.guide[id] ? ' open' : '') + '><summary>What a failure usually means, and the fix</summary>' + guideHTML(id) + '</details>';
+  if (!c || c.rule !== id || c.step !== S.cur + 1) h += '<p class="q-mut">judging ' + esc(id) + ' at this step…</p>';
+  else {
+    h += '<pre class="q-code">' + esc((c.when ? 'when ' + c.when + ':\n' : '') + c.text) + '</pre>';
+    if (c.note) h += '<p class="q-mut">' + esc(c.note) + '</p>';
+    if (c.truncated) h += '<p class="q-mut">' + esc(c.truncated) + '</p>';
+    if (c.shown && c.shown.length) {
+      h += '<p class="q-mut">' + plural(c.cases, 'case') + (c.failing ? ', ' + c.failing + ' failing' : '') +
+           (c.every_step ? '; they name no moment, so they are the same at every step' : '') +
+           (c.shown.length < c.cases ? '; the first ' + c.shown.length + ' shown, failing first, then the closest to failing' : '') + '</p>';
+      h += c.shown.map(caseHTML).join('');
+    }
+  }
+  h += '<div class="q-row"><button type="button" id="wyClosest" data-hint="debug:why:closest">Closest case in the whole program</button></div>';
+  if (S.why.closest[id]) h += closestHTML(S.why.closest[id]);
+  return h + '</div>';
+}
+function caseHTML(cs) {
+  var vals = Object.keys(cs.values || {}).map(function (k) {
+    return '<span class="q-bind"><i>' + esc(k) + '</i> = ' + esc(cs.values[k]) + '</span>';
+  }).join(' ');
+  var where = (cs.where || []).filter(function (w) { return w.kind !== 'circuit' && w.kind !== 'loop'; }).slice(0, 6)
+    .map(function (w) { return ent(w.id); }).join(' ');
+  // a body that is one comparison is all in its gauge; a larger one shows every part
+  var one = cs.gauge && cs.why && cs.why.left && !cs.why.parts;
+  return '<div class="q-case ' + (cs.holds ? 'q-hold' : 'q-fail') + '"><div class="q-caseh">' +
+    (cs.holds ? '<b class="q-ok">✓</b> ' : '<b class="q-bad">✗</b> ') + vals + '</div>' + gaugeHTML(cs.gauge) +
+    (one ? '' : '<div class="q-tree">' + treeHTML(cs.why) + '</div>') + (where ? '<div class="q-at">' + where + '</div>' : '') + '</div>';
+}
+// the rule's body under one case: every part with its value, true parts green, false ones red
+function treeHTML(t) {
+  if (!t) return '';
+  var cls = t.value === true ? 'q-t' : t.value === false ? 'q-fz' : 'q-un';
+  if (t.parts && (t.op === 'and' || t.op === 'or' || t.op === 'implies' || t.op === 'not')) {
+    return '<div class="q-node ' + cls + '"><span class="q-op">' + esc(t.op) +
+      (t.vacuous ? ' <span class="q-mut">(its condition is false: nothing to check)</span>' : '') + '</span>' + t.parts.map(treeHTML).join('') + '</div>';
+  }
+  if (t.left && t.right) {
+    return '<div class="q-leaf ' + cls + '"><code>' + esc(t.left.text) + '</code> <b>' + esc(t.left.value) + '</b> ' + (OPS[t.op] || esc(t.op)) +
+      ' <code>' + esc(t.right.text) + '</code> <b>' + esc(t.right.value) + '</b>' +
+      (t.room !== undefined ? ' <span class="q-mut">room ' + esc(num(t.room)) + '</span>' : '') + '</div>';
+  }
+  return '<div class="q-leaf ' + cls + '"><code>' + esc(t.text) + '</code> ' +
+    (t.error ? '<span class="q-mut">' + esc(t.error) + '</span>' : '<b>' + esc(String(t.value)) + '</b>') +
+    (t.fails_at ? ' <span class="q-mut">fails at ' + esc(t.fails_at) + '</span>' : '') + '</div>';
+}
+function loadClosest(id) {
+  if (!id) return Promise.reject(new Error('choose a rule first'));
+  say('looking for the closest case of ' + id + '…');
+  return pyCall('closest', { rule: id, rules: S.rules.set === 'none' ? null : S.rules.set, assertions: S.rules.assertions || null })
+    .then(function (r) {
+      S.why.closest[id] = r;
+      renderPane();
+      say(r.found ? id + ': the closest case has room ' + num(r.room) + (r.case.step ? ', at step ' + r.case.step : '') : (r.note || 'no closest case'));
+      return r;
+    });
+}
+function closestHTML(r) {
+  if (!r.found) return '<p class="q-mut">' + esc(r.note || 'no case compares a number with a limit') + '</p>';
+  var cs = r.case;
+  return '<div class="q-closest"><p>The closest of ' + plural(r.searched, 'case') + (r.complete ? '' : ' searched (the rule has more)') +
+    ': room <b>' + esc(num(r.room)) + '</b>' + (cs.step ? ', at <button type="button" class="q-mini" data-hint="debug:why:gostep" data-go="' + cs.step +
+    '">step ' + cs.step + '</button>' : ' (it names no moment)') + '</p>' + caseHTML(cs) + '</div>';
+}
+function wireGo(el) {
+  Array.prototype.forEach.call(el.querySelectorAll('[data-go]'), function (b) {
+    b.onclick = function () { goto(+b.getAttribute('data-go') - 1); };
+  });
+}
+
+// ------------------------------------------------------------------ notes
+//
+// An agent reviewing the program pins what it found to a step, and to a rule: the person sees each
+// note at its step (State), on the timeline, beside the rule and in the report, and may remove any.
+
+var NOTE_INK = '#7c3aed';            // the agent's cursor (workspace/web/pageact.js)
+function notesAt(step) { return S.notes.filter(function (n) { return n.step === step; }); }
+function addNote(a) {
+  need();
+  var text = String(a.text || '').trim().slice(0, 2000);
+  if (!text) throw new Error('a note needs text');
+  var step = a.step === undefined || a.step === null ? S.cur + 1 : Math.round(+a.step);
+  if (!(step >= 1 && step <= S.n)) throw new Error('there is no step ' + a.step + ': this program has steps 1 to ' + S.n);
+  var n = { id: ++S.noteSeq, step: step, rule: a.rule ? String(a.rule).slice(0, 40) : null, text: text,
+            by: a.by ? String(a.by).slice(0, 40) : null };
+  S.notes.push(n);
+  S.notes.sort(function (p, q) { return p.step - q.step || p.id - q.id; });
+  refresh();
+  return n;
+}
+function notesHTML(list) {
+  return '<ul class="q-notes">' + list.map(function (n) {
+    return '<li><div class="q-noteh"><span class="q-by">' + (n.by ? 'via ' + esc(n.by) : 'note') + '</span> ' +
+      '<button type="button" class="q-mini" data-hint="debug:why:gostep" data-go="' + n.step + '">step ' + n.step + '</button>' +
+      (n.rule ? ' <b>' + esc(n.rule) + '</b>' : '') + '<span class="q-grow"></span>' +
+      '<button type="button" class="q-mini" data-hint="debug:note:remove" data-note="' + n.id + '" aria-label="remove this note">×</button></div>' +
+      '<div class="q-notet">' + md(n.text) + '</div></li>';
+  }).join('') + '</ul>';
+}
+function wireNotes(el) {
+  Array.prototype.forEach.call(el.querySelectorAll('[data-note]'), function (b) {
+    b.onclick = function () { var id = +b.getAttribute('data-note'); S.notes = S.notes.filter(function (n) { return n.id !== id; }); refresh(); };
+  });
+  wireGo(el);
+}
+
+// ------------------------------------------------------------------ the person's own agent
+//
+// "Review with my agent": where a chat to the person's agent is on the page (their workspace's
+// Studio, or a website page opened through it), the request is written into the chat for them to
+// send -- a page never sends for them.  Elsewhere, how to open this page with their agent.
+
+function reviewPrompt() {
+  var set = S.rules.set === 'none' ? 'my assertions' : 'the ' + S.rules.set + ' rules';
+  return 'Review this program with me in the Debug panel, against ' + set + '. For each rule that fails, go to the step where it ' +
+         'first fails, show me the cases there and what usually fixes it, and pin a note at that step. Then tell me which ' +
+         'passing rules came closest to failing.';
+}
+function agentLink() {
+  var u = new URL(link());
+  return 'http://127.0.0.1:47100/web/' + sitePath() + (HOST === 'inpage' ? u.hash : u.search);
+}
+function agentHelpHTML() {
+  return '<div class="q-agenthelp"><p>Your own agent (Codex, Claude Code or Cursor) can review this program with you, here: it checks the rules, ' +
+    'steps to each failure, opens its cases and pins notes to the steps, while you watch its cursor. It runs on your computer.</p>' +
+    '<p><a class="q-go" href="' + esc(agentLink()) + '" target="_blank" rel="noopener" data-hint="debug:agent:open">Open this page with my agent</a></p>' +
+    '<p class="q-mut">This opens the same page from your own computer (127.0.0.1), with a chat to your agent; it works while your workspace is ' +
+    'running (<code>qccd web</code>). The Agent button in the site\'s bar says how to set one up.</p></div>';
+}
+function reviewWithAgent() {
+  var text = reviewPrompt();
+  if (typeof window.QCCD_AGENT_DRAFT === 'function' && window.QCCD_AGENT_DRAFT(text) !== false) {
+    S.agentHelp = false;
+    say('the review request is in your agent\'s chat: press Send there');
+    renderPane();
+    return { drafted: true, text: text };
+  }
+  S.agentHelp = !S.agentHelp;
+  renderPane();
+  return { drafted: false };
 }
 
 function renderBreaks() {
@@ -1174,6 +1535,10 @@ function report() {
     });
     if (S.rules.assertions.trim()) md.push('', '## My assertions', '', '```', S.rules.assertions.trim(), '```');
   } else md.push('Rules: not checked.');
+  if (S.notes.length) {
+    md.push('', '## Notes');
+    S.notes.forEach(function (n) { md.push('- step ' + n.step + (n.rule ? ', ' + n.rule : '') + (n.by ? ' (via ' + n.by + ')' : '') + ': ' + n.text); });
+  }
   if (st) {
     md.push('', '## Step ' + st.step + ' / ' + st.of, '', st.type + (st.class ? ' ' + st.class : '') + ': ' + st.instruction);
     if (st.moved.length) md.push('', 'Moved: ' + st.moved.join(', '));
@@ -1181,7 +1546,7 @@ function report() {
     if (S.watch.length) { md.push('', 'Watched:'); S.watch.forEach(function (w) { md.push('- ' + w.id + ': ' + lookText(st.watch[w.id])); }); }
   }
   md.push('', 'Reopen exactly here: ' + link());
-  return { markdown: md.join('\n'), link: link(), state: st,
+  return { markdown: md.join('\n'), link: link(), state: st, notes: S.notes.slice(),
            rules: r ? { ruleset: r.ruleset || null, failing: r.failing, rules: r.rules.map(function (x) {
              return { id: x.id, verdict: x.verdict, count: x.count || 0, first: (x.failures || [])[0] || null }; }) } : null };
 }
@@ -1230,6 +1595,7 @@ function drawTimeline() {
     for (var i = 0; i < S.n; i++) if (ev[i]) { var px2 = Math.round(x(i)); if (px2 - last >= 2) { h += '<rect x="' + (px2 - 1) + '" y="' + y + '" width="2" height="3" fill="' + w.color + '"/>'; last = px2; } }
   });
   S.bps.steps.forEach(function (s) { var p = x(s - 1); h += '<path d="M' + (p - 4) + ' 2 L' + (p + 4) + ' 2 L' + p + ' 9 Z" fill="#2a78d6"/>'; });
+  S.notes.forEach(function (nt) { var p = x(nt.step - 1); h += '<path d="M' + p + ' 34 L' + (p + 4) + ' 38 L' + p + ' 42 L' + (p - 4) + ' 38 Z" fill="' + NOTE_INK + '"/>'; });
   if (S.B) h += '<line x1="' + x(S.cur) + '" y1="4" x2="' + x(S.cur) + '" y2="40" stroke="#111827" stroke-width="2"/>';
   svg.innerHTML = h;
   svg.onclick = function (e) {
@@ -1415,7 +1781,9 @@ var API = {
              watch: S.watch.map(function (w) { return { id: w.id, kind: w.kind }; }), isolate: S.isolate,
              rules: { set: S.rules.set, assertions: S.rules.assertions, checked: !!r, stale: S.rules.stale, running: S.rules.running,
                       failing: r ? r.failing : null, error: S.rules.error || null },
-             python: PY.state, breakpoints: { steps: S.bps.steps, conditions: S.bps.conds.map(function (c) { return c.text; }), on_failure: S.bps.onFail, on_watch: S.bps.onWatch } };
+             python: PY.state, tab: S.tab, why: S.why.rule ? { rule: S.why.rule } : null, notes: S.notes.length,
+             error_here: S.B ? errorsHere().map(function (x) { return { rule: x.rule, message: x.message }; }) : [],
+             breakpoints: { steps: S.bps.steps, conditions: S.bps.conds.map(function (c) { return c.text; }), on_failure: S.bps.onFail, on_watch: S.bps.onWatch } };
   },
   goto: function (a) { need(); var s = +arg(a).step; if (!isFinite(s)) throw new Error('goto needs a step'); var i = goto(s < 0 ? S.n + s : s - 1); return stateOf(i); },
   step: function (a) { need(); var d = arg(a).delta; return stateOf(stepBy(d === undefined ? 1 : +d)); },
@@ -1477,10 +1845,66 @@ var API = {
   },
   continue: function (a) { need(); return continueRun(!!arg(a).backward); },
   report: function () { return report(); },
-  link: function () { return { link: link() }; }
+  link: function () { return { link: link() }; },
+  // a review: every verb below shows what it returns, in the panel, where the person is looking
+  review: function (a) {
+    need(); a = arg(a);
+    var same = S.rules.result && !S.rules.stale && (a.rules === undefined || String(a.rules) === S.rules.set);
+    showTab('rules');
+    return (same ? Promise.resolve(S.rules.result) : runCheck({ rules: a.rules })).then(function (r) {
+      return { ruleset: r.ruleset || null, failing: r.failing, notes: S.notes.length,
+               rules: r.rules.map(function (x) {
+                 var f = (x.failures || [])[0], g = (CFG.guide || {})[x.id];
+                 return { id: x.id, title: x.title, verdict: x.verdict, count: x.count || 0, reason: x.reason || null,
+                          first_step: f ? f.step : null, first: f ? f.message : null,
+                          means: g ? g.means : null, fix: g ? g.fix : null };
+               }),
+               next: 'for each failing rule: inspect it at its first_step, then note what you found there; closest shows how near a rule that holds came to failing' };
+    });
+  },
+  rules_at: function (a) {
+    need(); a = arg(a);
+    if (a.step !== undefined) goto(+a.step - 1);
+    return showWhy(undefined).then(function (r) { return r ? r.rules : S.why.list; });
+  },
+  inspect: function (a) {
+    need(); a = arg(a);
+    if (!a.rule) throw new Error('inspect needs a rule: an id from check or review');
+    if (a.step !== undefined) goto(+a.step - 1);
+    return showWhy(String(a.rule)).then(function (r) { return r ? r.inspect : S.why.cases; });
+  },
+  closest: function (a) {
+    need(); a = arg(a);
+    if (!a.rule) throw new Error('closest needs a rule: an id from check or review');
+    var id = String(a.rule);
+    if (id !== S.why.rule) { S.why.rule = id; S.why.cases = null; }
+    showTab('why');
+    return loadClosest(id).then(function (r) {
+      if (a.go && r.found && r.case.step) { goto(r.case.step - 1); loadWhy().catch(function () { /* shown */ }); }
+      else loadWhy().catch(function () { /* shown */ });
+      return r;
+    });
+  },
+  guide: function (a) {
+    var id = String(arg(a).rule || ''), g = (CFG.guide || {})[id];
+    if (!g) throw new Error('the guide has no row for ' + JSON.stringify(id) + ': it has ' + Object.keys(CFG.guide || {}).length + ' rules');
+    S.why.guide[id] = true;
+    if (S.B) showWhy(id).catch(function () { /* shown */ });
+    return { rule: id, means: g.means, fix: g.fix };
+  },
+  note: function (a) { var n = addNote(arg(a)); return { note: n, notes: S.notes.length }; },
+  notes: function (a) {
+    a = arg(a);
+    if (a.clear) S.notes = [];
+    if (a.remove !== undefined) S.notes = S.notes.filter(function (n) { return n.id !== +a.remove; });
+    if (a.clear || a.remove !== undefined) refresh();
+    return { notes: S.notes.slice() };
+  }
 };
 if (HOST === 'inpage') {
-  API.open = function (a) {
+  API.open = VIA_SERVICE ? function () {
+    throw new Error('in your workspace the debugger opens beside the program on this page: the Design page, or a run\'s own page');
+  } : function (a) {
     var src = String(arg(a).src || '');
     if (!src || src === 'design' || src === 'studio') src = 'studio.html';
     var to = new URL(CFG.root + src.replace(/^\/+/, ''), location.href);
@@ -1518,10 +1942,21 @@ window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, {
   'debug:trails': { t: 'Trails', d: 'draw where each watched ion has been over the last steps' },
   'debug:crosses': { t: 'Crosses', d: 'show or hide the red crosses where rules fail' },
   'debug:split': { t: 'Divider', d: 'drag to make the panel wider or narrower' },
-  'debug:timeline': { t: 'Timeline', d: 'every step: red where rules fail, coloured ticks where watched things change, blue marks for breakpoints; click to go there' },
+  'debug:timeline': { t: 'Timeline', d: 'every step: red where rules fail, coloured ticks where watched things change, blue marks for breakpoints, purple diamonds for notes; click to go there' },
   'debug:tab:state': { t: 'State', d: 'the state after this step: the instruction, what moved, what fails here, what you watch' },
   'debug:tab:watch': { t: 'Watch', d: 'ions, sites, junctions and rails to highlight and follow, and watch expressions' },
   'debug:tab:rules': { t: 'Rules', d: 'check the program against a rule set and your own assertions' },
+  'debug:tab:why': { t: 'Why', d: 'every rule at this step: how many cases it judges here and whether they hold; a rule\'s cases with the values each compares; it follows the step' },
+  'debug:why:rule': { t: 'A rule at this step', d: 'show this rule\'s cases at this step: its variables, the places it names, and the value of every part of the rule' },
+  'debug:why:closest': { t: 'Closest case', d: 'of every case this rule judges in the whole program, the one that holds with the least room (the hottest gate under the heat budget)' },
+  'debug:why:gostep': { t: 'Go to that step', d: 'show the step it happens at' },
+  'debug:error:why': { t: 'Why?', d: 'every case of this rule at this step, with the values it compares (the Why tab)' },
+  'debug:error:fix': { t: 'How to fix it', d: 'what a failure of this rule usually means, and what to change' },
+  'debug:rules:why': { t: 'Why, at this step', d: 'this rule\'s cases at the step shown, with the values each compares (the Why tab)' },
+  'debug:rules:closest': { t: 'Closest case', d: 'the case of this rule that holds with the least room, in the whole program' },
+  'debug:rules:agent': { t: 'Review with my agent', d: 'write a review request into your own agent\'s chat (Codex, Claude Code or Cursor), which works in this panel while you watch; where this page has no chat, how to open it with one' },
+  'debug:agent:open': { t: 'Open this page with my agent', d: 'this page from your own computer, with a chat to your agent (your workspace must be running: qccd web)' },
+  'debug:note:remove': { t: 'Remove note', d: 'remove this note' },
   'debug:tab:breaks': { t: 'Breakpoints', d: 'where Continue stops: steps, conditions, failures, watched changes' },
   'debug:tab:report': { t: 'Report', d: 'what the page shows as a bug report, with a link back to exactly here' },
   'debug:entity': { t: 'Watch this', d: 'add this ion, site, junction or rail to the watch list' },
@@ -1716,7 +2151,8 @@ function boot() {
     return;
   }
   $('dTools').innerHTML = TOOLS_HTML;
-  $('dbgSide').innerHTML = SIDE_HTML;
+  // the runtime error at the head of the panels, as in a Studio page's panel: never over the Studio
+  $('dbgSide').innerHTML = '<div id="dErr" role="alert" hidden></div>' + SIDE_HTML;
   $('dTime').innerHTML = TIME_HTML;
   wireTools();
   wirePage();

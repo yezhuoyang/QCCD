@@ -21,6 +21,7 @@ body.dragging #dFrame{pointer-events:none}
 #dMsg{position:absolute;left:12px;bottom:12px;max-width:min(680px,80%);background:rgba(17,24,39,.86);color:#fff;
  border-radius:8px;padding:7px 11px;font-size:13px;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.15)}
 #dMsg:empty{display:none}
+#dbgSide #dErr{flex:0 0 auto;border-width:0 0 1px 4px;max-height:40%;overflow:auto}
 
 /* the start: what to open */
 #dStart{position:absolute;inset:0;overflow:auto;background:var(--surface)}

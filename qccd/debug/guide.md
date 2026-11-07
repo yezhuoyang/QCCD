@@ -1,9 +1,10 @@
 # Review guide: reading failures, fixing them, and what the checkers cannot see
 
-Hand-written. The generated files say what each rule asserts and how the grader treats it. This
-one gives a reviewer's judgement: what a failure usually means, what to change, and what to look
-at even when everything passes. Pointers into the code say where each claim can be checked. If
-the code moved, trust the code and the generated references.
+Hand-written, and read the same way by a person and by their agent: the Debug page shows a rule's
+row from section 2 beside its failure, and an agent reviewing a design reads this whole file. The
+Rules page says what each rule asserts; this guide gives a reviewer's judgement: what a failure
+usually means, what to change, and what to look at even when everything passes. Pointers into the
+code (sections 3 and 4) say where a claim can be checked. If the code moved, trust the code.
 
 ## Contents
 
@@ -24,8 +25,8 @@ the code moved, trust the code and the generated references.
   single sharp corner can appear as two cases (`r1, r2` and `r2, r1`). Count each node, rail
   or instruction once.
 - **A failure under the board's physics is not always a design flaw.** The grader scores the
-  device with the board's `primitives`, `heating`, `species` and `budget`
-  (`qccd.workspace.tasks.scored_device`). Suppose a programme was cooled or timed under the
+  device with the board's `primitives`, `heating`, `species` and `budget`. Suppose a programme
+  was cooled or timed under the
   device's own physics, or the template's. Then it can fail R7 on the board while passing at
   home. Say which physics produced the failure.
 
@@ -40,17 +41,17 @@ here). Device rules first, in the catalogue's groups; the machine rules (F, G, H
 | R1 | more ions in a site, or passing through it, than its capacity | raise the zone's capacity where the physics allows it (R13 caps a gate chain at 15), or route through a site with room |
 | R2 | two ions in one junction at once, resting or passing | serialise the crossings, and don't park ions on junctions (see R23) |
 | R3 | more ions on a rail than its capacity in one step | serialise, or give the rail more capacity only if the device really can hold it |
-| R4 | a transport step uses a movement class the device doesn't declare, or more classes in one cycle than `control.max_simd_classes_per_cycle` | declare the class in `control.classes` (Studio/workspace: operation `call`, method `declare_class`), or split the cycle |
+| R4 | a transport step uses a movement class the device doesn't declare, or more classes in one cycle than `control.max_simd_classes_per_cycle` | declare the class in the device's `control.classes`, or split the cycle |
 | R4b | one cycle mixes transport with gates, or intra- with inter-trap transport | split the cycle: one mode per cycle |
 | R4d | the control channels cannot drive the step. Either ions on one channel move differently, or a loaded site must hold still without a per-site switch | set `control.channels.switch_per_site: true` if the hardware has one; otherwise make every ion on the channel move the same way, or split the step. The grader's verifier reports this under **R4** |
 | R5 | two ions swap ends of one rail in one step | reroute one of them, or exchange them inside a trap (an ion swap) instead |
 | R6 | a gate, measurement/reset or cooling at a site whose zone type lacks that capability | give the site a zone type that has it (the device's `zone_types`: `gate`, `spam`, `cool`), or move the operation |
 | R6b | the two ions of a 2-qubit gate are not in the same trap when it starts | transport them together first. A programme that names `sites` for a gate must name the one they are in |
-| R7 | an ion is hotter than the board's heat budget when a 2-qubit gate starts | **re-cool under the board's physics** (snippet below). Inserting `cool` is the one change a board allows between the certified and the final programme. Otherwise, fewer junction crossings or shorter transport before the gate |
+| R7 | an ion is hotter than the board's heat budget when a 2-qubit gate starts | **re-cool under the board's physics**: insert `cool` before the hot gate (in a workspace, submitting locally compiles, cools and grades in one step). Inserting `cool` is the one change a board allows between the certified and the final programme. Otherwise, fewer junction crossings or shorter transport before the gate |
 | R7b | a gate zone absorbs more heat over time than its duty budget. It does not apply today: no device declares a duty budget | nothing to fix yet. Once a device declares one, spread the gates over more zones or leave the zone idle between them |
-| R7c | a programme with 2-qubit gates and no cooling at all | insert cooling (snippet below) |
+| R7c | a programme with 2-qubit gates and no cooling at all | insert cooling, as for R7 |
 | R8 | an ion takes part in two operations at once, appears, vanishes, or moves without an instruction moving it | a programme bug: recompile. If it is hand-written, find the instruction the diagnostic names |
-| R9 | a time, cost, step count or heat figure the programme states about itself is not what its replay computes. Advisory: the grader skips it, and the review script checks it | recompile, or drop the stale figures. A hand-edited programme often keeps its old totals |
+| R9 | a time, cost, step count or heat figure the programme states about itself is not what its replay computes. Advisory: the grader skips it, and the Debug page judges it | recompile, or drop the stale figures. A hand-edited programme often keeps its old totals |
 | R10 | the pulses, read through the certificate's qubit-to-ion map, do not compose to the circuit, or a gate is not performed once by its own ions in a trap that can gate. Only `certificate_binding`, `lean_certificate` and `semantics` decide it | compile the board's own circuit, and keep the certificate with the programme it was made for. If those three stages pass on another machine but not here, the toolchain is missing (section 5) |
 | R11 | ions on one loop move in different directions in one step, or a junction degree has no crossing cost (5- and 6-rail junctions cross at the X-junction's cost unless the device prices them) | one direction per loop per step. Price every junction degree the device uses (`junction_cross`), and note that a price the board lacks is listed as added physics |
 | R12 | two gates in one trap at once | serialise them |
@@ -59,22 +60,22 @@ here). Device rules first, in the catalogue's groups; the machine rules (F, G, H
 | R15 | `allowed partial` by design: heat from successive motions is added up, so every heat figure is an upper bound | nothing to fix. Report heat figures as upper bounds |
 | R16 | a property of the board's cost model (gate error read from the ions' heat), not of the design: the same verdict for every entry on the board | nothing in the design. A failure means the board's physics lacks the property: tell the board's maintainers |
 | R17 | a property of the board's cost model (background heating accrues with time), as R16 | as R16 |
-| R18 | true by definition: `junctions` are the nodes where three or more rails meet, and crossing one is priced by that number | nothing. A failure means the vocabulary changed: read `qccd/ruleset/vocabulary.py` |
+| R18 | true by definition: `junctions` are the nodes where three or more rails meet, and crossing one is priced by that number | nothing in the design. A failure means the vocabulary changed: tell the site's maintainers |
 | R19 | a node joins more rails than `budget.max_junction_degree` (default 6; a flat surface trap declares 4) | fewer rails at that node: split it into two junctions |
 | R20 | two rails at a node are closer than `budget.min_rail_angle_deg` (default 60°) | move the node, or cut the corner. A triangle's 60° corners become two 120° corners, and the shape still reads the same |
 | R21 | a rail passes through a node it doesn't end at, or two rails cross away from a shared node | put a junction where they cross, or reroute. A periodic grid cannot be drawn flat, so use `cylinder` |
-| R22 | the moving ions of one broadcast cycle don't all make the same motion | split into uniform cycles (the compiler's pass `qccd/compile/uniform.py` does it). Docks drawn as a sketched open path read as different motions, so draw docks as plain rails |
+| R22 | the moving ions of one broadcast cycle don't all make the same motion | split into uniform cycles (the compiler's uniform pass does it). Docks drawn as a sketched open path read as different motions, so draw docks as plain rails |
 | R23 | an ion ends a cycle on a junction while the traps have room for every ion | move it on to a trap. A conveyor's own slots are exempt |
 | R24 | a 2-qubit gate of the circuit is never performed, or one is performed that the circuit doesn't ask for | a compiler or bundle mismatch. Check that the certificate's circuit is the board's circuit (the binding stage) |
 | R25 | two operations on one qubit run out of the circuit's order, even commuting ones | keep the circuit's order. This website's compilers never reorder, and the Lean checker's order clause is strict |
 | R26 | as R25, but consecutive CNOTs in which a qubit plays the same role (always control, or always target) may run in any order among themselves: a failure is a reorder beyond that freedom | keep the circuit's order outside runs of same-role CNOTs |
-| R27 | two operations of the kinds in the set's `serial_kinds` overlap in one trap. The paper's machine does one such operation per trap at a time | serialise them in that trap. The set's `serial_kinds` (`references/rule-sets.md`) says which kinds count. 0 cases means the programme never had two in one trap |
+| R27 | two operations of the kinds in the set's `serial_kinds` overlap in one trap. The paper's machine does one such operation per trap at a time | serialise them in that trap. The set's `serial_kinds` (in its text on the Rules page) says which kinds count. 0 cases means the programme never had two in one trap |
 | R29 | a paper's timed schedule gives an operation a duration other than its clock's law. It reads words only a schedule has, so it never applies to an entry's programme (`does not apply`) | nothing for a programme entry |
 | R30 | a paper's timed schedule runs two operations that hold one component at once. Only a schedule declares what an operation holds, so it never applies to a programme | nothing for a programme entry |
-| R31 | broadcast hops that overlap in time don't start and end together, or are of different classes, or a hop names no class | make every broadcast cycle one class with one start and one end (uniform cycles: `qccd/compile/uniform.py`) |
+| R31 | broadcast hops that overlap in time don't start and end together, or are of different classes, or a hop names no class | make every broadcast cycle one class with one start and one end (the compiler's uniform pass) |
 | R32 | a rotation, preparation or measurement runs in a zone outside the set's `single_ion_zones` | move the operation to an allowed zone, or give the device such zones |
 | R33 | the two ions of a 2-qubit gate stand in zones that are neither the same nor neighbours when it starts | bring them into one zone, or neighbouring ones, before the gate |
-| C1 | a C2LR leg holds two crystals other than between an enter and its exit, or a crystal that entered a partner leg leaves by another step type than the one it came in by | keep one crystal per leg. A crystal that entered a partner leg leaves by the same step type. The C2LR router (`qccd/compile/c2lr_router.py`) keeps both |
+| C1 | a C2LR leg holds two crystals other than between an enter and its exit, or a crystal that entered a partner leg leaves by another step type than the one it came in by | keep one crystal per leg. A crystal that entered a partner leg leaves by the same step type. The site's C2LR router keeps both |
 | C2 | a transport step on a C2LR device writes its own routes, or chooses anything per leg beyond the direction bit | emit steps as direction bits on the device's matching, as the router does. Never hand-write the routes of a C2LR class |
 | C3 | a step ties horizontal and vertical legs together (a bit per axis, not per crystal) | give every crystal its own direction bit |
 | C4 | an exchange step is not "C2LR, one shared junction waveform, C2LR back": two waveforms, or a shift that is not undone | use the device's `swap_or_stay` primitive as one step. Don't compose a step from separate moves |
@@ -84,10 +85,19 @@ here). Device rules first, in the catalogue's groups; the machine rules (F, G, H
 | C8 | `allowed partial`: the COM frequency held during a shift is recorded with the step's primitive, not decided from the programme. Skipped (and blocking) when the primitive records none | nothing in the programme. Record the COM frequency on the device's `swap_or_stay` primitive (`Machine.c2lr_grid` does) |
 | C9 | a step heats only the crystals that move, as if one that sat it out stayed cold. The shared waveforms heat every crystal | give the device's `swap_or_stay` primitive its stay heat (`quanta_stay`, which `Machine.c2lr_grid` writes for Ba-Sr and Yb-Ba), then replay under the board's model |
 | C10 | a device with C2LR control whose document is not shared signals plus one input and one switch per leg | write the `control` block as `Machine.c2lr_grid` does, or don't declare C2LR control |
-| budget (device stage) | too many DACs (B1) or junctions (B2) for the board (`references/boards.md`) | broadcast wiring instead of direct drive (a direct-wired grid needs thousands of DACs), or fewer junctions. Declaring fewer electrodes buys nothing, because counts are floored by the physics |
+| W1 | on a WISE device, two qubits share a zone for something other than a gate or the first half of a swap, or stay together after it | merge two qubits only to gate them or to begin a swap, and split them again before anything else happens in that zone |
+| W2 | a swap step pairs zones of both parities, which the shared waveforms cannot drive at once | pair only odd zones, or only even ones, in one step, and the other parity in the next |
+| W4 | a transport step on a WISE device also carries gates, or moves ions other than between zones | run transport and gates in separate steps: one kind of operation across the chip at a time |
+| W10 | a gate layer runs more than one gate, or one gate at more than one angle | split the layer by gate and by angle. Frame changes are not pulses and are free of this |
+| W11 | a layer does not pay for its shims first: a reconfiguration with no opening layer that charges them, or a gate, readout or reset priced without the charge | open every reconfiguration with a layer that charges the shims and plays no pulse, and use the device's WISE primitives, which price the charge into every gate, readout and reset |
+| Y1 | on a Cyclone device, the traps are not one closed ring with junctions only at its corners: an X or T junction, a spur, or a second loop | draw one closed ring, its corners L-shaped junctions, with no branches |
+| Y2 | a data qubit moves in a transport step | move only ancillas. Spread the data qubits evenly round the ring at the start and leave them there |
+| Y3 | the ancillas do not all move together, one trap the same way round, in a transport step | move every ancilla one trap per step in the same direction; never move only some of them |
+| Y4 | a trap holds more than 30 ions | give no trap a capacity above 30, or use more traps |
+| budget (device stage) | too many DACs (B1) or junctions (B2) for the board's budget | broadcast wiring instead of direct drive (a direct-wired grid needs thousands of DACs), or fewer junctions. Declaring fewer electrodes buys nothing, because counts are floored by the physics |
 
-**Re-cooling under the board's physics** (fixes R7 and R7c without recompiling, and keeps
-`correspondence` passing):
+**Re-cooling under the board's physics**, for an agent working in a checkout (fixes R7 and R7c
+without recompiling, and keeps `correspondence` passing):
 
 ```python
 from qccd.arch.device import Architecture
@@ -106,8 +116,8 @@ Then rebuild the bundle with `final` as `program.tsir.json`. In a workspace,
 
 ### 2b. The machine rules: a floorplan of gadgets, and a schedule on it
 
-`review.py --floorplan` judges F1-F9; `--algorithm` schedules the program and judges all of
-them. A counterexample names the places, doors, roads, carries or events involved. Fix the
+`python -m qccd.gadget floorplan` judges F1-F9; `python -m qccd.gadget algorithm` schedules the
+program and judges all of them. A counterexample names the places, doors, roads, carries or events involved. Fix the
 floorplan (`place NAME MASTER at x y`, `road`, `junction`, `wire` lines) or the algorithm. When
 the floorplan is clean and a G rule still fails, suspect the scheduler, and report it with the
 `.alg` and `.floor` files.
@@ -129,7 +139,7 @@ the floorplan is clean and a G rule still fails, suspect the scheduler, and repo
 | G4 | a road holds more ions than its sites, or carries bundles both ways at once | serialise the opposite traffic, or lengthen the road |
 | G5 | two ops of one place overlap | serialise them. Two instructions racing for one place is the usual cause |
 | G6 | an ion's n-bar passes the ion-loss limit in an op, at a door, or on its way between places | shorter routes with fewer junction passes, or cooling on the way |
-| G7 | an instruction is refused or never realised, or a block's instructions run out of program order | read the refusal (`--algorithm` prints the schedule's counts). The floorplan may lack a place the instruction needs |
+| G7 | an instruction is refused or never realised, or a block's instructions run out of program order | read the refusal (the algorithm check prints the schedule's counts). The floorplan may lack a place the instruction needs |
 | G8 | a block waits or travels longer than its coherence budget between syndrome extractions | let the build add syndrome rounds (its `refresh`), or shorten the trip |
 | G9 | the schedule runs an op that is not verified, or whose logic check failed | verify the place (`python -m qccd.gadget places`) |
 | G10 | a classical message uses no wire or the wrong one, takes the wrong latency, leaves before its bits were measured, or is read before it arrives | wire the doors (F7, F8) and order the classical traffic |
@@ -142,9 +152,9 @@ the floorplan is clean and a G rule still fails, suspect the scheduler, and repo
 
 ## 3. Beyond the checkers: look at these in every review
 
-`rule-check.md` already reports the facts behind items 1-3, 5, 7, 8, 9 and 10 (fit, physics
-lock, budget, the shipped device of the same name, each rule's closest case, cases per rule, R9,
-buildability). Your job is the judgement: what each fact means for this design.
+The Debug page shows the facts behind items 5, 7 and 10 (each rule's closest case, R9, the cases a
+rule judges at each step), and a grade report the facts behind 2, 3 and 9. Your job is the
+judgement: what each fact means for this design.
 
 1. **Board fit.** Does the device hold the circuit's qubits (total capacity), and does its shape
    suit the compiler that will route it? The conveyor drives only the first closed loop plus
@@ -158,18 +168,18 @@ buildability). Your job is the judgement: what each fact means for this design.
 3. **Budget headroom.** Look at DACs and junctions against the budget, and the wiring notes
    about counts floored by the physics. A design near the limit is fragile to small edits.
 4. **Its own rule set.** If the entry declares `rules.json`, its own set decides the rules stage,
-   and the board's set decides only whether it is on the board's own ranking. Report both. The
-   review script's table then has a column for each. Every Goal 3 entry does this: each family
-   declares its paper's set (`references/boards.md`). List what the set drops, replaces and adds
+   and the board's set decides only whether it is on the board's own ranking. Report both: the
+   Debug page's rule set menu judges either. Every Goal 3 entry does this: each family declares
+   its paper's set (the Goal 3 page names it). List what the set drops, replaces and adds
    (`conformance`), and judge whether each drop is physically justified. For example, a trap
    built in two layers may drop R20/R21. A drop made only so the design passes is not
    justified. Core rules (R0, R1, R8, R24) cannot be dropped. A paper's set can carry rules that
    only its timed schedule can judge (R29, R30): on a programme they `do not apply`, which
    neither fails nor proves anything.
 5. **Heat margin.** R7 passing by a hair (peak n-bar just under the budget) is worth a sentence.
-   Every heat figure is an upper bound (R15), so the real margin is no smaller. The review
-   script's "closest case" note gives the tightest case of each rule that compares with a limit
-   (R7's heat, R1's occupancy, R20's angle, G6's ion-loss heat), with where it is. A site or road
+   Every heat figure is an upper bound (R15), so the real margin is no smaller. The Debug page's
+   "closest case" gives the tightest case of each rule that compares with a limit (R7's heat,
+   R1's occupancy, R13's chain, R20's angle), with its step and where it is. A site or road
    at exactly its capacity (slack 0) is legal; say so only when a small change would break it.
 6. **Control model.** `direct` wiring makes R22 vacuous and costs DACs. `switch_per_site: false`
    is what the R4d hold clause bites on. A C2LR device is judged by C1-C10, and its checkerboard
@@ -177,8 +187,8 @@ buildability). Your job is the judgement: what each fact means for this design.
 7. **The programme's own claims (R9, advisory).** If the programme states totals that the replay
    doesn't reproduce, the grader won't notice (it skips R9). A reader of the programme would.
 8. **Buildability beyond the rules (information only).** `qccd.phys` derives the electrodes a
-   device implies and runs a DRC. The review script reports it (`--tech` picks the preset; the
-   CLI `python -m qccd phys` only takes shipped devices). It is not part of grading. Many
+   device implies and runs a DRC (the CLI `python -m qccd phys` takes shipped devices). It is not
+   part of grading. Many
    shipped designs are not DRC-clean under the ETH preset, so report it as an observation,
    never as a failure. Refused shapes (a diagonal rail the builder can't draw) are the useful
    part.
@@ -195,28 +205,27 @@ These hold as of the code this guide was written against. Each pointer says wher
 
 - **R4d is reported under R4 by the grader's verifier** (`qccd/verify/rules.py`, `r4_drivable`
   files `Violation("R4", ...)`). The grader's report can show R4 failing while R4d reads
-  `passed`. The rule language reports R4d under its own id. The review script's two columns show
-  both.
+  `passed`. The rule language, and so the Debug page, reports R4d under its own id.
 - **R15, R16 and R17 read only the board's cost model, and R18 is true by definition**
   (`qccd/verify/__init__.py`, `verify`; the words' groups in `qccd/ruleset/vocabulary.py`). R16
   and R17 are marked checked whenever the cost model models heating and time. R18's
   `junctions` are, by definition, the nodes where three or more rails meet. None of them says
-  anything about a design. The review script finds model-only rules from the words they use,
-  so a new one is labelled the same way.
+  anything about a design.
 - **A device alone decides only some rules.** Those whose words are all about the device and
-  the board's physics (`references/rules.md`, "Reads") are judged. R11 is half and half:
-  without a programme, only its "every junction is priced" half is judged.
+  the board's physics are judged the same at every step (the Debug page marks their cases
+  "every step"). R11 is half and half: its "every junction is priced" half names no moment.
 - **R29 and R30 never apply to a programme.** They read words only a paper's timed schedule
   has (`clock`, `locks`). A paper's set that carries them is judged without them.
 - **The place checks cover fewer machine rules than the rule language.** The Python place
   checks (`qccd/gadget/place_checks.py`) judge G1-G11, H1 and H2. F1-F9 and G12-G14 exist only
-  in the rule language. The machine review shows both columns.
+  in the rule language.
 - **R0, R24 and R25 are not run by the rules stage of a `standard` board.** The board's set is
-  checked by `qccd.verify`, which has no such rules (`references/grader.md`). Their substance is
+  checked by `qccd.verify`, which has no such rules (`qccd/workspace/evaluator.py`,
+  `_rules_stage`). Their substance is
   covered in part by the Lean checker's conjuncts (`Compiler/lean/QCCDC/Cert/Check.lean`:
   `MovesAreHops`, `GatesLegal`, `Covered`, `Grounded`, and `RespectsOrder`, strict since
-  2026-10-19). The review script judges them directly in the rule language, with the
-  certificate's circuit. On C2LR boards the rules stage runs the rule language but passes no
+  2026-10-19). The Debug page judges them directly in the rule language, with the certificate's
+  circuit when it has one (R24 and R25 need the circuit). On C2LR boards the rules stage runs the rule language but passes no
   circuit, so R24 and R25 do not apply there either.
 - **R10 is skipped by the rules stage on purpose.** The certificate binding, the Lean checker
   and the semantics stage decide it. Outside the Clifford fragment the semantics stage's
@@ -247,13 +256,12 @@ These hold as of the code this guide was written against. Each pointer says wher
 | `ler` | the detectors aren't deterministic with the circuit's parity (memory boards) | the programme doesn't run the memory experiment the board defines |
 | `metrics` | the replay under the board's tables fails | usually follows an earlier failure |
 
-The evaluations' requirements (`references/grader.md`, generated from `qccd/evalset`) are
-checks beside the rules, with ids of their own. **Goal 1's G1-G3 are not the machine rules
-G1-G3.**
+The evaluations' requirements (the Evaluation page; `qccd/evalset`) are checks beside the rules,
+with ids of their own. **Goal 1's G1-G3 are not the machine rules G1-G3.**
 
 | Requirement | Where it is enforced | Fails when |
 |---|---|---|
-| B1, B2 (`board`) | the `device` stage (the review's budget line) | the wiring needs more DACs, or the device more junctions, than the board's budget |
+| B1, B2 (`board`) | the `device` stage (the grade report's budget line) | the wiring needs more DACs, or the device more junctions, than the board's budget |
 | G1 (`goal1`) | the `rules` stage | any rule of the standard set fails |
-| G2 (`goal1`) | Goal 1's listing, not eligibility | the programme places more than 200 ions (the review reports the count). The official listing filters by the board's experiment, which every Goal 1 board keeps under 200 |
+| G2 (`goal1`) | Goal 1's listing, not eligibility | the programme places more than 200 ions. The official listing filters by the board's experiment, which every Goal 1 board keeps under 200 |
 | G3 (`goal1`) | the `ler` stage's noiseless check (`QEC.CHECK_FAILED`) | with noise taken out, a detector or observable is not the fixed 0 the experiment's circuit gives it |

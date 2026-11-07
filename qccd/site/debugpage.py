@@ -222,9 +222,11 @@ EXAMPLES = (
 
 
 def config(cat: list[dict], root: str = "../") -> dict:
+    from ..debug.guide import guide
     api = json.loads((SRC / "debug_api.json").read_text(encoding="utf-8"))
     return {"root": root, "catalogue": cat, "rulesets": rulesets(),
             "examples": [{"t": t, "text": x} for t, x in EXAMPLES],
+            "guide": guide(),
             "python": {"version": PYODIDE_VERSION, "worker": "worker.js"},
             "verbs": sorted(api["verbs"])}
 
@@ -323,6 +325,53 @@ def loader() -> str:
     """The loader with the declared verbs written in (an agent's verbs work before the panel opens)."""
     api = json.loads((SRC / "debug_api.json").read_text(encoding="utf-8"))
     return LOADER.replace("__VERBS__", json.dumps(sorted(api["verbs"])))
+
+
+#: The Debug button in a page of the person's workspace (its Studio, a run's page), where the
+#: debugger itself is already on the page (`workspace_inject`): the same button the site's loader
+#: puts beside the Studio's transport, and `#debug` in the address opens the panel.
+WORKSPACE_BUTTON = r"""<script id="qdbg-workspace">
+(function(){
+  if(window.self !== window.top) return;                 // a run framed side by side: no panel
+  function toggle(e){
+    if(e){ e.preventDefault(); e.stopPropagation(); }
+    window.QCCD_DEBUG_INPAGE.toggle().catch(function(err){ if(window.console) console.warn(err); });
+  }
+  function start(){
+    // debug.js boots on DOMContentLoaded too, and was there first
+    if(!window.QCCD_DEBUG_INPAGE || !document.getElementById('svg')) return;
+    var bar = document.querySelector('#stagebar .ctrl');
+    if(bar && !document.getElementById('qdbgBtn')){
+      var b = document.createElement('button');
+      b.id = 'qdbgBtn'; b.type = 'button'; b.className = 'tgl'; b.setAttribute('aria-pressed', 'false');
+      b.setAttribute('data-hint', 'debug:enter'); b.textContent = 'Debug';
+      b.title = 'debug this program here: step it forward and back, see each rule at work at every step, ask your agent to review it';
+      b.addEventListener('click', toggle);
+      var after = document.getElementById('tLabels');
+      if(after && after.parentNode === bar) bar.insertBefore(b, after.nextSibling); else bar.appendChild(b);
+    }
+    if(/^#debug(&|$)/.test(location.hash)) window.QCCD_DEBUG_INPAGE.enter().catch(function(){});
+  }
+  window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, { 'debug:enter': { t: 'Debug',
+    d: 'debug this program here, beside it: step forward and back, see each rule at work at every step, check your own assertions, have your agent review it' } });
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>"""
+
+
+def workspace_inject(endpoint: str = "/api/debug/web") -> str:
+    """The debugger in a page of the person's workspace (its Studio, a run's page): the panel's code
+    on the page itself (the workspace's pages load nothing from elsewhere), and its rule language
+    the workspace's own Python, behind `endpoint` -- the same module the site's pages run in the
+    browser, so the answers are the same, with nothing to download."""
+    cfg = config([], root="/")
+    cfg.update(host="inpage", python={"backend": "service", "endpoint": endpoint})
+    css = ((SRC / "panel.css").read_text(encoding="utf-8") + (SRC / "inpage.css").read_text(encoding="utf-8")
+           + "\n:root{--qdbg-top:0px}\n")
+    blob = json.dumps(cfg, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
+    js = (SRC / "debug.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
+    return ("<style id=\"qdbg-css\">\n" + css + "</style>\n<script>window.QCCD_DEBUG_CONFIG=" + blob + ";</script>\n"
+            "<script>\n" + js + "\n</script>\n" + WORKSPACE_BUTTON + "\n")
 
 
 def page(PAGE: str, STYLE: str, cfg: dict) -> str:

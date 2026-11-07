@@ -143,6 +143,60 @@
    "kind": "read",
    "does": "the link that reopens the page on this program, at this step, with these rules, assertions and watch list",
    "args": {}
+  },
+  "review": {
+   "kind": "run",
+   "does": "start a review: check the program by the rule set shown (or the one named), open the Rules tab, and resolve with every rule's verdict, the step where it first fails, its first failure in the grader's words, and the review guide's row (what a failure usually means, the fix) -- the person sees the same rules, verdicts and guide in the panel",
+   "args": {
+    "rules": "a rule set's name, to check by that set instead of the one shown (optional)"
+   }
+  },
+  "rules_at": {
+   "kind": "run",
+   "does": "every rule at a step: how many cases it judges there and how many of them fail (a rule whose cases name no moment, a corner or a rail, judges them at every step); shows the Why tab at that step",
+   "args": {
+    "step": "the step (from 1; default: the step shown)"
+   }
+  },
+  "inspect": {
+   "kind": "run",
+   "does": "one rule at a step, case by case, failing first and then the closest to failing: each case's variables, the places it names, the value of every part of the rule (both sides of each comparison, the room left) and a gauge of the number against its limit; shows the same cases in the Why tab and the gauges on the picture",
+   "args": {
+    "rule": "a rule id from check or review (or one of your assertions)",
+    "step": "the step (from 1; default: the step shown)"
+   }
+  },
+  "closest": {
+   "kind": "run",
+   "does": "of every case a rule judges in the whole program, the one that holds with the least room (the hottest gate under the heat budget, the fullest site under its capacity), with its step; shown under the rule in the Why tab",
+   "args": {
+    "rule": "a rule id",
+    "go": "true to go to that case's step as well"
+   }
+  },
+  "guide": {
+   "kind": "read",
+   "does": "the review guide's row for a rule: what its failure usually means and what to change -- the words the panel shows the person beside the failure (opened in the Why tab)",
+   "args": {
+    "rule": "a rule id (R7, C3, F4, ...), or 'budget' for the device stage's budget"
+   }
+  },
+  "note": {
+   "kind": "view",
+   "does": "pin a note to a step (and a rule): what you found there, for the person -- it shows at its step in State, beside the rule, on the timeline and in the report, signed with your name; the person may remove it",
+   "args": {
+    "text": "the note, in plain words (backticks for code)",
+    "step": "the step (from 1; default: the step shown)",
+    "rule": "the rule it is about (optional)"
+   }
+  },
+  "notes": {
+   "kind": "view",
+   "does": "the notes pinned so far; remove one by its id, or clear them all",
+   "args": {
+    "remove": "a note's id to remove (optional)",
+    "clear": "true to remove every note (optional)"
+   }
   }
  }
 }

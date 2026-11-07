@@ -640,10 +640,15 @@ FEATURES: tuple[Feature, ...] = (
         "n-bar; step (step) -> one instruction; trace (entity, from, to) -> every step an ion/site/junction/rail "
         "changed or was acted on; find (condition: a formula over the instant t, from, backward) -> the first "
         "step it holds, a conditional breakpoint; value (exprs: terms over t, step); diff (from, to) -> ions that "
-        "moved. To find a compiler or hardware bug: check, then state/trace at the first failing step.",
+        "moved; rules_at (step, rules, assertions) -> every rule at that step: how many cases it judges there and "
+        "how many fail; inspect (rule, step, rules, assertions, limit) -> that rule's cases at that step, failing "
+        "first, each with its variables, the places it names and the value of every part of the rule (both sides "
+        "of each comparison and the room left); closest (rule, rules) -> of a rule that holds, the case with the "
+        "least room (the hottest gate under the heat budget). To find a compiler or hardware bug: check, then "
+        "inspect/state/trace at the first failing step.",
         _obj({"action": {"type": "string", "enum": ["summary", "check", "state", "step", "trace", "find",
-                                                    "value", "diff"]},
-              "run_id": _S, "arch": _S, "program": _S, "certificate": _S, "model": _S,
+                                                    "value", "diff", "rules_at", "inspect", "closest"]},
+              "run_id": _S, "arch": _S, "program": _S, "certificate": _S, "model": _S, "rule": _S,
               "rules": _S, "assertions": _S, "only": {"type": "array", "items": _S}, "limit": _I,
               "step": _I, "watch": {"type": "array", "items": _S}, "entity": _S, "from": _I, "to": _I,
               "condition": _S, "backward": {"type": "boolean"}, "exprs": {"type": "array", "items": _S}},
@@ -701,6 +706,8 @@ INTERNAL_ROUTES: dict[str, str] = {
     "GET /api/account": "the Studio's sign-in state; agents read it in qccd_get_context (account), and only a person signs in",
     "GET /api/board-view": "the Studio's Leaderboard panel; agents read the same through qccd_get_leaderboard and qccd_get_job",
     "GET /api/publications/{pid}": "the chat card of a request; an agent's own request comes back from qccd_submit_official",
+    "POST /api/debug/web": "the Debug panel on the workspace's pages runs its rule language here; an agent drives the same "
+                           "panel through qccd_page_act (debug), or the same debugger headless through qccd_debug",
 }
 
 #: CLI verbs with no tool behind them, and why: they run before a service exists, manage the

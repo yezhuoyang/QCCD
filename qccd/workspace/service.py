@@ -966,6 +966,17 @@ def create_app(state: ServiceState) -> FastAPI:
         from .debugging import debug_call
         return debug_call(ws, b)
 
+    @route("POST", "/api/debug/web", write=False)
+    def debug_web(request, actor, b):
+        """The rule language of the Debug panel on this workspace's own pages: the functions the
+        site's pages run in the browser (qccd.debug.web), here in the workspace's Python."""
+        from ..debug import web as dweb
+        fn, args = str(b.get("fn") or ""), b.get("args") or []
+        if fn not in ("open_session", "call", "rulesets") or not isinstance(args, list) \
+                or not all(isinstance(x, str) for x in args):
+            raise WorkspaceError("bad_request", "fn must be open_session, call or rulesets, with string args", status=422)
+        return {"text": getattr(dweb, fn)(*args)}
+
     @route("POST", "/api/publications")
     def publications_new(request, actor, b):
         return ws.request_publication(actor, board=b.get("board"), design=b.get("design"),
@@ -1095,7 +1106,7 @@ def _run_page(state: ServiceState, run_id: str) -> str:
         # the chat and the page actions: in a tab of its own the run page is where the agent
         # presses Play for the person (cowork.js stays out of the side-by-side frames); the
         # Evaluation panel shows the run's numbers growing as it plays (run_eval.py)
-        page = page[:at] + RUNVIEW_BLOCK + panel + _live_layer(state, "run", run_id=run_id) + page[at:]
+        page = page[:at] + RUNVIEW_BLOCK + panel + _live_layer(state, "run", run_id=run_id) + _debugger() + page[at:]
         with state.page_lock:
             state.page_cache[key] = page
     return page
@@ -1259,9 +1270,15 @@ def _studio_page(state: ServiceState, snapshot_id: str | None) -> str:
     inject = (_css() + '<script id="qccd-live-config" type="application/json">'
               + json.dumps(cfg).replace("</", "<\\/") + "</script>\n" + _contract(design_page=not snapshot_id)
               + "<script>\n" + _pageact() + "\n</script>\n"
-              + "<script>\n" + _js() + "\n</script>\n")
+              + "<script>\n" + _js() + "\n</script>\n" + _debugger())
     at = page.rfind("</body>")
     return page[:at] + inject + page[at:]
+
+
+def _debugger() -> str:
+    """The Debug panel beside the program (qccd/site/debug), its rule language this service's."""
+    from ..site.debugpage import workspace_inject
+    return workspace_inject("/api/debug/web")
 
 
 def _render(ws: Workspace, snapshot_id: str | None) -> str:

@@ -56,11 +56,13 @@ def open_session(arch: str, program: str, model: str = "null", name: str = "") -
     return _answer(go)
 
 
-_VERBS = ("check", "state", "step", "trace", "find", "value", "diff", "summary")
+_VERBS = ("check", "state", "step", "trace", "find", "value", "diff", "summary", "rules_at", "inspect", "closest")
 
 
 def call(key: str, verb: str, args: str = "{}") -> str:
-    """One verb of a kept session: check, state, step, trace, find, value, diff, summary."""
+    """One verb of a kept session: check, state, step, trace, find, value, diff, summary, and a
+    rule's work at one step -- rules_at (every rule), inspect (one rule, case by case), closest
+    (the case of a rule that holds with the least room)."""
     def go():
         s = _SESSIONS.get(key)
         if s is None:

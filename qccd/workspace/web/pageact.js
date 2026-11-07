@@ -260,7 +260,12 @@ function read(args) {
     if (!s) return { error: 'no section matches ' + JSON.stringify(args.section) + '; the headings are listed', headings: out.headings };
     out.section = { ref: s.heading.ref, text: s.heading.text };
     text = s.text;
-  } else text = textOf(mainRoot(doc));
+  } else {
+    text = textOf(mainRoot(doc));
+    // the debugger beside a Studio's program is an aside outside <main>; what it shows is on screen
+    var dbg = doc.getElementById('dbg');
+    if (dbg && !mainRoot(doc).contains(dbg) && vis(dbg)) text += '\n\n# Debug panel\n' + textOf(dbg);
+  }
   out.text = text.slice(off, off + lim);
   out.text_range = [off, Math.min(text.length, off + lim), text.length];
   if (off + lim < text.length) out.more = 'call read again with offset=' + (off + lim) + ' (or a section) for the rest';
@@ -839,12 +844,21 @@ function act(action, args, who) {
                                       note: 'steps count from 1, as the Studio status line does' };
       if (!DV[dverb]) throw new Error('the Debug page has no agent verb ' + JSON.stringify(dverb) + '; debug verb "verbs" lists the declared ones: ' +
                                       Object.keys(DV).sort().join(', '));
-      if (typeof DG[dverb] !== 'function') throw new Error('this Debug page has no ' + dverb + ' (an older build)');
       var darg = Array.isArray(args.args) ? (args.args[0] || {}) : (args.args && typeof args.args === 'object' ? args.args : {});
-      var dtarget = document.getElementById(DV[dverb].kind === 'read' ? 'dbgSide' : 'dbgStage') || document.body;
-      return pointAt(dtarget, null, who, dverb + (Object.keys(darg).length ? ' ' + clip(JSON.stringify(darg), 60) : '')).then(function () {
-        return Promise.resolve(DG[dverb](darg)).then(function (v) {
-          return { ok: !(v && v.ok === false), verb: dverb, result: jsonable(v), debug: jsonable(DG.status(), 4000) };
+      darg = Object.assign({}, darg);
+      if (dverb === 'note') darg.by = who || 'an agent';           // a note is signed, as a comment is
+      // a Studio page carries a small stand-in that knows the verbs of the build it was made with;
+      // opening the panel (status) loads the debugger itself, which has every verb
+      var ready = typeof DG[dverb] === 'function' ? Promise.resolve(DG)
+        : typeof DG.status === 'function' ? Promise.resolve(DG.status()).then(function () { return window.QCCD_DEBUG; })
+        : Promise.resolve(DG);
+      return ready.then(function (D) {
+        if (!D || typeof D[dverb] !== 'function') throw new Error('this Debug page has no ' + dverb + ' (an older build)');
+        var dtarget = document.getElementById(DV[dverb].kind === 'read' ? 'dbgSide' : 'dbgStage') || document.getElementById('dbgSide') || document.body;
+        return pointAt(dtarget, null, who, dverb + (Object.keys(darg).length ? ' ' + clip(JSON.stringify(darg), 60) : '')).then(function () {
+          return Promise.resolve(D[dverb](darg)).then(function (v) {
+            return { ok: !(v && v.ok === false), verb: dverb, result: jsonable(v), debug: jsonable(D.status(), 4000) };
+          });
         });
       });
     case 'comments':
