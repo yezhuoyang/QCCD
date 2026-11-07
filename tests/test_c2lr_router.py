@@ -303,7 +303,7 @@ def test_the_grader_judges_a_release_by_the_rule_set_it_declares(tmp_path):
         st = _Stage("rules", True)
         _rules_stage(st, TaskRelease(root=REP5.root, manifest=man), m.arch, cb)
         assert st.status == status, (rules, st.diagnostics[:2])
-        assert ("ruleset" in st.detail) == bool(rules)
+        assert st.detail["ruleset"] == (rules or "standard")    # every board's set, in the rule language too
     assert "C6" in st.detail["failed"] and st.detail.get("assumed")
 
 

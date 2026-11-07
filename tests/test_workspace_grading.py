@@ -315,3 +315,38 @@ def test_a_stage_that_outgrows_its_memory_limit_is_stopped_and_one_within_it_is_
     r = run_limited([sys.executable, "-c", hog], timeout=60, mem_mb=300)
     assert r.status != "ok", r
     assert time.time() - t0 < 15, "the limit was only noticed by the timeout"
+
+
+def test_every_board_judges_the_circuit_rules_with_the_certificate():
+    """The rules stage judges the board's set in the rule language too, with the circuit the
+    certificate names, so R0, R24 and R25 -- which the legacy verifier does not have -- are judged
+    on every board (user, 2026-11-07), as they already were for an entry that declares its set."""
+    from qccd.arch.device import Architecture
+    from qccd.ir.tsir import TSIR
+    from qccd.workspace.evaluator import _Stage, _rules_stage
+    c = Path(__file__).resolve().parents[1] / "qccd" / "site" / "compiled"
+    arch = Architecture.from_json(json.loads((c / "chain4.arch.json").read_text(encoding="utf-8")))
+    prog = TSIR.from_json(json.loads((c / "bell" / "prog.tsir.json").read_text(encoding="utf-8")))
+    cert = json.loads((c / "bell" / "prog.qcert.json").read_text(encoding="utf-8"))
+    rel = find_release("ghz4@1")                          # a board that names no rule set: `standard`
+    assert not rel.manifest.get("rules")
+
+    def stage(certificate):
+        st = _Stage("rules", True)
+        _rules_stage(st, rel, arch, prog, cert=certificate)
+        return st
+    ok = stage(cert)
+    assert ok.detail["ruleset"] == "standard" and {"R0", "R24", "R25"} <= set(ok.detail["ruleset_holds"])
+    assert "R24" not in ok.detail["failed"]
+    bare = stage(None)                                    # no circuit: R24 and R25 do not apply
+    assert "R24" not in bare.detail["ruleset_holds"] and "R24" not in bare.detail["failed"]
+    # a certificate whose circuit lists q0's gates in another order: the programme's gate no longer
+    # performs the circuit's cx, and the stage says so
+    bad = copy.deepcopy(cert)
+    ops = bad["circuit_ops"]
+    ops[0], ops[1] = ops[1], ops[0]
+    for i, o in enumerate(ops):
+        o["i"] = i
+    st = stage(bad)
+    assert st.status == "failed" and "R24" in st.detail["failed"]
+    assert any(d["id"] == "RULE.R24" and "gate_count" in d["message"] for d in st.diagnostics)

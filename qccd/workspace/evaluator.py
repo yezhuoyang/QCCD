@@ -468,23 +468,25 @@ BOARD_RULES = "standard"
 
 def _rules_stage(st: _Stage, release: TaskRelease, arch, prog, *, declared: Mapping | None = None,
                  cert: Mapping | None = None, ctx: dict | None = None) -> None:
-    """The board's rules (`qccd.verify`, as always), and the entry's own set when it declares one
-    (`qccd.ruleset`).  The stage's verdict is the entry's set's; `ctx["rules"]` keeps how the entry
-    stands to the board's, for `conformance`."""
+    """The board's rules -- `qccd.verify`, as always, and the board's rule set in the rule language
+    with the certificate's circuit -- and the entry's own set when it declares one (`qccd.ruleset`).
+    The stage's verdict is the entry's set's; `ctx["rules"]` keeps how the entry stands to the
+    board's, for `conformance`."""
     from ..cost.models import corrected_model
+    from ..ruleset import legacy_config
+    from ..ruleset import load as load_rules
     from ..verify import verify
     table = release.manifest["physics"].get("rank_table", "qccdsim_jones")
-    # A release that declares its rule set (the C2LR boards: `c2lr`) is judged by it as
-    # well: the legacy verifier with the set's parameters (C6's forms), and the set itself,
-    # in the rule language.  A release that declares none is judged exactly as it always was.
+    # Every board's rule set is judged in the rule language too, with the circuit the certificate
+    # names, as an entry's own set is: so R0, R24 and R25, which the legacy verifier does not have,
+    # are judged on every board (the user's call, 2026-11-07).  A release that declares its set (the
+    # C2LR boards: `c2lr`) also gives the legacy verifier that set's parameters (C6's forms); one that
+    # declares none keeps the verifier exactly as it always ran.
     board_set = release.manifest.get("rules") or BOARD_RULES
-    rs, config = None, None
-    if release.manifest.get("rules"):
-        from ..ruleset import load as load_rules, legacy_config
-        rs = load_rules(str(board_set))
-        config = legacy_config(rs)
+    rs = load_rules(str(board_set))
+    config = legacy_config(rs) if release.manifest.get("rules") else None
     rep = verify(prog, arch, corrected_model(table), check_metrics=False,
-                 **({"rule_config": config} if rs is not None else {}))
+                 **({"rule_config": config} if config is not None else {}))
     s = rep.rules.summary()
     failed = sorted(s.get("failed") or [])
     own = None
@@ -492,23 +494,24 @@ def _rules_stage(st: _Stage, release: TaskRelease, arch, prog, *, declared: Mapp
         own = _declared_rules(st, release, arch, prog, declared, cert, corrected_model(table), board_set)
     # a board rule the entry's own set leaves out or writes otherwise: noted, not held against it
     waived = set((own or {}).get("changes", {}).get("drops", [])) | set((own or {}).get("changes", {}).get("replaces", []))
-    language: dict = {}
-    if rs is not None:
-        from ..ruleset import check as check_rules
-        from ..ruleset.programme import programme_execution
-        lang = check_rules(rs, programme_execution(prog, arch, corrected_model(table), rule_config=config,
-                                                   check_metrics=False))
-        ls = lang.summary()
-        for r in lang.results:
-            if r.id in ls["fails"] and r.id not in failed:
-                st.diag(f"RULE.{r.id}", f"the release's rule set {rs.name!r}: {r.id} fails "
-                        f"({r.count} case(s))", rule=r.id, **({"severity": "warning"} if r.id in waived else {}),
-                        reference={"ruleset": rs.name, "release": release.id})
-        failed = sorted(set(failed) | set(ls["fails"]))
-        language = {"ruleset": rs.name, "ruleset_holds": ls["holds"], "ruleset_fails": sorted(ls["fails"]),
-                    "ruleset_could_not_check": ls["could_not_check"]}
-        if ls.get("assumed"):
-            language["assumed"] = ls["assumed"]
+    from ..ruleset import check as check_rules
+    from ..ruleset.programme import programme_execution
+    lang = check_rules(rs, programme_execution(prog, arch, corrected_model(table), rule_config=config,
+                                               check_metrics=False, circuit=_circuit_of(cert)))
+    ls = lang.summary()
+    for r in lang.results:
+        if r.id in ls["fails"] and r.id not in failed:
+            st.diag(f"RULE.{r.id}", f"the board's rule set {rs.name!r}: {r.id} fails "
+                    f"({r.count} case(s))" + (": " + "; ".join(r.examples[:2]) if r.examples else ""),
+                    rule=r.id, **({"severity": "warning"} if r.id in waived else {}),
+                    reference={"ruleset": rs.name, "release": release.id})
+    failed = sorted(set(failed) | set(ls["fails"]))
+    # R10 and the other rules the certificate stages decide may not be checked here, as below
+    unchecked = sorted(set(ls["could_not_check"]) - ALLOWED_SKIPS)
+    language = {"ruleset": rs.name, "ruleset_holds": ls["holds"], "ruleset_fails": sorted(ls["fails"]),
+                "ruleset_could_not_check": unchecked}
+    if ls.get("assumed"):
+        language["assumed"] = ls["assumed"]
     skipped = dict(s.get("skipped") or {})
     partial = dict(s.get("partial") or {})
     passed = sorted(set(s.get("passed") or []) - set(partial))
@@ -548,6 +551,18 @@ def _rules_stage(st: _Stage, release: TaskRelease, arch, prog, *, declared: Mapp
         st.done("partial", cov + "; required rules were not all checked", **detail)
     else:
         st.done("passed", cov, **detail)
+
+
+def _circuit_of(cert: Mapping | None):
+    """The circuit a certificate names, for the rules about the circuit (R24, R25); None without one,
+    or for one that cannot be read (the certificate stages say why)."""
+    if not cert:
+        return None
+    from ..ruleset.compile import circuit_of_certificate
+    try:
+        return circuit_of_certificate(cert)
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def _declared_rules(st: _Stage, release: TaskRelease, arch, prog, declared: Mapping, cert: Mapping | None,

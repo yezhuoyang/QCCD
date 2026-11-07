@@ -219,14 +219,13 @@ These hold as of the code this guide was written against. Each pointer says wher
 - **The place checks cover fewer machine rules than the rule language.** The Python place
   checks (`qccd/gadget/place_checks.py`) judge G1-G11, H1 and H2. F1-F9 and G12-G14 exist only
   in the rule language.
-- **R0, R24 and R25 are not run by the rules stage of a `standard` board.** The board's set is
-  checked by `qccd.verify`, which has no such rules (`qccd/workspace/evaluator.py`,
-  `_rules_stage`). Their substance is
-  covered in part by the Lean checker's conjuncts (`Compiler/lean/QCCDC/Cert/Check.lean`:
-  `MovesAreHops`, `GatesLegal`, `Covered`, `Grounded`, and `RespectsOrder`, strict since
-  2026-10-19). The Debug page judges them directly in the rule language, with the certificate's
-  circuit when it has one (R24 and R25 need the circuit). On C2LR boards the rules stage runs the rule language but passes no
-  circuit, so R24 and R25 do not apply there either.
+- **R24 and R25 need the circuit.** `qccd.verify` has no R0, R24 or R25, so since 2026-11-07 the
+  rules stage of every board also judges the board's set in the rule language, with the circuit
+  the certificate names (`qccd/workspace/evaluator.py`, `_rules_stage`), as it judges an entry's
+  own set. Without a certificate, R24 and R25 do not apply. Their substance is also covered by the
+  Lean checker's conjuncts (`Compiler/lean/QCCDC/Cert/Check.lean`: `MovesAreHops`, `GatesLegal`,
+  `Covered`, `Grounded`, and `RespectsOrder`, strict since 2026-10-19). The Debug page judges them
+  the same way, with the certificate's circuit when it has one.
 - **R10 is skipped by the rules stage on purpose.** The certificate binding, the Lean checker
   and the semantics stage decide it. Outside the Clifford fragment the semantics stage's
   tableau check is `partial`.
