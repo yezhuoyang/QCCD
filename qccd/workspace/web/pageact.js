@@ -969,8 +969,32 @@ function pick() {
   });
 }
 
+// The Debug panel (qccd/site/debug: fixed at the right while it is open, body[data-qdbg]) and the
+// chat share the right edge.  While the panel is open the chat stands left of it, and goes back when
+// the panel closes -- unless the person placed the chat meanwhile (the caller says so: placed()).
+function keepClearOfDebug(el) {
+  var was = null;
+  function fit() {
+    var open = document.body.getAttribute('data-qdbg') === '1', dbg = document.getElementById('dbg');
+    if (open && dbg) {
+      var p = dbg.getBoundingClientRect(), r = el.getBoundingClientRect();
+      if (r.right <= p.left - 8 || r.left >= p.right) return;
+      if (!was) was = { left: el.style.left, right: el.style.right };
+      el.style.left = Math.max(8, p.left - 12 - r.width) + 'px';
+      el.style.right = 'auto';
+    } else if (!open && was) {
+      el.style.left = was.left; el.style.right = was.right;
+      was = null;
+    }
+  }
+  new MutationObserver(fit).observe(document.body, { attributes: true, attributeFilter: ['data-qdbg'] });
+  window.addEventListener('resize', fit);
+  fit();
+  return { placed: function () { was = null; }, fit: fit };
+}
+
 window.QCCD_PAGE = { read: read, act: safe, context: context, pick: pick, keepInView: keepInView,
-                     keepInViewSoon: keepInViewSoon,
+                     keepInViewSoon: keepInViewSoon, keepClearOfDebug: keepClearOfDebug,
                      // the gate (tests/test_agent_interface.py): every control on the page, declared or listed here
                      undeclared: function () {
                        var out = [];

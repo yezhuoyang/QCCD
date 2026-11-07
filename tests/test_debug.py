@@ -445,16 +445,24 @@ def test_the_workspace_studio_debugs_and_hands_a_review_to_the_agent(tmp_path, m
                      " failing: r.failing, py: QCCD_DEBUG.status().python}); })"},
             {"eval": "document.querySelector('#dTabs [data-tab=rules]').click(), document.getElementById('rAgent').click(),"
                      " JSON.stringify({chat: document.getElementById('qcl-text').value,"
-                     " help: !!document.querySelector('.q-agenthelp')})"}]}), encoding="utf-8")
+                     " help: !!document.querySelector('.q-agenthelp')})"},
+            # the chat and the panel share the right edge: the chat stands left of the panel while it is open
+            {"eval": "Math.round(document.getElementById('qcl-dock').getBoundingClientRect().right"
+                     " - document.getElementById('dbg').getBoundingClientRect().left)"},
+            {"eval": "document.getElementById('qdbgBtn').click(), true"},
+            {"wait": "!document.getElementById('dbg')", "timeout": 10000},
+            {"eval": "Math.round(innerWidth - document.getElementById('qcl-dock').getBoundingClientRect().right)"}]}), encoding="utf-8")
         r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
                            timeout=300, cwd=REPO)
         out = json.loads(r.stdout.decode("utf-8") or "{}")
         st = out.get("steps", [])
-        assert len(st) == 5 and all(s.get("ok", True) for s in st[:3]), json.dumps(out)[:3000]
+        assert len(st) == 9 and all(s.get("ok", True) for s in st[:3]), json.dumps(out)[:3000]
         chk = json.loads(st[3]["value"])
         assert chk["n"] > 20 and chk["py"] == "ready", chk                 # judged by the workspace's Python
         got = json.loads(st[4]["value"])
         assert got["chat"].startswith("Review this program with me") and not got["help"], got
+        assert st[5]["value"] <= -8, f"the chat overlaps the Debug panel by {st[5]['value']} px"
+        assert st[8]["value"] <= 20, f"the chat did not go back to its corner: {st[8]['value']} px from the edge"
         assert not out.get("errors"), out.get("errors")
     finally:
         try:
@@ -522,9 +530,12 @@ def test_a_website_page_opened_with_my_agent_is_reviewed_in_its_panel(tmp_path, 
             {"eval": "document.querySelector('#dTabs [data-tab=rules]').click(), document.getElementById('rAgent').click(), true"},  # 3
             {"frame": "/chatframe", "eval": "document.getElementById('qcl-text').value"},                               # 4
             act("debug", verb="inspect", args=[{"rule": "R7", "step": 7}]),                                             # 5
-            act("debug", verb="note", args=[{"step": 7, "rule": "R7", "text": "cool q0 before the gate"}]),             # 6
-            {"eval": "JSON.stringify(QCCD_DEBUG.notes().notes)"},                                                       # 7
-            act("read", controls=False),                                                                                # 8
+            # the chat frame stands left of the open panel, not over it
+            {"eval": "Math.round(document.getElementById('qccd-chat').getBoundingClientRect().right"
+                     " - document.getElementById('dbg').getBoundingClientRect().left)"},                                # 6
+            act("debug", verb="note", args=[{"step": 7, "rule": "R7", "text": "cool q0 before the gate"}]),             # 7
+            {"eval": "JSON.stringify(QCCD_DEBUG.notes().notes)"},                                                       # 8
+            act("read", controls=False),                                                                                # 9
         ]
         code = own("POST", "/api/pair-code", {})["code"]
         spec = tmp_path / "spec.json"
@@ -540,9 +551,10 @@ def test_a_website_page_opened_with_my_agent_is_reviewed_in_its_panel(tmp_path, 
         assert st[4]["value"].startswith("Review this program with me"), diag
         ins = json.loads(st[5]["body"])
         assert ins["ok"] and ins["result"]["result"]["failing"] == 1, diag
-        notes = json.loads(st[7]["value"])
+        assert st[6]["value"] <= -8, f"the chat overlaps the Debug panel by {st[6]['value']} px"
+        notes = json.loads(st[8]["value"])
         assert notes and notes[0]["step"] == 7 and notes[0]["by"], diag   # signed with the agent's name
-        rd = json.loads(st[8]["body"])
+        rd = json.loads(st[9]["body"])
         assert "# Debug panel" in rd["result"]["text"] and "R7" in rd["result"]["text"], diag
     finally:
         httpd.shutdown()

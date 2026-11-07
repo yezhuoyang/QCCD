@@ -1661,6 +1661,9 @@ function movable(dock) {
     try { var r = JSON.parse(localGet('qccd.dock.rect') || 'null');
           if (r && r.x >= 0 && r.y >= 0 && r.x < innerWidth - 80 && r.y < innerHeight - 40) place(r); } catch (e) { /* none */ }
   }
+  // the Debug panel opens at the right edge: the chat steps left of it while it is open (pageact.js)
+  var clear = !CFG.framed && window.QCCD_PAGE && QCCD_PAGE.keepClearOfDebug ? QCCD_PAGE.keepClearOfDebug(dock)
+                                                                           : { placed: function () {}, fit: function () {} };
   function place(r) {
     dock.style.left = r.x + 'px'; dock.style.top = r.y + 'px'; dock.style.right = 'auto'; dock.style.bottom = 'auto';
     // less than the corner allows (300 x 220) is a folded header's size, which older code saved: not the person's
@@ -1675,7 +1678,7 @@ function movable(dock) {
       el.setPointerCapture(e.pointerId);
       function mv(ev) { onDelta(ev.screenX - x0, ev.screenY - y0); x0 = ev.screenX; y0 = ev.screenY; }
       function up() { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up);
-                      el.removeEventListener('pointercancel', up); if (CFG.framed) toParent({ qccd: 'moved' }); else save(); }
+                      el.removeEventListener('pointercancel', up); if (CFG.framed) toParent({ qccd: 'moved' }); else { clear.placed(); save(); } }
       el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
     });
   }
@@ -1700,6 +1703,7 @@ function movable(dock) {
     if (e.target.closest && e.target.closest('button, select')) return;
     if (CFG.framed) { toParent({ qccd: 'home' }); return; }
     localSet('qccd.dock.rect', ''); dock.style.cssText = '';
+    clear.placed(); clear.fit();
   });
 }
 document.addEventListener('click', function () { closeMenu(); });

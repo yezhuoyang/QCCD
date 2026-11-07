@@ -58,6 +58,9 @@ if (nav && CFG.studio_url) {
   nav.appendChild(a);
 }
 
+// the Debug panel opens at the right edge: the chat steps left of it while it is open (pageact.js)
+var clear = window.QCCD_PAGE.keepClearOfDebug(box);
+
 function reply(msg) { if (frame.contentWindow) frame.contentWindow.postMessage(msg, CHAT); }
 // the Debug panel's "Review with my agent": the chat shows the request, and the person sends it
 window.QCCD_AGENT_DRAFT = function (text) {
@@ -82,6 +85,7 @@ window.addEventListener('message', function (e) {
     try { u = new URL(String(m.url || '')); } catch (x) { u = null; }
     if (u && u.origin === CHAT && /^\/(studio|runview\/|compare|run\/)/.test(u.pathname)) location.assign(u.href);
   } else if (m.qccd === 'move' || m.qccd === 'resize') {
+    clear.placed();                                       // the person placed it: it stays where they put it
     var r = box.getBoundingClientRect();
     box.style.right = 'auto'; box.style.bottom = 'auto';
     if (m.qccd === 'move') {
@@ -100,6 +104,7 @@ window.addEventListener('message', function (e) {
                                    h: folded ? Math.round(parseFloat(box.style.height)) || 0 : Math.round(q.height) }));
   } else if (m.qccd === 'home') {
     box.style.cssText = ''; set(RECT_KEY, '');
+    clear.placed(); clear.fit();
   } else if (m.qccd === 'size') {
     box.classList.toggle('min', !!m.min);
     set(MIN_KEY, m.min ? '1' : '0');
