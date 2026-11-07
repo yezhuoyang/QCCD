@@ -280,6 +280,7 @@ class Session:
         self._ion_ids = {str(x.id) for x in self.exe.ions}
         self._ev: Evaluator | None = None
         self._at_cache: dict[tuple, tuple] = {}
+        self._untimed: dict[tuple, dict] = {}     # rules_at's verdicts on rules that name no moment
 
     # ---------------------------------------------------------------- numbering
 
@@ -619,30 +620,68 @@ class Session:
         if rs is not None:
             out["ruleset"] = rs.name
         for r in todo:
-            rec: dict[str, Any] = {"id": r.id, "title": r.title}
-            try:
-                if r.when is not None and not ev.ev(r.when, {}):
-                    rec["here"] = NOT_APPLICABLE
-                    out["rules"].append(rec)
-                    continue
-                n = bad = 0
-                timed = False
-                left = [budget]
-                for e, body in self._cases(ev, r.formula, {}, p, left):
-                    n += 1
-                    timed = timed or any(self._pos(v) is not None for v in e.values())
-                    if not ev.ev(body, e):
-                        bad += 1
-                rec.update(cases=n, failing=bad, every_step=bool(n) and not timed,
-                           here=FAILS if bad else (HOLDS if n else "nothing to judge"))
-            except _OutOfCases:
-                rec.update(here="too many cases", note=f"more than {budget} cases at this step")
-            except NotApplicable as exc:
-                rec.update(here=NOT_APPLICABLE, note=self.renumber(str(exc)))
-            except EvalError as exc:
-                rec.update(here=UNCHECKED, note=self.renumber(str(exc)))
+            # a rule none of whose variables ranges over time (a corner, every pair of rails) judges
+            # the same cases at every step: walked once per programme, with the larger budget
+            key = (str(rules), assertions or "", r.id)
+            if key in self._untimed:
+                out["rules"].append(dict(self._untimed[key]))
+                continue
+            untimed = self._names_no_moment(ev, r)
+            rec = self._rule_at(ev, r, None if untimed else p, CLOSEST_BUDGET if untimed else budget)
+            if untimed:
+                rec["every_step"] = rec.get("cases", 0) > 0 or rec["here"] == "too many cases"
+                self._untimed[key] = dict(rec)
             out["rules"].append(rec)
         return out
+
+    def _rule_at(self, ev: Evaluator, r: Rule, p: int | None, budget: int) -> dict:
+        rec: dict[str, Any] = {"id": r.id, "title": r.title}
+        try:
+            if r.when is not None and not ev.ev(r.when, {}):
+                rec["here"] = NOT_APPLICABLE
+                return rec
+            n = bad = 0
+            timed = False
+            for e, body in self._cases(ev, r.formula, {}, p, [budget]):
+                n += 1
+                timed = timed or any(self._pos(v) is not None for v in e.values())
+                if not ev.ev(body, e):
+                    bad += 1
+            rec.update(cases=n, failing=bad, every_step=bool(n) and not timed,
+                       here=FAILS if bad else (HOLDS if n else "nothing to judge"))
+        except _OutOfCases:
+            rec.update(here="too many cases", note=f"more than {budget} cases" + (" at this step" if p is not None else ""))
+        except NotApplicable as exc:
+            rec.update(here=NOT_APPLICABLE, note=self.renumber(str(exc)))
+        except EvalError as exc:
+            rec.update(here=UNCHECKED, note=self.renumber(str(exc)))
+        return rec
+
+    def _names_no_moment(self, ev: Evaluator, r: Rule) -> bool:
+        """Whether no variable of a rule's `for all`s ranges over time: every domain that depends on
+        nothing else holds no instant, operation or step (one that depends on another variable
+        counts as timed, to be safe)."""
+        def quants(n):
+            if isinstance(n, BinOp) and n.op in ("and", "implies", "or"):
+                yield from quants(n.left)
+                yield from quants(n.right)
+            elif isinstance(n, Not):
+                yield from quants(n.arg)
+            elif isinstance(n, Quant):
+                yield n
+                yield from quants(n.body)
+        try:
+            for q in quants(r.formula):
+                names = {nm for b in q.binders for nm in b.names}
+                for b in q.binders:
+                    if free_names(b.domain) & names:
+                        return False
+                    dom = ev.domain(b.domain, {}, names)
+                    if any(self._pos(v) is not None for v in dom[:64]):
+                        return False
+        except (EvalError, NotApplicable, TypeError):
+            return False
+        return True
 
     def inspect(self, rule: str, step: Any, rules: Any = "standard", assertions: str | None = None, *,
                 limit: int = 40, budget: int = CASES_PER_STEP) -> dict:
