@@ -35,90 +35,14 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from ..arch import Architecture
-from ..arch.wise import gate_zone
+from ..arch.wise import Edge, NotWise, Zones
 from ..ir.tsir import TSIR, Participant
 from .c2lr_router import GATES_2Q, U3, Refused, RouteError, SourceOp, _parse, layers_reading_together, pulses
 from .layered import Emitter, certificate
 
-__all__ = ["Zones", "compile_wise", "compile_with_router", "COMPILER_NAME"]
+__all__ = ["compile_wise", "compile_with_router", "COMPILER_NAME"]
 
 COMPILER_NAME = "wise-router (baseline)"
-
-
-@dataclass(frozen=True)
-class Edge:
-    """A pair of gate zones a swap step can exchange: `u` <- `v` is its merge half, and
-    `in_` and `out` are the rails each half takes, where it is more than the one between them."""
-
-    kind: str
-    u: str
-    v: str
-    in_: tuple[str, ...] = ()
-    out: tuple[str, ...] = ()
-
-
-class Zones:
-    """The gate zones as a graph whose edges are the swap steps' pairs."""
-
-    #: a swap's length in t0: a neighbour, across a junction zone, and between rows (S6's three
-    #: shuttling steps through the junction)
-    COST = {"h": 1, "x": 2, "v": 3}
-
-    def __init__(self, arch: Architecture):
-        p = (arch.device.params if hasattr(arch.device, "params") else {}) or {}
-        if p.get("family") != "wise":
-            raise Refused(f"{arch.name} is not a WISE chip: its geometry does not say family wise")
-        self.h, self.cx, self.cy = int(p["h"]), int(p["cx"]), int(p["cy"])
-        k = self.h + 1
-        m = self.cx * k
-        self.sites = [gate_zone(r, c) for r in range(self.cy) for c in range(m) if c % k]
-        self.edges: dict[str, list[Edge]] = {}
-
-        def add(e: Edge) -> None:
-            self.edges.setdefault(e.kind, []).append(e)
-
-        for r in range(self.cy):
-            for c in range(m):
-                if c % k == 0:      # a junction zone
-                    if c and c + 1 < m:
-                        add(Edge("x", gate_zone(r, c - 1), gate_zone(r, c + 1),
-                                 (f"H{r}_{c}", f"H{r}_{c - 1}"), (f"H{r}_{c - 1}", f"H{r}_{c}")))
-                    continue
-                if c + 1 < m and (c + 1) % k:
-                    add(Edge(f"h{c % 2}", gate_zone(r, c), gate_zone(r, c + 1)))
-        for r in range(self.cy - 1):
-            for c in range(0, m, k):
-                # the row below's rail to its junction zone, the column, this row's rail away
-                rails = (f"H{r + 1}_{c}", f"V{r}_{c}", f"H{r}_{c}")
-                add(Edge(f"vr{r % 2}", gate_zone(r, c + 1), gate_zone(r + 1, c + 1), rails, rails[::-1]))
-                if c:
-                    rails = (f"H{r + 1}_{c - 1}", f"V{r}_{c}", f"H{r}_{c - 1}")
-                    add(Edge(f"vl{r % 2}", gate_zone(r, c - 1), gate_zone(r + 1, c - 1), rails, rails[::-1]))
-        self.slots = [e for kind, es in self.edges.items() if kind.startswith("h") for e in es]
-        self.nbrs: dict[str, list[str]] = {s: [] for s in self.sites}
-        for es in self.edges.values():
-            for e in es:
-                self.nbrs[e.u].append(e.v)
-                self.nbrs[e.v].append(e.u)
-        for v in self.nbrs.values():
-            v.sort()
-        self.dist = {s: self._bfs(s) for s in self.sites}
-        if any(len(d) != len(self.sites) for d in self.dist.values()):
-            raise Refused(f"{arch.name}'s gate zones are not all connected")
-
-    def _bfs(self, src: str) -> dict[str, int]:
-        out = {src: 0}
-        todo = deque([src])
-        while todo:
-            x = todo.popleft()
-            for y in self.nbrs[x]:
-                if y not in out:
-                    out[y] = out[x] + 1
-                    todo.append(y)
-        return out
-
-    def cost(self, kind: str) -> int:
-        return self.COST[kind[0]]
 
 
 def place(z: Zones, n: int, plan: Sequence[Sequence[SourceOp]], *, seed: int = 0, iters: int = 60000) -> dict[int, str]:
@@ -365,7 +289,10 @@ class _Build:
 
 def compile_wise(qasm_text: str, arch: Architecture, *, name: str = "circuit", seed: int = 0) -> tuple[TSIR, dict]:
     """`(programme, certificate)` for `qasm_text` on the chip `arch`, uncooled."""
-    z = Zones(arch)
+    try:
+        z = Zones(arch)
+    except NotWise as exc:
+        raise Refused(str(exc)) from None
     n, ops, _ = _parse(qasm_text)
     plan = layers_reading_together(ops)
     at = place(z, n, plan, seed=seed)

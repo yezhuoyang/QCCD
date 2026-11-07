@@ -1,6 +1,6 @@
 """The words the WISE and Cyclone rule sets are written in (the transport deck's S-rules).
 
-A WISE step's pairs are the device's own (`qccd.compile.wise_router.Zones`) and a Cyclone step's
+A WISE step's pairs are the device's own (`qccd.arch.wise.Zones`) and a Cyclone step's
 one trap round its ring, so each word reads the programme's step against the device, never a
 claim of the programme's.  Each answers for one step, or for the device, as the C rules' words
 do; `qccd/ruleset/library/wise.rules` and `cyclone-deck.rules` say what must hold.
@@ -32,7 +32,7 @@ def _step(ctx: Ctx, k, fn: str) -> dict:
 def _wise_pairs(ctx: Ctx) -> dict[tuple[str, str], set[tuple[str, str]]]:
     """(pair kind, half) -> the moves that kind of step may make, from the device."""
     def make():
-        from ..compile.wise_router import Zones
+        from ..arch.wise import Zones
         out: dict = {}
         for kind, edges in Zones(ctx.hw.arch).edges.items():
             out[(kind, "a")] = {(e.v, e.u) for e in edges}

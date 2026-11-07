@@ -288,6 +288,17 @@ def test_y2_and_y3_catch_data_moved_and_an_ancilla_left_behind(cyclone_prog):
         pass
 
 
+def test_the_rule_words_run_in_the_debug_page_s_python():
+    """The Debug page's bundle holds no compiler, so a word that needs one fails there on WISE alone."""
+    from qccd.site.debugpage import PY_PACKAGES
+    assert "compile" not in PY_PACKAGES and {"ruleset", "arch"} <= set(PY_PACKAGES)
+    src = (ROOT / "qccd" / "ruleset" / "transport.py").read_text(encoding="utf-8")
+    assert "..compile" not in src and "qccd.compile" not in src
+    for mod in ("wise.py", "cyclone.py"):
+        text = (ROOT / "qccd" / "arch" / mod).read_text(encoding="utf-8")
+        assert "..compile" not in text, mod
+
+
 def test_y1_and_y4_read_the_device():
     from qccd.api import Machine
     ring = Architecture.from_json(cyclone.device_doc(8, 4))
