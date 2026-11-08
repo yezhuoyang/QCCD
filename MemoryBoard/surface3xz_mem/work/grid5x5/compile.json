@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 0.886,
+ "total_s": 1.345,
+ "log": "--- qccdc_cli compile (exit 0)\ncircuit: 34 qubits, 66 clbits, 281 ops (144 two-qubit), 391 edges, Clifford -> grid5x5 (broadcast-free regime)\n  23 layers, 286 transport cycles, 633 beams, 144 MS, 57 virtual-Z, 429 instructions\n  - seeded q4 (weight 12) at T1_2h\n  - candidates: greedy 222, spectral 363 -> greedy\n  - hill-climb 222 -> 207 in 2 rounds\n  - weighted interaction distance 207 over 48 distinct pairs\n  - undock deferred: q3 cannot reach T1_1h from T0_1h within 22 cycles\n  - undock deferred: q4 cannot reach T1_2h from T1_1v within 22 cycles\n  - undock deferred: q30 cannot reach T1_0h from T0_0h within 22 cycles\n  - undock deferred: q6 cannot reach T1_0v from T2_0v within 22 cycles\n  - undock deferred: q13 cannot reach T2_0v from T2_2v within 22 cycles\n  - undock deferred: q30 cannot reach T1_0h from T0_0h within 22 cycles\n  - undock deferred: q3 cannot reach T1_1h from T2_1v within 22 cycles\n  certificate: 201 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\grid5x5\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\grid5x5\\prog.qcert.json\n\n"
+}

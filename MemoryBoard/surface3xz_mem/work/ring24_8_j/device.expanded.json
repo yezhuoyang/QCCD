@@ -1,0 +1,1929 @@
+{
+ "name": "ring24_8_j",
+ "schema_version": "0.3",
+ "description": "a 24-slot ring with 8 docks and junction corners",
+ "provenance": {
+  "artifact": "visualizer_24_ancillas_24_junctions_standalone.html",
+  "geometry_label": "W72_H2",
+  "deck": "ion_transport_deck_v3.pptx.pdf",
+  "knowledge": [
+   "fd_verticals_are_the_real_junction_cost",
+   "ex_audit_inline_data"
+  ]
+ },
+ "geometry": {
+  "generator": "ring",
+  "params": {
+   "width": 14,
+   "height": 2,
+   "verticals": 8,
+   "site_zone": "data",
+   "ancilla_zone": "trap",
+   "segment_capacity": 1,
+   "loop_id": "L0",
+   "dock_offset": 0,
+   "corners": "junction"
+  },
+  "nodes": [
+   {
+    "id": "S0",
+    "pos": [
+     1.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S1",
+    "pos": [
+     2.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S2",
+    "pos": [
+     3.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S3",
+    "pos": [
+     4.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S4",
+    "pos": [
+     5.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S5",
+    "pos": [
+     6.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S6",
+    "pos": [
+     7.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S7",
+    "pos": [
+     8.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S8",
+    "pos": [
+     9.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S9",
+    "pos": [
+     10.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S10",
+    "pos": [
+     11.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S11",
+    "pos": [
+     12.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S12",
+    "pos": [
+     12.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S13",
+    "pos": [
+     11.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S14",
+    "pos": [
+     10.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S15",
+    "pos": [
+     9.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S16",
+    "pos": [
+     8.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S17",
+    "pos": [
+     7.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S18",
+    "pos": [
+     6.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S19",
+    "pos": [
+     5.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S20",
+    "pos": [
+     4.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S21",
+    "pos": [
+     3.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S22",
+    "pos": [
+     2.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S23",
+    "pos": [
+     1.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "J0",
+    "pos": [
+     0.0,
+     0.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "corner"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "J1",
+    "pos": [
+     13.0,
+     0.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "corner"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "J2",
+    "pos": [
+     13.0,
+     1.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "corner"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "J3",
+    "pos": [
+     0.0,
+     1.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "corner"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "A0",
+    "pos": [
+     1.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A3",
+    "pos": [
+     4.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A6",
+    "pos": [
+     7.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A9",
+    "pos": [
+     10.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A12",
+    "pos": [
+     12.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A15",
+    "pos": [
+     9.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A18",
+    "pos": [
+     6.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A21",
+    "pos": [
+     3.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   }
+  ],
+  "segments": [
+   {
+    "id": "E0",
+    "ends": [
+     "S0",
+     "S1"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E1",
+    "ends": [
+     "S1",
+     "S2"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E2",
+    "ends": [
+     "S2",
+     "S3"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E3",
+    "ends": [
+     "S3",
+     "S4"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E4",
+    "ends": [
+     "S4",
+     "S5"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E5",
+    "ends": [
+     "S5",
+     "S6"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E6",
+    "ends": [
+     "S6",
+     "S7"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E7",
+    "ends": [
+     "S7",
+     "S8"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E8",
+    "ends": [
+     "S8",
+     "S9"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E9",
+    "ends": [
+     "S9",
+     "S10"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E10",
+    "ends": [
+     "S10",
+     "S11"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E11",
+    "ends": [
+     "S11",
+     "J1"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "E12",
+    "ends": [
+     "J1",
+     "J2"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 2
+   },
+   {
+    "id": "E13",
+    "ends": [
+     "J2",
+     "S12"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "E14",
+    "ends": [
+     "S12",
+     "S13"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E15",
+    "ends": [
+     "S13",
+     "S14"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E16",
+    "ends": [
+     "S14",
+     "S15"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E17",
+    "ends": [
+     "S15",
+     "S16"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E18",
+    "ends": [
+     "S16",
+     "S17"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E19",
+    "ends": [
+     "S17",
+     "S18"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E20",
+    "ends": [
+     "S18",
+     "S19"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E21",
+    "ends": [
+     "S19",
+     "S20"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E22",
+    "ends": [
+     "S20",
+     "S21"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E23",
+    "ends": [
+     "S21",
+     "S22"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E24",
+    "ends": [
+     "S22",
+     "S23"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E25",
+    "ends": [
+     "S23",
+     "J3"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "E26",
+    "ends": [
+     "J3",
+     "J0"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 2
+   },
+   {
+    "id": "E27",
+    "ends": [
+     "J0",
+     "S0"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "V0",
+    "ends": [
+     "S0",
+     "A0"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V3",
+    "ends": [
+     "S3",
+     "A3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V6",
+    "ends": [
+     "S6",
+     "A6"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V9",
+    "ends": [
+     "S9",
+     "A9"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V12",
+    "ends": [
+     "S12",
+     "A12"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V15",
+    "ends": [
+     "S15",
+     "A15"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V18",
+    "ends": [
+     "S18",
+     "A18"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V21",
+    "ends": [
+     "S21",
+     "A21"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   }
+  ],
+  "loops": [
+   {
+    "id": "L0",
+    "kind": "ring",
+    "nodes": [
+     "S0",
+     "S1",
+     "S2",
+     "S3",
+     "S4",
+     "S5",
+     "S6",
+     "S7",
+     "S8",
+     "S9",
+     "S10",
+     "S11",
+     "J1",
+     "J2",
+     "S12",
+     "S13",
+     "S14",
+     "S15",
+     "S16",
+     "S17",
+     "S18",
+     "S19",
+     "S20",
+     "S21",
+     "S22",
+     "S23",
+     "J3",
+     "J0"
+    ],
+    "closed": true,
+    "note": "the rigid-rotation orbit; one movement template shifts every ion on it"
+   }
+  ]
+ },
+ "zone_types": {
+  "data": {
+   "capacity": 2,
+   "gate": false,
+   "spam": false,
+   "cool": true
+  },
+  "trap": {
+   "capacity": 2,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "note": "general-purpose trap: gate, measure and cool all available"
+  },
+  "load": {
+   "capacity": 8,
+   "gate": false,
+   "spam": true,
+   "cool": true,
+   "photoionization": true
+  }
+ },
+ "control": {
+  "model": "simd_classes",
+  "classes": {
+   "generator": "x_junction_grid",
+   "count": 18,
+   "note": "12 directional shifts + 6 directional swaps (JT-SIMD, 2504.17886)",
+   "extra": [
+    {
+     "id": "rotate_cw",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": 1,
+     "note": "the single movement template rigid rotation needs (PLAN \u00a71)"
+    },
+    {
+     "id": "rotate_ccw",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": -1
+    },
+    {
+     "id": "dock",
+     "type": "shift",
+     "orbit": "spurs",
+     "direction": "inward",
+     "entails": [
+      "split",
+      "merge"
+     ],
+     "note": "lifts one ion out of the rail's potential and inserts it into the dock trap: split at the source, merge at the destination. A conveyor-belt rotation entails neither -- the whole chain moves with the potential (2305.03828)"
+    },
+    {
+     "id": "undock",
+     "type": "shift",
+     "orbit": "spurs",
+     "direction": "outward",
+     "entails": [
+      "split",
+      "merge"
+     ]
+    },
+    {
+     "id": "sort_merge",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": -1,
+     "entails": [
+      "merge"
+     ],
+     "note": "one ion of the pair joins the neighbouring chain"
+    },
+    {
+     "id": "sort_split",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": 1,
+     "entails": [
+      "split"
+     ],
+     "note": "the other splits back out; which one realizes the transposition"
+    },
+    {
+     "id": "shuttle",
+     "type": "shift",
+     "orbit": "any",
+     "note": "one ion, one trap to the next; the lowest common denominator move"
+    }
+   ]
+  },
+  "max_simd_classes_per_cycle": 1,
+  "intra_inter_exclusive": true,
+  "wiring": {
+   "scheme": "wise",
+   "dacs_dynamic": 100,
+   "shim_per_dac": 100,
+   "electrodes_per_trap": 24,
+   "electrodes_per_junction": 48,
+   "compensation_electrodes_per_trap": 8
+  },
+  "optical": {
+   "addressing": "global_beam",
+   "per_zone_switch": true
+  },
+  "channels": {
+   "grouping": "broadcast",
+   "roles": {
+    "linear_h": 6,
+    "linear_v": 6,
+    "junction": 4
+   },
+   "differential": 2,
+   "switch_per_site": true
+  }
+ },
+ "primitives": {
+  "ion_swap": {
+   "curve": [
+    {
+     "us": 200.0,
+     "quanta": 2.0,
+     "table": "quantinuum",
+     "source": "arXiv:2003.01293 Table II",
+     "label": "physical swap of a two-ion crystal: 200 us, < 2 quanta per mode (the bound used as the value)"
+    }
+   ]
+  },
+  "merge": {
+   "curve": [
+    {
+     "us": 128.0,
+     "quanta": 1.0,
+     "table": "quantinuum",
+     "source": "arXiv:2003.01293 Table II",
+     "label": "combine: 128 us, < 1 quantum per mode (the bound used as the value)"
+    }
+   ]
+  },
+  "shuttle_segment": {
+   "curve": [
+    {
+     "us": 94.0,
+     "quanta": 0.0075,
+     "table": "quantinuum",
+     "source": "arXiv:2206.11888 Fig. 1 and Table II",
+     "label": "one zone pitch, 375 um at 4 m/s (derived: 94 us), the speed at which a Ba-Yb crystal gains <= 0.03 quanta per round trip of four such legs (derived: 0.0075 per leg)"
+    }
+   ]
+  },
+  "split": {
+   "curve": [
+    {
+     "us": 128.0,
+     "quanta": 1.0,
+     "table": "quantinuum",
+     "source": "arXiv:2003.01293 Table II",
+     "label": "split: 128 us, < 1 quantum per mode (the bound used as the value)"
+    }
+   ]
+  },
+  "junction_cross": {
+   "curve_by_degree": {
+    "3": [
+     {
+      "us": 0.0,
+      "quanta": 0.0,
+      "table": "quantinuum",
+      "source": "arXiv:2206.11888 Table II",
+      "label": "no extra time or excitation beyond the two 375 um legs it joins: a Ba-Yb crystal crosses at the same 4 m/s, and a whole round trip through it (four legs) adds <= 0.03 quanta, charged on the legs. Measured on an X junction; no Y-junction figure for a Ba-Yb crystal is published"
+     }
+    ],
+    "4": [
+     {
+      "us": 0.0,
+      "quanta": 0.0,
+      "table": "quantinuum",
+      "source": "arXiv:2206.11888 Table II",
+      "label": "no extra time or excitation beyond the two 375 um legs it joins: a Ba-Yb crystal crosses at the same 4 m/s, and a whole round trip through it (four legs) adds <= 0.03 quanta, charged on the legs"
+     }
+    ]
+   }
+  },
+  "1q_gate": {
+   "fidelity": 0.999975,
+   "note": "Clifford-averaged infidelity 2.5(1)e-5 on Helios; a single-qubit pi/2 takes 5 us on H0",
+   "source": "arXiv:2511.05465 Table II; duration arXiv:2003.01293 Table III",
+   "us": 5
+  },
+  "cool": {
+   "broadcastable": true,
+   "note": "the 300 us of cooling Helios applies after a shift, before the next gates. It leaves the floor n-bar 0.05 that qccd-noise@2 adds (arXiv:2206.11888, Fig. 3's Ba-Yb experiment); the replay counts heating from 0",
+   "removes_quanta": "all",
+   "scope": "global",
+   "source": "arXiv:2511.05465 p.5",
+   "us": 300
+  },
+  "gate_swap": {
+   "gates": 3,
+   "note": "3 CX, distance-independent: the logical identity SWAP = CX CX CX, not a measured number"
+  },
+  "measure": {
+   "fidelity": 0.999999,
+   "note": "Helios's SPAM error, 4.8(6)e-4, is mostly preparation (arXiv:2511.05465 p.7); the vendor's emulator splits it as p_meas 1e-6 and p_init 5e-4, which this block follows (reset.error). 120 us is H0's high-fidelity measurement",
+   "source": "arXiv:2511.05465 Table II; Quantinuum Helios-1E emulator parameters (p_meas); duration arXiv:2003.01293 Table III",
+   "us": 120
+  },
+  "ms_gate": {
+   "chain_note": "the chain-length term of Murali et al. (arXiv:2004.04706 Eq. 1, ISCA 2020): A ~ N/ln N, referenced to the two-qubit gate the fidelity was measured on",
+   "error_vs_chain": "murali:2",
+   "error_vs_quanta": "linear:9.5e-4",
+   "fidelity_at_n0": 0.99921,
+   "max_quanta": 1,
+   "note": "two-qubit RB infidelity 7.9(2)e-4 on Helios, gate time about 70 us. Error per quantum (derived): Bell-state fidelity 0.993(1) near the ground state and 0.974(1) at n-bar 20(2), the same MS gate (arXiv:0810.0670 Sec. 5.2), i.e. 9.5e-4 per quantum. max_quanta is R7's gate budget, a rule of the boards, not a measurement",
+   "source": "arXiv:2511.05465 Table II and p.5; arXiv:0810.0670 Sec. 5.2",
+   "us": 70
+  },
+  "reset": {
+   "error": 0.0005,
+   "note": "preparation error p_init 5e-4 of the vendor's Helios emulator, the bulk of the measured SPAM 4.8(6)e-4; H0 initialises in 10 us",
+   "source": "Quantinuum Helios-1E emulator parameters (p_init); arXiv:2511.05465 Table II; duration arXiv:2003.01293 Table III",
+   "us": 10
+  }
+ },
+ "heating": {
+  "anomalous_rate_quanta_per_ms": 0.029,
+  "note": "R17: accrues whether or not the ion moves. 29(4) quanta/s, the axial centre-of-mass mode of a Ba-Yb crystal in Quantinuum's junction trap",
+  "source": "arXiv:2206.11888 Fig. 3 caption"
+ },
+ "species": {
+  "T_coh_s": 126.6,
+  "coolant": "171Yb+",
+  "coolant_fraction": 0.5,
+  "note": "Helios pairs each 137Ba+ qubit with one 171Yb+ coolant. T_coh_s (derived) is 1/r for the Helios linear memory rate r = 7.9e-3/s, so the coarse idle estimate of qccd.cost.physical agrees with qccd-noise@2's memory channel",
+  "qubit": "137Ba+",
+  "source": "arXiv:2511.05465 Sec. II B",
+  "sympathetic": true
+ },
+ "budget": {
+  "junction_electrode_multiplier": 2,
+  "max_area_mm2": 100,
+  "max_dacs": 128,
+  "max_junctions": 200
+ },
+ "node_caps": {
+  "S0": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S1": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S2": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S3": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S4": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S5": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S6": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S7": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S8": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S9": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S10": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S11": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S12": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S13": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S14": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S15": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S16": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S17": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S18": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S19": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S20": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S21": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S22": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S23": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "J0": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "corner"
+   ]
+  },
+  "J1": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "corner"
+   ]
+  },
+  "J2": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "corner"
+   ]
+  },
+  "J3": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "corner"
+   ]
+  },
+  "A0": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A3": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A6": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A9": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A12": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A15": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A18": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A21": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  }
+ },
+ "simd_classes": {
+  "rotate_cw": {
+   "id": "rotate_cw",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": 1,
+   "note": "the single movement template rigid rotation needs (PLAN \u00a71)"
+  },
+  "rotate_ccw": {
+   "id": "rotate_ccw",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": -1
+  },
+  "dock": {
+   "id": "dock",
+   "type": "shift",
+   "orbit": "spurs",
+   "direction": "inward",
+   "entails": [
+    "split",
+    "merge"
+   ],
+   "note": "lifts one ion out of the rail's potential and inserts it into the dock trap: split at the source, merge at the destination. A conveyor-belt rotation entails neither -- the whole chain moves with the potential (2305.03828)"
+  },
+  "undock": {
+   "id": "undock",
+   "type": "shift",
+   "orbit": "spurs",
+   "direction": "outward",
+   "entails": [
+    "split",
+    "merge"
+   ]
+  },
+  "sort_merge": {
+   "id": "sort_merge",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": -1,
+   "entails": [
+    "merge"
+   ],
+   "note": "one ion of the pair joins the neighbouring chain"
+  },
+  "sort_split": {
+   "id": "sort_split",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": 1,
+   "entails": [
+    "split"
+   ],
+   "note": "the other splits back out; which one realizes the transposition"
+  },
+  "shuttle": {
+   "id": "shuttle",
+   "type": "shift",
+   "orbit": "any",
+   "note": "one ion, one trap to the next; the lowest common denominator move"
+  }
+ },
+ "max_simd_classes_per_cycle": 1,
+ "entails": {
+  "rotate_cw": [],
+  "rotate_ccw": [],
+  "dock": [
+   "split",
+   "merge"
+  ],
+  "undock": [
+   "split",
+   "merge"
+  ],
+  "sort_merge": [
+   "merge"
+  ],
+  "sort_split": [
+   "split"
+  ],
+  "shuttle": []
+ },
+ "loop_corners": {
+  "L0": [
+   "J0",
+   "J1",
+   "J2",
+   "J3"
+  ]
+ },
+ "corner_endpoints": {
+  "E0": 0,
+  "E1": 0,
+  "E2": 0,
+  "E3": 0,
+  "E4": 0,
+  "E5": 0,
+  "E6": 0,
+  "E7": 0,
+  "E8": 0,
+  "E9": 0,
+  "E10": 0,
+  "E11": 1,
+  "E12": 2,
+  "E13": 1,
+  "E14": 0,
+  "E15": 0,
+  "E16": 0,
+  "E17": 0,
+  "E18": 0,
+  "E19": 0,
+  "E20": 0,
+  "E21": 0,
+  "E22": 0,
+  "E23": 0,
+  "E24": 0,
+  "E25": 1,
+  "E26": 2,
+  "E27": 1,
+  "V0": 0,
+  "V3": 0,
+  "V6": 0,
+  "V9": 0,
+  "V12": 0,
+  "V15": 0,
+  "V18": 0,
+  "V21": 0
+ },
+ "sha256": "0385a02315922e8de084b5318d601d8b6a02228c625728263e84ee63a3fbc92d"
+}

@@ -1,0 +1,118 @@
+{
+ "kind": "qccd.ler_report",
+ "version": 1,
+ "experiment": {
+  "experiment": "surface3_r3_z",
+  "code": "rotated_surface_d3",
+  "distance": 3,
+  "rounds": 3,
+  "basis": "Z",
+  "n_data": 9,
+  "n_ancilla": 8,
+  "detectors": 24,
+  "observables": 1,
+  "matchable": true,
+  "readout": "appended",
+  "logical_qubits": 1,
+  "ions": 17
+ },
+ "noise": {
+  "id": "qccd-noise@1",
+  "settings": {
+   "id": "qccd-noise@1",
+   "t2_s": null,
+   "scale": 1.0,
+   "heating": true,
+   "chain": true,
+   "idle": true,
+   "table": "qccdsim_jones"
+  },
+  "params": {
+   "id": "qccd-noise@1",
+   "table": "qccdsim_jones",
+   "scale": 1.0,
+   "heating": true,
+   "chain": true,
+   "idle": true,
+   "p1": 2.5000000000052758e-05,
+   "pm": 0.0016000000000000458,
+   "pr": 0.005,
+   "t2_s": 600.0,
+   "t2_source": "species.T_coh_s",
+   "ms": {
+    "eps0": 0.0018399999999999528,
+    "error_vs_quanta": "linear:2.0e-3",
+    "error_vs_chain": "murali:2",
+    "max_quanta": 1.0
+   }
+  },
+  "evaluation": {
+   "name": "qccd-noise@1",
+   "digest": "sha256:e46c03f0624231d046973baea76f1e69e93a85b16745d43b230ddca8223db818"
+  }
+ },
+ "check": {
+  "stage": "noiseless",
+  "ok": true,
+  "reason": "every detector and observable is deterministic and has the source's parity",
+  "nondeterministic": false,
+  "wrong_detectors": [],
+  "wrong_observables": [],
+  "random_detectors": [],
+  "random_observables": []
+ },
+ "ler": {
+  "ler": 0.001775,
+  "lo": 0.0015522580114410963,
+  "hi": 0.0020296394811337077,
+  "shots": 120000,
+  "errors": 213,
+  "per_round": 0.0005920170817275139,
+  "per_round_lo": 0.0005176872910315211,
+  "per_round_hi": 0.0006770047256781098,
+  "rounds": 3,
+  "decoder": "pymatching",
+  "seconds": 0.026,
+  "seed": 20260928,
+  "stim_version": "1.15.0",
+  "stopped": "max_errors"
+ },
+ "budget": {
+  "ms_base": 0.1324799999999966,
+  "ms_heating": 0.016815000000000024,
+  "ms_chain": 0.0,
+  "gate_1q": 0.00780000000001646,
+  "measure": 0.05280000000000151,
+  "reset": 0.08,
+  "idle": 0.0002861665836280114,
+  "total": 0.2901811665836426
+ },
+ "stats": {
+  "n_ms": 72,
+  "n_1q": 312,
+  "n_vz": 24,
+  "n_measure": 24,
+  "n_reset": 16,
+  "n_cool": 12,
+  "n_readout_appended": 9,
+  "n_instructions": 126,
+  "nbar_max": 0.30125,
+  "nbar_mean_at_ms": 0.11677083333333334,
+  "chain_max": 2,
+  "t_us": 20080.0,
+  "t_readout_us": 120.0,
+  "ions": 17,
+  "qubits": 17,
+  "detectors": 24,
+  "observables": 1,
+  "qubit_map": "meta.qubit_map",
+  "rules_failed": [],
+  "rule_violations": {},
+  "cert_crosscheck": "agrees"
+ },
+ "tools": {
+  "stim": "1.15.0",
+  "pymatching": "2.4.0",
+  "ldpc": "2.4.1"
+ }
+}

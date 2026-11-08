@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 2.051,
+ "total_s": 2.327,
+ "log": "--- qccdc_cli compile (exit 0)\ncircuit: 34 qubits, 66 clbits, 281 ops (144 two-qubit), 391 edges, Clifford -> grid9x9 (free regime)\n  23 layers, 210 transport cycles, 633 beams, 144 MS, 57 virtual-Z, 353 instructions\n  - seeded q4 (weight 12) at T3_4h\n  - candidates: greedy 180, spectral 360 -> greedy\n  - weighted interaction distance 180 over 48 distinct pairs\n  - undock deferred: q16 cannot reach T2_0v from T1_1h within 38 cycles\n  - undock deferred: q4 cannot reach T3_4h from T3_3v within 38 cycles\n  - undock deferred: q11 cannot reach T2_1v from T0_2h within 38 cycles\n  - undock deferred: q7 cannot reach T3_4v from T3_5v within 38 cycles\n  certificate: 201 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\grid9x9\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\grid9x9\\prog.qcert.json\n\n"
+}

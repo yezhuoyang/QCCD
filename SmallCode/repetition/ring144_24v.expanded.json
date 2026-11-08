@@ -1,0 +1,7719 @@
+{
+ "name": "ring144_24v",
+ "schema_version": "0.3",
+ "description": "The shipped 24-dock design: a 2x72 rectangular rotation loop of 144 slots with 24 evenly spaced dock spurs to mid-line traps. The spurs are what make 24 of the 144 rail nodes degree 3, putting a junction on every rigid hop.",
+ "provenance": {
+  "artifact": "visualizer_24_ancillas_24_junctions_standalone.html",
+  "geometry_label": "W72_H2",
+  "deck": "ion_transport_deck_v3.pptx.pdf",
+  "knowledge": [
+   "fd_verticals_are_the_real_junction_cost",
+   "ex_audit_inline_data"
+  ]
+ },
+ "geometry": {
+  "generator": "ring",
+  "params": {
+   "width": 72,
+   "height": 2,
+   "verticals": 24,
+   "site_zone": "data",
+   "ancilla_zone": "trap",
+   "segment_capacity": 1,
+   "loop_id": "L0",
+   "dock_offset": 0
+  },
+  "nodes": [
+   {
+    "id": "S0",
+    "pos": [
+     0.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": true
+   },
+   {
+    "id": "S1",
+    "pos": [
+     1.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S2",
+    "pos": [
+     2.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S3",
+    "pos": [
+     3.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S4",
+    "pos": [
+     4.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S5",
+    "pos": [
+     5.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S6",
+    "pos": [
+     6.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S7",
+    "pos": [
+     7.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S8",
+    "pos": [
+     8.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S9",
+    "pos": [
+     9.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S10",
+    "pos": [
+     10.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S11",
+    "pos": [
+     11.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S12",
+    "pos": [
+     12.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S13",
+    "pos": [
+     13.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S14",
+    "pos": [
+     14.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S15",
+    "pos": [
+     15.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S16",
+    "pos": [
+     16.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S17",
+    "pos": [
+     17.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S18",
+    "pos": [
+     18.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S19",
+    "pos": [
+     19.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S20",
+    "pos": [
+     20.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S21",
+    "pos": [
+     21.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S22",
+    "pos": [
+     22.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S23",
+    "pos": [
+     23.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S24",
+    "pos": [
+     24.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S25",
+    "pos": [
+     25.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S26",
+    "pos": [
+     26.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S27",
+    "pos": [
+     27.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S28",
+    "pos": [
+     28.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S29",
+    "pos": [
+     29.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S30",
+    "pos": [
+     30.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S31",
+    "pos": [
+     31.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S32",
+    "pos": [
+     32.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S33",
+    "pos": [
+     33.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S34",
+    "pos": [
+     34.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S35",
+    "pos": [
+     35.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S36",
+    "pos": [
+     36.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S37",
+    "pos": [
+     37.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S38",
+    "pos": [
+     38.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S39",
+    "pos": [
+     39.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S40",
+    "pos": [
+     40.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S41",
+    "pos": [
+     41.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S42",
+    "pos": [
+     42.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S43",
+    "pos": [
+     43.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S44",
+    "pos": [
+     44.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S45",
+    "pos": [
+     45.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S46",
+    "pos": [
+     46.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S47",
+    "pos": [
+     47.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S48",
+    "pos": [
+     48.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S49",
+    "pos": [
+     49.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S50",
+    "pos": [
+     50.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S51",
+    "pos": [
+     51.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S52",
+    "pos": [
+     52.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S53",
+    "pos": [
+     53.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S54",
+    "pos": [
+     54.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S55",
+    "pos": [
+     55.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S56",
+    "pos": [
+     56.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S57",
+    "pos": [
+     57.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S58",
+    "pos": [
+     58.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S59",
+    "pos": [
+     59.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S60",
+    "pos": [
+     60.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S61",
+    "pos": [
+     61.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S62",
+    "pos": [
+     62.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S63",
+    "pos": [
+     63.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S64",
+    "pos": [
+     64.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S65",
+    "pos": [
+     65.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S66",
+    "pos": [
+     66.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S67",
+    "pos": [
+     67.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S68",
+    "pos": [
+     68.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S69",
+    "pos": [
+     69.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S70",
+    "pos": [
+     70.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S71",
+    "pos": [
+     71.0,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "top"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "S72",
+    "pos": [
+     71.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": true
+   },
+   {
+    "id": "S73",
+    "pos": [
+     70.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S74",
+    "pos": [
+     69.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S75",
+    "pos": [
+     68.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S76",
+    "pos": [
+     67.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S77",
+    "pos": [
+     66.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S78",
+    "pos": [
+     65.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S79",
+    "pos": [
+     64.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S80",
+    "pos": [
+     63.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S81",
+    "pos": [
+     62.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S82",
+    "pos": [
+     61.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S83",
+    "pos": [
+     60.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S84",
+    "pos": [
+     59.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S85",
+    "pos": [
+     58.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S86",
+    "pos": [
+     57.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S87",
+    "pos": [
+     56.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S88",
+    "pos": [
+     55.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S89",
+    "pos": [
+     54.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S90",
+    "pos": [
+     53.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S91",
+    "pos": [
+     52.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S92",
+    "pos": [
+     51.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S93",
+    "pos": [
+     50.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S94",
+    "pos": [
+     49.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S95",
+    "pos": [
+     48.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S96",
+    "pos": [
+     47.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S97",
+    "pos": [
+     46.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S98",
+    "pos": [
+     45.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S99",
+    "pos": [
+     44.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S100",
+    "pos": [
+     43.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S101",
+    "pos": [
+     42.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S102",
+    "pos": [
+     41.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S103",
+    "pos": [
+     40.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S104",
+    "pos": [
+     39.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S105",
+    "pos": [
+     38.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S106",
+    "pos": [
+     37.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S107",
+    "pos": [
+     36.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S108",
+    "pos": [
+     35.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S109",
+    "pos": [
+     34.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S110",
+    "pos": [
+     33.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S111",
+    "pos": [
+     32.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S112",
+    "pos": [
+     31.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S113",
+    "pos": [
+     30.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S114",
+    "pos": [
+     29.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S115",
+    "pos": [
+     28.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S116",
+    "pos": [
+     27.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S117",
+    "pos": [
+     26.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S118",
+    "pos": [
+     25.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S119",
+    "pos": [
+     24.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S120",
+    "pos": [
+     23.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S121",
+    "pos": [
+     22.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S122",
+    "pos": [
+     21.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S123",
+    "pos": [
+     20.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S124",
+    "pos": [
+     19.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S125",
+    "pos": [
+     18.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S126",
+    "pos": [
+     17.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S127",
+    "pos": [
+     16.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S128",
+    "pos": [
+     15.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S129",
+    "pos": [
+     14.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S130",
+    "pos": [
+     13.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S131",
+    "pos": [
+     12.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S132",
+    "pos": [
+     11.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S133",
+    "pos": [
+     10.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S134",
+    "pos": [
+     9.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S135",
+    "pos": [
+     8.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S136",
+    "pos": [
+     7.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S137",
+    "pos": [
+     6.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S138",
+    "pos": [
+     5.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom",
+     "dock"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "S139",
+    "pos": [
+     4.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S140",
+    "pos": [
+     3.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S141",
+    "pos": [
+     2.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S142",
+    "pos": [
+     1.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "S143",
+    "pos": [
+     0.0,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "data",
+    "labels": [
+     "bottom"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "A0",
+    "pos": [
+     0.0,
+     -0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A6",
+    "pos": [
+     6.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A12",
+    "pos": [
+     12.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A18",
+    "pos": [
+     18.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A24",
+    "pos": [
+     24.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A30",
+    "pos": [
+     30.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A36",
+    "pos": [
+     36.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A42",
+    "pos": [
+     42.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A48",
+    "pos": [
+     48.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A54",
+    "pos": [
+     54.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A60",
+    "pos": [
+     60.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A66",
+    "pos": [
+     66.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A72",
+    "pos": [
+     71.0,
+     1.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A78",
+    "pos": [
+     65.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A84",
+    "pos": [
+     59.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A90",
+    "pos": [
+     53.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A96",
+    "pos": [
+     47.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A102",
+    "pos": [
+     41.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A108",
+    "pos": [
+     35.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A114",
+    "pos": [
+     29.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A120",
+    "pos": [
+     23.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A126",
+    "pos": [
+     17.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A132",
+    "pos": [
+     11.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   },
+   {
+    "id": "A138",
+    "pos": [
+     5.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "spur_trap"
+    ],
+    "degree": 1,
+    "corner": false
+   }
+  ],
+  "segments": [
+   {
+    "id": "E0",
+    "ends": [
+     "S0",
+     "S1"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "E1",
+    "ends": [
+     "S1",
+     "S2"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E2",
+    "ends": [
+     "S2",
+     "S3"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E3",
+    "ends": [
+     "S3",
+     "S4"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E4",
+    "ends": [
+     "S4",
+     "S5"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E5",
+    "ends": [
+     "S5",
+     "S6"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E6",
+    "ends": [
+     "S6",
+     "S7"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E7",
+    "ends": [
+     "S7",
+     "S8"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E8",
+    "ends": [
+     "S8",
+     "S9"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E9",
+    "ends": [
+     "S9",
+     "S10"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E10",
+    "ends": [
+     "S10",
+     "S11"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E11",
+    "ends": [
+     "S11",
+     "S12"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E12",
+    "ends": [
+     "S12",
+     "S13"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E13",
+    "ends": [
+     "S13",
+     "S14"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E14",
+    "ends": [
+     "S14",
+     "S15"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E15",
+    "ends": [
+     "S15",
+     "S16"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E16",
+    "ends": [
+     "S16",
+     "S17"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E17",
+    "ends": [
+     "S17",
+     "S18"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E18",
+    "ends": [
+     "S18",
+     "S19"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E19",
+    "ends": [
+     "S19",
+     "S20"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E20",
+    "ends": [
+     "S20",
+     "S21"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E21",
+    "ends": [
+     "S21",
+     "S22"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E22",
+    "ends": [
+     "S22",
+     "S23"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E23",
+    "ends": [
+     "S23",
+     "S24"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E24",
+    "ends": [
+     "S24",
+     "S25"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E25",
+    "ends": [
+     "S25",
+     "S26"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E26",
+    "ends": [
+     "S26",
+     "S27"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E27",
+    "ends": [
+     "S27",
+     "S28"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E28",
+    "ends": [
+     "S28",
+     "S29"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E29",
+    "ends": [
+     "S29",
+     "S30"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E30",
+    "ends": [
+     "S30",
+     "S31"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E31",
+    "ends": [
+     "S31",
+     "S32"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E32",
+    "ends": [
+     "S32",
+     "S33"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E33",
+    "ends": [
+     "S33",
+     "S34"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E34",
+    "ends": [
+     "S34",
+     "S35"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E35",
+    "ends": [
+     "S35",
+     "S36"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E36",
+    "ends": [
+     "S36",
+     "S37"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E37",
+    "ends": [
+     "S37",
+     "S38"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E38",
+    "ends": [
+     "S38",
+     "S39"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E39",
+    "ends": [
+     "S39",
+     "S40"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E40",
+    "ends": [
+     "S40",
+     "S41"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E41",
+    "ends": [
+     "S41",
+     "S42"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E42",
+    "ends": [
+     "S42",
+     "S43"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E43",
+    "ends": [
+     "S43",
+     "S44"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E44",
+    "ends": [
+     "S44",
+     "S45"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E45",
+    "ends": [
+     "S45",
+     "S46"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E46",
+    "ends": [
+     "S46",
+     "S47"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E47",
+    "ends": [
+     "S47",
+     "S48"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E48",
+    "ends": [
+     "S48",
+     "S49"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E49",
+    "ends": [
+     "S49",
+     "S50"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E50",
+    "ends": [
+     "S50",
+     "S51"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E51",
+    "ends": [
+     "S51",
+     "S52"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E52",
+    "ends": [
+     "S52",
+     "S53"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E53",
+    "ends": [
+     "S53",
+     "S54"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E54",
+    "ends": [
+     "S54",
+     "S55"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E55",
+    "ends": [
+     "S55",
+     "S56"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E56",
+    "ends": [
+     "S56",
+     "S57"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E57",
+    "ends": [
+     "S57",
+     "S58"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E58",
+    "ends": [
+     "S58",
+     "S59"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E59",
+    "ends": [
+     "S59",
+     "S60"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E60",
+    "ends": [
+     "S60",
+     "S61"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E61",
+    "ends": [
+     "S61",
+     "S62"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E62",
+    "ends": [
+     "S62",
+     "S63"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E63",
+    "ends": [
+     "S63",
+     "S64"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E64",
+    "ends": [
+     "S64",
+     "S65"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E65",
+    "ends": [
+     "S65",
+     "S66"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E66",
+    "ends": [
+     "S66",
+     "S67"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E67",
+    "ends": [
+     "S67",
+     "S68"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E68",
+    "ends": [
+     "S68",
+     "S69"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E69",
+    "ends": [
+     "S69",
+     "S70"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E70",
+    "ends": [
+     "S70",
+     "S71"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "E71",
+    "ends": [
+     "S71",
+     "S72"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 2
+   },
+   {
+    "id": "E72",
+    "ends": [
+     "S72",
+     "S73"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "E73",
+    "ends": [
+     "S73",
+     "S74"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E74",
+    "ends": [
+     "S74",
+     "S75"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E75",
+    "ends": [
+     "S75",
+     "S76"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E76",
+    "ends": [
+     "S76",
+     "S77"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E77",
+    "ends": [
+     "S77",
+     "S78"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E78",
+    "ends": [
+     "S78",
+     "S79"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E79",
+    "ends": [
+     "S79",
+     "S80"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E80",
+    "ends": [
+     "S80",
+     "S81"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E81",
+    "ends": [
+     "S81",
+     "S82"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E82",
+    "ends": [
+     "S82",
+     "S83"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E83",
+    "ends": [
+     "S83",
+     "S84"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E84",
+    "ends": [
+     "S84",
+     "S85"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E85",
+    "ends": [
+     "S85",
+     "S86"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E86",
+    "ends": [
+     "S86",
+     "S87"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E87",
+    "ends": [
+     "S87",
+     "S88"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E88",
+    "ends": [
+     "S88",
+     "S89"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E89",
+    "ends": [
+     "S89",
+     "S90"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E90",
+    "ends": [
+     "S90",
+     "S91"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E91",
+    "ends": [
+     "S91",
+     "S92"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E92",
+    "ends": [
+     "S92",
+     "S93"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E93",
+    "ends": [
+     "S93",
+     "S94"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E94",
+    "ends": [
+     "S94",
+     "S95"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E95",
+    "ends": [
+     "S95",
+     "S96"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E96",
+    "ends": [
+     "S96",
+     "S97"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E97",
+    "ends": [
+     "S97",
+     "S98"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E98",
+    "ends": [
+     "S98",
+     "S99"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E99",
+    "ends": [
+     "S99",
+     "S100"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E100",
+    "ends": [
+     "S100",
+     "S101"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E101",
+    "ends": [
+     "S101",
+     "S102"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E102",
+    "ends": [
+     "S102",
+     "S103"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E103",
+    "ends": [
+     "S103",
+     "S104"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E104",
+    "ends": [
+     "S104",
+     "S105"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E105",
+    "ends": [
+     "S105",
+     "S106"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E106",
+    "ends": [
+     "S106",
+     "S107"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E107",
+    "ends": [
+     "S107",
+     "S108"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E108",
+    "ends": [
+     "S108",
+     "S109"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E109",
+    "ends": [
+     "S109",
+     "S110"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E110",
+    "ends": [
+     "S110",
+     "S111"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E111",
+    "ends": [
+     "S111",
+     "S112"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E112",
+    "ends": [
+     "S112",
+     "S113"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E113",
+    "ends": [
+     "S113",
+     "S114"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E114",
+    "ends": [
+     "S114",
+     "S115"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E115",
+    "ends": [
+     "S115",
+     "S116"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E116",
+    "ends": [
+     "S116",
+     "S117"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E117",
+    "ends": [
+     "S117",
+     "S118"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E118",
+    "ends": [
+     "S118",
+     "S119"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E119",
+    "ends": [
+     "S119",
+     "S120"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E120",
+    "ends": [
+     "S120",
+     "S121"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E121",
+    "ends": [
+     "S121",
+     "S122"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E122",
+    "ends": [
+     "S122",
+     "S123"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E123",
+    "ends": [
+     "S123",
+     "S124"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E124",
+    "ends": [
+     "S124",
+     "S125"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E125",
+    "ends": [
+     "S125",
+     "S126"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E126",
+    "ends": [
+     "S126",
+     "S127"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E127",
+    "ends": [
+     "S127",
+     "S128"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E128",
+    "ends": [
+     "S128",
+     "S129"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E129",
+    "ends": [
+     "S129",
+     "S130"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E130",
+    "ends": [
+     "S130",
+     "S131"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E131",
+    "ends": [
+     "S131",
+     "S132"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E132",
+    "ends": [
+     "S132",
+     "S133"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E133",
+    "ends": [
+     "S133",
+     "S134"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E134",
+    "ends": [
+     "S134",
+     "S135"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E135",
+    "ends": [
+     "S135",
+     "S136"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E136",
+    "ends": [
+     "S136",
+     "S137"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E137",
+    "ends": [
+     "S137",
+     "S138"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E138",
+    "ends": [
+     "S138",
+     "S139"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E139",
+    "ends": [
+     "S139",
+     "S140"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E140",
+    "ends": [
+     "S140",
+     "S141"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E141",
+    "ends": [
+     "S141",
+     "S142"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "E142",
+    "ends": [
+     "S142",
+     "S143"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 1
+   },
+   {
+    "id": "E143",
+    "ends": [
+     "S143",
+     "S0"
+    ],
+    "length": 1.0,
+    "capacity": 1,
+    "loop": "L0",
+    "labels": [
+     "rail"
+    ],
+    "corner_endpoints": 2
+   },
+   {
+    "id": "V0",
+    "ends": [
+     "S0",
+     "A0"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V6",
+    "ends": [
+     "S6",
+     "A6"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V12",
+    "ends": [
+     "S12",
+     "A12"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V18",
+    "ends": [
+     "S18",
+     "A18"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V24",
+    "ends": [
+     "S24",
+     "A24"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V30",
+    "ends": [
+     "S30",
+     "A30"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V36",
+    "ends": [
+     "S36",
+     "A36"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V42",
+    "ends": [
+     "S42",
+     "A42"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V48",
+    "ends": [
+     "S48",
+     "A48"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V54",
+    "ends": [
+     "S54",
+     "A54"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V60",
+    "ends": [
+     "S60",
+     "A60"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V66",
+    "ends": [
+     "S66",
+     "A66"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V72",
+    "ends": [
+     "S72",
+     "A72"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V78",
+    "ends": [
+     "S78",
+     "A78"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V84",
+    "ends": [
+     "S84",
+     "A84"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V90",
+    "ends": [
+     "S90",
+     "A90"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V96",
+    "ends": [
+     "S96",
+     "A96"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V102",
+    "ends": [
+     "S102",
+     "A102"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V108",
+    "ends": [
+     "S108",
+     "A108"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V114",
+    "ends": [
+     "S114",
+     "A114"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V120",
+    "ends": [
+     "S120",
+     "A120"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V126",
+    "ends": [
+     "S126",
+     "A126"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V132",
+    "ends": [
+     "S132",
+     "A132"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   },
+   {
+    "id": "V138",
+    "ends": [
+     "S138",
+     "A138"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "labels": [
+     "spur"
+    ],
+    "corner_endpoints": 0
+   }
+  ],
+  "loops": [
+   {
+    "id": "L0",
+    "kind": "ring",
+    "nodes": [
+     "S0",
+     "S1",
+     "S2",
+     "S3",
+     "S4",
+     "S5",
+     "S6",
+     "S7",
+     "S8",
+     "S9",
+     "S10",
+     "S11",
+     "S12",
+     "S13",
+     "S14",
+     "S15",
+     "S16",
+     "S17",
+     "S18",
+     "S19",
+     "S20",
+     "S21",
+     "S22",
+     "S23",
+     "S24",
+     "S25",
+     "S26",
+     "S27",
+     "S28",
+     "S29",
+     "S30",
+     "S31",
+     "S32",
+     "S33",
+     "S34",
+     "S35",
+     "S36",
+     "S37",
+     "S38",
+     "S39",
+     "S40",
+     "S41",
+     "S42",
+     "S43",
+     "S44",
+     "S45",
+     "S46",
+     "S47",
+     "S48",
+     "S49",
+     "S50",
+     "S51",
+     "S52",
+     "S53",
+     "S54",
+     "S55",
+     "S56",
+     "S57",
+     "S58",
+     "S59",
+     "S60",
+     "S61",
+     "S62",
+     "S63",
+     "S64",
+     "S65",
+     "S66",
+     "S67",
+     "S68",
+     "S69",
+     "S70",
+     "S71",
+     "S72",
+     "S73",
+     "S74",
+     "S75",
+     "S76",
+     "S77",
+     "S78",
+     "S79",
+     "S80",
+     "S81",
+     "S82",
+     "S83",
+     "S84",
+     "S85",
+     "S86",
+     "S87",
+     "S88",
+     "S89",
+     "S90",
+     "S91",
+     "S92",
+     "S93",
+     "S94",
+     "S95",
+     "S96",
+     "S97",
+     "S98",
+     "S99",
+     "S100",
+     "S101",
+     "S102",
+     "S103",
+     "S104",
+     "S105",
+     "S106",
+     "S107",
+     "S108",
+     "S109",
+     "S110",
+     "S111",
+     "S112",
+     "S113",
+     "S114",
+     "S115",
+     "S116",
+     "S117",
+     "S118",
+     "S119",
+     "S120",
+     "S121",
+     "S122",
+     "S123",
+     "S124",
+     "S125",
+     "S126",
+     "S127",
+     "S128",
+     "S129",
+     "S130",
+     "S131",
+     "S132",
+     "S133",
+     "S134",
+     "S135",
+     "S136",
+     "S137",
+     "S138",
+     "S139",
+     "S140",
+     "S141",
+     "S142",
+     "S143"
+    ],
+    "closed": true,
+    "note": "the rigid-rotation orbit; one movement template shifts every ion on it"
+   }
+  ]
+ },
+ "zone_types": {
+  "data": {
+   "capacity": 2,
+   "gate": false,
+   "spam": false,
+   "cool": true
+  },
+  "trap": {
+   "capacity": 2,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "note": "general-purpose trap: gate, measure and cool all available"
+  },
+  "load": {
+   "capacity": 8,
+   "gate": false,
+   "spam": true,
+   "cool": true,
+   "photoionization": true
+  }
+ },
+ "control": {
+  "model": "simd_classes",
+  "classes": {
+   "generator": "x_junction_grid",
+   "count": 18,
+   "note": "12 directional shifts + 6 directional swaps (JT-SIMD, 2504.17886)",
+   "extra": [
+    {
+     "id": "rotate_cw",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": 1,
+     "note": "the single movement template rigid rotation needs (PLAN \u00a71)"
+    },
+    {
+     "id": "rotate_ccw",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": -1
+    },
+    {
+     "id": "dock",
+     "type": "shift",
+     "orbit": "spurs",
+     "direction": "inward",
+     "entails": [
+      "split",
+      "merge"
+     ],
+     "note": "lifts one ion out of the rail's potential and inserts it into the dock trap: split at the source, merge at the destination. A conveyor-belt rotation entails neither -- the whole chain moves with the potential (2305.03828)"
+    },
+    {
+     "id": "undock",
+     "type": "shift",
+     "orbit": "spurs",
+     "direction": "outward",
+     "entails": [
+      "split",
+      "merge"
+     ]
+    },
+    {
+     "id": "sort_merge",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": -1,
+     "entails": [
+      "merge"
+     ],
+     "note": "one ion of the pair joins the neighbouring chain"
+    },
+    {
+     "id": "sort_split",
+     "type": "shift",
+     "orbit": "L0",
+     "delta": 1,
+     "entails": [
+      "split"
+     ],
+     "note": "the other splits back out; which one realizes the transposition"
+    },
+    {
+     "id": "shuttle",
+     "type": "shift",
+     "orbit": "any",
+     "note": "one ion, one trap to the next; the lowest common denominator move"
+    }
+   ]
+  },
+  "max_simd_classes_per_cycle": 1,
+  "intra_inter_exclusive": true,
+  "wiring": {
+   "scheme": "wise",
+   "dacs_dynamic": 100,
+   "shim_per_dac": 100,
+   "electrodes_per_trap": 24,
+   "electrodes_per_junction": 48,
+   "compensation_electrodes_per_trap": 8
+  },
+  "optical": {
+   "addressing": "global_beam",
+   "per_zone_switch": true
+  },
+  "channels": {
+   "grouping": "broadcast",
+   "roles": {
+    "linear_h": 6,
+    "linear_v": 6,
+    "junction": 4
+   },
+   "differential": 2,
+   "switch_per_site": true
+  }
+ },
+ "primitives": {
+  "shuttle_segment": {
+   "curve": [
+    {
+     "us": 5.0,
+     "quanta": 0.1,
+     "table": "qccdsim_jones",
+     "source": "2510.23519",
+     "label": "t7 ion shuttling, one segment"
+    },
+    {
+     "us": 10.0,
+     "quanta": 0.1,
+     "table": "cyclone",
+     "source": "2511.15910",
+     "label": "move, one shuttling zone; quanta borrowed from Jones"
+    },
+    {
+     "us": 12.0,
+     "quanta": 1.0,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "single-ion transport, fast operating point"
+    },
+    {
+     "us": 14.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "single-ion transport, slow operating point"
+    }
+   ]
+  },
+  "split": {
+   "curve": [
+    {
+     "us": 80.0,
+     "quanta": 6.0,
+     "table": "qccdsim_jones",
+     "source": "2510.23519",
+     "label": "t8-t9 split and merge -- 60x a shuttle in heating"
+    },
+    {
+     "us": 80.0,
+     "quanta": 6.0,
+     "table": "cyclone",
+     "source": "2511.15910",
+     "label": "split; quanta borrowed from Jones (Cyclone charges none)"
+    },
+    {
+     "us": 30.0,
+     "quanta": 1.0,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "fast split, n~1"
+    },
+    {
+     "us": 40.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "slow split, n~0.1"
+    }
+   ]
+  },
+  "merge": {
+   "curve": [
+    {
+     "us": 80.0,
+     "quanta": 6.0,
+     "table": "qccdsim_jones",
+     "source": "2510.23519"
+    },
+    {
+     "us": 80.0,
+     "quanta": 6.0,
+     "table": "cyclone",
+     "source": "2511.15910"
+    },
+    {
+     "us": 30.0,
+     "quanta": 1.0,
+     "table": "transport_excitation",
+     "source": "2605.25118"
+    },
+    {
+     "us": 40.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118"
+    }
+   ]
+  },
+  "ion_swap": {
+   "curve": [
+    {
+     "us": 18.0,
+     "quanta": 1.0,
+     "table": "transport_excitation",
+     "source": "2605.25118"
+    },
+    {
+     "us": 20.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118"
+    }
+   ]
+  },
+  "junction_cross": {
+   "curve_by_degree": {
+    "2": [
+     {
+      "us": 10.0,
+      "quanta": 0.5,
+      "table": "cyclone",
+      "source": "2511.15910",
+      "label": "L-junction; superseded by R18, a bend is not a junction"
+     }
+    ],
+    "3": [
+     {
+      "us": 100.0,
+      "quanta": 3.0,
+      "table": "qccdsim_jones",
+      "source": "2510.23519",
+      "label": "t10-t11 junction entry/exit"
+     },
+     {
+      "us": 100.0,
+      "quanta": 3.0,
+      "table": "cyclone",
+      "source": "2511.15910",
+      "label": "degree-3 junction crossing; quanta borrowed from Jones"
+     },
+     {
+      "us": 200.0,
+      "quanta": 3.0,
+      "table": "measured",
+      "source": "1210.3655",
+      "label": "~200 us one-way measured: 85 round trips in ~34 ms"
+     }
+    ],
+    "4": [
+     {
+      "us": 120.0,
+      "quanta": 3.0,
+      "table": "cyclone",
+      "source": "2511.15910",
+      "label": "X-junction crossing; quanta borrowed from Jones"
+     },
+     {
+      "us": 120.0,
+      "quanta": 3.0,
+      "table": "qccdsim_jones",
+      "source": "2511.15910",
+      "label": "Jones gives no degree-4 figure; Cyclone's is carried over"
+     }
+    ]
+   }
+  },
+  "gate_swap": {
+   "gates": 3,
+   "note": "3 CX, distance-independent; R14's hidden cost of splitting off-edge",
+   "source": "2510.23519"
+  },
+  "ms_gate": {
+   "us": 25,
+   "fidelity_at_n0": 0.99816,
+   "error_vs_quanta": "linear:2.0e-3",
+   "error_vs_chain": "murali:2",
+   "chain_note": "G1: laser-intensity instability grows with chain length as A ~ N/ln N (Murali et al., ISCA 2020). The value is the reference chain length at which fidelity_at_n0 and error_vs_quanta were measured -- 2, from a two-ion gate zone.",
+   "max_quanta": 1.0,
+   "source": "2305.03828",
+   "note": "1.84e-3 two-qubit infidelity measured on H2 (2305.03828). max_quanta is R7's gate budget; PLAN \u00a70.4 puts it at 1-2 quanta, 1.0 is the strict end"
+  },
+  "1q_gate": {
+   "us": 5,
+   "fidelity": 0.999975,
+   "source": "2305.03828"
+  },
+  "measure": {
+   "us": 120,
+   "fidelity": 0.9984,
+   "source": "2305.03828"
+  },
+  "reset": {
+   "us": 50,
+   "error": 0.005,
+   "source": "2510.23519"
+  },
+  "cool": {
+   "us": 300,
+   "removes_quanta": "all",
+   "broadcastable": true,
+   "scope": "global",
+   "source": "2606.06455",
+   "note": "Doppler sheet beams cover the whole trap, so one cooling operation cools every ion: it costs schedule time but does not serialize per ion (R7c)"
+  }
+ },
+ "heating": {
+  "anomalous_rate_quanta_per_ms": 0.05,
+  "note": "R17: ndot = S_E(w) e^2 / 4 m hbar w, accruing whether or not the ion moves. Device-specific and unmeasured for the target trap -- q_heating_rate_measurement",
+  "source": "2605.25118"
+ },
+ "species": {
+  "qubit": "Ba+",
+  "coolant": "Sr+",
+  "sympathetic": true,
+  "coolant_fraction": 0.5,
+  "T_coh_s": 600,
+  "source": "2510.23519"
+ },
+ "budget": {
+  "max_dacs": 128,
+  "max_junctions": 200,
+  "max_area_mm2": 100,
+  "junction_electrode_multiplier": 2
+ },
+ "node_caps": {
+  "S0": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S1": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S2": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S3": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S4": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S5": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S6": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S7": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S8": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S9": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S10": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S11": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S12": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S13": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S14": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S15": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S16": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S17": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S18": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S19": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S20": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S21": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S22": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S23": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S24": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S25": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S26": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S27": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S28": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S29": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S30": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S31": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S32": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S33": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S34": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S35": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S36": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S37": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S38": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S39": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S40": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S41": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S42": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S43": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S44": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S45": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S46": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S47": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S48": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S49": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S50": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S51": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S52": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S53": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S54": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S55": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S56": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S57": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S58": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S59": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S60": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S61": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S62": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S63": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S64": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S65": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S66": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top",
+    "dock"
+   ]
+  },
+  "S67": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S68": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S69": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S70": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S71": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "top"
+   ]
+  },
+  "S72": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S73": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S74": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S75": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S76": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S77": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S78": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S79": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S80": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S81": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S82": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S83": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S84": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S85": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S86": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S87": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S88": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S89": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S90": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S91": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S92": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S93": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S94": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S95": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S96": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S97": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S98": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S99": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S100": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S101": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S102": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S103": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S104": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S105": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S106": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S107": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S108": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S109": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S110": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S111": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S112": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S113": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S114": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S115": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S116": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S117": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S118": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S119": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S120": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S121": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S122": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S123": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S124": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S125": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S126": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S127": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S128": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S129": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S130": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S131": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S132": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S133": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S134": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S135": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S136": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S137": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S138": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom",
+    "dock"
+   ]
+  },
+  "S139": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S140": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S141": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S142": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "S143": {
+   "capacity": 2,
+   "zone_type": "data",
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": true,
+   "labels": [
+    "bottom"
+   ]
+  },
+  "A0": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A6": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A12": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A18": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A24": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A30": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A36": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A42": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A48": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A54": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A60": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A66": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A72": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A78": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A84": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A90": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A96": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A102": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A108": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A114": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A120": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A126": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A132": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  },
+  "A138": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 1,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "spur_trap"
+   ]
+  }
+ },
+ "simd_classes": {
+  "rotate_cw": {
+   "id": "rotate_cw",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": 1,
+   "note": "the single movement template rigid rotation needs (PLAN \u00a71)"
+  },
+  "rotate_ccw": {
+   "id": "rotate_ccw",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": -1
+  },
+  "dock": {
+   "id": "dock",
+   "type": "shift",
+   "orbit": "spurs",
+   "direction": "inward",
+   "entails": [
+    "split",
+    "merge"
+   ],
+   "note": "lifts one ion out of the rail's potential and inserts it into the dock trap: split at the source, merge at the destination. A conveyor-belt rotation entails neither -- the whole chain moves with the potential (2305.03828)"
+  },
+  "undock": {
+   "id": "undock",
+   "type": "shift",
+   "orbit": "spurs",
+   "direction": "outward",
+   "entails": [
+    "split",
+    "merge"
+   ]
+  },
+  "sort_merge": {
+   "id": "sort_merge",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": -1,
+   "entails": [
+    "merge"
+   ],
+   "note": "one ion of the pair joins the neighbouring chain"
+  },
+  "sort_split": {
+   "id": "sort_split",
+   "type": "shift",
+   "orbit": "L0",
+   "delta": 1,
+   "entails": [
+    "split"
+   ],
+   "note": "the other splits back out; which one realizes the transposition"
+  },
+  "shuttle": {
+   "id": "shuttle",
+   "type": "shift",
+   "orbit": "any",
+   "note": "one ion, one trap to the next; the lowest common denominator move"
+  }
+ },
+ "max_simd_classes_per_cycle": 1,
+ "entails": {
+  "rotate_cw": [],
+  "rotate_ccw": [],
+  "dock": [
+   "split",
+   "merge"
+  ],
+  "undock": [
+   "split",
+   "merge"
+  ],
+  "sort_merge": [
+   "merge"
+  ],
+  "sort_split": [
+   "split"
+  ],
+  "shuttle": []
+ },
+ "loop_corners": {
+  "L0": [
+   "S0",
+   "S143",
+   "S71",
+   "S72"
+  ]
+ },
+ "corner_endpoints": {
+  "E0": 1,
+  "E1": 0,
+  "E2": 0,
+  "E3": 0,
+  "E4": 0,
+  "E5": 0,
+  "E6": 0,
+  "E7": 0,
+  "E8": 0,
+  "E9": 0,
+  "E10": 0,
+  "E11": 0,
+  "E12": 0,
+  "E13": 0,
+  "E14": 0,
+  "E15": 0,
+  "E16": 0,
+  "E17": 0,
+  "E18": 0,
+  "E19": 0,
+  "E20": 0,
+  "E21": 0,
+  "E22": 0,
+  "E23": 0,
+  "E24": 0,
+  "E25": 0,
+  "E26": 0,
+  "E27": 0,
+  "E28": 0,
+  "E29": 0,
+  "E30": 0,
+  "E31": 0,
+  "E32": 0,
+  "E33": 0,
+  "E34": 0,
+  "E35": 0,
+  "E36": 0,
+  "E37": 0,
+  "E38": 0,
+  "E39": 0,
+  "E40": 0,
+  "E41": 0,
+  "E42": 0,
+  "E43": 0,
+  "E44": 0,
+  "E45": 0,
+  "E46": 0,
+  "E47": 0,
+  "E48": 0,
+  "E49": 0,
+  "E50": 0,
+  "E51": 0,
+  "E52": 0,
+  "E53": 0,
+  "E54": 0,
+  "E55": 0,
+  "E56": 0,
+  "E57": 0,
+  "E58": 0,
+  "E59": 0,
+  "E60": 0,
+  "E61": 0,
+  "E62": 0,
+  "E63": 0,
+  "E64": 0,
+  "E65": 0,
+  "E66": 0,
+  "E67": 0,
+  "E68": 0,
+  "E69": 0,
+  "E70": 1,
+  "E71": 2,
+  "E72": 1,
+  "E73": 0,
+  "E74": 0,
+  "E75": 0,
+  "E76": 0,
+  "E77": 0,
+  "E78": 0,
+  "E79": 0,
+  "E80": 0,
+  "E81": 0,
+  "E82": 0,
+  "E83": 0,
+  "E84": 0,
+  "E85": 0,
+  "E86": 0,
+  "E87": 0,
+  "E88": 0,
+  "E89": 0,
+  "E90": 0,
+  "E91": 0,
+  "E92": 0,
+  "E93": 0,
+  "E94": 0,
+  "E95": 0,
+  "E96": 0,
+  "E97": 0,
+  "E98": 0,
+  "E99": 0,
+  "E100": 0,
+  "E101": 0,
+  "E102": 0,
+  "E103": 0,
+  "E104": 0,
+  "E105": 0,
+  "E106": 0,
+  "E107": 0,
+  "E108": 0,
+  "E109": 0,
+  "E110": 0,
+  "E111": 0,
+  "E112": 0,
+  "E113": 0,
+  "E114": 0,
+  "E115": 0,
+  "E116": 0,
+  "E117": 0,
+  "E118": 0,
+  "E119": 0,
+  "E120": 0,
+  "E121": 0,
+  "E122": 0,
+  "E123": 0,
+  "E124": 0,
+  "E125": 0,
+  "E126": 0,
+  "E127": 0,
+  "E128": 0,
+  "E129": 0,
+  "E130": 0,
+  "E131": 0,
+  "E132": 0,
+  "E133": 0,
+  "E134": 0,
+  "E135": 0,
+  "E136": 0,
+  "E137": 0,
+  "E138": 0,
+  "E139": 0,
+  "E140": 0,
+  "E141": 0,
+  "E142": 1,
+  "E143": 2,
+  "V0": 0,
+  "V6": 0,
+  "V12": 0,
+  "V18": 0,
+  "V24": 0,
+  "V30": 0,
+  "V36": 0,
+  "V42": 0,
+  "V48": 0,
+  "V54": 0,
+  "V60": 0,
+  "V66": 0,
+  "V72": 0,
+  "V78": 0,
+  "V84": 0,
+  "V90": 0,
+  "V96": 0,
+  "V102": 0,
+  "V108": 0,
+  "V114": 0,
+  "V120": 0,
+  "V126": 0,
+  "V132": 0,
+  "V138": 0
+ },
+ "sha256": "f722756b18702ed1c29e4d4b6740f8e02193524d86dfa7e43dbdb4e9438e505f"
+}

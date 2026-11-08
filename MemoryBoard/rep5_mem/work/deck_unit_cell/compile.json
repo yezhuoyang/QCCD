@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 0.25,
+ "total_s": 0.466,
+ "log": "--- qccdc_cli compile (exit 0)\ncircuit: 9 qubits, 25 clbits, 76 ops (40 two-qubit), 107 edges, Clifford -> deck_unit_cell (broadcast-free regime)\n  19 layers, 43 transport cycles, 160 beams, 40 MS, 0 virtual-Z, 104 instructions\n  - seeded q1 (weight 10) at T3_4h\n  - candidates: greedy 40, spectral 65 -> greedy\n  - weighted interaction distance 40 over 8 distinct pairs\n  certificate: 40 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\rep5_mem\\work.new\\deck_unit_cell\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\rep5_mem\\work.new\\deck_unit_cell\\prog.qcert.json\n\n"
+}

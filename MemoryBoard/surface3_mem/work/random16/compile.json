@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 0.294,
+ "total_s": 0.531,
+ "log": "--- qccdc_cli compile (exit 0)\ncircuit: 17 qubits, 33 clbits, 136 ops (72 two-qubit), 191 edges, Clifford -> random16 (free regime)\n  23 layers, 163 transport cycles, 312 beams, 72 MS, 24 virtual-Z, 298 instructions\n  - seeded q4 (weight 12) at T0\n  - candidates: greedy 87, spectral 144 -> greedy\n  - weighted interaction distance 87 over 24 distinct pairs\n  - undock deferred: q4 cannot reach T0 from T8 within 16 cycles\n  - undock deferred: q2 cannot reach T7 from T4 within 16 cycles\n  certificate: 96 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\random16\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\random16\\prog.qcert.json\n\n"
+}

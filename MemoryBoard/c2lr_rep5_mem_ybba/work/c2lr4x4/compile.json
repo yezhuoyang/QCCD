@@ -1,0 +1,8 @@
+{
+ "mode": "c2lr-router",
+ "cool": true,
+ "table": "qccdsim_jones",
+ "compile_s": 1.298,
+ "instructions": 100,
+ "steps": 30
+}

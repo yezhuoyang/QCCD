@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 0.561,
+ "total_s": 0.852,
+ "log": "--- qccdc_cli compile (exit 0)\ncircuit: 34 qubits, 66 clbits, 281 ops (144 two-qubit), 391 edges, Clifford -> torus4x4 (free regime)\n  23 layers, 314 transport cycles, 633 beams, 144 MS, 57 virtual-Z, 457 instructions\n  - device is tight: up to 2 ions per trap at t=0\n  - seeded q4 (weight 12) at T0_0h\n  - candidates: greedy 126, spectral 198 -> greedy\n  - hill-climb 126 -> 114 in 3 rounds\n  - placement variant 2 (a fallback)\n  - weighted interaction distance 198 over 48 distinct pairs\n  - undock deferred: q0 cannot reach T0_1h from T0_2h within 16 cycles\n  - undock deferred: q6 cannot reach T0_0h from T2_1h within 16 cycles\n  - undock deferred: q30 cannot reach T2_0v from T1_1h within 16 cycles\n  - undock deferred: q26 cannot reach T1_1h from T2_3v within 16 cycles\n  - undock deferred: q31 cannot reach T2_3v from T2_1v within 16 cycles\n  - undock deferred: q6 cannot reach T0_0h from T2_1h within 16 cycles\n  - undock deferred: q14 cannot reach T2_0h from T2_2h within 16 cycles\n  - undock deferred: q2 cannot reach T3_0h from T1_1v within 16 cycles\n  - undock deferred: q6 cannot reach T0_0h from T2_1h within 16 cycles\n  certificate: 201 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\torus4x4\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\torus4x4\\prog.qcert.json\n\n"
+}

@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 4.727,
+ "total_s": 5.54,
+ "log": "--- qccdc_cli rotate (exit 5)\n\nC:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\h2_racetrack\\circuit.qasm: rotation does not apply: the device has no closed loop with docks\n--- qccdc_cli compile (exit 0)\ncircuit: 34 qubits, 66 clbits, 281 ops (144 two-qubit), 391 edges, Clifford -> h2_racetrack (race track)\n  - race track: loop L0 of 40 sites, up to 20 gates per round, classes rotate_cw/rotate_ccw + shuttle\n  - placement: 34 ions side by side from S0, in the order the gates meet them\n  - 144 two-qubit gates in 12 rounds; 0 shifts totalling 0 hops (0 to serve one-qubit ops), 2128 one-ion steps (905 swaps)\n  1961 instructions\n  certificate: 201 gate witnesses, 2128 moves, 0 rotations, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\h2_racetrack\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\h2_racetrack\\prog.qcert.json\n\nC:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\h2_racetrack\\circuit.qasm: unroutable: q33 cannot reach S13 from S28 within 48 cycles\n  trying rigid rotation, which does not need a free slot to move into\n  rotation does not apply either: the device has no closed loop with docks\n  trying the race track: rigid shifts of the whole loop, swaps in its zones\n"
+}

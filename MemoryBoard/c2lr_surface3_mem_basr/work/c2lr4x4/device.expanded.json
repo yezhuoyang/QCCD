@@ -1,0 +1,1925 @@
+{
+ "name": "c2lr4x4_BaSr",
+ "schema_version": "0.3",
+ "description": "A 4x4 C2LR swap-or-stay lattice, Ba-Sr crystals (arXiv:2403.00756): one leg on every wire, moved by direction bits and one shared junction waveform.",
+ "geometry": {
+  "generator": "grid",
+  "params": {
+   "a": 4,
+   "b": 4,
+   "site_zone": "trap",
+   "segment_capacity": 1,
+   "spacing": 1,
+   "periodic": false
+  },
+  "nodes": [
+   {
+    "id": "J0_0",
+    "pos": [
+     0.0,
+     0.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "J0_1",
+    "pos": [
+     0.0,
+     1.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J0_2",
+    "pos": [
+     0.0,
+     2.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J0_3",
+    "pos": [
+     0.0,
+     3.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "J1_0",
+    "pos": [
+     1.0,
+     0.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J1_1",
+    "pos": [
+     1.0,
+     1.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 4,
+    "corner": false
+   },
+   {
+    "id": "J1_2",
+    "pos": [
+     1.0,
+     2.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 4,
+    "corner": false
+   },
+   {
+    "id": "J1_3",
+    "pos": [
+     1.0,
+     3.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J2_0",
+    "pos": [
+     2.0,
+     0.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J2_1",
+    "pos": [
+     2.0,
+     1.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 4,
+    "corner": false
+   },
+   {
+    "id": "J2_2",
+    "pos": [
+     2.0,
+     2.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 4,
+    "corner": false
+   },
+   {
+    "id": "J2_3",
+    "pos": [
+     2.0,
+     3.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J3_0",
+    "pos": [
+     3.0,
+     0.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "J3_1",
+    "pos": [
+     3.0,
+     1.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J3_2",
+    "pos": [
+     3.0,
+     2.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 3,
+    "corner": false
+   },
+   {
+    "id": "J3_3",
+    "pos": [
+     3.0,
+     3.0
+    ],
+    "kind": "junction",
+    "labels": [
+     "lattice"
+    ],
+    "degree": 2,
+    "corner": true
+   },
+   {
+    "id": "T0_0h",
+    "pos": [
+     0.5,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T0_1h",
+    "pos": [
+     0.5,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T0_2h",
+    "pos": [
+     0.5,
+     2.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T0_3h",
+    "pos": [
+     0.5,
+     3.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T1_0h",
+    "pos": [
+     1.5,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T1_1h",
+    "pos": [
+     1.5,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T1_2h",
+    "pos": [
+     1.5,
+     2.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T1_3h",
+    "pos": [
+     1.5,
+     3.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T2_0h",
+    "pos": [
+     2.5,
+     0.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T2_1h",
+    "pos": [
+     2.5,
+     1.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T2_2h",
+    "pos": [
+     2.5,
+     2.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T2_3h",
+    "pos": [
+     2.5,
+     3.0
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T0_0v",
+    "pos": [
+     0.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T0_1v",
+    "pos": [
+     0.0,
+     1.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T0_2v",
+    "pos": [
+     0.0,
+     2.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T1_0v",
+    "pos": [
+     1.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T1_1v",
+    "pos": [
+     1.0,
+     1.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T1_2v",
+    "pos": [
+     1.0,
+     2.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T2_0v",
+    "pos": [
+     2.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T2_1v",
+    "pos": [
+     2.0,
+     1.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T2_2v",
+    "pos": [
+     2.0,
+     2.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T3_0v",
+    "pos": [
+     3.0,
+     0.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T3_1v",
+    "pos": [
+     3.0,
+     1.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   },
+   {
+    "id": "T3_2v",
+    "pos": [
+     3.0,
+     2.5
+    ],
+    "kind": "site",
+    "capacity": 2,
+    "zone_type": "trap",
+    "labels": [
+     "trap"
+    ],
+    "degree": 2,
+    "corner": false
+   }
+  ],
+  "segments": [
+   {
+    "id": "T0_0h.a",
+    "ends": [
+     "J0_0",
+     "T0_0h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_0h.b",
+    "ends": [
+     "T0_0h",
+     "J1_0"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_1h.a",
+    "ends": [
+     "J0_1",
+     "T0_1h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_1h.b",
+    "ends": [
+     "T0_1h",
+     "J1_1"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_2h.a",
+    "ends": [
+     "J0_2",
+     "T0_2h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_2h.b",
+    "ends": [
+     "T0_2h",
+     "J1_2"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_3h.a",
+    "ends": [
+     "J0_3",
+     "T0_3h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_3h.b",
+    "ends": [
+     "T0_3h",
+     "J1_3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_0h.a",
+    "ends": [
+     "J1_0",
+     "T1_0h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_0h.b",
+    "ends": [
+     "T1_0h",
+     "J2_0"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_1h.a",
+    "ends": [
+     "J1_1",
+     "T1_1h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_1h.b",
+    "ends": [
+     "T1_1h",
+     "J2_1"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_2h.a",
+    "ends": [
+     "J1_2",
+     "T1_2h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_2h.b",
+    "ends": [
+     "T1_2h",
+     "J2_2"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_3h.a",
+    "ends": [
+     "J1_3",
+     "T1_3h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_3h.b",
+    "ends": [
+     "T1_3h",
+     "J2_3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_0h.a",
+    "ends": [
+     "J2_0",
+     "T2_0h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_0h.b",
+    "ends": [
+     "T2_0h",
+     "J3_0"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_1h.a",
+    "ends": [
+     "J2_1",
+     "T2_1h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_1h.b",
+    "ends": [
+     "T2_1h",
+     "J3_1"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_2h.a",
+    "ends": [
+     "J2_2",
+     "T2_2h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_2h.b",
+    "ends": [
+     "T2_2h",
+     "J3_2"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_3h.a",
+    "ends": [
+     "J2_3",
+     "T2_3h"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_3h.b",
+    "ends": [
+     "T2_3h",
+     "J3_3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_0v.a",
+    "ends": [
+     "J0_0",
+     "T0_0v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_0v.b",
+    "ends": [
+     "T0_0v",
+     "J0_1"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_1v.a",
+    "ends": [
+     "J0_1",
+     "T0_1v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_1v.b",
+    "ends": [
+     "T0_1v",
+     "J0_2"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_2v.a",
+    "ends": [
+     "J0_2",
+     "T0_2v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T0_2v.b",
+    "ends": [
+     "T0_2v",
+     "J0_3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_0v.a",
+    "ends": [
+     "J1_0",
+     "T1_0v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_0v.b",
+    "ends": [
+     "T1_0v",
+     "J1_1"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_1v.a",
+    "ends": [
+     "J1_1",
+     "T1_1v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_1v.b",
+    "ends": [
+     "T1_1v",
+     "J1_2"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_2v.a",
+    "ends": [
+     "J1_2",
+     "T1_2v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T1_2v.b",
+    "ends": [
+     "T1_2v",
+     "J1_3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_0v.a",
+    "ends": [
+     "J2_0",
+     "T2_0v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_0v.b",
+    "ends": [
+     "T2_0v",
+     "J2_1"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_1v.a",
+    "ends": [
+     "J2_1",
+     "T2_1v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_1v.b",
+    "ends": [
+     "T2_1v",
+     "J2_2"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_2v.a",
+    "ends": [
+     "J2_2",
+     "T2_2v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T2_2v.b",
+    "ends": [
+     "T2_2v",
+     "J2_3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T3_0v.a",
+    "ends": [
+     "J3_0",
+     "T3_0v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T3_0v.b",
+    "ends": [
+     "T3_0v",
+     "J3_1"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T3_1v.a",
+    "ends": [
+     "J3_1",
+     "T3_1v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T3_1v.b",
+    "ends": [
+     "T3_1v",
+     "J3_2"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T3_2v.a",
+    "ends": [
+     "J3_2",
+     "T3_2v"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   },
+   {
+    "id": "T3_2v.b",
+    "ends": [
+     "T3_2v",
+     "J3_3"
+    ],
+    "length": 0.5,
+    "capacity": 1,
+    "loop": null,
+    "corner_endpoints": 0
+   }
+  ]
+ },
+ "zone_types": {
+  "data": {
+   "capacity": 2,
+   "gate": false,
+   "spam": false,
+   "cool": true
+  },
+  "trap": {
+   "capacity": 2,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "note": "general-purpose trap: gate, measure and cool all available"
+  },
+  "load": {
+   "capacity": 8,
+   "gate": false,
+   "spam": true,
+   "cool": true,
+   "photoionization": true
+  }
+ },
+ "control": {
+  "model": "c2lr",
+  "c2lr": {
+   "diagonals": [
+    "WS",
+    "WN",
+    "ES",
+    "EN"
+   ],
+   "checkerboard": [
+    "P1",
+    "P2"
+   ],
+   "assumed": [
+    "checkerboard"
+   ],
+   "shared_signals": 27,
+   "inputs_per_leg": 1,
+   "switches_per_leg": 1,
+   "shims_per_leg": 2,
+   "source": "arXiv:2403.00756 v2, p4 (27 shared analog signals; N digital inputs and N switches; two site-dependent shims per leg)"
+  },
+  "classes": {
+   "extra": [
+    {
+     "id": "swap_or_stay",
+     "type": "c2lr",
+     "note": "one swap-or-stay step: the template's direction bits, the device's matching"
+    },
+    {
+     "id": "reorder_or_not",
+     "type": "c2lr",
+     "note": "a 180-degree rotation of the listed crystals' wells; nothing moves"
+    }
+   ]
+  },
+  "max_simd_classes_per_cycle": 1,
+  "intra_inter_exclusive": true,
+  "wiring": {
+   "scheme": "broadcast_groups",
+   "dacs_dynamic": 27,
+   "compensation_electrodes_per_trap": 2,
+   "shim_per_dac": 1,
+   "note": "arXiv:2403.00756 v2, p4: 27 shared analog signals drive every leg (the broadcast bank); two site-dependent shims per leg, each its own DAC; the per-leg digital input and switch are not DACs"
+  }
+ },
+ "primitives": {
+  "shuttle_segment": {
+   "curve": [
+    {
+     "us": 5.0,
+     "quanta": 0.1,
+     "table": "qccdsim_jones",
+     "source": "2510.23519",
+     "label": "t7 ion shuttling, one segment"
+    },
+    {
+     "us": 10.0,
+     "quanta": 0.1,
+     "table": "cyclone",
+     "source": "2511.15910",
+     "label": "move, one shuttling zone; quanta borrowed from Jones"
+    },
+    {
+     "us": 12.0,
+     "quanta": 1.0,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "single-ion transport, fast operating point"
+    },
+    {
+     "us": 14.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "single-ion transport, slow operating point"
+    }
+   ]
+  },
+  "split": {
+   "curve": [
+    {
+     "us": 40.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "slow point; the platform's curve, not arXiv:2403.00756"
+    }
+   ]
+  },
+  "merge": {
+   "curve": [
+    {
+     "us": 40.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118",
+     "label": "slow point; the platform's curve, not arXiv:2403.00756"
+    }
+   ]
+  },
+  "ion_swap": {
+   "curve": [
+    {
+     "us": 18.0,
+     "quanta": 1.0,
+     "table": "transport_excitation",
+     "source": "2605.25118"
+    },
+    {
+     "us": 20.0,
+     "quanta": 0.1,
+     "table": "transport_excitation",
+     "source": "2605.25118"
+    }
+   ]
+  },
+  "junction_cross": {
+   "curve_by_degree": {
+    "2": [
+     {
+      "us": 10.0,
+      "quanta": 0.5,
+      "table": "cyclone",
+      "source": "2511.15910",
+      "label": "L-junction; superseded by R18, a bend is not a junction"
+     }
+    ],
+    "3": [
+     {
+      "us": 100.0,
+      "quanta": 3.0,
+      "table": "qccdsim_jones",
+      "source": "2510.23519",
+      "label": "t10-t11 junction entry/exit"
+     },
+     {
+      "us": 100.0,
+      "quanta": 3.0,
+      "table": "cyclone",
+      "source": "2511.15910",
+      "label": "degree-3 junction crossing; quanta borrowed from Jones"
+     },
+     {
+      "us": 200.0,
+      "quanta": 3.0,
+      "table": "measured",
+      "source": "1210.3655",
+      "label": "~200 us one-way measured: 85 round trips in ~34 ms"
+     }
+    ],
+    "4": [
+     {
+      "us": 120.0,
+      "quanta": 3.0,
+      "table": "cyclone",
+      "source": "2511.15910",
+      "label": "X-junction crossing; quanta borrowed from Jones"
+     },
+     {
+      "us": 120.0,
+      "quanta": 3.0,
+      "table": "qccdsim_jones",
+      "source": "2511.15910",
+      "label": "Jones gives no degree-4 figure; Cyclone's is carried over"
+     }
+    ]
+   }
+  },
+  "gate_swap": {
+   "gates": 3,
+   "note": "3 CX, distance-independent; R14's hidden cost of splitting off-edge",
+   "source": "2510.23519"
+  },
+  "ms_gate": {
+   "us": 25,
+   "fidelity_at_n0": 0.99816,
+   "error_vs_quanta": "linear:2.0e-3",
+   "error_vs_chain": "murali:2",
+   "chain_note": "G1: laser-intensity instability grows with chain length as A ~ N/ln N (Murali et al., ISCA 2020). The value is the reference chain length at which fidelity_at_n0 and error_vs_quanta were measured -- 2, from a two-ion gate zone.",
+   "max_quanta": 1.0,
+   "source": "2305.03828",
+   "note": "1.84e-3 two-qubit infidelity measured on H2 (2305.03828). max_quanta is R7's gate budget; PLAN \u00a70.4 puts it at 1-2 quanta, 1.0 is the strict end"
+  },
+  "1q_gate": {
+   "us": 5,
+   "fidelity": 0.999975,
+   "source": "2305.03828"
+  },
+  "measure": {
+   "us": 120,
+   "fidelity": 0.9984,
+   "source": "2305.03828"
+  },
+  "reset": {
+   "us": 50,
+   "error": 0.005,
+   "source": "2510.23519"
+  },
+  "cool": {
+   "us": 300,
+   "removes_quanta": "all",
+   "broadcastable": true,
+   "scope": "global",
+   "source": "2606.06455",
+   "note": "Doppler sheet beams cover the whole trap, so one cooling operation cools every ion: it costs schedule time but does not serialize per ion (R7c)"
+  },
+  "swap_or_stay": {
+   "us": 312.5,
+   "quanta_swap": 0.14,
+   "quanta_stay": 0.035,
+   "com_mhz": 1.85,
+   "source": "arXiv:2403.00756 v2: us = 1/Gamma_swap, Gamma = 3.2 kHz at 3.0 m/s (Sec. V, p6); quanta derived (docs/c2lr.md section 6: Table II less the cooling residue, halved; Table III rates x 1/Gamma, the larger); COM held at 1.85 MHz (p4, C8)"
+  }
+ },
+ "heating": {
+  "anomalous_rate_quanta_per_ms": 0.05,
+  "note": "R17: ndot = S_E(w) e^2 / 4 m hbar w, accruing whether or not the ion moves. Device-specific and unmeasured for the target trap -- q_heating_rate_measurement",
+  "source": "2605.25118"
+ },
+ "species": {
+  "qubit": "Ba+",
+  "coolant": "Sr+",
+  "sympathetic": true,
+  "coolant_fraction": 0.5,
+  "T_coh_s": 600,
+  "source": "2510.23519",
+  "pair": "Ba-Sr",
+  "pair_source": "arXiv:2403.00756 v2"
+ },
+ "budget": {
+  "max_dacs": 128,
+  "max_junctions": 200,
+  "max_area_mm2": 100,
+  "junction_electrode_multiplier": 2
+ },
+ "node_caps": {
+  "J0_0": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J0_1": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J0_2": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J0_3": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J1_0": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J1_1": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 4,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J1_2": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 4,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J1_3": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J2_0": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J2_1": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 4,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J2_2": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 4,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J2_3": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J3_0": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J3_1": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J3_2": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 3,
+   "is_junction": true,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "J3_3": {
+   "capacity": 0,
+   "zone_type": null,
+   "degree": 2,
+   "is_junction": false,
+   "gate": false,
+   "spam": false,
+   "cool": false,
+   "labels": [
+    "lattice"
+   ]
+  },
+  "T0_0h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T0_1h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T0_2h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T0_3h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T1_0h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T1_1h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T1_2h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T1_3h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T2_0h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T2_1h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T2_2h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T2_3h": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T0_0v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T0_1v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T0_2v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T1_0v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T1_1v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T1_2v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T2_0v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T2_1v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T2_2v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T3_0v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T3_1v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  },
+  "T3_2v": {
+   "capacity": 2,
+   "zone_type": "trap",
+   "degree": 2,
+   "is_junction": false,
+   "gate": true,
+   "spam": true,
+   "cool": true,
+   "labels": [
+    "trap"
+   ]
+  }
+ },
+ "simd_classes": {
+  "swap_or_stay": {
+   "id": "swap_or_stay",
+   "type": "c2lr",
+   "note": "one swap-or-stay step: the template's direction bits, the device's matching"
+  },
+  "reorder_or_not": {
+   "id": "reorder_or_not",
+   "type": "c2lr",
+   "note": "a 180-degree rotation of the listed crystals' wells; nothing moves"
+  }
+ },
+ "max_simd_classes_per_cycle": 1,
+ "entails": {
+  "swap_or_stay": [],
+  "reorder_or_not": []
+ },
+ "loop_corners": {},
+ "corner_endpoints": {
+  "T0_0h.a": 0,
+  "T0_0h.b": 0,
+  "T0_1h.a": 0,
+  "T0_1h.b": 0,
+  "T0_2h.a": 0,
+  "T0_2h.b": 0,
+  "T0_3h.a": 0,
+  "T0_3h.b": 0,
+  "T1_0h.a": 0,
+  "T1_0h.b": 0,
+  "T1_1h.a": 0,
+  "T1_1h.b": 0,
+  "T1_2h.a": 0,
+  "T1_2h.b": 0,
+  "T1_3h.a": 0,
+  "T1_3h.b": 0,
+  "T2_0h.a": 0,
+  "T2_0h.b": 0,
+  "T2_1h.a": 0,
+  "T2_1h.b": 0,
+  "T2_2h.a": 0,
+  "T2_2h.b": 0,
+  "T2_3h.a": 0,
+  "T2_3h.b": 0,
+  "T0_0v.a": 0,
+  "T0_0v.b": 0,
+  "T0_1v.a": 0,
+  "T0_1v.b": 0,
+  "T0_2v.a": 0,
+  "T0_2v.b": 0,
+  "T1_0v.a": 0,
+  "T1_0v.b": 0,
+  "T1_1v.a": 0,
+  "T1_1v.b": 0,
+  "T1_2v.a": 0,
+  "T1_2v.b": 0,
+  "T2_0v.a": 0,
+  "T2_0v.b": 0,
+  "T2_1v.a": 0,
+  "T2_1v.b": 0,
+  "T2_2v.a": 0,
+  "T2_2v.b": 0,
+  "T3_0v.a": 0,
+  "T3_0v.b": 0,
+  "T3_1v.a": 0,
+  "T3_1v.b": 0,
+  "T3_2v.a": 0,
+  "T3_2v.b": 0
+ },
+ "sha256": "0bb9a0a04760d0f90f022ccac4c090f13d253ac1e211041504ca960c54dae191"
+}

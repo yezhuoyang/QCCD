@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 10.778,
+ "total_s": 11.06,
+ "log": "--- qccdc_cli compile (exit 0)\ncircuit: 17 qubits, 33 clbits, 136 ops (72 two-qubit), 191 edges, Clifford -> ladder_2x72 (conveyor regime)\n  23 layers, 472 transport cycles, 312 beams, 72 MS, 24 virtual-Z, 607 instructions\n  - seeded q4 (weight 12) at HB35\n  - candidates: greedy 144, spectral 267 -> greedy\n  - hill-climb 144 -> 138 in 2 rounds\n  - placement variant 2 (a fallback)\n  - weighted interaction distance 267 over 24 distinct pairs\n  - junctions: 46 site(s) where three or more rails meet are crossed, never rested on\n  - undock deferred: q7 cannot reach HB37 from HT37 within 128 cycles\n  - undock deferred: q7 cannot reach HB37 from HT37 within 128 cycles\n  certificate: 96 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\ladder_2x72\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\ladder_2x72\\prog.qcert.json\n\n"
+}

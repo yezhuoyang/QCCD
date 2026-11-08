@@ -11,6 +11,7 @@ body{margin:0;background:var(--surface);color:var(--ink);
 main{max-width:1280px;margin:0 auto;padding:26px 28px 60px}
 h1{font-size:22px;font-weight:600;margin:0 0 2px;letter-spacing:-.01em}
 .sub{color:var(--ink2);margin:0 0 18px;max-width:80ch}
+.intro{color:var(--ink2);max-width:80ch;margin:-8px 0 16px;font-size:13.5px}.intro p{margin:0 0 8px}.intro b{color:var(--ink);font-weight:600}
 .controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;padding:10px 0 6px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:8px}
 .controls label{display:flex;gap:8px;align-items:center;color:var(--ink2);font-size:13px}
 select{font:inherit;font-size:13px;padding:5px 8px;border:1px solid #cfceca;border-radius:6px;background:#fff;color:var(--ink)}
@@ -220,6 +221,9 @@ function detail(d){ var el=$('detail'); el.className='detail'; el.innerHTML='';
     tb.appendChild(row('buildable', n.buildable ? 'yes' : (n.drc_clean ? 'DRC clean, but no control electrodes survive' : 'no'+(d.drc?' ('+d.drc+' design-rule violations)':'')), n.buildable?'ok':'bad'));
     tb.appendChild(row('rules', d.rules_failed.length ? d.rules_failed.join(' ')+' FAILED' : d.rules_passed+' passed', d.rules_failed.length?'bad':'ok'));
     tb.appendChild(row('R10: Lean checker + tableau', n.r10 === true ? 'passed' : n.r10 === false ? (n.r10_verdict ? n.r10_verdict.replace(/^-> R10 /, '') : 'FAILED') : 'not run', n.r10 === true ? 'ok' : n.r10 === false ? 'bad' : ''));
+    // which engine wrote the programme, and whether each qubit keeps the circuit's order (check_cert)
+    if (n.engine) tb.appendChild(row('compiler engine', n.engine));
+    if (n.order_violations != null) tb.appendChild(row('gate order (each qubit, as the circuit writes it)', n.order_violations === 0 ? 'kept' : n.order_violations + ' operations out of order', n.order_violations === 0 ? 'ok' : 'bad'));
     right.appendChild(tb); }
   el.appendChild(left); el.appendChild(right); }
 function table(){ var w=$('tablewrap'); w.innerHTML=''; var yk=ysel.value;

@@ -1,0 +1,7 @@
+{
+ "mode": "rotate",
+ "cool": true,
+ "compile_s": 0.228,
+ "total_s": 0.465,
+ "log": "--- qccdc_cli rotate (exit 0)\ncircuit: 9 qubits, 25 clbits, 76 ops (40 two-qubit), 107 edges, Clifford -> ring16 (rigid rotation)\n  - conveyor: loop L0 of 16 slots, 8 docks, classes rotate_cw/rotate_ccw + dock/undock\n  - 4 qubits at docks, 5 riding the loop (stride 3)\n  - 39 rotations totalling 131 hops, 40 contacts in 40 batches\n  357 instructions\n  40 contacts in 40 batches, 39 rotations, 131 hops\n  certificate: 40 gate witnesses, 80 moves, 39 rotations, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\rep5_mem\\work.new\\ring16\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\rep5_mem\\work.new\\ring16\\prog.qcert.json\n\n"
+}

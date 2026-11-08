@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 0.268,
+ "total_s": 0.503,
+ "log": "--- qccdc_cli rotate (exit 5)\n\nC:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\rep5_mem\\work.new\\cyclone_base_j\\circuit.qasm: rotation does not apply: the device has no closed loop with docks\n--- qccdc_cli compile (exit 0)\ncircuit: 9 qubits, 25 clbits, 76 ops (40 two-qubit), 107 edges, Clifford -> cyclone_base_j (conveyor regime)\n  19 layers, 39 transport cycles, 160 beams, 40 MS, 0 virtual-Z, 100 instructions\n  - seeded q1 (weight 10) at S0\n  - candidates: greedy 40, spectral 105 -> greedy\n  - weighted interaction distance 40 over 8 distinct pairs\n  certificate: 40 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\rep5_mem\\work.new\\cyclone_base_j\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\rep5_mem\\work.new\\cyclone_base_j\\prog.qcert.json\n\n"
+}

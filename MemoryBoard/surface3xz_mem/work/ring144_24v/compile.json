@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 9.162,
+ "total_s": 10.268,
+ "log": "--- qccdc_cli rotate (exit 5)\n\nC:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\ring144_24v\\circuit.qasm: rotation does not apply: h acts on q9, which rides the loop; only docked ions can gate\n--- qccdc_cli compile (exit 0)\ncircuit: 34 qubits, 66 clbits, 281 ops (144 two-qubit), 391 edges, Clifford -> ring144_24v (conveyor regime)\n  23 layers, 2696 transport cycles, 633 beams, 144 MS, 57 virtual-Z, 2839 instructions\n  - device is tight: up to 2 ions per trap at t=0\n  - seeded q4 (weight 12) at A0\n  - candidates: greedy 1101, spectral 3321 -> greedy\n  - hill-climb 1101 -> 981 in 3 rounds\n  - weighted interaction distance 981 over 48 distinct pairs\n  - junctions: 24 site(s) where three or more rails meet are crossed, never rested on\n  - undock deferred: q22 cannot reach A0 from A102 within 130 cycles\n  - undock deferred: q23 cannot reach A132 from A108 within 130 cycles\n  - undock deferred: q3 cannot reach A12 from A54 within 130 cycles\n  certificate: 201 gate witnesses, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\ring144_24v\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD-wt\\integ\\MemoryBoard\\surface3xz_mem\\work.new\\ring144_24v\\prog.qcert.json\n\n"
+}

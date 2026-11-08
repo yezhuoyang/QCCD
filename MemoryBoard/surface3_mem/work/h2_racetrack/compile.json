@@ -1,0 +1,7 @@
+{
+ "mode": "compile",
+ "cool": true,
+ "compile_s": 2.243,
+ "total_s": 2.524,
+ "log": "--- qccdc_cli rotate (exit 5)\n\nC:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\h2_racetrack\\circuit.qasm: rotation does not apply: the device has no closed loop with docks\n--- qccdc_cli compile (exit 0)\ncircuit: 17 qubits, 33 clbits, 136 ops (72 two-qubit), 191 edges, Clifford -> h2_racetrack (race track)\n  - race track: loop L0 of 40 sites, up to 20 gates per round, classes rotate_cw/rotate_ccw + shuttle\n  - placement: 17 ions side by side from S0, in the order the gates meet them\n  - 72 two-qubit gates in 12 rounds; 0 shifts totalling 0 hops (0 to serve one-qubit ops), 889 one-ion steps (361 swaps)\n  866 instructions\n  certificate: 96 gate witnesses, 889 moves, 0 rotations, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\h2_racetrack\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\h2_racetrack\\prog.qcert.json\n\nC:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\h2_racetrack\\circuit.qasm: unroutable: q11 cannot reach S2 from S36 within 48 cycles\n  trying rigid rotation, which does not need a free slot to move into\n  rotation does not apply either: the device has no closed loop with docks\n  trying the race track: rigid shifts of the whole loop, swaps in its zones\n"
+}

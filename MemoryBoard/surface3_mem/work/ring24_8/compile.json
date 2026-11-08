@@ -1,0 +1,7 @@
+{
+ "mode": "rotate",
+ "cool": true,
+ "compile_s": 0.218,
+ "total_s": 0.515,
+ "log": "--- qccdc_cli rotate (exit 0)\ncircuit: 17 qubits, 33 clbits, 136 ops (72 two-qubit), 191 edges, Clifford -> ring24_8 (rigid rotation)\n  - conveyor: loop L0 of 24 slots, 8 docks, classes rotate_cw/rotate_ccw + dock/undock\n  - 8 qubits at docks, 9 riding the loop (stride 2)\n  - 68 rotations totalling 219 hops, 72 contacts in 68 batches\n  625 instructions\n  72 contacts in 68 batches, 68 rotations, 219 hops\n  certificate: 96 gate witnesses, 144 moves, 68 rotations, self-check OK\n  -> C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\ring24_8\\prog.tsir.json  C:\\Users\\yezhu\\Documents\\QCCD\\MemoryBoard\\surface3_mem\\work.new\\ring24_8\\prog.qcert.json\n\n"
+}
