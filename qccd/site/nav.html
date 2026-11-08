@@ -26,7 +26,7 @@
 #sitehits b{color:#0b0b0b;font-weight:600} #sitehits small{display:block;color:#8a8985;font-size:12px}
 #sitehits .sn-k{float:right;color:#8a8985;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-left:8px}
 #sitehits .sn-none{padding:8px 12px;color:#8a8985}
-/* Learn: the five reference pages in one menu (2026-10-26), so the bar holds fewer places.
+/* Learn: the six reference pages in one menu (2026-10-26; Machine added 2026-11-08), so the bar holds fewer places.
    The button is unset first: the studio styles every button, and this one must look like
    the links beside it on every page. */
 #sitenav .sn-menu{position:relative;display:inline-flex;align-items:center;height:40px}
@@ -55,6 +55,7 @@
   <span class="sn-menu" data-open="0"><button class="sn-mbtn" type="button" aria-haspopup="true"
     aria-expanded="false" data-hint="site:learn">Learn<i></i></button><span class="sn-drop" role="menu">
     <a href="__ROOT__physics/" data-part="physics" role="menuitem">Physics<small>from one trapped ion to the noise</small></a>
+    <a href="__ROOT__machine/" data-part="machine" role="menuitem">Machine<small>the machine as a text: its grammar, meaning and readers</small></a>
     <a href="__ROOT__language/" data-part="language" role="menuitem">Language<small>every statement a programme is written in</small></a>
     <a href="__ROOT__rules/" data-part="rules" role="menuitem">Rules<small>every rule, as the assertion that decides it</small></a>
     <a href="__ROOT__compilation/" data-part="compilation" role="menuitem">Compilation<small>from a circuit to a verified programme</small></a>
@@ -149,7 +150,7 @@
   // what an agent may operate in this bar, in the page's hint table (docs/agent-interface.md)
   window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, { 'site:search': { t: 'Search the site',
     d: 'type words; the matching pages are listed under the box, and Enter opens the first' },
-    'site:learn': { t: 'Learn', d: 'the reference pages: Physics, Language, Rules, Compilation and Evaluation; press to list them' },
+    'site:learn': { t: 'Learn', d: 'the reference pages: Physics, Machine, Language, Rules, Compilation and Evaluation; press to list them' },
     'site:debug': { t: 'Debug', d: 'step through a program, watch ions and places, and check it against rules; from a Studio page it opens that program' } });
   // Debug, from a Studio page: the debugger opens THIS program at this step (qccd/site/debugpage.py).  The Design
   // page's own work travels through the Studio's autosave, written here first so it is the latest.

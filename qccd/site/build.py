@@ -38,6 +38,7 @@ from pathlib import Path
 from .compile_examples import GATES, OUT as COMPILED, load_algo, load_compiled
 from . import algorithm
 from . import learn
+from . import machinepage
 from .examples import (GRAMMAR, IR_TABLE, RULES, VERBS, build_example, cards_phrase, core_form, judge, machine,
                        rule_meta, text_of)
 from .md import Renderer, hints, slug
@@ -801,6 +802,8 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
     body.append("<h2>The reference</h2><div class=\"docs\">")
     body.append('<a class="doc" href="../physics/"><span class="tag">background</span><b>The physics, from one trapped ion to the noise model</b>'
                 '<span>Traps, qubits, gates, transport, the control system, where the noise comes from and how this website simulates it.</span></a>')
+    body.append('<a class="doc" href="../machine/"><span class="tag">the machine</span><b>The machine as a text: grammar, well-formedness, meaning</b>'
+                '<span>What a machine document may say, which documents are machines, what is derived from one, and who reads which part: the language, the rules, the compiler, the evaluation.</span></a>')
     body.append('<a class="doc" href="../language/"><span class="tag">the language</span><b>Every statement, with a running example</b>'
                 '<span>The syntax, what each statement does to the machine, what it costs, and the IR beneath it.</span></a>')
     body.append('<a class="doc" href="../rules/"><span class="tag">the rules</span><b>All 27 rules, each with a programme that passes and one that fails</b>'
@@ -1104,26 +1107,33 @@ def language_page(built: dict) -> str:
     n_core = sum(1 for v in VERBS if v.get("kind", "core") == "core")
     n_short = sum(1 for v in VERBS if v.get("kind") == "shorthand")
     body = ["<h1>The hardware language</h1>",
-            "<p class=\"sub\">A programme is a list of statements over one device. Each core statement is one instruction "
+            "<p class=\"sub\">A programme is a list of statements over one machine: the text the "
+            "<a href=\"../machine/\">Machine</a> page defines, whose sites, rails, loops and movement classes are the "
+            "only names a statement may use. Each core statement is one instruction "
             "and one machine cycle: it says what moves where, or which ions a gate, a measurement or a cooling "
             "touches. It says nothing about cost. The replay computes the cost, the duration and the heating of "
-            "every cycle from the device's own primitive tables, and the rules judge each cycle as a whole. "
+            "every cycle from the machine's own primitive curves, and the rules judge each cycle as a whole. "
             "The same text runs in the studio's Write pane and in your own workspace.</p>",
             learn.strip("language"),
             learn.summary([
-                f"<b>What a programme is.</b> A list of statements, each one machine cycle, over one device. "
+                f"<b>What a programme is.</b> A list of statements, each one machine cycle, over one machine <var>M</var>. "
                 f"There are {n_core} core statements and {n_short} shorthands, and you will meet every one with a "
                 f"running example you can play.",
-                "<b>What a statement does to the machine.</b> The machine state is three things: where every ion is, "
-                "how hot it is (n&#772;), and the clock. Every statement is a step of that state, and nothing else.",
+                "<b>What a statement does to the machine.</b> The state is the Machine page's Σ<sub><var>M</var></sub>: "
+                "where every ion is (a map into <var>M</var>'s sites), how hot it is (n&#772;), and the clock. Every "
+                "statement is a step of that state, and nothing else.",
+                "<b>What a statement may name.</b> Only what <var>M</var> declares: a move goes along a rail of "
+                "<var>M</var>, a rotation turns a closed loop of <var>M</var>, a gate happens at a site whose zone "
+                "allows it. A statement that names what <var>M</var> lacks is ill-typed and refused before any rule runs.",
                 "<b>What a statement does not say.</b> Cost, time and heat are never written in a programme. They are "
-                "computed from the device's own tables when the programme is replayed, so two programmes on two "
-                "devices are priced by their devices, not by their authors.",
+                "computed from the machine's own curves when the programme is replayed, so two programmes on two "
+                "machines are priced by their machines, not by their authors.",
                 "<b>What lies beneath.</b> Every statement becomes one record of the control IR, the JSON the compiler "
                 "emits and the verifier replays: the text you write by hand and the compiler's output meet there.",
-            ], lead="You read on the <a href=\"../physics/\">Physics</a> page what a trapped-ion machine can do: hold ions, "
-                    "carry them, pulse them, cool them. This page is the language in which it is told to do those "
-                    "things, one cycle at a time."),
+            ], lead="The <a href=\"../physics/\">Physics</a> page said what a trapped-ion machine can do: hold ions, "
+                    "carry them, pulse them, cool them. The <a href=\"../machine/\">Machine</a> page made the machine a "
+                    "text, <var>M</var>, with sites, rails, loops, zones and prices. This page is the language in which "
+                    "<var>M</var> is told what to do, one cycle at a time."),
             learn.ask("Why does a hardware language need to exist at all? A quantum circuit already says what to compute.",
                       "Because a circuit says <i>what</i> and this machine needs <i>where and when</i>: which ion carries "
                       "which qubit, along which rails it travels, in which trap it meets its partner, when it is cooled. "
@@ -1140,13 +1150,17 @@ def language_page(built: dict) -> str:
             "<h2 id=\"semantics\">Semantics</h2>",
             learn.section("what a programme <i>means</i>: a machine state and the step each statement takes on it. "
                           "Hold on to the three-part state; everything on the Rules and Evaluation pages reads it."),
-            "<p class=\"sub\">The machine state is a map from ions to sites, a motional excitation n&#772; per ion, "
-            "and a clock. <code>init</code> creates the map; every other statement is a "
-            "transition of it. Transport statements move ions along segments and through junctions; each "
-            "crossing is priced from the device's curves and adds to n&#772;. Gates leave positions alone and "
+            "<p class=\"sub\">The state is the <a href=\"../machine/#def-state\">state space</a> of the machine, "
+            "Σ<sub><var>M</var></sub>: a map from ions to the sites of <var>M</var>, a motional excitation n&#772; "
+            "per ion, and a clock. <code>init</code> creates the map; every other statement is a "
+            "transition of it. Transport statements move ions along <var>M</var>'s rails and through its junctions; "
+            "each crossing is priced from <var>M</var>'s curves and adds to n&#772;. Gates leave positions alone and "
             "read n&#772; to evaluate their error. Cooling lowers n&#772;. Instructions execute in order, each "
-            "atomically; the next starts when the previous ends. Every cycle is then judged by the "
-            "<a href=\"../rules/\">rules</a>, which is where a programme is refused.</p>",
+            "atomically; the next starts when the previous ends. A statement must be "
+            "<a href=\"../machine/#def-typed\">well-typed</a> on <var>M</var>, naming only sites, rails, loops and "
+            "classes <var>M</var> has; one that is not is refused by the replay with the name it could not find. "
+            "Every cycle of a well-typed programme is then judged by the <a href=\"../rules/\">rules</a>, which is "
+            "where a legal-looking programme is refused.</p>",
             "<p class=\"sub\">The language has seven <b>core</b> statements, and every programme means a list of "
             "them. Four more are <b>shorthands</b>: each is defined as the core statements it stands for, is "
             "judged exactly as they are, and is there only to keep a programme short. Each shorthand below shows "
@@ -1204,7 +1218,8 @@ def language_page(built: dict) -> str:
                 + "".join(f"<tr><td><code>{a}</code></td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in IR_TABLE)
                 + "</tbody></table></div>"
                 "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">the control IR</a>; the device language "
-                "the programmes run on is <a href=\"../docs/adl/\">the architecture description</a>.</p>")
+                "the programmes run on is the machine of the <a href=\"../machine/\">Machine</a> page, whose file format is "
+                "<a href=\"../docs/adl/\">the architecture description</a>.</p>")
     body.append(learn.recap([
         "A programme is a list of statements, one machine cycle each, over one device. The state it steps is "
         "three things: where every ion is, how hot it is, and the clock.",
@@ -1510,7 +1525,8 @@ def compilation_page(built: list[dict]) -> str:
     bell = by.get("bell")
     n_gates = sum(1 for g in built if g["id"] != "bell" and not g["id"].startswith("algo_"))
     body = ["<h1>Compilation</h1>",
-            "<p class=\"sub\">The compiler takes a quantum circuit and a device, and writes the programme the "
+            "<p class=\"sub\">The compiler takes a quantum circuit and a machine (the text of the "
+            "<a href=\"../machine/\">Machine</a> page), and writes the programme the "
             "device runs: which ion holds each qubit, how ions are carried so that the two ions of every "
             "two-qubit gate stand in the same trap, and the laser operations, in order. Every example on "
             "this page can be played.</p>",
@@ -1528,7 +1544,8 @@ def compilation_page(built: list[dict]) -> str:
                 "programme, its ion map, its pulses and its verdicts.",
                 "<b>The algorithm</b> (&sect;5 onwards). What each pass computes, stated precisely, with a picture "
                 "after every definition; and what is proved, what is only computed, and what the compiler cannot do.",
-            ], lead="You have the machine (<a href=\"../physics/\">Physics</a>), the language it is told what to do in "
+            ], lead="You have the hardware (<a href=\"../physics/\">Physics</a>), the machine as a text "
+                    "(<a href=\"../machine/\">Machine</a>), the language it is told what to do in "
                     "(<a href=\"../language/\">Language</a>) and the rules it must keep (<a href=\"../rules/\">Rules</a>). "
                     "This page is the program that writes those programmes from an ordinary quantum circuit, and the "
                     "checks that catch it when it is wrong. The first four sections are the story; the rest is the "
@@ -2217,9 +2234,10 @@ def physics_page(d: dict, runs: dict[str, dict] | None = None) -> str:
                    "<b>The control system</b> and the price of wiring it at scale: one motion per cycle (R22).",
                    "<b>The noise</b>: the six things that go wrong, how a noisy machine is simulated in general, and "
                    "how this website does it, down to the logical error rate.",
-               ], lead="This is the first of the five Learn pages. It is the machine itself, read in the order you "
+               ], lead="This is the first of the six Learn pages. It is the hardware itself, read in the order you "
                        "need it to understand the studio: from one trapped ion to the noise model. Each section "
-                       "says which rule it stands behind.")
+                       "says which rule it stands behind. The next page, <a href=\"../machine/\">Machine</a>, turns "
+                       "the hardware into a text with a grammar, the object every later page is about.")
                + learn.ask("Why does a quantum computer built from trapped ions need to <i>move</i> anything at all?",
                            "Because its two-qubit gate works only on ions sharing one trap, and a trap holds only a "
                            "short chain well. So any pair of qubits that must interact has to be brought together, and "
@@ -2416,6 +2434,7 @@ def build(out: Path) -> int:
                   "u": "physics/", "k": "page"})
     index += [{"t": html.unescape(re.sub(r"<[^>]+>", "", text)), "d": "Physics background",
                "u": f"physics/#{sid}", "k": "physics"} for lvl, sid, text in phys["headings"] if lvl == 2]
+    index += machinepage.index_entries()
     index.append({"t": "People", "d": "who takes part in the project", "u": "people/", "k": "page"})
     index += [{"t": p["name"], "d": " \u00b7 ".join(x for x in (p.get("role"), p.get("affiliation")) if x),
                "u": f"people/#{slug(p['name'])}", "k": "person"} for p in PEOPLE]
@@ -2506,6 +2525,10 @@ def build(out: Path) -> int:
     put("connect/index.html", leaderboard.connect_page(PAGE, STYLE), 1, None)
     runs = build_phys_runs(out, put)
     put("physics/index.html", physics_page(phys, runs), 1, "physics")
+    # the machine as a text: the page every later Learn page's object is defined on
+    mach = machinepage.build_examples(out, put)
+    put("machine/index.html", machinepage.page(PAGE, STYLE, mach), 1, "machine")
+    print(f"  machine      {len(mach)} machines read as texts, each with a programme played on it")
     put("people/index.html", people_page(), 1, "people")
     from . import agentic
     put("agentic/index.html", agentic.page(PAGE, STYLE), 1, "agentic")

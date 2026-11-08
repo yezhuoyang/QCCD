@@ -176,8 +176,11 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
 
     b = ['<h1>The rules</h1>',
          '<div class="rules-intro">',
-         f'<p class="sub">A rule is one assertion about the hardware and what the machine does on it, '
-         f'written in a small language you can read on this page: '
+         f'<p class="sub">A rule is one assertion about a machine and what a programme does on it. The machine is '
+         f'itself a text, defined on the <a href="../machine/">Machine</a> page: a rule&rsquo;s device words '
+         f'(sites, rails, capacity, degree) are read off that text, and its execution words (operations, '
+         f'instants, occupancy) off the programme&rsquo;s replay. A rule is written in a small language you can '
+         f'read on this page: '
          f'<i>for every site and every instant, the ions in the site number at most its capacity</i> is '
          f'written <code>for all s in sites, t in instants: occupancy(s, t) &lt;= capacity(s)</code>. '
          f'The checker evaluates exactly that text; nothing else decides a rule.</p>',
@@ -196,8 +199,9 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
          '</div></div>',
          learn.strip("rules"),
          learn.summary([
-             '<b>What a rule is.</b> One sentence of logic about the device and a programme on it, evaluated on '
-             'the replay, true or false. You will be able to read every rule on this page in its own words.',
+             '<b>What a rule is.</b> One sentence of logic about a machine <var>M</var> (the text of the '
+             '<a href="../machine/">Machine</a> page) and a programme&rsquo;s run on it, evaluated on the replay, '
+             'true or false. You will be able to read every rule on this page in its own words.',
              f'<b>What the rules are for.</b> They are the hardware\'s side of the bargain: capacity, junctions, '
              f'one waveform per cycle, cold ions at a gate. A programme that breaks one is refused, and the page '
              f'says which values broke it. {len(core)} of the {n_rules} are <span class="core">core</span> and hold '
@@ -222,10 +226,12 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     # -- the language
     b += ['<h2 id="language">Reading a rule</h2>',
           learn.section('the ten shapes a rule can take. They are ordinary logic (for all, for some, and, or, '
-                        'counts and sums) over four finite sets: sites, operations, instants, and the circuit. '
+                        'counts and sums) over four finite sets: the sites of the machine, the operations and the '
+                        'instants of the run, and the circuit. '
                         'After this section every rule on the page reads as a sentence.'),
           '<p class="sub">A rule is a formula of first-order logic over finite sets: the sites of the '
-          'device, the operations of the execution, the instants at which its state is judged, and the '
+          'machine (the text of the <a href="../machine/">Machine</a> page), the operations of the '
+          'execution, the instants at which its state is judged, and the '
           'operations of the input circuit.</p>',
           '<pre class="assert">' + highlight(
               'for all x in D: P            P holds for every x in the set D\n'
@@ -259,7 +265,13 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
         terms = [t for t in TERMS.values() if t.group == g]
         if not terms:
             continue
-        b.append(f'<h3>{title}</h3><table class="vocab">')
+        b.append(f'<h3>{title}</h3>')
+        if g == "hardware":
+            b.append('<p class="sub">Every word in this group is read off the machine text <var>M</var> of the '
+                     '<a href="../machine/#readers">Machine</a> page, through one record: its sites, junctions, '
+                     'rails, capacities, degrees, zones, abilities, loops and declared numbers. Nothing about the '
+                     'hardware reaches a rule any other way, which is why a rule set is a text about a machine text.</p>')
+        b.append('<table class="vocab">')
         for t in sorted(terms, key=lambda t: (not t.domain, t.signature.lower())):
             name = t.name.split("(")[0]
             anchor = f' id="w-{name}"' if t.name == name else ""

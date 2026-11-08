@@ -18,7 +18,7 @@ const args = process.argv.slice(2);
 const site = path.resolve(args[0] || 'site');
 const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const LIVE = opt('--base'), ONLY = opt('--only'), SHOTS = opt('--shots');
-const PAGES = ['physics/', 'language/', 'rules/', 'compilation/', 'evaluation/'].filter(p => !ONLY || p.includes(ONLY));
+const PAGES = ['physics/', 'machine/', 'language/', 'rules/', 'compilation/', 'evaluation/'].filter(p => !ONLY || p.includes(ONLY));
 const CHROME = findChrome();
 if (!CHROME) { console.error('no Chrome found; set CHROME'); process.exit(2); }
 
@@ -90,7 +90,7 @@ for (const pg of PAGES) {
       sumBeforeH2: (function(){ var sum=m.querySelector('.sum'), h2=m.querySelector('h2'); return !!(sum && h2 && (sum.compareDocumentPosition(h2) & Node.DOCUMENT_POSITION_FOLLOWING)); })(),
       recap: !!m.querySelector('.recap'), gl: m.querySelectorAll('a.gl').length, posters: m.querySelectorAll('.runbox .poster').length,
       iframes: m.querySelectorAll('iframe').length}; })()`);
-  check(f.story === 5 && f.current === 1, `story strip: 5 pages, this one marked (${f.story}/${f.current})`);
+  check(f.story === 6 && f.current === 1, `story strip: 6 pages, this one marked (${f.story}/${f.current})`);
   check(f.sumBeforeH2, 'the summary stands before the first section');
   check(f.recap, 'the recap is there');
   check(f.gl > 10, `glossary marks: ${f.gl}`);

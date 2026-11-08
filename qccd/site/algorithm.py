@@ -747,26 +747,30 @@ def section(by: dict, lowering_text: str = "") -> str:
     # ================================================================ 1. setting
     A('<h3 id="algo-problem">5.1 Setting and problem statement</h3>'
       + learn.ask('Before any algorithm: what, exactly, is the compiler given, and what must it hand back?',
-                  'It is given a device (a graph of traps, junctions and rails) and a circuit (gates on qubits, in '
-                  'order). It must hand back a programme the device can run and a certificate that says where every '
-                  'gate happened. This section writes those four things down once, as symbols, and then shows every '
-                  'symbol on the three devices the examples use.')
+                  'It is given a machine (the text of the <a href="../machine/">Machine</a> page, of which it reads '
+                  'the trap graph: traps, junctions, rails, capacities, abilities, loops) and a circuit (gates on '
+                  'qubits, in order). It must hand back a programme the machine can run and a certificate that says '
+                  'where every gate happened. This section writes those four things down once, as symbols, and then '
+                  'shows every symbol on the three machines the examples use.')
       + learn.section('four definitions (device, trap graph, circuit, programme and certificate), the notation '
                       'table that concretises them, and the problem statement: legal, realised, correct, and short.'))
     A(df("Definition 1", "device",
-         'An <i>expanded architecture</i> is a tuple <var>A</var> = (<var>V</var>, <var>E</var>, cap, gate, meas, '
-         '<var>L</var>) where <var>V</var> = <var>T</var> ⊔ <var>J</var> is a set of nodes partitioned into '
-         '<i>traps</i> <var>T</var> and <i>junctions</i> <var>J</var>, <var>E</var> ⊆ <var>V</var>×<var>V</var> '
-         'is the set of rails (segments), cap: <var>T</var> → ℕ gives each trap the number of ions it holds, '
-         'gate ⊆ <var>T</var> is the set of traps in which a gate may happen and meas ⊆ <var>T</var> the set '
-         'in which a measurement or reset may, and <var>L</var> is a set of named loops, each a cyclic '
+         'Let <var>M</var> be a machine, the text defined on the <a href="../machine/#def-machine">Machine</a> '
+         'page. Its <i>expanded architecture</i> (the compiler&rsquo;s projection of <var>M</var>) is the tuple '
+         '<var>A</var>(<var>M</var>) = (<var>V</var>, <var>E</var>, cap, gate, meas, '
+         '<var>L</var>) where <var>V</var> = <var>T</var> ⊔ <var>J</var> is <var>M</var>&rsquo;s set of nodes partitioned into '
+         '<i>traps</i> <var>T</var> (its sites) and <i>junctions</i> <var>J</var> (its bare junctions), <var>E</var> ⊆ <var>V</var>×<var>V</var> '
+         'is <var>M</var>&rsquo;s set of rails (segments), cap: <var>T</var> → ℕ is <var>M</var>&rsquo;s capacity of each trap, '
+         'gate ⊆ <var>T</var> is the set of traps whose zone allows a gate (can(<var>t</var>, gate)) and meas ⊆ <var>T</var> the set '
+         'whose zone allows a measurement or reset (can(<var>t</var>, spam)), and <var>L</var> is the set of <var>M</var>&rsquo;s closed loops, each a cyclic '
          'sequence of nodes that one instruction can turn as a whole.',
-         'The device is a graph. Some nodes are <b>traps</b> (the set <var>T</var>), where ions can sit, up to a '
+         'The compiler reads the machine as a graph. Some nodes are <b>traps</b> (the set <var>T</var>), where ions can sit, up to a '
          'capacity, and in some of them be gated (the set gate) or measured (the set meas); the other nodes '
          'are <b>junctions</b> (<var>J</var>), where rails cross and no ion rests; the edges <var>E</var> are '
          'the <b>rails</b>. Some rails form named <b>loops</b> (<var>L</var>) that the control system can turn '
-         'as a whole. This document is the same one the studio draws, and it is all the compiler ever reads '
-         'about the hardware.'))
+         'as a whole. Every part of this tuple is read off the machine text (the Machine page, section 6); the '
+         'prices in that text are read only by cooling insertion (5.8), and nothing else about the hardware is '
+         'ever read by the compiler.'))
     A(notation_table([("chain4", "the register", mc), ("grid2x3", "the lattice", mg), ("ring6d", "the ring", mr)]))
     A(eg('The same three devices drawn, in one size, with their traps (discs), junctions (squares) and rails; '
          'the column of the table above each picture is the tuple <var>A</var> read off it. '

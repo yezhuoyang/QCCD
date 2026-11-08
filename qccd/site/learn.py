@@ -1,8 +1,9 @@
-"""The furniture the five Learn pages share (2026-11-07, from a reader's comments on
+"""The furniture the six Learn pages share (2026-11-07, from a reader's comments on
 /compilation/: "hard to follow", "goes straight into symbols", "add a summary, a
 conclusion, and a hover that explains a word").
 
-Five pages tell one story -- Physics (the machine), Language (how it is told what to
+Six pages tell one story -- Physics (the hardware), Machine (the machine as a text, added
+2026-11-08), Language (how it is told what to
 do), Rules (what it may do), Compilation (from a circuit to a programme), Evaluation
 (how a design is judged) -- and each page now carries:
 
@@ -14,7 +15,7 @@ do), Rules (what it may do), Compilation (from a circuit to a programme), Evalua
   * the GLOSSARY: the first mention of an important word in each section is a link.
     Hovering it shows a card with the word explained in a sentence or two; clicking it
     goes to where the word is defined, on this page or another.  One table below holds
-    every word, its sentence and its definition's address, so the five pages cannot
+    every word, its sentence and its definition's address, so the six pages cannot
     explain a word five ways;
   * RUNBOXES: an animation is a poster of the device with a Play button, and the Studio
     page is loaded and played when the reader presses it.  A page used to load nineteen
@@ -37,7 +38,8 @@ import re
 
 #: The Learn pages in reading order: (key, path, title, the one-line role in the story).
 STORY = (
-    ("physics", "physics/", "Physics", "the machine: ions, traps, lasers, heat"),
+    ("physics", "physics/", "Physics", "the hardware: ions, traps, lasers, heat"),
+    ("machine", "machine/", "Machine", "the machine as a text: what every programme runs on"),
     ("language", "language/", "Language", "how a programme tells the machine what to do"),
     ("rules", "rules/", "Rules", "what the machine may and may not do"),
     ("compilation", "compilation/", "Compilation", "from a circuit to a verified programme"),
@@ -46,7 +48,7 @@ STORY = (
 
 
 def strip(active: str, depth: int = 1) -> str:
-    """The story strip: the five pages in order, the current one marked."""
+    """The story strip: the six pages in order, the current one marked."""
     root = "../" * depth
     out = ['<nav class="story" aria-label="the Learn pages, in order">']
     for i, (key, path, title, role) in enumerate(STORY, 1):
@@ -132,16 +134,34 @@ GLOSSARY: dict[str, dict] = {
             "d": "A charged atom held in a trap by electric fields. On this website one ion carries one qubit (a second species beside it carries none and is there to be cooled)."},
     "qubit": {"t": "Qubit", "u": "physics/#the-qubit-inside-the-ion", "a": ["qubit"],
               "d": "Two internal states of an ion, used as the 0 and 1 of a quantum bit. A circuit names qubits; the compiler decides which ion carries each one."},
-    "trap": {"t": "Trap (trapping site)", "u": "physics/#the-qccd-idea", "a": ["trapping site", "trap site", "trap", "site"],
-             "d": "A well in the electric potential where one or a few ions rest. Ions are moved between traps; a two-qubit gate needs both ions in one trap. Also called a site; in the formal sections the set of traps is T."},
-    "junction": {"t": "Junction", "u": "physics/#the-qccd-idea", "a": ["junction"],
-                 "d": "A node where three or more rails meet. An ion passes through a junction but never rests on one (rule R2), and the crossing costs time and heat."},
-    "rail": {"t": "Rail (segment)", "u": "physics/#the-qccd-idea", "a": ["rail", "segment"],
-             "d": "The stretch of trap axis an ion is shuttled along between two nodes. In the device graph the rails are the edges, E."},
-    "loop": {"t": "Loop", "u": "physics/#the-qccd-idea", "a": ["transport loop", "loop"],
-             "d": "A closed path of rails and sites that the control system can turn as a whole, carrying every ion on it one slot round in one instruction."},
-    "zone": {"t": "Zone type", "u": "physics/#the-qccd-idea", "a": ["zone type", "zone"],
-             "d": "The label a site carries saying how many ions fit there and whether gates, measurement or cooling may happen in it."},
+    "machine": {"t": "Machine", "u": "machine/#def-machine", "a": ["machine"],
+                "d": "The text everything runs on: a document with a geometry (nodes, rails, loops), zone types, primitive curves, a control plane, heating, species and budget, loaded once into a graph with tables. Also called a device. The Machine page defines it; a programme is written in its names, a rule quantifies over its sets."},
+    "trap": {"t": "Trap (site)", "u": "machine/#def-node", "a": ["trapping site", "trap site", "trap", "site"],
+             "d": "A node of the machine where an ion can stand: site(id, pos, zone, capacity). Ions are moved between sites; a two-qubit gate needs both ions in one site that can gate. In the formal sections the set of traps is T."},
+    "junction": {"t": "Junction", "u": "machine/#def-degree", "a": ["junction"],
+                 "d": "A node where three or more rails meet: derived from the geometry by counting, never declared (rule R18). An ion crosses a junction and does not rest on one (R2, R23), and the crossing is priced at its degree."},
+    "rail": {"t": "Rail (segment)", "u": "machine/#def-rail", "a": ["rail", "segment"],
+             "d": "An edge of the machine's geometry: rail(id, a, b, length, capacity, loop), the stretch of trap axis an ion is shuttled along between two nodes. The set of rails is E."},
+    "loop": {"t": "Loop", "u": "machine/#def-loop", "a": ["transport loop", "loop"],
+             "d": "A named sequence of nodes of the machine joined by rails. A closed loop is the domain of the shift map: one instruction turns every ion on it one slot round."},
+    "zone": {"t": "Zone type", "u": "machine/#def-zone", "a": ["zone type", "zone"],
+             "d": "A record (capacity, gate, spam, cool) the machine declares once and stamps on sites: how many ions fit there and what may happen to them. Capacity is rule R1's bound, the flags are rule R6's permissions."},
+    "capacity": {"t": "Capacity", "u": "machine/#def-zone", "a": ["capacity"],
+                 "d": "How many ions a site or a rail may hold at once: a site's own number, or its zone type's. Rule R1 for sites, R3 for rails."},
+    "bend": {"t": "Bend", "u": "machine/#def-bend", "a": ["bend"],
+             "d": "A node of degree two at which the rail turns. Not a junction (rule R18): an ion is carried round it at the price of ordinary rail. A bend that is a bare junction is no slot of its loop: nothing stops there."},
+    "corner": {"t": "Corner", "u": "machine/#def-bend", "a": ["corner"],
+               "d": "A node at which a loop changes direction, found by walking the loop. A corner that is a site is a slot like any other; a corner that is a bare junction is a bend."},
+    "slot": {"t": "Slot", "u": "machine/#def-slot", "a": ["slot"],
+             "d": "A place an ion stands on a loop: the loop's nodes in order, less its bends. The shift map moves every ion one slot along."},
+    "movement class": {"t": "Movement class", "u": "machine/#def-control", "a": ["movement class", "SIMD class"],
+                       "d": "One of the ways a machine's control plane can move ions in a cycle: a motion template over an orbit (a loop, the spurs, or any rail), with the primitives it entails. Rule R4 bounds how many classes one cycle may drive."},
+    "operating point": {"t": "Operating point", "u": "machine/#def-primitives", "a": ["operating point", "curve"],
+                        "d": "One measured (duration, heat) pair of a transport primitive's curve, tagged with the table it was taken from. A policy picks one point per primitive; the price of a cycle is the sum over the primitives it uses."},
+    "well-typed": {"t": "Well-typed on a machine", "u": "machine/#def-typed", "a": ["well-typed", "ill-typed"],
+                   "d": "A statement every name of which the machine declares and every relation of which holds in it (a hop along a rail, a rotation of a closed loop). Ill-typed is refused by the replay itself; legal is the rules' word."},
+    "well-formed": {"t": "Well-formed machine", "u": "machine/#def-well-formed", "a": ["well-formed"],
+                    "d": "A document that passes the loader's ten structural checks (every rail end a node, no self-loop, no parallel rail, loops of two or more distinct nodes joined by rails, sites with capacity, junctions without). A programme or a rule never sees one that failed."},
     "dock": {"t": "Dock (spur)", "u": "physics/#transport-primitives-and-what-each-one-costs", "a": ["dock", "spur"],
              "d": "A gate-capable trap hanging off a loop by one short rail, the spur. An ion riding the loop is docked into it for a gate and undocked afterwards."},
     "hop": {"t": "Hop", "u": "compilation/#def-trap-graph", "a": ["hop"],
@@ -243,7 +263,7 @@ GLOSSARY: dict[str, dict] = {
     "R16": {"t": "Rule R16: gate error grows with heat", "u": "rules/#R16", "a": ["R16"], "d": "The two-qubit gate's error is linear in the quanta the ions bring to it."},
     "R17": {"t": "Rule R17: anomalous heating", "u": "rules/#R17", "a": ["R17"], "d": "Every ion warms with elapsed time, moving or not."},
     "R18": {"t": "Rule R18: a bend is not a junction", "u": "rules/#R18", "a": ["R18"], "d": "A corner where two rails meet is ordinary transport; only a node of degree three or more costs a junction crossing."},
-    "R19": {"t": "Rule R19: junction degree", "u": "rules/#R19", "a": ["R19"], "d": "At most four rails meet at a node on a planar chip."},
+    "R19": {"t": "Rule R19: junction degree", "u": "rules/#R19", "a": ["R19"], "d": "A node joins at most max_junction_degree rails: six unless the machine's document declares fewer, and a planar chip declares four."},
     "R20": {"t": "Rule R20: rail angle", "u": "rules/#R20", "a": ["R20"], "d": "Two rails leaving a node are at least 60 degrees apart, room for their electrodes."},
     "R21": {"t": "Rule R21: planar rails", "u": "rules/#R21", "a": ["R21"], "d": "A rail meets only the nodes it ends at, and two rails cross only at a node they share."},
     "R22": {"t": "Rule R22: one waveform per cycle", "u": "rules/#R22", "a": ["R22"],
@@ -596,7 +616,7 @@ JS = r"""
 </script>
 """
 
-# The five Learn pages share one column and one measure: 868 px main (762 px of content) and
+# The six Learn pages share one column and one measure: 868 px main (762 px of content) and
 # NOT ONE block keeps a cap of its own, so prose, boxes, tables and figures end on the same
 # right edge.  The caps this overrides are written in ch, which differs by font, which is how
 # the pages came to have a dozen right edges (2026-11-08).  Appended last to each page's

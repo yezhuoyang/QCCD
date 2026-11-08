@@ -146,7 +146,7 @@ ExpansionError: node 'S0': file says degree 10, graph gives 3
 ```jsonc
 "zone_types": {
   "data":    { "capacity": 2, "gate": false, "spam": false, "cool": true },
-  "ancilla": { "capacity": 2, "gate": true,  "spam": true,  "cool": true }
+  "trap":    { "capacity": 2, "gate": true,  "spam": true,  "cool": true }
 }
 ```
 

@@ -648,7 +648,8 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '</div>')
     w(learn.strip("evaluation"))
     w(learn.summary([
-        '<b>Three texts, one function.</b> A device, a programme and an evaluation go in; every metric, every '
+        '<b>Three texts, one function.</b> A machine (the text of the <a href="../machine/">Machine</a> page), a '
+        'programme and an evaluation go in; every metric, every '
         'requirement\'s verdict and the noisy circuit come out. Nothing else is read, so every number on the '
         'leaderboard can be recomputed.',
         '<b>The evaluation language</b>, which is the rule language with three more kinds of item: a '
@@ -664,7 +665,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
             'Legal and correct is not yet <i>good</i>. This page is how a design is judged in numbers, and why '
             'each number is one you can recompute.'))
     w(learn.ask('A design claims a logical error rate. What would it take for you to believe the number?',
-                'You would want to recompute it: from the device, the programme, and a written-down noise model, '
+                'You would want to recompute it: from the machine, the programme, and a written-down noise model, '
                 'with no hidden step. That is the design of this page. Every number is a term of a small language '
                 'over three texts; the grader is an interpreter of the text, not an authority.'))
     w('<ul class="toc2">' + "".join(f'<li><a href="#{a}">{html.escape(t)}</a></li>' for a, t in HEADINGS) + '</ul>')
@@ -673,12 +674,13 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     w('<h2 id="texts">Three texts and one function</h2>')
     w(learn.section('the one definition the rest of the page unpacks: what an evaluation is, and that its result '
                     'is a function of three texts and nothing else (which is proved in two lines).'))
-    w('<div class="df"><b>Definition 1</b>(An evaluation.) Let <i>D</i> be a device &mdash; its graph of '
+    w('<div class="df"><b>Definition 1</b>(An evaluation.) Let <i>M</i> be a machine, the text defined on the '
+      '<a href="../machine/#def-machine">Machine</a> page &mdash; its graph of '
       'sites, junctions and rails, its zones, the (time, heat) curves of its transport primitives, its gates, '
       'its heating, its wiring and its budget &mdash; and <i>P</i> a programme on it, a list of instructions '
       'of the <a href="../language/">hardware language</a>. An <i>evaluation</i> <i>E</i> is a text in the '
-      'language of the next section. Its meaning on (<i>D</i>, <i>P</i>) is the triple'
-      '<div class="eq">⟦<i>E</i>⟧(<i>D</i>, <i>P</i>) = (μ, ρ, <i>C</i>)</div>'
+      'language of the next section. Its meaning on (<i>M</i>, <i>P</i>) is the triple'
+      '<div class="eq">⟦<i>E</i>⟧(<i>M</i>, <i>P</i>) = (μ, ρ, <i>C</i>)</div>'
       '<p>where μ gives every metric a value, ρ gives every requirement a verdict, and <i>C</i> is the noisy '
       'circuit: a stim circuit with the experiment&rsquo;s detectors. The logical error rate is a statistic '
       'of <i>C</i>, LER(<i>C</i>) = Pr[the decoder&rsquo;s correction leaves a logical observable wrong].</p>'

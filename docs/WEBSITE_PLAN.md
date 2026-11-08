@@ -772,3 +772,37 @@ was small stood until the next zoom.  render.py now observes the canvas with a R
 through the same debounced relayout; the page stamp moved to 3bafba36d95b6454 and every seed
 page was regenerated.  `tests/learn.mjs` presses a poster in that very frame and reads the
 labels, which is how it was found.
+
+## A Machine page, and the other Learn pages speak of one machine - 2026-11-08
+
+The reader asked for a Learn page that defines the machine "from a PL standard point of
+view", and for the other pages to be consistent with it: a programme acts on a machine, a
+rule is an assertion about a machine and a run on it, the compiler's abstractions model a
+machine, and none of the five pages had defined the object.  `qccd/site/machinepage.py` is
+that page, second in the story (Physics, Machine, Language, Rules, Compilation, Evaluation):
+the abstract syntax as a grammar with one definition per production (M1-M8: machine,
+geometry, node, rail, loop, zone types, primitives, control), the static semantics (M9, ten
+checks, each quoted with the sentence the loader prints, produced by breaking the register
+and asking `Device.check_structure`), the derived notions (M10-M13: degree and junction,
+bend and corner, slots and the shift map, hop), the meaning (M14 the state space, M15
+well-typed on M: a hop the machine lacks is a replay refusal, not a rule), who reads what
+(the Hardware record, the trap graph A(M), the evaluation's tables, the proved checker's
+gateSites/hops/loops), six machines as texts with a programme played on each
+(machine/ex/<name>.html), the generators, and the listing as a language (M16, M17) with a
+machine written by hand.  Every count, listing and message is computed from the documents
+at build time; a listing that does not rebuild its machine, or a programme that is not legal
+on its machine, stops the build.
+
+The other pages now name that object: STORY has six entries (Physics' role is "the
+hardware"), the nav menu and its hint list six pages, the Tutorial's reference cards have a
+sixth, the glossary's trap/junction/rail/loop/zone entries point at the Machine definitions
+and nine words join (machine, capacity, bend, corner, slot, movement class, operating point,
+well-typed, well-formed).  Language: "over one machine M", the state is Sigma_M, a statement
+must be well-typed on M.  Rules: an assertion about a machine and a run on it, the four
+finite sets split into the machine's and the run's, the device vocabulary is one record read
+off M.  Compilation: Definition 1 is A(M), the compiler's projection of the Machine page's
+M.  Evaluation: Definition 1 reads (M, P).  Physics: the five words are introduced from the
+hardware and made formal on the next page; R19's default corrected to the code's (six unless
+the document declares fewer; a planar chip declares four), in the glossary too.  The adl
+reference's zone example loses "ancilla".  tests/learn.mjs walks six pages and expects a
+six-entry strip; test_learn_pages knows the Machine anchors.

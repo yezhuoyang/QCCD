@@ -39,7 +39,7 @@ def test_nothing_is_marked_inside_links_headings_code_drawings_or_the_studio_car
     body = ('<h2 id="x">The trap</h2><a href="#">trap</a><pre>trap</pre><svg><text>trap</text></svg>'
             '<span class="h" data-t="t">trap</span><div class="eq">trap</div><p class="sub">trap</p>')
     out, used = learn.mark(body, "rules/", 1)
-    assert out.count('class="gl"') == 1 and out.endswith('<p class="sub"><a class="gl" data-gl="trap" href="../physics/#the-qccd-idea">trap</a></p>')
+    assert out.count('class="gl"') == 1 and out.endswith('<p class="sub"><a class="gl" data-gl="trap" href="../machine/#def-node">trap</a></p>')
 
 
 def test_a_word_defined_on_this_page_links_to_a_bare_fragment_and_others_to_the_page():
@@ -103,9 +103,12 @@ def test_every_glossary_anchor_is_one_the_page_builders_write():
     from qccd.site.algorithm import IDS
     from qccd.site.evaluation import HEADINGS as EVAL
     from qccd.site.examples import VERBS
+    from qccd.site import machinepage
     from qccd.ruleset import catalogue
     known = {
         "physics/": _physics_anchors(),
+        "machine/": set(machinepage.IDS.values()) | {a for a, _ in machinepage.HEADINGS}
+                    | {f"m-{k}" for k, _, _, _ in machinepage.MACHINES},
         "compilation/": _ids_in(SITE / "algorithm.py", SITE / "build.py") | set(IDS.values()),
         "evaluation/": {a for a, _ in EVAL} | _ids_in(SITE / "evaluation.py"),
         "language/": {v["verb"] for v in VERBS} | _ids_in(SITE / "build.py"),
