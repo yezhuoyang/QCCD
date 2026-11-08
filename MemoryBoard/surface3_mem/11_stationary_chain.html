@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="qccd-page" content="118ab802e03d1250">
+<meta name="qccd-page" content="3bafba36d95b6454">
 <title>stationary_chain - circuit+cooling</title>
 <style>
 :root{
@@ -12395,7 +12395,14 @@ document.getElementById('ctxmenu').addEventListener('contextmenu', e=>e.preventD
 document.getElementById('stDrive').addEventListener('click', ()=>{
   if (window.EDITOR && EDITOR.pressTestDrive) EDITOR.pressTestDrive(); });
 let rt=null;
-window.addEventListener('resize', ()=>{clearTimeout(rt); rt=setTimeout(relayout,120);});
+const relayoutSoon=()=>{clearTimeout(rt); rt=setTimeout(relayout,120);};
+window.addEventListener('resize', relayoutSoon);
+// The canvas also changes size without the window doing so: an embed's frame is laid out
+// after the page, a panel folds, a column is dragged.  The hardware labels are decided from
+// the canvas's size on screen (`hwlRefresh`), and a decision taken while the canvas was
+// still small stayed until the next zoom; in a 300 px frame on the Rules page the labels
+// were "on" and never drawn (2026-11-08).  Debounced through the same path as a resize.
+if(typeof ResizeObserver === 'function') new ResizeObserver(relayoutSoon).observe(svg);
 
 // ---------- chrome ----------
 const M=D.metrics, hw=A.hardware, rl=D.rules, SUM=A.summary||{};
