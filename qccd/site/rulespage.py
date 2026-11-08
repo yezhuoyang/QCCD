@@ -382,7 +382,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     page_body = learn.apply("\n".join(b), "rules/", 1)
     page_body += "<script>\n" + (CATEGORIES / "rules.js").read_text(encoding="utf-8") + "\n</script>"
     return PAGE.format(title="Rules - QCCD studio", style=STYLE,
-                       extra_css="main{max-width:1120px}" + CSS + (CATEGORIES / "rules.css").read_text(encoding="utf-8"),
+                       extra_css=CSS + (CATEGORIES / "rules.css").read_text(encoding="utf-8") + learn.LAYOUT_CSS,
                        body=page_body)
 
 

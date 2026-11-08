@@ -1218,8 +1218,9 @@ def language_page(built: dict) -> str:
                         "pane takes exactly this text and plays it. The tutorial's Part B does it with you, one statement "
                         "at a time."))
     # the examples are short: a taller stage, so the ions can be seen moving
-    css = ("main{max-width:1120px} .verb .runbox iframe.live{height:420px}"
-           " .coreq{font-size:13.5px;margin:14px 0 4px} .verb .two pre.grammar{white-space:pre-wrap;font-size:12.5px}")
+    css = (".verb .runbox iframe.live{height:420px}"
+           " .coreq{font-size:13.5px;margin:14px 0 4px} .verb .two pre.grammar{white-space:pre-wrap;font-size:12.5px}"
+           + learn.LAYOUT_CSS)
     return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css=css,
                        body=learn.apply("\n".join(body), "language/", 1))
 
@@ -1778,15 +1779,14 @@ def compilation_page(built: list[dict]) -> str:
                                        "example opens as the Studio page the compiler wrote. To compile a circuit of your "
                                        "own, open the <a href=\"../studio.html#design\">Design page</a>; to see these "
                                        "programmes ranked, the <a href=\"../board/\">Leaderboard</a>."))
-    css = ("main{max-width:1120px}"
-           " .ideas{list-style:none;counter-reset:idea;padding:0;margin:8px 0 10px;max-width:100ch}"
+    css = (" .ideas{list-style:none;counter-reset:idea;padding:0;margin:8px 0 10px}"
            " .ideas li{position:relative;padding:4px 0 10px 54px;margin:0 0 6px}"
            " .ideas li:before{counter-increment:idea;content:counter(idea);position:absolute;left:0;top:4px;width:38px;height:38px;"
            "border-radius:19px;background:#1c2a4a;color:#fff;font:700 17px/38px var(--sans);text-align:center}"
            " .ideas .q{margin:0 0 3px;font-family:var(--serif);font-size:18px;font-weight:600;color:#1a2540}"
-           " .ideas p{margin:0;max-width:86ch} .ideas p b{color:#1c2a4a}"
+           " .ideas p{margin:0} .ideas p b{color:#1c2a4a}"
            " .runnote{font-family:var(--sans);font-size:12px;color:var(--ink3);margin:4px 0 0}"
-           + algorithm.CSS)
+           + algorithm.CSS + learn.LAYOUT_CSS)
     return PAGE.format(title="Compilation - QCCD studio", style=STYLE, extra_css=css,
                        body=learn.apply("\n".join(body), "compilation/", 1))
 
@@ -2251,7 +2251,8 @@ def physics_page(d: dict, runs: dict[str, dict] | None = None) -> str:
     # the device gallery two to a row (its drawings share one box, see `_figures`), one to a
     # row on a phone; this page's own rule, so no other page changes
     css = (".gallery{grid-template-columns:repeat(2,minmax(0,1fr))}"
-           "@media (max-width:640px){.gallery{grid-template-columns:minmax(0,1fr)}}")
+           "@media (max-width:640px){.gallery{grid-template-columns:minmax(0,1fr)}}"
+           + learn.LAYOUT_CSS)
     return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css=css,
                        body=learn.apply(body, "physics/", 1))
 

@@ -750,3 +750,25 @@ with `QCCD_SITE_DIR` the built pages' links, posters, strip, summary, recap) and
 `tests/learn.mjs` (in Chrome: the card opens on hover with the explanation and the link, a
 poster pressed loads the page and the slider moves by itself, the labels are drawn at 9 px
 or more in the embed, no console errors).
+
+## One column on the Learn pages, and labels that come back when a frame grows - 2026-11-08
+
+The reader's next comment: the widths vary, an Example box is wider than the Theorem above
+it, the page looks messy.  Measured in Chrome, the Compilation page had a dozen right edges:
+the main was 1120 px wide, prose was capped at 80ch, the theorem boxes at 100ch, the ideas
+at 86ch, the example boxes not at all, the recap at its own margins; and ch differs by font,
+so even two "100ch" boxes did not agree.  Now `learn.LAYOUT_CSS`, appended last to each of
+the five pages' extra CSS: one 868 px main (762 px of content, the width Physics already
+had), and NOT ONE block keeps a cap of its own, so prose, boxes, tables, strips and posters
+end on the same edge; boxes inset their text by their own padding and nothing else.  Language,
+Rules and Compilation lose their 1120 px mains; strips of three or four figures still fit
+(figures flex from 150 px); example boxes scroll sideways on a phone instead of the page.
+
+The narrower column exposed a Studio bug: in a 300 px frame the hardware labels were "on"
+and not drawn.  `hwlRefresh` decides from the canvas's size on screen and is called on zoom
+and on window resize; the embed's canvas changes size AFTER the page's first decision (the
+frame is laid out later) and no window resize follows, so a "no room" taken while the canvas
+was small stood until the next zoom.  render.py now observes the canvas with a ResizeObserver
+through the same debounced relayout; the page stamp moved to 3bafba36d95b6454 and every seed
+page was regenerated.  `tests/learn.mjs` presses a poster in that very frame and reads the
+labels, which is how it was found.

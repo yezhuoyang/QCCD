@@ -1255,5 +1255,5 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
                           '<a href="../studio.html#design">Design page</a>, where your own device is scored by the '
                           'same texts as you draw it.'))
     w('</div>')
-    return PAGE.format(title="Evaluation - QCCD studio", style=STYLE, extra_css=CSS,
+    return PAGE.format(title="Evaluation - QCCD studio", style=STYLE, extra_css=CSS + learn.LAYOUT_CSS,
                        body=learn.apply(_anchor_declarations("\n".join(b)), "evaluation/", 1))

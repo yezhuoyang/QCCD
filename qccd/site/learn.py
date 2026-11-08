@@ -484,16 +484,16 @@ CSS = r"""
 .story a[aria-current="page"] small{color:#3b5b8c}
 @media (max-width:900px){.story{flex-wrap:wrap}.story a{flex:1 1 45%;border-bottom:1px solid var(--line)}.story a small{display:none}}
 .sum{background:#f3f6fb;border:1px solid #d6e2f4;border-left:4px solid #2a78d6;border-radius:12px;padding:14px 20px 12px;margin:18px 0 22px;
- font-family:var(--sans);font-size:14.5px;line-height:1.55;max-width:100ch;color:#1f2b44}
+ font-family:var(--sans);font-size:14.5px;line-height:1.55;color:#1f2b44}
 .sum .sumh,.recap .sumh{margin:0 0 6px;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#2a78d6}
 .sum p{margin:0 0 6px;color:#1f2b44} .sum ul{margin:4px 0 2px;padding-left:20px} .sum li{margin:0 0 5px;color:#1f2b44}
 .sum.sec{padding:10px 16px;margin:10px 0 14px;font-size:14px;border-radius:10px} .sum.sec b{color:#2a78d6;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
-.ask{display:grid;grid-template-columns:46px 1fr;gap:4px 14px;align-items:start;margin:20px 0 20px;max-width:100ch}
+.ask{display:grid;grid-template-columns:46px 1fr;gap:4px 14px;align-items:start;margin:20px 0 20px}
 .ask:before{content:"?";grid-column:1;grid-row:1 / span 2;width:46px;height:46px;border-radius:23px;background:#1c2a4a;color:#fff;font:700 26px/46px var(--serif);text-align:center}
 .ask .q,.ask .a{grid-column:2;max-width:none}
 .ask .q{margin:0 0 4px;font-size:19px;line-height:1.45;color:#1a2540;font-weight:600;font-family:var(--serif)}
 .ask .a{margin:0;color:var(--ink2);font-size:15.5px}
-.bridge{font-family:var(--serif);font-style:italic;color:#3b4660;border-left:3px solid #e4e2db;padding:4px 0 4px 16px;margin:26px 0 8px;max-width:80ch;font-size:16.5px}
+.bridge{font-family:var(--serif);font-style:italic;color:#3b4660;border-left:3px solid #e4e2db;padding:4px 0 4px 16px;margin:26px 0 8px;font-size:16.5px}
 .recap{background:var(--card);border:1px solid var(--line);border-top:4px solid #1c2a4a;border-radius:12px;padding:18px 22px 14px;margin:40px 0 10px;font-family:var(--sans);font-size:14.5px;line-height:1.55}
 .recap .sumh{color:#1c2a4a} .recap ol{margin:4px 0 10px;padding-left:22px} .recap li{margin:0 0 7px;color:var(--ink)} .recap .more{color:var(--ink2);margin:0 0 10px}
 .recap .ways{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
@@ -594,4 +594,19 @@ JS = r"""
   });
 })();
 </script>
+"""
+
+# The five Learn pages share one column and one measure: 868 px main (762 px of content) and
+# NOT ONE block keeps a cap of its own, so prose, boxes, tables and figures end on the same
+# right edge.  The caps this overrides are written in ch, which differs by font, which is how
+# the pages came to have a dozen right edges (2026-11-08).  Appended last to each page's
+# extra_css so it wins.
+LAYOUT_CSS = """
+main{max-width:868px}
+main>p,main>ul,main>ol,main>blockquote,main>.sub,.note,.sum,.ask,.ideas,.ideas p,.recap,.rules-intro,dl.native,
+.algo p,.algo .df,.algo .eg p,.algo .eq,.algo figure.dg figcaption,.algo ul.refs,.algo ol.pf,.algo .guide,
+.evl p,.evl .df,.evl .eg p,.evl .eq,.evl figure.dg figcaption{max-width:none}
+.algo .strip figure{flex:1 1 150px;max-width:none}
+.algo .strip figure.wide{flex:1 1 100%}
+.algo .eg,.evl .eg{overflow-x:auto}
 """
