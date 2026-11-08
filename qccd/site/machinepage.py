@@ -542,6 +542,9 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
                               "listing, a programme in a grammar of a few method calls and no expressions (section 9), and running "
                               "that listing gives <var>M</var> back. The two texts are interchangeable; the Studio's "
                               "Design page edits the listing, the files on disk are documents."))
+    w("<p>One word first. On this website <i>machine</i> and <i>device</i> name the same object: <i>device</i> is the "
+      "Studio's and the file format's word (a device document, the Design page's device), <i>machine</i> the one the "
+      "definitions use. Wherever another page says <i>the device</i>, it means the <var>M</var> of this page.</p>")
     w("<p>Why two forms? A document is what a file should be: data, with a schema, that a loader validates and "
       "nobody has to execute. A listing is what an editor should show: statements a person can read top to bottom, "
       "change one of, and run again, which is what the Design page's text lane does and what a Python session does. "
