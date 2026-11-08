@@ -2558,29 +2558,29 @@ function buildStatic(S){
   // site's name sits across the bar from its ions, past its electrodes, on the side that
   // reads downwards (or rightwards on an upright bar); a junction's below and right of
   // its square.
-  const HWT_ = S.reg.HWT;
+  const HWT_ = S.reg.HWT, HWLG_ = S.reg.HWLG || {};
   if(HWT_){
-    const fs = Math.min(12, Math.max(2.5, 0.18*L.g));
+    const fs = hwlFont();
     for (const n of A.nodes){
       const x=px(n), y=py(n);
-      let tx, ty, anchor='middle';
+      // where a label stands depends on its size, and its size follows the zoom
+      // (`hwlRefresh`), so the geometry it is placed from is kept beside the element
+      let g;
       if(n.kind==='junction' || (n.cap||0)===0){
-        tx = x + L.r_junc + 0.15*fs; ty = y + L.r_junc + 0.55*fs; anchor='start';
+        g = {k:'j', x, y};
       } else {
         const ax=AXIS[n.id]||{ux:1,uy:0};
         let nx=-ax.uy, ny=ax.ux;
         if(ny < -1e-9 || (Math.abs(ny) <= 1e-9 && nx < 0)){ nx=-nx; ny=-ny; }
-        const d = Math.max(L.site_t/2, (L.pad_off||0) + (L.pad_t||0)/2) + 0.6*fs;
-        tx = x + nx*d; ty = y + ny*d;
-        if(Math.abs(nx) > 0.9){ anchor='start'; tx = x + nx*(d - 0.6*fs) + 0.2*fs; }
+        g = {k:'s', x, y, nx, ny, d0: Math.max(L.site_t/2, (L.pad_off||0) + (L.pad_t||0)/2)};
       }
-      const t=el('text',{x:tx, y:ty, 'text-anchor':anchor, 'dominant-baseline':'central',
-        'font-size':fs, 'font-weight':650, fill:C.ink||'#1f2937', 'fill-opacity':0.82,
-        stroke:'#ffffff', 'stroke-width':fs*0.28, 'stroke-linejoin':'round',
+      const t=el('text',{'dominant-baseline':'central', 'font-weight':650, fill:C.ink||'#1f2937',
+        'fill-opacity':0.82, stroke:'#ffffff', 'stroke-linejoin':'round',
         'paint-order':'stroke', 'pointer-events':'none'});
+      hwlPlace(t, g, fs);
       t.textContent = n.id;
       if(HWL_SHOWN === false) t.setAttribute('display','none');
-      gNode.append(t); HWT_[n.id]=t;
+      gNode.append(t); HWT_[n.id]=t; HWLG_[n.id]=g;
     }
   }
 }
@@ -2598,14 +2598,15 @@ function buildStatic(S){
 let HWL = true;
 try { HWL = localStorage.getItem('qccd.studio.hwlabels') !== '0'; } catch(e) { HWL = true; }
 let HWL_SHOWN = null, HWL_LIVE = false;   // LIVE: the page has drawn once; until then nothing redraws
-const HWT = {};
+let HWL_FS = 0;                            // the labels' size at the current zoom, in user units (0: not yet measured)
+const HWT = {}, HWLG = {};                 // the label elements, and the geometry each is placed from
 // the labels' size in user units: a fraction of the lattice step, so a label sits between
 // its own bar's electrodes (to 0.40 g) and the next row's (from 0.60 g)
 const hwlFont = () => Math.min(12, Math.max(2.5, 0.18*L.g));
 const STAGE = {A, L, AXIS, role:ROLE, px, py, byId:nodeById,
                into:{loop:gLoop, seg:gSeg, elec:gElec, node:gNode},
                reg:{SEGEL, SEGINFO, PAD_BY_SEG, PAD_BY_SITE, SITE_SPAN, SEG_BY_PAIR,
-                    NODEEL, CAPTXT, HWT}};
+                    NODEEL, CAPTXT, HWT, HWLG}};
 buildStatic(STAGE);
 
 // slot offsets, in px along the trap axis, for k ions resting on one site
@@ -3245,8 +3246,9 @@ function draw(){
     } else hide(p.k);
     if(HWL_SHOWN){
       // the hardware label replaces the number inside the ion: one name, the whole name,
-      // just above it (its site's label is across the bar, below)
-      const fs=hwlFont();
+      // just above it (its site's label is across the bar, below), at the size the site
+      // labels have at this zoom (`hwlRefresh` keeps it)
+      const fs=HWL_FS || hwlFont();
       p.h.setAttribute('x',pt.x); p.h.setAttribute('y',pt.y - r - 0.6*fs);
       p.h.setAttribute('font-size',fs); p.h.setAttribute('stroke-width',fs*0.28);
       show(p.h); hide(p.t);
@@ -3447,21 +3449,57 @@ const applyVB=()=>{
   placeScaleBar();
   hwlRefresh();
 };
-// HARDWARE LABELS, drawn or not: the reader's choice (`HWL`), and only while the label is
-// big enough on screen to read -- 7 css px, at this zoom and this box.  Called on every
-// view change; it redraws only when the answer flips.  Per-element `display`, never a
-// class, so the harness reads what the browser shows.
-function hwlLegible(){
+// HARDWARE LABELS, drawn or not: the reader's choice (`HWL`), and only while there is room
+// for them.  A label is drawn between 9 and 13 css px tall whatever the zoom: a four-site
+// register in a 360 px embed used to draw its names at 4 px and then hide them as
+// unreadable, so a reader who pressed Labels saw nothing happen (reader comment,
+// 2026-11-07).  It is hidden when the two nearest nodes stand closer on screen than 2.4
+// label heights, where the names would overlap (a 144-site ring at fit), and comes back
+// as you zoom in.  Called on every view change; it redraws only when the answer flips.
+// Per-element `display`, never a class, so the harness reads what the browser shows.
+function hwlScale(){
   const r = svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
   const w = (r && r.width) || svg.clientWidth || L.W, h = (r && r.height) || svg.clientHeight || L.H;
   const k = Math.min(w/Math.max(1e-9, VB.w), h/Math.max(1e-9, VB.h));
-  return hwlFont()*k >= 7;
+  return {k, px: Math.min(13, Math.max(9, hwlFont()*k))};   // css px per user unit; the label's css px
+}
+// the closest two nodes of the device, in user units: the room a label has
+function hwlGap(){
+  const P = A.nodes.map(n => [px(n), py(n)]);
+  let best = Infinity;
+  for(let i=0;i<P.length;i++) for(let j=i+1;j<P.length;j++){
+    const dx=P[i][0]-P[j][0], dy=P[i][1]-P[j][1], d=dx*dx+dy*dy; if(d<best) best=d; }
+  return P.length < 2 ? Infinity : Math.sqrt(best);
+}
+function hwlLegible(){
+  const s = hwlScale();
+  return hwlGap()*s.k >= 2.4*s.px;
+}
+// one label's size and place, for a size `fs` in user units: a junction's name sits below
+// and right of its square; a site's across the bar from its ions, past the electrodes, on
+// the side that reads downwards (or rightwards on an upright bar)
+function hwlPlace(t, g, fs){
+  let tx, ty, anchor='middle';
+  if(g.k==='j'){
+    tx = g.x + L.r_junc + 0.15*fs; ty = g.y + L.r_junc + 0.55*fs; anchor='start';
+  } else {
+    const d = g.d0 + 0.6*fs;
+    tx = g.x + g.nx*d; ty = g.y + g.ny*d;
+    if(Math.abs(g.nx) > 0.9){ anchor='start'; tx = g.x + g.nx*(d - 0.6*fs) + 0.2*fs; }
+  }
+  t.setAttribute('x', tx); t.setAttribute('y', ty); t.setAttribute('text-anchor', anchor);
+  t.setAttribute('font-size', fs); t.setAttribute('stroke-width', fs*0.28);
 }
 function hwlRefresh(force){
   // a resize during start-up can arrive before the view box exists (`VB` is declared
   // below its first callers); nothing is drawn yet then, and the initial call settles it
-  let on;
-  try { on = !!HWL && hwlLegible(); } catch(e) { return HWL_SHOWN; }
+  let on, s;
+  try { s = hwlScale(); on = !!HWL && hwlLegible(); } catch(e) { return HWL_SHOWN; }
+  if(on){
+    // the labels follow the zoom: the same 9 to 13 css px at every view box
+    HWL_FS = s.px / s.k;
+    for(const id in HWT){ const g = HWLG[id]; if(g) hwlPlace(HWT[id], g, HWL_FS); }
+  }
   if(on === HWL_SHOWN && !force) return on;
   HWL_SHOWN = on;
   for(const id in HWT) (on ? show : hide)(HWT[id]);

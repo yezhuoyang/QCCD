@@ -188,6 +188,27 @@ class Renderer:
             if not ln.strip():
                 i += 1
                 continue
+            # the Learn pages' furniture, one paragraph each (qccd/site/learn.py):
+            #   !!sum text          "In this section" at the head of a section
+            #   !!ask question || answer   a question before the detail, and its one-line answer
+            #   !!bridge text       the sentence that carries the reader to the next section
+            m = re.match(r"^!!(sum|ask|bridge)\s+(.*)$", ln)
+            if m:
+                from . import learn
+                kind, text = m.group(1), m.group(2).strip()
+                j = i + 1
+                while j < n and lines[j].strip() and not lines[j].startswith(("!!", "#", "```", "{{")):
+                    text += " " + lines[j].strip()
+                    j += 1
+                if kind == "sum":
+                    out.append(learn.section(self.inline(text)))
+                elif kind == "bridge":
+                    out.append(learn.bridge(self.inline(text)))
+                else:
+                    q, _, a = text.partition("||")
+                    out.append(learn.ask(self.inline(q.strip()), self.inline(a.strip()) if a.strip() else ""))
+                i = j
+                continue
             j = i
             para = []
             while j < n and lines[j].strip() and not re.match(r"^(#{1,6}\s|```|\||>|\s*[-*]\s|\s*\d+\.\s|---$)", lines[j]):

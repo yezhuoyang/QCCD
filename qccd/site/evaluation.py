@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from ..evalset import GROUPS, WORDS, load
 from ..evalset.interp import CALL_ALIAS
 from ..evalset.syntax import ITEM_NAMES, NOISE_OPS, parse_term
+from . import learn
 from ..ruleset.syntax import KEYWORDS
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -645,10 +646,33 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '<div class="pr"><b>proved</b>decided by a checker whose correctness is proved in Lean</div>'
       '<div class="es"><b>estimated</b>a sample of a distribution the three texts fix, with its 95&nbsp;% interval</div>'
       '</div>')
+    w(learn.strip("evaluation"))
+    w(learn.summary([
+        '<b>Three texts, one function.</b> A device, a programme and an evaluation go in; every metric, every '
+        'requirement\'s verdict and the noisy circuit come out. Nothing else is read, so every number on the '
+        'leaderboard can be recomputed.',
+        '<b>The evaluation language</b>, which is the rule language with three more kinds of item: a '
+        '<code>metric</code> (a named number), a <code>require</code> (what must hold to be ranked) and a '
+        '<code>channel</code> (noise: which Pauli error goes where).',
+        '<b>The four families of numbers</b> a design is judged by, each written out and explained: speed, heat, '
+        'hardware, and the logical error rate.',
+        '<b>From a run to a stim circuit</b>: how a hardware programme becomes the noisy stabilizer circuit that is '
+        'sampled, and the noise model qccd-noise@2, clause by clause, with where each number was measured.',
+        '<b>One Goal 1 entry recomputed</b> on this page, line by line, beside its official report; then what on '
+        'this website is proved, decided, computed and merely estimated.',
+    ], lead='The <a href="../compilation/">Compilation</a> page ended with a programme that is legal and correct. '
+            'Legal and correct is not yet <i>good</i>. This page is how a design is judged in numbers, and why '
+            'each number is one you can recompute.'))
+    w(learn.ask('A design claims a logical error rate. What would it take for you to believe the number?',
+                'You would want to recompute it: from the device, the programme, and a written-down noise model, '
+                'with no hidden step. That is the design of this page. Every number is a term of a small language '
+                'over three texts; the grader is an interpreter of the text, not an authority.'))
     w('<ul class="toc2">' + "".join(f'<li><a href="#{a}">{html.escape(t)}</a></li>' for a, t in HEADINGS) + '</ul>')
 
     # ---------------------------------------------------------------- 1 texts
     w('<h2 id="texts">Three texts and one function</h2>')
+    w(learn.section('the one definition the rest of the page unpacks: what an evaluation is, and that its result '
+                    'is a function of three texts and nothing else (which is proved in two lines).'))
     w('<div class="df"><b>Definition 1</b>(An evaluation.) Let <i>D</i> be a device &mdash; its graph of '
       'sites, junctions and rails, its zones, the (time, heat) curves of its transport primitives, its gates, '
       'its heating, its wiring and its budget &mdash; and <i>P</i> a programme on it, a list of instructions '
@@ -690,7 +714,11 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
           f'<th class="r">same circuit</th><th class="r">same metrics</th></tr>{rows}</table></div></div>')
 
     # ---------------------------------------------------------------- 2 the language
+    w(learn.bridge('If every number is a term of a text, the text\'s grammar is worth a look. It is short, and '
+                   'you already know most of it from the Rules page.'))
     w('<h2 id="language">The evaluation language</h2>')
+    w(learn.section('the grammar, the five kinds of item (param, define, metric, require, channel), exactly '
+                    'what a noise channel writes into the circuit, and Goal 1\'s evaluation printed whole.'))
     w('<p>An evaluation is a text file. Its terms and formulas are the rule language&rsquo;s, unchanged '
       '&mdash; quantifiers over finite sets, comparisons, arithmetic, <code>count</code>, <code>sum</code>, '
       '<code>max</code>, <code>min</code> and set builders &mdash; with one more term, '
@@ -742,7 +770,12 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         w(f'<h3>{html.escape(label)}</h3><table class="vocab">{rows}</table>')
 
     # ---------------------------------------------------------------- 4 the state
+    w(learn.bridge('Every word above reads the <i>run</i>. Before the numbers, then, the run itself: what the '
+                   'replay keeps at every instant, and how one step changes it. It is the same replay the rules '
+                   'judge; here its clock and its heat are written as equations.'))
     w('<h2 id="state">The state a programme leaves</h2>')
+    w(learn.section('the replay as four equations (time, duration, heat, cooling), then one small programme '
+                    'traced cell by cell, so each equation can be seen doing its work.'))
     w('<p>Every metric reads the run, and the run is the replay: the semantics of the hardware language, '
       'the same one the rules judge. It is worth writing out, because every number below inherits it.</p>')
     w('<div class="df"><b>Definition 3</b>(The run.) The steps <i>k</i> = 1 … <i>n</i> are the '
@@ -785,6 +818,8 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       + _clock_table(_clock_rows(ex[0]["machine"].arch, "qccdsim_jones")) + '</details>')
 
     # ---------------------------------------------------------------- 5 speed
+    w(learn.bridge('With the run defined, the numbers follow. Three sections, one per thing a design spends: '
+                   'time, heat, and hardware. Each metric is printed as the term the interpreter evaluates.'))
     w('<h2 id="speed">Speed: how long a programme runs</h2>')
     w('<p>Time is the first thing a design spends. Under <a href="#noise">qccd-noise@2</a> every '
       'microsecond an ion is not operated on is memory error, and the coherent part grows with the square of '
@@ -879,6 +914,12 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     w('<p class="note">Chip area is not a metric: no grader measures it, so no design is ranked by it.</p>')
 
     # ---------------------------------------------------------------- 8 the circuit
+    w(learn.ask('Time, heat and hardware are properties of the machine. How does any of it reach the thing a '
+                'quantum memory is for, the logical error rate?',
+                'Through a circuit. The programme\'s gates, measurements and resets are translated into a '
+                'stabilizer circuit, the noise model puts a Pauli error after each one with a probability read '
+                'off the run (its heat, its waiting time, its chain length), and that noisy circuit is sampled '
+                'and decoded. The next two sections are that translation and that noise model.'))
     w('<h2 id="circuit">From a run to a stim circuit</h2>')
     w('<p>A memory experiment is a circuit, written in OpenQASM, together with its <i>detectors</i> &mdash; '
       'parities of its measurement results that are 0 when nothing went wrong &mdash; and its logical '
@@ -922,6 +963,9 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     # ---------------------------------------------------------------- 9 noise
     n2names = _names(n2)
     w('<h2 id="noise">The noise model, qccd-noise@2</h2>')
+    w(learn.section('the noise model as the text it is, one channel at a time: what each clause says in words, '
+                    'the measurement it quotes, and where in the circuit it writes. The physics behind each '
+                    'channel is on the <a href="../physics/#where-the-noise-comes-from">Physics page</a>.'))
     w(f'<p>{html.escape(n2.about)}</p>')
     e2 = Evaluator(n2, entry["r"].run) if entry else None
     prow = []
@@ -965,6 +1009,9 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       + '</details>')
 
     # ---------------------------------------------------------------- 10 the entry
+    w(learn.bridge('Everything so far was the method. Here it is applied, in public, to one real entry: every '
+                   'number the board shows for it is recomputed on this page from its files, and the two columns '
+                   'must agree.'))
     w('<h2 id="entry">A Goal 1 entry, recomputed</h2>')
     if entry:
         r = entry["r"]
@@ -1144,6 +1191,8 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'runs the whole grader, every stage above included.</p></div>')
 
     # ---------------------------------------------------------------- 14 status
+    w(learn.bridge('A reader should know how much weight each number bears. Not everything on this website is '
+                   'proved, and the page says exactly what is.'))
     w('<h2 id="status">What is proved, decided, computed and estimated</h2>')
     w('<div class="tw"><table class="t"><tr><th>what</th><th>status</th><th>by</th></tr>'
       '<tr><td>every rule of the rule set</td><td class="de">decided</td><td>the rule language, on the run</td></tr>'
@@ -1189,6 +1238,22 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
               f'{num(sum(r2.circuit.budget.values()))} the board&rsquo;s model charges.</p>')
         except Exception as exc:  # noqa: BLE001 -- the page says what went wrong rather than hiding the example
             w(f'<p class="note">The example could not be evaluated: {html.escape(str(exc))}</p>')
+    w(learn.recap([
+        'A design is judged by a function of three texts: the device, the programme, and the evaluation. '
+        'Every number the leaderboard shows is a term of that text, and anyone can recompute it.',
+        'The numbers come in four families: speed (the clock of the replay), heat (motional quanta, and the gate '
+        'error they cause), hardware (electrodes, switches, DACs), and the logical error rate.',
+        'The logical error rate is reached through a circuit: the programme is translated to a stabilizer '
+        'circuit, the noise model writes a Pauli error after each operation with a probability read off the run, '
+        'and the result is sampled and decoded. Time becomes memory error; heat becomes gate error.',
+        'Rules and requirements are decided, R10\'s first half is proved, the metrics and the circuit are exact, '
+        'and only the logical error rate is estimated, with its interval. The page says which is which.',
+        'An evaluation is a text you can extend: add a metric, a requirement or a channel, and the same '
+        'interpreter computes it on every design.',
+    ], "evaluation", more='This is the end of the story. From here: the <a href="../board/goal1/">Goal 1 board</a>, '
+                          'where these numbers rank real designs, each one opening on its own page; or the '
+                          '<a href="../studio.html#design">Design page</a>, where your own device is scored by the '
+                          'same texts as you draw it.'))
     w('</div>')
     return PAGE.format(title="Evaluation - QCCD studio", style=STYLE, extra_css=CSS,
-                       body=_anchor_declarations("\n".join(b)))
+                       body=learn.apply(_anchor_declarations("\n".join(b)), "evaluation/", 1))

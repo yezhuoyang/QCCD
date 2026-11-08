@@ -25,21 +25,37 @@ import math
 import re
 from collections import deque
 
+from . import learn
+
 #: The headings, for the search index.
 HEADINGS = [
-    ("algorithm", "The algorithm"),
-    ("algo-problem", "1. Setting and problem statement"),
-    ("algo-lower", "2. Lowering"),
-    ("algo-layout", "3. Placement"),
-    ("algo-layers", "4. Layering and round emission"),
-    ("algo-site", "5. Site selection"),
-    ("algo-route", "6. Routing within a layer"),
-    ("algo-rotate", "7. The conveyor pass"),
-    ("algo-cool", "8. Cooling insertion"),
-    ("algo-correct", "9. Correctness"),
-    ("algo-limits", "10. Limitations and measured gaps"),
-    ("algo-examples", "11. The four circuits, compiled and verified"),
+    ("algorithm", "5. The algorithm, pass by pass"),
+    ("algo-problem", "5.1 Setting and problem statement"),
+    ("notation", "The notation, on three devices"),
+    ("algo-lower", "5.2 Lowering"),
+    ("algo-layout", "5.3 Placement"),
+    ("algo-layers", "5.4 Layering and round emission"),
+    ("algo-site", "5.5 Site selection"),
+    ("algo-route", "5.6 Routing within a layer"),
+    ("algo-rotate", "5.7 The conveyor pass"),
+    ("algo-cool", "5.8 Cooling insertion"),
+    ("algo-correct", "5.9 Correctness"),
+    ("algo-limits", "5.10 Limitations and measured gaps"),
+    ("algo-examples", "5.11 The four circuits, compiled and verified"),
 ]
+
+#: The anchor each formal block carries, so a word on any Learn page can link to where it
+#: is defined (qccd/site/learn.py GLOSSARY).
+IDS = {
+    ("Definition 1", "device"): "def-device", ("Definition 2", "trap graph"): "def-trap-graph",
+    ("Definition 3", "circuit"): "def-circuit", ("Definition 4", "programme and certificate"): "def-programme",
+    ("Problem", "compilation"): "def-problem", ("Problem", "placement"): "def-placement",
+    ("Definition 5", "ASAP layering"): "def-asap", ("Definition 6", "meeting trap"): "def-meeting-trap",
+    ("Definition 7", "undocking with one-layer lookahead"): "def-undock", ("Problem", "layer routing"): "def-routing",
+    ("Definition 8", "conveyor device"): "def-conveyor", ("Definition 9", "Implements"): "def-implements",
+    ("Theorem 1", "pulse identities, proved"): "thm-identities", ("Theorem 2", "soundness of the checker"): "thm-checker",
+    ("Check 1", "legality"): "check-legality", ("Check 2", "semantics"): "check-semantics",
+}
 
 INK, GREEN, RED, ORANGE, BLUE, TEAL, GREY, PURPLE = "#1c2a4a", "#0b7a4b", "#c62828", "#b26a00", "#2a78d6", "#1baf7a", "#8a8985", "#7b3fa0"
 
@@ -71,6 +87,10 @@ CSS = """
 .algo ul.refs{font-size:12.5px;color:var(--ink2);padding-left:18px;max-width:78ch} .algo ul.refs li{margin:0 0 3px}
 .algo ol.pf{max-width:78ch;padding-left:22px} .algo ol.pf li{margin:0 0 6px}
 .algo .guide{background:var(--soft);border:1px solid #d6e2f4;border-radius:10px;padding:10px 16px;max-width:100ch;font-size:14.5px}
+.algo table.notation{width:100%;font-size:13px} .algo table.notation td,.algo table.notation th{white-space:normal;vertical-align:top;padding:5px 12px 5px 0}
+.algo table.notation td:first-child{font-family:var(--serif);font-size:15px;color:#1c2a4a;white-space:nowrap} .algo table.notation td:nth-child(2){color:var(--ink2)}
+.algo table.notation th{font-family:var(--sans);font-size:12px;color:var(--ink3)} .algo .notecap{font-size:14px;margin:6px 0 14px}
+.algo .strip figure{flex:1 1 220px;max-width:340px}
 """
 
 
@@ -335,7 +355,8 @@ def listing_excerpt(prog: dict, cert: dict, ids: list[int]) -> str:
 
 def df(kind: str, name: str, body: str, words: str = "") -> str:
     w = f'<p class="words"><b>In words.</b> {words}</p>' if words else ""
-    return f'<div class="df"><b>{kind}</b> <i>{html.escape(name)}.</i> {body}{w}</div>'
+    i = IDS.get((kind, name))
+    return f'<div class="df"{f" id={chr(34)}{i}{chr(34)}" if i else ""}><b>{kind}</b> <i>{html.escape(name)}.</i> {body}{w}</div>'
 
 
 def eg(body: str, label: str = "Example") -> str:
@@ -356,11 +377,60 @@ def esc(s) -> str:
     return html.escape(str(s))
 
 
-def dev_fig(dev: str, caption: str, **kw) -> str:
+def dev_fig(dev: str, caption: str, fit: tuple[int, int] | None = (300, 230), **kw) -> str:
+    """One device, drawn into a box of one size (`fit`), so the figures of a strip come out
+    the same height with their labels the same size (a reader's comment, 2026-11-07); `fit=None`
+    draws it at its natural size."""
     from .build import device_svg
-    svg = device_svg(machine(dev), labels=True, **kw)
-    cls = ' wide' if dev == 'chain4' else ''
+    svg = device_svg(machine(dev), labels=True, fit=fit, **kw)
+    cls = ' wide' if dev == 'chain4' and not fit else ''
     return f'<figure class="dg{cls}"><div class="figsvg">{svg}</div><figcaption>{caption}</figcaption></figure>'
+
+
+def notation_table(devices: list[tuple[str, str, object]]) -> str:
+    """Definition 1's tuple read off real devices: one column per device, one row per
+    symbol, the values taken from the device document itself (reader's comment, 2026-11-07:
+    "show how the device tuple concretizes in these examples")."""
+    def names(xs: list[str], cap: int = 8) -> str:
+        xs = list(xs)
+        if not xs:
+            return "∅"
+        if len(xs) > cap:
+            return "{" + ", ".join(xs[:cap - 1]) + f", … ({len(xs)} in all)" + "}"
+        return "{" + ", ".join(xs) + "}"
+    cols = []
+    for dev, label, m in devices:
+        d = m.arch.device
+        traps = [n for n in d.nodes if d.nodes[n].kind == "site"]
+        juncs = [n for n in d.nodes if d.nodes[n].kind != "site"]
+        caps = sorted({d.nodes[n].capacity for n in traps})
+        gate = [n for n in traps if m.arch.can(n, "gate")]
+        meas = [n for n in traps if m.arch.can(n, "spam")]
+        loops = [f"{k} = ⟨{', '.join(l.nodes)}⟩" for k, l in d.loops.items()]
+        cols.append({"label": f"{label} ({dev})",
+                     "V": f"{len(d.nodes)} nodes", "T": names(traps), "J": names(juncs),
+                     "E": f"{len(d.segments)} rails", "cap": (f"{caps[0]} in every trap" if len(caps) == 1 else ", ".join(f"{c}" for c in caps)),
+                     "gate": "every trap" if len(gate) == len(traps) else names(gate),
+                     "meas": "every trap" if len(meas) == len(traps) else names(meas),
+                     "L": "; ".join(loops) if loops else "∅"})
+    rows = [("<var>V</var> = <var>T</var> ⊔ <var>J</var>", "the nodes: traps and junctions together", "V"),
+            ("<var>T</var>", "the traps, where ions rest", "T"),
+            ("<var>J</var>", "the junctions, where rails meet and no ion rests", "J"),
+            ("<var>E</var>", "the rails between nodes", "E"),
+            ("cap(<var>t</var>)", "how many ions trap <var>t</var> holds", "cap"),
+            ("gate", "the traps in which a gate may happen", "gate"),
+            ("meas", "the traps in which a measurement or reset may happen", "meas"),
+            ("<var>L</var>", "the loops one instruction can turn as a whole", "L")]
+    head = "".join(f"<th>{esc(c['label'])}</th>" for c in cols)
+    body = "".join(f"<tr><td>{sym}</td><td>{what}</td>" + "".join(f"<td>{esc(c[key])}</td>" for c in cols) + "</tr>"
+                   for sym, what, key in rows)
+    return (f'<div class="tw" id="notation"><table class="sm notation"><thead><tr><th>symbol</th><th>meaning</th>{head}</tr></thead>'
+            f'<tbody>{body}</tbody></table></div>'
+            '<p class="sub notecap">The notation of this part, read off the three devices the examples run on. Every '
+            'later symbol is built from these: <var>d</var>(<var>t</var>, <var>t′</var>) counts hops between traps, '
+            'π(<var>a</var>) is the trap qubit <var>a</var> starts in, pos<sub><var>t</var></sub>(<var>i</var>) is '
+            'where ion <var>i</var> is at cycle <var>t</var>, and <var>μ</var>(<var>a</var>) is the ion that carries '
+            'qubit <var>a</var>.</p>')
 
 
 def ions_of(pos: dict) -> dict[str, list[str]]:
@@ -648,43 +718,68 @@ def section(by: dict, lowering_text: str = "") -> str:
     body: list[str] = ['<div class="algo">']
     A = body.append
 
-    A('<h2 id="algorithm">The algorithm</h2>'
-      '<p class="sub">The pipeline above says what happens to a circuit, and the cards show the result for '
-      'every basic gate. This section states the problem each pass solves, the algorithm that solves it, '
+    A('<h2 id="algorithm">5. The algorithm, pass by pass</h2>'
+      + learn.summary([
+          'Each of the nine pipeline steps of §2, as the problem it solves, the algorithm that solves it, and '
+          'what is checked afterwards: the setting and the notation (5.1), lowering (5.2), placement (5.3), '
+          'layering (5.4), where a gate happens (5.5), routing (5.6), the conveyor pass for rings (5.7), cooling '
+          '(5.8), correctness (5.9), and what the compiler cannot do (5.10).',
+          'Every formal statement is followed by a line <b>in words</b> and by a green <b>Example</b> drawn from a '
+          'real compiled artefact, so no symbol is left without a picture.',
+          'One notation, introduced once in 5.1 and shown on the three devices the examples run on; every symbol '
+          'that appears later is in that table, and hovering a word anywhere on the page explains it.',
+          'The four circuits of the examples can be played at the end (5.11).',
+      ], title="In this part")
+      + '<p class="sub">The pipeline of §2 says what happens to a circuit, and the cards of §4 show the result for '
+      'every basic gate. This part states the problem each pass solves, the algorithm that solves it, '
       'and the proposition the checker decides afterwards, for the compiler that produced every programme '
       'on this page and the leaderboard entries.</p>'
       '<div class="guide"><b>How to read it.</b> Each numbered definition, algorithm, theorem or check is stated '
       'once, formally, with a line in words underneath. It is then followed by a green <b>Example</b>, '
-      'drawn as a diagram, on one of four circuits compiled for this section: <b>circuit 1</b>, two Bell '
+      'drawn as a diagram, on one of four circuits compiled for this part: <b>circuit 1</b>, two Bell '
       'pairs then a joining CNOT, on the 2×3 lattice; <b>circuit 2</b>, a GHZ chain, on the four-site '
       'register; <b>circuit 3</b>, a three-qubit parity check, on the six-site ring by rigid rotation; and '
-      'a Toffoli, for the lowering. The Bell pair of the worked example above is used where two qubits '
+      'a Toffoli, for the lowering. The Bell pair of §3 is used where two qubits '
       'suffice. Every diagram is drawn from the device document and the compiler\'s own certificate, and the '
       'placement traces re-execute the placer\'s rules and are checked against the layout it chose. The '
-      'four circuits can be played in §11.</div>')
+      'four circuits can be played in §5.11.</div>')
 
     # ================================================================ 1. setting
-    A('<h3 id="algo-problem">1. Setting and problem statement</h3>')
+    A('<h3 id="algo-problem">5.1 Setting and problem statement</h3>'
+      + learn.ask('Before any algorithm: what, exactly, is the compiler given, and what must it hand back?',
+                  'It is given a device (a graph of traps, junctions and rails) and a circuit (gates on qubits, in '
+                  'order). It must hand back a programme the device can run and a certificate that says where every '
+                  'gate happened. This section writes those four things down once, as symbols, and then shows every '
+                  'symbol on the three devices the examples use.')
+      + learn.section('four definitions (device, trap graph, circuit, programme and certificate), the notation '
+                      'table that concretises them, and the problem statement: legal, realised, correct, and short.'))
     A(df("Definition 1", "device",
-         'An <i>expanded architecture</i> is a tuple <var>A</var> = (<var>V</var>, <var>E</var>, cap, gate, spam, '
+         'An <i>expanded architecture</i> is a tuple <var>A</var> = (<var>V</var>, <var>E</var>, cap, gate, meas, '
          '<var>L</var>) where <var>V</var> = <var>T</var> ⊔ <var>J</var> is a set of nodes partitioned into '
-         '<i>traps</i> and <i>junctions</i>, <var>E</var> ⊆ <var>V</var>×<var>V</var> is the set of segments, '
-         'cap: <var>T</var> → ℕ is the trap capacity, gate, spam ⊆ <var>T</var> are the traps in which a gate '
-         'or a measurement may happen, and <var>L</var> is a set of named loops, each a cyclic sequence of '
-         'nodes with a movement class per direction.',
-         'The device is a graph. Some nodes are traps, where ions can sit (up to a capacity) and, in some '
-         'of them, be gated or measured; the other nodes are junctions, where rails cross; the edges are '
-         'the rails. Some rails form named loops that the control system can turn as a whole. This '
-         'document is the same one the studio draws, and it is all the compiler ever reads about the '
-         'hardware.'))
-    A(eg('The three devices of this section, with their traps (discs), junctions (squares) and rails. '
-         'On the lattice every trap can gate and measure and there is no loop. On the ring, the six loop '
-         'sites S0–S5 (yellow) hold ions but cannot gate; only the two docks A0 and A3 (blue), each on a '
-         'spur off the loop, can. The register is four traps in a line, no junction at all.'
+         '<i>traps</i> <var>T</var> and <i>junctions</i> <var>J</var>, <var>E</var> ⊆ <var>V</var>×<var>V</var> '
+         'is the set of rails (segments), cap: <var>T</var> → ℕ gives each trap the number of ions it holds, '
+         'gate ⊆ <var>T</var> is the set of traps in which a gate may happen and meas ⊆ <var>T</var> the set '
+         'in which a measurement or reset may, and <var>L</var> is a set of named loops, each a cyclic '
+         'sequence of nodes that one instruction can turn as a whole.',
+         'The device is a graph. Some nodes are <b>traps</b> (the set <var>T</var>), where ions can sit, up to a '
+         'capacity, and in some of them be gated (the set gate) or measured (the set meas); the other nodes '
+         'are <b>junctions</b> (<var>J</var>), where rails cross and no ion rests; the edges <var>E</var> are '
+         'the <b>rails</b>. Some rails form named <b>loops</b> (<var>L</var>) that the control system can turn '
+         'as a whole. This document is the same one the studio draws, and it is all the compiler ever reads '
+         'about the hardware.'))
+    A(notation_table([("chain4", "the register", mc), ("grid2x3", "the lattice", mg), ("ring6d", "the ring", mr)]))
+    A(eg('The same three devices drawn, in one size, with their traps (discs), junctions (squares) and rails; '
+         'the column of the table above each picture is the tuple <var>A</var> read off it. '
+         'The <b>register</b> is four traps in a line: <var>T</var> = {C0, …, C3}, no junction, no loop, and '
+         'every trap can gate and measure. The <b>lattice</b> has seven traps on its wires and six lattice '
+         'nodes, two of which are junctions of degree three; every trap gates and measures, and there is no loop. '
+         'On the <b>ring</b> the six loop sites S0–S5 (yellow) hold ions but are in neither gate nor meas; only '
+         'the two docks A0 and A3 (blue), each on a spur off the loop, are, and <var>L</var> has one loop, '
+         'L0 = ⟨S0, …, S5⟩.'
          + '<div class="strip">'
-         + dev_fig("grid2x3", "the 2×3 lattice: 7 traps, 6 junctions")
-         + dev_fig("ring6d", "the six-site ring: loop L0 = S0…S5, docks A0 (on S0) and A3 (on S3)")
-         + dev_fig("chain4", "the four-site register")
+         + dev_fig("chain4", "the four-site register: T = {C0, C1, C2, C3}, J = ∅, L = ∅")
+         + dev_fig("grid2x3", "the 2×3 lattice: 7 traps, 6 junctions, no loop")
+         + dev_fig("ring6d", "the six-site ring: loop L0 = ⟨S0 … S5⟩, docks A0 (on S0) and A3 (on S3)")
          + '</div>'))
     A(df("Definition 2", "trap graph",
          'The <i>trap graph</i> <var>G</var><sub><var>T</var></sub> = (<var>T</var>, <var>H</var>) has an edge, a '
@@ -721,7 +816,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'its wires gives the dependency graph. The interaction graph forgets the order and only counts '
          'how many two-qubit gates each pair of qubits shares.'))
     A(eg('Circuit 1 is <code>' + esc(par["qasm"].split("creg c[4];\n", 1)[-1].strip().replace("\n", " ")) + '</code>. '
-         'Its dependency graph, laid out so that each column is one layer of §4: an arrow means "must come '
+         'Its dependency graph, laid out so that each column is one layer of §5.4: an arrow means "must come '
          'after". The two Hadamards depend on nothing; the third CNOT waits for both of the first two; each '
          'measurement waits for the last gate on its qubit.'
          + fig(dag_svg(ops1, 4), "the dependency graph of circuit 1; orange boxes are two-qubit gates, blue single-qubit gates, grey measurements")
@@ -753,7 +848,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          '(i) <var>P</var> satisfies every rule of the rule set it is given (the standard set unless another '
          'is given; see the <a href="../rules/">Rules</a> page) '
          '(<i>legality</i>); (ii) <var>κ</var> satisfies Implements(<var>A</var>, <var>C</var>, <var>κ</var>) of '
-         '§9 (<i>realisation</i>); (iii) the unitary of the pulses of <var>P</var>, read through <var>μ</var>, '
+         '§5.9 (<i>realisation</i>); (iii) the unitary of the pulses of <var>P</var>, read through <var>μ</var>, '
          'equals that of <var>C</var> up to global phase (<i>semantics</i>); while keeping the number of '
          'ion-hops, and the number of cycles, small.',
          'Produce a programme the machine can run, a certificate that places every gate of the circuit once, '
@@ -762,26 +857,29 @@ def section(by: dict, lowering_text: str = "") -> str:
          'ion, and a hot ion gates worse (R7, R16), so a programme that moves ions further is not only '
          'slower but less accurate.'))
     A('<p>Conditions (i)–(iii) are decided after the fact by checkers that share no code with the '
-      'compiler (§9); the objective is pursued heuristically, because its two sub-problems are '
+      'compiler (§5.9); the objective is pursued heuristically, because its two sub-problems are '
       'NP-hard: placement is a quadratic assignment problem and routing is multi-agent path finding '
       'under capacity constraints. The pipeline is therefore <i>untrusted heuristics followed by a '
       'trusted decision procedure</i>. At a glance:</p>'
       '<div class="tw"><table class="glance"><thead><tr><th>pass</th><th>problem</th><th>algorithm</th>'
       '<th>cost</th><th>discharged by</th></tr></thead><tbody>'
-      '<tr><td>§2 lowering</td><td>arity ≤ 2</td><td>rewrite table</td><td>linear</td><td>§9 (iii), tableau route only</td></tr>'
-      '<tr><td>§3 placement</td><td>QAP on <var>W</var>, <var>d</var></td><td>greedy + spectral, 2-swap descent</td>'
+      '<tr><td>§5.2 lowering</td><td>arity ≤ 2</td><td>rewrite table</td><td>linear</td><td>§5.9 (iii), tableau route only</td></tr>'
+      '<tr><td>§5.3 placement</td><td>QAP on <var>W</var>, <var>d</var></td><td>greedy + spectral, 2-swap descent</td>'
       '<td><var>O</var>(<var>n</var>²|<var>W</var>|) per sweep</td><td>none (objective only)</td></tr>'
-      '<tr><td>§4 layering</td><td>DAG scheduling</td><td>ASAP levels, round emission</td><td>linear</td><td>R12 by construction, §9 (ii)</td></tr>'
-      '<tr><td>§5 site selection</td><td>meeting trap</td><td>argmin over <var>T</var></td><td><var>O</var>(|<var>T</var>|) per gate</td><td>R6, R6b, R1</td></tr>'
-      '<tr><td>§6 routing</td><td>MAPF with capacities and waveforms</td><td>prioritised space-time A*</td>'
+      '<tr><td>§5.4 layering</td><td>DAG scheduling</td><td>ASAP levels, round emission</td><td>linear</td><td>R12 by construction, §5.9 (ii)</td></tr>'
+      '<tr><td>§5.5 site selection</td><td>meeting trap</td><td>argmin over <var>T</var></td><td><var>O</var>(|<var>T</var>|) per gate</td><td>R6, R6b, R1</td></tr>'
+      '<tr><td>§5.6 routing</td><td>MAPF with capacities and waveforms</td><td>prioritised space-time A*</td>'
       '<td><var>O</var>(|<var>T</var>|·<var>H</var> log) per ion</td><td>R1–R5, R8, R11, R22</td></tr>'
-      '<tr><td>§7 conveyor</td><td>bipartite contacts on a loop</td><td>readiness batching, greedy sweep</td><td>linear in contacts</td><td>as §6, plus R4d</td></tr>'
-      '<tr><td>§8 cooling</td><td>R7 feasibility</td><td>replay and insert</td><td>one pass</td><td>R7, R7c</td></tr>'
+      '<tr><td>§5.7 conveyor</td><td>bipartite contacts on a loop</td><td>readiness batching, greedy sweep</td><td>linear in contacts</td><td>as §5.6, plus R4d</td></tr>'
+      '<tr><td>§5.8 cooling</td><td>R7 feasibility</td><td>replay and insert</td><td>one pass</td><td>R7, R7c</td></tr>'
       '</tbody></table></div>')
 
     # ================================================================ 2. lowering
-    A('<h3 id="algo-lower">2. Lowering</h3>'
-      '<p>Every operation with |<var>q</var>(<var>o</var>)| ≥ 3 is replaced, before placement, by a '
+    A('<h3 id="algo-lower">5.2 Lowering</h3>'
+      + learn.section('pipeline step 2. The router only ever brings <i>two</i> ions together, so a gate on three '
+                      'qubits must first become one- and two-qubit gates. One table does it; the correctness check '
+                      'later compares against the <i>original</i> circuit, so a wrong table entry would show.')
+      + '<p>Every operation with |<var>q</var>(<var>o</var>)| ≥ 3 is replaced, before placement, by a '
       'sequence of one- and two-qubit operations from a composite table, and the DAG is rebuilt from the '
       'rewritten list. All later passes see the lowered circuit <var>C′</var>. The rewrite is checked '
       'wherever condition (iii) is checked, because (iii) compares the programme with the original '
@@ -797,10 +895,17 @@ def section(by: dict, lowering_text: str = "") -> str:
          + '<div class="wide">' + fig(circuit_svg(cc["circuit_ops"], 3), f"the lowered circuit the compiler works on: {len(cc['circuit_ops'])} operations, read from the certificate") + '</div>'
          + (f'<p>Each of those is then rewritten into pulses (Theorem 1). The tool\'s own count for the whole Toffoli is '
             f'{low.group(2)} two-ion pulses, {low.group(1)} single-ion pulses and {low.group(3)} frame updates. Because the '
-            f'T gates are not Clifford, this circuit is checked against the exact 8×8 unitary; its card in §11 says so.</p>' if low else "")))
+            f'T gates are not Clifford, this circuit is checked against the exact 8×8 unitary; its card in §5.11 says so.</p>' if low else "")))
 
     # ================================================================ 3. placement
-    A('<h3 id="algo-layout">3. Placement</h3>')
+    A('<h3 id="algo-layout">5.3 Placement</h3>'
+      + learn.ask('Where should each qubit\'s ion start?',
+                  'Close to the ions it will gate with. Every hop later costs time and heat, so a good start saves '
+                  'both; a bad start cannot be repaired by routing. Choosing the start is an assignment problem that '
+                  'is NP-hard in general, so three cheap heuristics are tried and the best is kept.')
+      + learn.section('pipeline step 3. The score of a layout (gates shared times hops apart), which traps may be '
+                      'used, a greedy placer (Algorithm 1), a spectral one (Algorithm 2), and the descent that '
+                      'improves whichever wins (Algorithm 3), each traced on a real circuit.'))
     A(df("Problem", "placement",
          'Choose π: <var>Q</var> → <var>T</var><sub>u</sub> with |π<sup>−1</sup>(<var>t</var>)| ≤ '
          '<var>c</var>(<var>t</var>) for every trap, minimising'
@@ -838,7 +943,7 @@ def section(by: dict, lowering_text: str = "") -> str:
     A(eg('On the lattice every trap qualifies: seven traps for four qubits, one ion each. On the ring only '
          'the two docks can gate, and together they hold four ions, exactly the four qubits, so the general '
          'router would start two ions in each dock and report "device is tight". (Circuit 3 is compiled by '
-         'the conveyor pass of §7 instead, which lays out riders and docks by its own rule.)'
+         'the conveyor pass of §5.7 instead, which lays out riders and docks by its own rule.)'
          + '<div class="strip">'
          + dev_fig("grid2x3", "the lattice: all 7 traps usable, one ion each", hi=set(g_sites))
          + dev_fig("ring6d", "the ring: only A0 and A3 gate, so two ions per dock", hi={"A0", "A3"},
@@ -914,7 +1019,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          '<b>return</b> ⟨π, π<sub>greedy</sub>, π<sub>spectral</sub>⟩                (a ranked list)\n'
          '</pre>'
          'Φ is blind to routability, so the compiler tries the ranked candidates in turn and keeps '
-         'the first that routes (§6).',
+         'the first that routes (§5.6).',
          'Take whichever of the two layouts scores better, then keep swapping pairs of qubits whenever a '
          'swap lowers the score, until no swap does. Keep the other two layouts as spares: a layout can '
          'score well and still leave an ion somewhere the router cannot get past later.'))
@@ -933,7 +1038,13 @@ def section(by: dict, lowering_text: str = "") -> str:
          + f'<div class="two"><div>{notes_block(par["meta"], "the compiler on circuit 1")}</div><div>{notes_block(ghz["meta"], "the compiler on circuit 2")}</div></div>'))
 
     # ================================================================ 4. layering
-    A('<h3 id="algo-layers">4. Layering and round emission</h3>')
+    A('<h3 id="algo-layers">5.4 Layering and round emission</h3>'
+      + learn.ask('Which gates can happen at the same time, and how are they fired together?',
+                  'Gates that do not depend on each other. The circuit is cut into layers of such gates, and within '
+                  'a layer the pulses are fired in rounds: first pulse of every gate, then second, and so on, each '
+                  'gate in its own trap.')
+      + learn.section('pipeline step 4, first half. The layering rule (Definition 5), round emission, and the '
+                      'proposition that one rule of the machine, R12, holds by construction because of it.'))
     A(df("Definition 5", "ASAP layering",
          'λ(<var>o</var>) = 0 if <var>o</var> has no predecessor in the DAG, otherwise λ(<var>o</var>) = '
          '1 + max{λ(<var>o′</var>) : <var>o′</var> → <var>o</var>}; equivalently, the length of the longest '
@@ -957,7 +1068,7 @@ def section(by: dict, lowering_text: str = "") -> str:
       'instruction set {<var>p</var><sub><var>g</var>,<var>k</var></sub> : <var>k</var> ≤ ℓ(<var>g</var>)}, one '
       'instruction per pulse kind, all in one machine cycle.</p>')
     A(df("Proposition 1", "R12 by construction",
-         'If every gate of a layer is assigned a distinct trap (§5), then no round places two gates in one '
+         'If every gate of a layer is assigned a distinct trap (§5.5), then no round places two gates in one '
          'trap, so R12 (one gate per trap per cycle) holds for every emitted cycle. <i>Proof.</i> A round '
          'contains at most one pulse per gate, and gates have pairwise distinct traps. ∎ Consequently a layer '
          'with <var>r</var> gates costs max<sub><var>g</var></sub> ℓ(<var>g</var>) pulse cycles rather than '
@@ -979,11 +1090,17 @@ def section(by: dict, lowering_text: str = "") -> str:
     A('<p>Measurements and resets do not claim traps (R12 bounds gates), so a layer emits one readout '
       'instruction naming every ion it measures; a barrier orders and costs nothing. The scheme forgoes '
       'pipelining across layers: transport for the next layer starts only after the pulses of this one. '
-      '§10 reports what that costs against an exact solver.</p>')
+      '§5.10 reports what that costs against an exact solver.</p>')
 
     # ================================================================ 5. site
-    A('<h3 id="algo-site">5. Site selection</h3>'
-      '<p>Let pos be the current positions, <var>K</var> the traps already claimed in this layer, and '
+    A('<h3 id="algo-site">5.5 Site selection</h3>'
+      + learn.ask('Two ions must meet for a gate. In which trap?',
+                  'In a trap that can gate, is not taken by another gate of this layer, has room for both, and is '
+                  'nearest to the pair counting both journeys. After the layer, an ion that is not needed next goes '
+                  'home, so the few gate-capable traps stay free.')
+      + learn.section('pipeline step 4, second half: the meeting trap (Definition 6) and the undocking rule '
+                      '(Definition 7), both shown on the Bell pair and on circuit 1.')
+      + '<p>Let pos be the current positions, <var>K</var> the traps already claimed in this layer, and '
       'occ(<var>t</var>) = |pos<sup>−1</sup>(<var>t</var>)| the number of ions in a trap.</p>')
     A(df("Definition 6", "meeting trap",
          'For a two-qubit gate on ions <var>i</var>, <var>j</var> at <var>s</var><sub><var>i</var></sub>, '
@@ -1038,7 +1155,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'After the pulses of Λ<sub><var>k</var></sub>, the set '
          '<var>R</var><sub><var>k</var></sub> = { <var>i</var> : <var>i</var> an operand of a two-qubit gate of '
          'Λ<sub><var>k</var></sub>, <var>i</var> ∉ ions(Λ<sub><var>k</var>+1</sub>), pos(<var>i</var>) ≠ init(<var>i</var>) } '
-         'is routed back to init by the layer router of §6; an ion that cannot be routed home stays and '
+         'is routed back to init by the layer router of §5.6; an ion that cannot be routed home stays and '
          'is noted.',
          'When a layer is done, every ion that gated in it and is not needed by the very next layer is sent '
          'back to where it started. That keeps the few gate-capable traps of a device free for the gates '
@@ -1062,7 +1179,15 @@ def section(by: dict, lowering_text: str = "") -> str:
             if swc else "")))
 
     # ================================================================ 6. routing
-    A('<h3 id="algo-route">6. Routing within a layer</h3>')
+    A('<h3 id="algo-route">5.6 Routing within a layer</h3>'
+      + learn.ask('Several ions must move at once through traps that other ions occupy. How are their paths found '
+                  'without breaking a rule at any cycle?',
+                  'One ion at a time, in a priority order, each by a shortest-path search over (cycle, trap) that '
+                  'respects what earlier ions reserved and what every rule allows; then the orders are compared and '
+                  'the fewest cycles kept. The one-waveform rule R22 is what makes this harder than textbook routing.')
+      + learn.section('pipeline step 4, third half: the routing problem, the seven constraints (each one a rule of '
+                      'the Rules page), the waveform signature, Algorithm 4, and why the order the ions are '
+                      'planned in matters.'))
     A(df("Problem", "layer routing",
          'Given pos: <var>I</var> → <var>T</var>, a set of movers <var>M</var> ⊆ <var>I</var> with targets '
          'τ: <var>M</var> → <var>T</var>, and a horizon <var>H</var>, find for each <var>i</var> ∈ <var>M</var> a '
@@ -1151,15 +1276,22 @@ def section(by: dict, lowering_text: str = "") -> str:
          'Right: b is planned first, steps to slot 1 at once and parks there for the whole layer; a now finds '
          'slot 1 blocked at every cycle and must go the long way round. Makespan 5. No single order avoids '
          'this kind of trap on every layer, which is why four are compared. On a racetrack the exact solver '
-         'of §10 once found a layer where the single order then in use cost 43 cycles against 5.'
+         'of §5.10 once found a layer where the single order then in use cost 43 cycles against 5.'
          + fig(loop_order_svg(), "the same two movers on an eight-slot loop, planned in the two orders"), "Example (a small loop)"))
-    A('<p><b>Failure is a result.</b> When Algorithm 4 raises, or §5 leaves an operation unrealised, the '
+    A('<p><b>Failure is a result.</b> When Algorithm 4 raises, or §5.5 leaves an operation unrealised, the '
       'compiler tries again with the next placement of Algorithm 3; when all three fail on a device with a '
-      'closed loop and docks, §7 is tried; otherwise the compiler declines with the reason. No branch '
+      'closed loop and docks, §5.7 is tried; otherwise the compiler declines with the reason. No branch '
       'emits a programme that violates a rule it knows about.</p>')
 
     # ================================================================ 7. conveyor
-    A('<h3 id="algo-rotate">7. The conveyor pass</h3>')
+    A('<h3 id="algo-rotate">5.7 The conveyor pass</h3>'
+      + learn.ask('On a ring that is more than half full, ions cannot pass each other. How can gates happen at all?',
+                  'By turning the whole ring, like a conveyor belt with workstations beside it. It works exactly when '
+                  'every gate pairs an ion riding the belt with one parked at a dock, which is the shape of a '
+                  'syndrome-extraction round.')
+      + learn.section('the compiler\'s second router: the conveyor device (Definition 8), when rigid rotation '
+                      'suffices (Proposition 2), and the greedy sweep that schedules it (Algorithm 5), traced on '
+                      'circuit 3.'))
     A(df("Definition 8", "conveyor device",
          'A closed loop ℓ ∈ <var>L</var> with rail slots <var>r</var><sub>0</sub>, …, <var>r</var><sub><var>N</var>−1</sub> '
          'and a set of <i>docks</i> <var>D</var>, each a gate-capable trap joined to one rail slot by one spur '
@@ -1212,7 +1344,7 @@ def section(by: dict, lowering_text: str = "") -> str:
       'order of a qubit\'s gates is the circuit author\'s to choose, so the compiler keeps it even where '
       'two CNOTs commute: one that shares only its control, or only its target, with another would give '
       'the same unitary in either order, which is exactly why no semantic check could tell, and why the '
-      'order conjunct of §9 has no exemption for it.</p>')
+      'order conjunct of §5.9 has no exemption for it.</p>')
     A(df("Algorithm 5", "greedy sweep",
          '<pre class="alg">'
          '<b>while</b> operations remain\n'
@@ -1251,8 +1383,13 @@ def section(by: dict, lowering_text: str = "") -> str:
          + listing_excerpt(rot["tsir"], rc, [4, 6, 10, 11, 12, 14, 18, 19, 20, 22, 26])))
 
     # ================================================================ 8. cooling
-    A('<h3 id="algo-cool">8. Cooling insertion</h3>'
-      '<p>Let <var>n̄</var><sub><var>i</var></sub>(<var>t</var>) be the motional quanta of ion <var>i</var> at cycle '
+    A('<h3 id="algo-cool">5.8 Cooling insertion</h3>'
+      + learn.ask('Every hop heated the ions. When is a cool inserted, and how do we know once is enough?',
+                  'Just before any two-qubit gate whose ions would be over the budget, found by replaying the '
+                  'programme with the heating model; once is enough because a cool is global and heating only adds.')
+      + learn.section('pipeline step 6: the rule R7 as an inequality, the pass, and the proposition that one pass '
+                      'suffices, shown on circuit 1\'s cooled programme.')
+      + '<p>Let <var>n̄</var><sub><var>i</var></sub>(<var>t</var>) be the motional quanta of ion <var>i</var> at cycle '
       '<var>t</var> under the heating model (each hop, split and merge adds a table value; a global cool '
       'sets every <var>n̄</var><sub><var>i</var></sub> to zero). R7 requires, for every two-qubit gate <var>g</var> '
       'at cycle <var>t</var>, max<sub><var>i</var> ∈ <var>g</var></sub> <var>n̄</var><sub><var>i</var></sub>(<var>t</var>) ≤ '
@@ -1279,8 +1416,16 @@ def section(by: dict, lowering_text: str = "") -> str:
          + fig(strip_svg(par["tsir"]["instructions"]), "the cooled programme of circuit 1: orange boxes are two-ion pulses, blue beams, green moves; the cools marked R7 were inserted by the pass")))
 
     # ================================================================ 9. correctness
-    A('<h3 id="algo-correct">9. Correctness</h3>'
-      '<p>The compiler is outside the trusted base. Conditions (i)–(iii) of the Problem are decided by '
+    A('<h3 id="algo-correct">5.9 Correctness</h3>'
+      + learn.ask('The compiler is a pile of heuristics. Why believe its output?',
+                  'Because its output is not believed: it is checked. Legality by the rule checker, &ldquo;every '
+                  'gate happened where claimed&rdquo; by a checker with a machine-checked proof, &ldquo;the pulses '
+                  'compute the circuit&rdquo; by a computation; and the gate rewrite rests on two proved identities.')
+      + learn.section('pipeline steps 7 and 8: Theorem 1 (the identities), Check 1 (legality), Definition 9 '
+                      '(what &ldquo;the certificate implements the circuit&rdquo; means, in ten conjuncts), Theorem 2 '
+                      '(the checker is sound), and Check 2 (the semantics), each with an example that is accepted and '
+                      'a mutation that is refused.')
+      + '<p>The compiler is outside the trusted base. Conditions (i)–(iii) of the Problem are decided by '
       'three independent checkers, each reading only (<var>A</var>, <var>C</var>, <var>P</var>, <var>κ</var>). '
       'The checker for (ii) is proved correct (Theorem 2); the checkers for (i) and (iii) are '
       'executable and not proved (Checks 1 and 2). The gate rewrite rests on proved identities.</p>')
@@ -1310,8 +1455,8 @@ def section(by: dict, lowering_text: str = "") -> str:
          'and it does not know or care how the programme was made. A router bug shows up as a failed rule on '
          'this page, not as a programme a machine would refuse.'))
     rr = par["rules"]
-    A(eg(f'For circuit 1 the verifier reports {len(rr.get("passed", []))} rules passed and none failed (the badge on its card in §11). '
-         'Suppose the router had let q1 and q2 hop in the same cycle of layer 2, which §6 showed it must not: the '
+    A(eg(f'For circuit 1 the verifier reports {len(rr.get("passed", []))} rules passed and none failed (the badge on its card in §5.11). '
+         'Suppose the router had let q1 and q2 hop in the same cycle of layer 2, which §5.6 showed it must not: the '
          'replay would find two waveforms in one transport instruction and report R22 failed, with the instruction '
          'number, here on this page.'))
     A(df("Definition 9", "Implements",
@@ -1409,8 +1554,11 @@ def section(by: dict, lowering_text: str = "") -> str:
       'instruction it names.</p>')
 
     # ================================================================ 10. limits
-    A('<h3 id="algo-limits">10. Limitations and measured gaps</h3>'
-      '<p><b>Optimality.</b> Nothing above certifies minimality. The router\'s layer instances were re-solved '
+    A('<h3 id="algo-limits">5.10 Limitations and measured gaps</h3>'
+      + learn.section('what is <i>not</i> guaranteed (optimality), what is not attempted (pipelining across layers, '
+                      'non-bipartite circuits by rotation, large non-Clifford circuits), and the numbers that were '
+                      'measured against an exact solver.')
+      + '<p><b>Optimality.</b> Nothing above certifies minimality. The router\'s layer instances were re-solved '
       'exactly by a SAT encoding of the same problem on the same trap graph; the heuristic was optimal '
       'on every instance of the lattice and cyclone devices and lost on a racetrack, where a single '
       'priority order had cost 43 cycles against 5, which is the origin of the four orders in '
@@ -1437,7 +1585,10 @@ def section(by: dict, lowering_text: str = "") -> str:
       '</ul>')
 
     # ================================================================ 11. the cards
-    A('<h3 id="algo-examples">11. The four circuits, compiled and verified</h3>'
+    A(learn.bridge('That is the whole algorithm. The four circuits every example above was drawn from are '
+                     'below, each playable, each through the same nine steps and the same checks as the basic gates '
+                     'of §4.'))
+    A('<h3 id="algo-examples">5.11 The four circuits, compiled and verified</h3>'
       '<p class="sub">The examples quoted above, through the same pipeline and the same checks as every '
       'gate: the input, the programme it became, the ion mapping, the pulses witnessed, and the '
       'verdicts. Press Play, or step the machine.</p>')

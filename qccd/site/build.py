@@ -37,6 +37,7 @@ from pathlib import Path
 
 from .compile_examples import GATES, OUT as COMPILED, load_algo, load_compiled
 from . import algorithm
+from . import learn
 from .examples import (GRAMMAR, IR_TABLE, RULES, VERBS, build_example, cards_phrase, core_form, judge, machine,
                        rule_meta, text_of)
 from .md import Renderer, hints, slug
@@ -360,7 +361,7 @@ h2,h3{font-family:var(--serif);color:#1a2540}
 .sub{font-family:var(--serif);font-size:17px;line-height:1.6;color:var(--ink2)}
 #sitefoot{background:transparent;border-top:0}
 </style>"""
-STYLE = STYLE + FOOTER_CSS
+STYLE = STYLE + FOOTER_CSS + learn.CSS
 
 HASH_JS = """<script>
 (function(){
@@ -368,11 +369,13 @@ HASH_JS = """<script>
   // #design is the blank canvas (the default), and #embed (with &step=N) is the page as
   // the examples show it -- head, tools bar, rail and dock folded away, the stage and its
   // transport waiting at the step named; with &play it runs on a loop (the landing).  It
-  // is the same page, not a picture of it.  Under the test shim there is
-  // no `location`, and nothing here runs.
+  // is the same page, not a picture of it.  With &go (the Learn pages' posters, 2026-11-07)
+  // the programme plays once as soon as the page is up, at 1x while it is short enough
+  // to follow, and the transport is the reader's afterwards.  Under the test shim there
+  // is no `location`, and nothing here runs.
   if(typeof location === 'undefined' || typeof window === 'undefined' || !window.addEventListener) return;
-  var looping = false;
-  function embed(play){
+  var looping = false, went = false;
+  function embed(play, go){
     document.body.setAttribute('data-embed', '1');
     // the website's embedded examples run and are watched, never edited
     try { if(window.EDITOR && EDITOR.setViewOnly) EDITOR.setViewOnly(true); } catch(e){}
@@ -386,12 +389,21 @@ HASH_JS = """<script>
       // a short example at the default 4x is over in a fifth of a second, too fast to see: it
       // plays at 1x, a step every second or so
       try { var sp = document.getElementById('speed');
-            if(sp && slider && +slider.max > 0 && +slider.max <= 8){ sp.value = '1'; sp.dispatchEvent(new Event('change')); } } catch(e){}
+            if(sp && slider && +slider.max > 0 && +slider.max <= (go ? 24 : 8)){ sp.value = '1'; sp.dispatchEvent(new Event('change')); } } catch(e){}
       // and Play on the last frame plays it again from the start, as a player does, instead
       // of doing nothing until Reset is pressed (a capture listener runs before the page's own)
       play.addEventListener('click', function(){ try {
         if(!play.disabled && play.textContent === 'Play' && slider && +slider.max > 0 && +slider.value >= +slider.max && reset) reset.click();
       } catch(e){} }, true);
+    }
+    if(go && play && !went){
+      // pressed on the poster: play it once, from the start, now
+      went = true;
+      setTimeout(function(){ try {
+        if(play.disabled) return;
+        if(slider && +slider.max > 0 && +slider.value >= +slider.max && reset) reset.click();
+        if(play.textContent === 'Play') play.click();
+      } catch(e){} }, 350);
     }
     if(looping || !play || !autoplay) return;
     looping = true;
@@ -405,7 +417,7 @@ HASH_JS = """<script>
   function apply(){
     var h = (location.hash || '').replace(/^#/, ''), m = /^learn(?:=([A-Za-z]\\d+))?$/.exec(h);
     var dk = document.getElementById('dock'), pl = document.getElementById('paneL');
-    if(h.split('&').indexOf('embed') >= 0){ embed(h.split('&').indexOf('play') >= 0); return; }
+    if(h.split('&').indexOf('embed') >= 0){ embed(h.split('&').indexOf('play') >= 0, h.split('&').indexOf('go') >= 0); return; }
     if(h === 'design'){
       // the canvas, not the course: the course remembers itself across visits, so a lesson
       // left open is folded away here -- the work on the canvas is untouched
@@ -577,7 +589,7 @@ READING_JS = r"""
   measure();
   spy();
 })();
-</script>"""
+</script>""" + learn.JS
 
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -1068,6 +1080,15 @@ def _verdict(v: dict, focus: str | None, expect: str | None, tag: str | None) ->
     return cls, tag_text, "".join(parts)
 
 
+def poster(m, init: dict | None, fit: tuple[int, int] = (640, 280)) -> str:
+    """The still a runbox shows before it is pressed: the device, with its ions where the
+    programme starts, drawn into one box so every poster of a page is one size."""
+    ions: dict[str, list[str]] = {}
+    for ion, site in sorted((init or {}).items()):
+        ions.setdefault(site, []).append(ion)
+    return device_svg(m, labels=True, ions=ions or None, fit=fit)
+
+
 def _example_card(ex: dict, focus: str | None, root: str, device: str | None = None) -> str:
     cls, tag, verdict = _verdict(ex["verdict"], focus, ex.get("expect"), ex.get("tag"))
     dev = f'<p class="src">device: {html.escape(device)}</p>' if device else ""
@@ -1075,24 +1096,50 @@ def _example_card(ex: dict, focus: str | None, root: str, device: str | None = N
             f'<p class="why">{ex["why"]}</p>{dev}'
             f'<pre{" class=\"ir\"" if ex.get("ir") else ""}><code>{html.escape(ex["text"])}</code></pre>'
             f'<div class="verdict">{verdict}</div>'
-            f'<div class="runbox"><iframe class="live" loading="lazy" src="{ex["page"]}#embed&amp;step=1" title="the example, on its page"></iframe></div>'
-            f'<a class="open" href="{ex["page"]}#step=1">open the page, with its Report pane</a></div>')
+            + learn.runbox(ex["page"], ex.get("poster", ""), "the example, on its page")
+            + f'<a class="open" href="{ex["page"]}#step=1">open the page, with its Report pane</a></div>')
 
 
 def language_page(built: dict) -> str:
+    n_core = sum(1 for v in VERBS if v.get("kind", "core") == "core")
+    n_short = sum(1 for v in VERBS if v.get("kind") == "shorthand")
     body = ["<h1>The hardware language</h1>",
             "<p class=\"sub\">A programme is a list of statements over one device. Each core statement is one instruction "
             "and one machine cycle: it says what moves where, or which ions a gate, a measurement or a cooling "
             "touches. It says nothing about cost. The replay computes the cost, the duration and the heating of "
             "every cycle from the device's own primitive tables, and the rules judge each cycle as a whole. "
             "The same text runs in the studio's Write pane and in your own workspace.</p>",
+            learn.strip("language"),
+            learn.summary([
+                f"<b>What a programme is.</b> A list of statements, each one machine cycle, over one device. "
+                f"There are {n_core} core statements and {n_short} shorthands, and you will meet every one with a "
+                f"running example you can play.",
+                "<b>What a statement does to the machine.</b> The machine state is three things: where every ion is, "
+                "how hot it is (n&#772;), and the clock. Every statement is a step of that state, and nothing else.",
+                "<b>What a statement does not say.</b> Cost, time and heat are never written in a programme. They are "
+                "computed from the device's own tables when the programme is replayed, so two programmes on two "
+                "devices are priced by their devices, not by their authors.",
+                "<b>What lies beneath.</b> Every statement becomes one record of the control IR, the JSON the compiler "
+                "emits and the verifier replays: the text you write by hand and the compiler's output meet there.",
+            ], lead="You read on the <a href=\"../physics/\">Physics</a> page what a trapped-ion machine can do: hold ions, "
+                    "carry them, pulse them, cool them. This page is the language in which it is told to do those "
+                    "things, one cycle at a time."),
+            learn.ask("Why does a hardware language need to exist at all? A quantum circuit already says what to compute.",
+                      "Because a circuit says <i>what</i> and this machine needs <i>where and when</i>: which ion carries "
+                      "which qubit, along which rails it travels, in which trap it meets its partner, when it is cooled. "
+                      "A programme is that second description. The <a href=\"../compilation/\">compiler</a> writes it "
+                      "for you; you can also write it by hand, and the rules judge both the same way."),
             "<h2 id=\"syntax\">Syntax</h2>",
+            learn.section("the whole grammar fits on one screen. Read it once, then read the two sentences under it; "
+                          "every example below is written in exactly this form."),
             f"<pre class=\"grammar\"><code>{html.escape(GRAMMAR)}</code></pre>",
             "<p class=\"sub\">A statement is a call on a programme <code>p</code>, such as "
             "<code>p.move(\"d0\", \"C1\", \"C2\")</code>: names in quotes, numbers as written, lists in square "
             "brackets. A statement may span lines while a bracket is open, and that is the only "
             "line-joining rule there is. Positional arguments come first, keywords after.</p>",
             "<h2 id=\"semantics\">Semantics</h2>",
+            learn.section("what a programme <i>means</i>: a machine state and the step each statement takes on it. "
+                          "Hold on to the three-part state; everything on the Rules and Evaluation pages reads it."),
             "<p class=\"sub\">The machine state is a map from ions to sites, a motional excitation n&#772; per ion, "
             "and a clock. <code>init</code> creates the map; every other statement is a "
             "transition of it. Transport statements move ions along segments and through junctions; each "
@@ -1105,13 +1152,27 @@ def language_page(built: dict) -> str:
             "judged exactly as they are, and is there only to keep a programme short. Each shorthand below shows "
             "its example written out in core statements too, and the site is not built if the two are judged "
             "differently in any figure or verdict. One <b>annotation</b>, <code>claim</code>, records the "
-            "totals an author claims.</p>"]
-    groups = (("core", "statements", "Core statements"), ("shorthand", "shorthands", "Shorthands"),
-              ("annotation", "annotation", "The annotation"))
+            "totals an author claims.</p>",
+            learn.bridge("That is the whole language in principle. The rest of the page is the statements one by one, "
+                         "each with what it does to the state, what it costs, which rules watch it, and a small "
+                         "programme you can play. Read the core statements in order: <code>init</code> places the "
+                         "ions, the transport statements move them, <code>gate</code> uses them, <code>cool</code> "
+                         "pays the heat back, <code>measure</code> and <code>reset</code> read and prepare.")]
+    groups = (("core", "statements", "Core statements",
+               "the seven statements every programme is made of. Each card is one statement: its signature, "
+               "its effect on the state, its cost, the rules that judge it, the IR it becomes, and a programme "
+               "that uses it, running on the right."),
+              ("shorthand", "shorthands", "Shorthands",
+               "four statements that stand for lists of core statements. Each card also shows its example "
+               "written out in core statements, judged to the same numbers; a shorthand saves typing and "
+               "changes nothing else."),
+              ("annotation", "annotation", "The annotation",
+               "one statement that does nothing to the machine: it records what the author claims the totals "
+               "are, and the replay checks the claim (R9)."))
     body.append("<ul class=\"toc2\">" + "".join(
         f'<li><a href="#{v["verb"]}"><code>p.{v["verb"]}</code></a></li>' for v in VERBS) + "</ul>")
-    for kind, anchor, title in groups:
-        body.append(f'<h2 id="{anchor}">{title}</h2>')
+    for kind, anchor, title, lead in groups:
+        body.append(f'<h2 id="{anchor}">{title}</h2>' + learn.section(lead))
         for v in VERBS:
             if v.get("kind", "core") != kind:
                 continue
@@ -1131,18 +1192,36 @@ def language_page(built: dict) -> str:
                 f'<dl class="sem">{means}<dt>state</dt><dd>{v["state"]}</dd><dt>cost</dt><dd>{v["cost"]}</dd>'
                 f'<dt>rules</dt><dd>{rules}</dd><dt>IR</dt><dd><code>{v["ir"]}</code></dd></dl>{core}</div>'
                 f'{_example_card(ex, None, "")}</div></section>')
+    body.append(learn.bridge("Every card above named the IR its statement becomes. That is not a detail for implementers: "
+                             "it is the reason a programme you write by hand and a programme the compiler writes are "
+                             "judged by one verifier."))
     body.append("<h2 id=\"ir\">Beneath the text: the IR</h2>"
-                "<p class=\"sub\">Every statement becomes one instruction of the control IR, the JSON the compiler "
+                + learn.section("one table: each statement and the instruction record it becomes. The compiler never "
+                                "sees the text; it writes these records directly.")
+                + "<p class=\"sub\">Every statement becomes one instruction of the control IR, the JSON the compiler "
                 "emits and the verifier replays. The Write pane and the compiler meet there.</p>"
                 "<div class=\"tw\"><table><thead><tr><th>statement</th><th>instruction type</th><th>carries</th></tr></thead><tbody>"
                 + "".join(f"<tr><td><code>{a}</code></td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in IR_TABLE)
                 + "</tbody></table></div>"
                 "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">the control IR</a>; the device language "
                 "the programmes run on is <a href=\"../docs/adl/\">the architecture description</a>.</p>")
+    body.append(learn.recap([
+        "A programme is a list of statements, one machine cycle each, over one device. The state it steps is "
+        "three things: where every ion is, how hot it is, and the clock.",
+        f"{n_core} core statements are the whole language; the {n_short} shorthands stand for lists of them and are "
+        "judged exactly as those lists. <code>claim</code> only records what the author believes the totals are.",
+        "A programme never states a cost. Time and heat are read from the device's tables when it is replayed, "
+        "which is why one programme can be priced on many devices and many programmes compared on one.",
+        "Every statement is one record of the control IR, so hand-written and compiled programmes are judged by "
+        "one verifier. The next page is that verifier's rules: what a cycle may and may not do.",
+    ], "language", more="To write one yourself, open the <a href=\"../studio.html#design\">Design page</a>: its Write "
+                        "pane takes exactly this text and plays it. The tutorial's Part B does it with you, one statement "
+                        "at a time."))
     # the examples are short: a taller stage, so the ions can be seen moving
     css = ("main{max-width:1120px} .verb .runbox iframe.live{height:420px}"
            " .coreq{font-size:13.5px;margin:14px 0 4px} .verb .two pre.grammar{white-space:pre-wrap;font-size:12.5px}")
-    return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css=css, body="\n".join(body))
+    return PAGE.format(title="Language - QCCD studio", style=STYLE, extra_css=css,
+                       body=learn.apply("\n".join(body), "language/", 1))
 
 
 def _sources(src: str) -> str:
@@ -1187,7 +1266,7 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
         r = build_example({"program": v["example"]}, m, "corrected", out / rel, kicker="THE LANGUAGE",
                           headline=f'p.{v["verb"]}', lede=v["what"], check_metrics=v.get("check_metrics", False))
         put(rel, (out / rel).read_text(encoding="utf-8"), 2, "language", app=True, extra=HASH_JS)
-        lang[v["verb"]] = {**r, "page": f"ex/{v['verb']}.html"}
+        lang[v["verb"]] = {**r, "page": f"ex/{v['verb']}.html", "poster": poster(m, r.get("init"), fit=(640, 380))}
         if v.get("kind") == "shorthand":
             # the page says a shorthand is judged exactly as its core statements: hold it to that
             core = core_form(m, v["example"])
@@ -1215,7 +1294,8 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
                               ruleset=R.get("ruleset", "standard"))
             put(rel, (out / rel).read_text(encoding="utf-8"), 2, "rules", app=True, extra=HASH_JS)
             entry[which] = {**r, "page": f"ex/{R['id']}_{which}.html", "model": model,
-                            "device": (ex.get("device") or R["device"])["about"]}
+                            "device": (ex.get("device") or R["device"])["about"],
+                            "poster": poster(m, r.get("init"))}
         rules[R["id"]] = entry
     return lang, rules
 
@@ -1416,8 +1496,10 @@ def _gate_row(g: dict, page: str, head: str | None = None) -> str:
             f'<div class="lab">pulses witnessed</div><div class="pulses">{pulses}</div>'
             f'<div class="lab">verdict &middot; {html.escape(_method_words(v))}</div><div class="badges">{"".join(badges)}</div>'
             f'<a class="open" href="{page}#step=1">open the page, with the circuit beside the programme</a></div>'
-            f'<div><div class="lab">the machine: press Play, or step it</div>'
-            f'<div class="runbox tall"><iframe class="live" loading="lazy" src="{page}#embed&amp;step=1" title="{html.escape(m["title"])}, compiled, on its page"></iframe></div>'
+            f'<div><div class="lab">the machine: press Play, then step it</div>'
+            + learn.runbox(page, poster(algorithm.machine(dev), c.get("init"), fit=(560, 300)),
+                           f'{m["title"]}, compiled, on its page', cls="tall")
+            + '<div class="runnote">Site and ion names are drawn on the picture; the <b>Labels</b> button hides them.</div>'
             f'<div class="lab">hardware programme ({len(g["tsir"]["instructions"])} instructions, cooled)</div><pre><code>{html.escape(_listing(g["tsir"], c))}</code></pre>'
             f'</div></div></section>')
 
@@ -1425,16 +1507,43 @@ def _gate_row(g: dict, page: str, head: str | None = None) -> str:
 def compilation_page(built: list[dict]) -> str:
     by = {g["id"]: g for g in built}
     bell = by.get("bell")
+    n_gates = sum(1 for g in built if g["id"] != "bell" and not g["id"].startswith("algo_"))
     body = ["<h1>Compilation</h1>",
             "<p class=\"sub\">The compiler takes a quantum circuit and a device, and writes the programme the "
             "device runs: which ion holds each qubit, how ions are carried so that the two ions of every "
             "two-qubit gate stand in the same trap, and the laser operations, in order. Every example on "
-            "this page can be played.</p>"
-            "<p>Every programme it writes is checked twice: against the <a href=\"../rules/\">rules</a> of the "
-            "machine, and against the circuit, to show that it computes what the circuit says.</p>"]
-    # the input, and what the machine can do
-    body.append("<h2 id=\"input\">The input, and the machine's three operations</h2>"
-                "<p class=\"sub\">The input is a circuit in <b>OpenQASM 2.0</b>, the standard text format for "
+            "this page can be played.</p>",
+            learn.strip("compilation"),
+            learn.summary([
+                "<b>The problem</b> (&sect;1). A circuit names qubits and gates. The machine has ions in traps and "
+                "three laser operations. Compiling is deciding which ion is which qubit, where ions must travel, "
+                "and which pulses fire, so that the programme runs the circuit.",
+                "<b>The design</b> (&sect;2). Five ideas the compiler is built on, each answering one question; the "
+                "first of them, <i>untrusted heuristics, trusted checks</i>, is the one to keep. Then the pipeline, "
+                "nine steps.",
+                "<b>A worked example</b> (&sect;3). The smallest circuit that needs transport, a Bell pair, through "
+                "every step, with the programme it became and its checks. Press Play on it.",
+                f"<b>Every basic gate</b> (&sect;4). {n_gates} gates compiled on four small devices, each with its "
+                "programme, its ion map, its pulses and its verdicts.",
+                "<b>The algorithm</b> (&sect;5 onwards). What each pass computes, stated precisely, with a picture "
+                "after every definition; and what is proved, what is only computed, and what the compiler cannot do.",
+            ], lead="You have the machine (<a href=\"../physics/\">Physics</a>), the language it is told what to do in "
+                    "(<a href=\"../language/\">Language</a>) and the rules it must keep (<a href=\"../rules/\">Rules</a>). "
+                    "This page is the program that writes those programmes from an ordinary quantum circuit, and the "
+                    "checks that catch it when it is wrong. The first four sections are the story; the rest is the "
+                    "reference, for when you want to know exactly what a pass does."),
+            learn.ask("A circuit says <code>cx q[0],q[1]</code>. On a trapped-ion machine the two qubits are two ions, "
+                      "possibly in different traps, and the only two-qubit operation needs both of them in one trap "
+                      "under one laser beam. What has to happen between reading that line and firing the beam?",
+                      "Someone has to choose which ion plays which qubit and where each starts; carry the two "
+                      "together without breaking any rule of the machine; fire the right pulses; and, since all of "
+                      "that was decided by a heuristic, prove afterwards that it really happened and really computes "
+                      "a CNOT. That is the whole page, in one sentence.")]
+    # ---------------------------------------------------------------- 1. the input
+    body.append("<h2 id=\"input\">1. The input, and the machine's three operations</h2>"
+                + learn.section("what the compiler is given (a circuit in OpenQASM) and the only three things the "
+                                "machine can do to a qubit. Two short identities turn any gate into those three.")
+                + "<p class=\"sub\">The input is a circuit in <b>OpenQASM 2.0</b>, the standard text format for "
                 "quantum circuits (<a href=\"https://arxiv.org/abs/1707.03429\">its specification</a>). A "
                 "trapped-ion machine cannot apply most of its gates directly. This one has three operations, and "
                 "every gate is rewritten into them:</p>"
@@ -1479,8 +1588,50 @@ def compilation_page(built: list[dict]) -> str:
                 + "</tbody></table></div>")
     if bell:
         c = bell["cert"]
-        body.append(f'<div class="two"><pre><code>{html.escape(bell["qasm"].strip())}</code></pre>'
+        body.append('<p>The circuit this page walks through, as text and as the textbook draws it: a Hadamard, '
+                    'a CNOT, two measurements.</p>'
+                    f'<div class="two"><pre><code>{html.escape(bell["qasm"].strip())}</code></pre>'
                     f'<div><div class="lab">the same circuit, drawn</div>{circuit_svg(c.get("circuit_ops", []), c.get("n_qubits", 2))}</div></div>')
+    body.append(learn.bridge("So every gate is a short recipe of R, VZ and MS pulses; that part is a table. The "
+                             "difficulty is not the pulses, it is geography: which ion is which qubit, and how do "
+                             "the pairs meet without breaking the rules? That is what the compiler is designed around."))
+    # ---------------------------------------------------------------- 2. the design
+    body.append("<h2 id=\"design\">2. How the compiler is designed</h2>"
+                + learn.section("the five ideas behind the compiler, each as a question and its answer, and then the "
+                                "pipeline that follows from them. Read this section even if you skip the rest: every "
+                                "later detail is one of these ideas carried out.")
+                + '<ol class="ideas">'
+                '<li><p class="q">What should we trust?</p><p><b>Nothing the compiler says; everything the checks '
+                'say.</b> The two hard parts of compiling, choosing where ions start and finding their routes, are '
+                'NP-hard problems (a quadratic assignment and a multi-agent path-finding problem), so the compiler '
+                'solves them with heuristics that may be clumsy and may even be wrong. Its output is therefore '
+                'checked by code that shares nothing with it: the rule checker for legality, a checker whose '
+                'correctness is <i>proved</i> for &ldquo;every gate happened where it was claimed&rdquo;, and a '
+                'computation for &ldquo;the pulses make the right gate&rdquo;. The insight: a bug in the compiler '
+                'becomes a failed check on this page, never a wrong programme on a machine. The pipeline is '
+                '<i>untrusted heuristics followed by trusted decision procedures</i>.</p></li>'
+                '<li><p class="q">What does a programme cost?</p><p><b>Hops.</b> Every hop heats the ion that '
+                'makes it, a hot ion gates badly (R16) and may not gate at all until it is cooled (R7), and cooling '
+                'takes time in which every other qubit decays. So the compiler places qubits that gate together '
+                'close together, moves ions as little as it can, and cools only where a gate would otherwise be '
+                'too hot.</p></li>'
+                '<li><p class="q">What can run at the same time?</p><p><b>Independent gates, in lock-step.</b> '
+                'Gates on different qubits do not care about each other\'s order, so the circuit is cut into '
+                'layers of independent gates, each gate of a layer gets its own trap, and the first pulse of every '
+                'gate fires in one cycle, then the second of every gate, and so on. A layer of many gates then '
+                'costs as much as one gate, and no trap is ever asked to do two things in a cycle (R12) by '
+                'construction.</p></li>'
+                '<li><p class="q">What does the hardware forbid?</p><p><b>Whatever the rule set says, and the '
+                'router plans against exactly that.</b> Capacity (R1), one ion through a junction at a time (R2), '
+                'no head-on exchange (R5), and on a broadcast-wired machine one waveform per cycle (R22): the '
+                'router\'s search space is the set of moves these rules allow, cycle by cycle. The last one matters '
+                'most. It is why two ions heading in different directions cannot share a cycle, and much of why a '
+                'ring beats a lattice on the leaderboard.</p></li>'
+                '<li><p class="q">Whose order is it?</p><p><b>The circuit author\'s.</b> The compiler never '
+                'reorders a qubit\'s gates, not even two CNOTs that commute. Two gates that commute give the same '
+                'unitary in either order, which is exactly why no semantic check could tell them apart; so the '
+                'order is kept as written and checked as written.</p></li>'
+                '</ol>')
     # the pipeline
     stages = [
         ("Read the circuit", "the operations, and the order between them",
@@ -1494,7 +1645,7 @@ def compilation_page(built: list[dict]) -> str:
          "and a gate on three qubits (a Toffoli) is first unfolded into one- and two-qubit gates."),
         ("Place", "which ion is which qubit, and where it starts",
          "each qubit is given an ion, and each ion a starting trap, so that qubits that gate together start "
-         "close together (how, in <a href=\"#algo-layout\">&sect;3</a>)."),
+         "close together (how, in <a href=\"#algo-layout\">&sect;5.3</a>)."),
         ("Route and schedule", "the moves, in layers",
          "operations run in layers of the dependency graph, and each qubit's operations keep the circuit's "
          "order exactly, even where two of them would commute. Before a two-qubit gate, its two ions are "
@@ -1535,17 +1686,26 @@ def compilation_page(built: list[dict]) -> str:
          "the page joins the programme and the circuit through the marks on the instructions, after "
          "checking each witness against the instruction it names; a disagreement refuses to draw."),
     ]
-    body.append("<h2 id=\"pipeline\">How a circuit becomes a machine programme</h2>"
-                "<p class=\"sub\">In short: read the circuit, rewrite every gate as the machine's operations, "
-                "decide which ion plays which qubit, carry ions so that the pairs that must interact end up in the "
-                "same trap, write out the instructions, add cooling where the ions would be too hot to gate "
-                "&mdash; then check the result, twice. The nine steps below are that in full.</p>"
+    body.append("<h3 id=\"pipeline\">The pipeline: nine steps</h3>"
+                "<p class=\"sub\">The five ideas, carried out in order. In short: read the circuit, rewrite every gate "
+                "as the machine's operations, decide which ion plays which qubit, carry ions so that the pairs that "
+                "must interact end up in the same trap, write out the instructions, add cooling where the ions would "
+                "be too hot to gate &mdash; then check the result, twice. Steps 1&ndash;6 are the untrusted "
+                "heuristics; steps 7 and 8 are the trusted checks.</p>"
                 "<ol class=\"stages\">" + "".join(
         f'<li><div><b>{t}</b><span class="art">{a}</span></div><div class="out">{d}</div></li>' for t, a, d in stages) + "</ol>")
+    body.append(learn.bridge("Nine steps is a lot to hold in the head. Let us watch all of them on the smallest "
+                             "circuit that needs transport."))
+    # ---------------------------------------------------------------- 3. the worked example
     if bell:
         c, v = bell["cert"], bell["verdict"]
         final = _positions(c)
-        body.append("<h2 id=\"mapping\">The ion mapping, verified</h2>"
+        dev = bell["meta"].get("device", "chain4")
+        body.append("<h2 id=\"mapping\">3. A worked example: the Bell pair, step by step</h2>"
+                    + learn.section("the Bell pair of &sect;1 compiled onto a four-site register: where each ion starts and "
+                                    "ends, the one move the CNOT needs, the pulses of each gate as the certificate "
+                                    "witnesses them, the verdicts, and the programme itself, playable.")
+                    + "<h3 id=\"mapping-ions\">The ion mapping, verified</h3>"
                     "<p class=\"sub\">For the Bell pair, compiled here onto the four-site register, each qubit is given an ion and "
                     "a starting trap. The CNOT needs both ions in one trap, and that happens in two steps: one ion is "
                     "carried along the register until its trap sits right beside the other &mdash; the ion waiting there "
@@ -1557,7 +1717,7 @@ def compilation_page(built: list[dict]) -> str:
                     + "".join(f'<tr><td>q{q}</td><td>{ion}</td><td>{c["init"].get(ion)}</td><td>{final.get(ion)}</td></tr>' for q, ion in sorted(c["map"].items(), key=lambda kv: int(kv[0])))
                     + "</table><p class=\"sub\" style=\"margin-top:8px\">moves recorded: " + ", ".join(f'{m["ion"]} {m["from"]}→{m["to"]}' for m in c["moves"]) + "</p></div>"
                     f'<div><pre><code>{html.escape(_listing(bell["tsir"], c))}</code></pre></div></div>')
-        body.append("<h2 id=\"pulses\">The pulse sequence, matched to the gate</h2>"
+        body.append("<h3 id=\"pulses\">The pulse sequence, matched to the gate</h3>"
                     "<p class=\"sub\">Each witness names the instruction that completes the gate, the trap, the ions and "
                     "the operations, in the order they happen. Two checks meet here: the identities above say these "
                     "operations are this gate, and O2 composes the operations the programme actually fires back into "
@@ -1565,25 +1725,70 @@ def compilation_page(built: list[dict]) -> str:
                     "is caught.</p><div class=\"pulses\">"
                     + "".join(f'<code>op {w["dag"]} ({c["circuit_ops"][w["dag"]]["name"]}) at {w["site"]}, instruction #{w["instr"]}: {html.escape(", ".join(w["pulses"]))}</code>' for w in c["gates"])
                     + f'</div><p class="sub">Verdict for the Bell pair: {_rules_words(bell)}; R10 {_r10_words(v)}.</p>')
-        body.append(f'<div class="ex pass"><span class="tag">runs</span><p class="why">The compiled Bell pair on the four-site register: press Play, or step it. The full page shows the circuit stepping beside the programme.</p>'
-                    f'<div class="runbox tall"><iframe class="live" loading="lazy" src="ex/bell.html#embed&amp;step=1" title="the Bell pair, on its page"></iframe></div>'
-                    f'<a class="open" href="ex/bell.html#step=1">open the page</a></div>')
-    # every basic gate
-    body.append("<h2 id=\"gates\">Every basic gate, compiled and verified</h2>"
-                "<p class=\"sub\">One circuit per gate, each on one of four small devices named on its card, through the "
+        body.append(f'<div class="ex pass"><span class="tag">runs</span><p class="why">The compiled Bell pair on the four-site '
+                    f'register. Press Play: the page loads and plays the programme once; then step it, or scrub the slider. '
+                    f'The names of the sites and ions are drawn on the picture. The full page shows the circuit stepping '
+                    f'beside the programme.</p>'
+                    + learn.runbox("ex/bell.html", poster(algorithm.machine(dev), c.get("init"), fit=(760, 300)),
+                                   "the Bell pair, on its page", cls="tall")
+                    + f'<a class="open" href="ex/bell.html#step=1">open the page</a></div>')
+    body.append(learn.bridge("One circuit is an anecdote. The next section puts every basic gate through the same "
+                             "nine steps, each on a different small device, so that transport is seen on a line, a "
+                             "loop, a lattice and a dock."))
+    # ---------------------------------------------------------------- 4. every basic gate
+    body.append("<h2 id=\"gates\">4. Every basic gate, compiled and verified</h2>"
+                + learn.section(f"{n_gates} cards, one per gate. Each shows the input, the circuit drawn, the ion mapping, "
+                                "the pulses witnessed, the four verdicts (the rules, R10, its proved half O1 and its "
+                                "computed half O2), the programme, and a Play button. The two-qubit gates are the ones "
+                                "with transport; the gates outside the Clifford set (t, and the rotations by an arbitrary "
+                                "angle) are checked as exact matrices.")
+                + "<p class=\"sub\">One circuit per gate, each on one of four small devices named on its card, through the "
                 "same steps: the input, the programme it became, the ion mapping, the operations witnessed, and the "
-                "verdicts of the rules and of R10's two halves. The two-qubit gates show the transport that brings "
-                "the ions together; the gates outside the Clifford set (t, and the rotations by an arbitrary angle) "
-                "are compared as exact matrices.</p>")
+                "verdicts of the rules and of R10's two halves.</p>")
     body.append("".join(_gate_row(g, f'ex/{g["id"]}.html') for g in built
                         if g["id"] != "bell" and not g["id"].startswith("algo_")))
     if not built:
         body.append('<p class="note">No compiled examples in this build: the compiler and the proof checker write them, '
                     'and the site build reads them.</p>')
+    body.append(learn.bridge("Up to here everything was shown and nothing was defined. The rest of the page is the "
+                             "reference: what each pass computes, stated once and precisely, with a drawn example "
+                             "after every statement. Read it as far as your question takes you; the conclusion at the "
+                             "end stands on its own."))
     lowering = COMPILED / "lowering.txt"
     body.append(algorithm.section(by, lowering.read_text(encoding="utf-8") if lowering.exists() else ""))
-    return PAGE.format(title="Compilation - QCCD studio", style=STYLE, extra_css="main{max-width:1120px}" + algorithm.CSS,
-                       body="\n".join(body))
+    # ---------------------------------------------------------------- the conclusion
+    body.append('<h2 id="conclusion">Conclusion</h2>'
+                + learn.recap([
+                    "Compiling a circuit for a QCCD machine is three decisions and one proof: which ion plays which "
+                    "qubit and where it starts (placement), how the pairs meet without breaking a rule (routing, in "
+                    "layers), which pulses fire (the two identities), and then evidence that all of it happened.",
+                    "The compiler is untrusted and its checks are trusted. Legality is decided by the rule checker, "
+                    "&ldquo;every gate happened where claimed&rdquo; by a checker whose correctness is proved in Lean, "
+                    "and &ldquo;the pulses compute the circuit&rdquo; by a stabilizer tableau or an exact matrix. A "
+                    "compiler bug is a red verdict on this page, not a wrong programme on a machine.",
+                    "Hops are the cost. Placement keeps interacting qubits close, routing moves few ions, and cooling "
+                    "is inserted only before a gate that would be too hot. One waveform per cycle (R22) is the rule "
+                    "that shapes the router most.",
+                    "Independent gates run in lock-step layers, so many gates cost one; a qubit's own gates keep the "
+                    "circuit's order, always.",
+                    "What is not done: no cross-layer pipelining, no optimality guarantee, and for a non-Clifford "
+                    "circuit of more than ten qubits the second half of R10 is reported as not checked rather than "
+                    "passed.",
+                ], "compilation", more="Every number and picture on this page came out of the real toolchain, and every "
+                                       "example opens as the Studio page the compiler wrote. To compile a circuit of your "
+                                       "own, open the <a href=\"../studio.html#design\">Design page</a>; to see these "
+                                       "programmes ranked, the <a href=\"../board/\">Leaderboard</a>."))
+    css = ("main{max-width:1120px}"
+           " .ideas{list-style:none;counter-reset:idea;padding:0;margin:8px 0 10px;max-width:100ch}"
+           " .ideas li{position:relative;padding:4px 0 10px 54px;margin:0 0 6px}"
+           " .ideas li:before{counter-increment:idea;content:counter(idea);position:absolute;left:0;top:4px;width:38px;height:38px;"
+           "border-radius:19px;background:#1c2a4a;color:#fff;font:700 17px/38px var(--sans);text-align:center}"
+           " .ideas .q{margin:0 0 3px;font-family:var(--serif);font-size:18px;font-weight:600;color:#1a2540}"
+           " .ideas p{margin:0;max-width:86ch} .ideas p b{color:#1c2a4a}"
+           " .runnote{font-family:var(--sans);font-size:12px;color:var(--ink3);margin:4px 0 0}"
+           + algorithm.CSS)
+    return PAGE.format(title="Compilation - QCCD studio", style=STYLE, extra_css=css,
+                       body=learn.apply("\n".join(body), "compilation/", 1))
 
 
 def build_compiled_pages(out: Path, put) -> list[dict]:
@@ -1974,9 +2179,9 @@ def _figures(body: str, runs: dict[str, dict]) -> str:
     def run(args):
         rid, cap = args[0], (args[1] if len(args) > 1 else "")
         r = runs[rid]
-        lazy = "" if first_run[0] else ' loading="lazy"'
         first_run[0] = False
-        return (f'<figure class="fig run"><iframe class="live"{lazy} src="{r["page"]}#embed&amp;step=1" title="{html.escape(PHYS_RUNS[rid]["headline"])}"></iframe>'
+        still = poster(_arch_machine(PHYS_RUNS[rid]["device"]), r.get("init"), fit=(640, 300))
+        return (f'<figure class="fig run">{learn.runbox(r["page"], still, PHYS_RUNS[rid]["headline"])}'
                 f'<figcaption>{cap} <a href="{r["page"]}#step=1">Open the page &rarr;</a></figcaption></figure>')
 
     kinds = {"photo": photo, "device": device, "gallery": gallery, "run": run}
@@ -2001,13 +2206,54 @@ def render_physics() -> dict:
 
 
 def physics_page(d: dict, runs: dict[str, dict] | None = None) -> str:
+    opening = (learn.strip("physics")
+               + learn.summary([
+                   "<b>The trap and the qubit.</b> How an oscillating field holds a charged atom, which two states of "
+                   "it are the qubit, and the one number that says how hot an ion is: n&#772;, the motional quanta.",
+                   "<b>Gates, and why they need cold ions.</b> The two-qubit gate works through the ions' shared "
+                   "motion, so the ions must be in one trap and that motion must be cold. Two rules follow.",
+                   "<b>The QCCD idea.</b> Many small traps joined by rails, ions carried between them; the five words "
+                   "the studio's map is drawn in; what each transport move costs in time and heat.",
+                   "<b>The control system</b> and the price of wiring it at scale: one motion per cycle (R22).",
+                   "<b>The noise</b>: the six things that go wrong, how a noisy machine is simulated in general, and "
+                   "how this website does it, down to the logical error rate.",
+               ], lead="This is the first of the five Learn pages. It is the machine itself, read in the order you "
+                       "need it to understand the studio: from one trapped ion to the noise model. Each section "
+                       "says which rule it stands behind.")
+               + learn.ask("Why does a quantum computer built from trapped ions need to <i>move</i> anything at all?",
+                           "Because its two-qubit gate works only on ions sharing one trap, and a trap holds only a "
+                           "short chain well. So any pair of qubits that must interact has to be brought together, and "
+                           "every move heats the ions a gate wants cold. Hold that tension in mind: it is the whole "
+                           "design problem, and every later page is about it."))
     body = (f'<p class="sub"><a href="../learn/">Tutorial</a> &rsaquo; background</p>'
             f'<ul class="toc">{d["toc"]}</ul>{_figures(d["body"], runs or {})}')
+    # the opening boxes go after the page's first paragraph (the h1 and the lede are the
+    # document's own), before the first section
+    cut = body.find("<h2 ")
+    body = body[:cut] + opening + body[cut:] if cut > 0 else opening + body
+    body += learn.recap([
+        "An ion sits in a well of an oscillating field; its qubit is two internal states; its heat is counted in "
+        "motional quanta, n&#772;. Every cost on this website comes back to n&#772;.",
+        "The two-qubit gate needs both ions in one trap and cold (the Lamb&ndash;Dicke condition). That is why "
+        "ions are moved (R6b) and why cooling is inserted before gates (R7).",
+        "A QCCD is many small traps and the rails between them. A move is a shuttle, a split or merge, a junction "
+        "crossing or a rotation, each with a measured time and heat; splits and junctions are the expensive ones.",
+        "Broadcast wiring keeps the control small and allows one kind of motion per cycle (R22). Most of what the "
+        "compiler does differently from a textbook router follows from that.",
+        "Noise is simulated by replaying the programme, reading heat, time and chain length off the replay, and "
+        "writing a Pauli error after each operation; the result is a stim circuit whose samples give the logical "
+        "error rate.",
+    ], "physics", more="The studio shows all of this as editable fields on the <a href=\"../studio.html#design\">Design "
+                       "page</a> (the primitives, the heating rate, the species, the wiring), with a hover card on "
+                       "each; the <a href=\"../docs/adl/\">architecture document</a> is the reference for how they are "
+                       "declared, and every entry on the <a href=\"../board/\">Leaderboard</a> is a full replay you can "
+                       "step through.")
     # the device gallery two to a row (its drawings share one box, see `_figures`), one to a
     # row on a phone; this page's own rule, so no other page changes
     css = (".gallery{grid-template-columns:repeat(2,minmax(0,1fr))}"
            "@media (max-width:640px){.gallery{grid-template-columns:minmax(0,1fr)}}")
-    return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css=css, body=body)
+    return PAGE.format(title=f'{html.escape(d["title"])} - QCCD studio', style=STYLE, extra_css=css,
+                       body=learn.apply(body, "physics/", 1))
 
 
 def people_page() -> str:

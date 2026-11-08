@@ -683,3 +683,70 @@ any (`render.py`'s `FORBIDDEN` and `provenance.thin` already hold those). Now `b
 through `thin`. Fixed in place on the server (each file re-serialised byte-exactly before the
 change); a scan of all 663 live text files finds none, with originals from the backup as the
 control.
+
+
+### The Learn pages as one story, and a glossary on hover — 2026-11-07
+
+Asked for, in seven comments pinned on `/compilation/` and one message: the page was "terribly
+written and hard to follow"; it went straight into symbols (`A = (V, E, cap, gate, spam, L)`:
+"which of these means trap? what is spam?") without motivation, and the symbols never appeared
+in the examples beside them; the three device figures of one strip came out three sizes; the
+parts of the compiler felt disconnected; the animations did not play when Play was pressed and
+the Labels button showed no labels; and every Learn page should open with a summary, ask a
+question before each technical part, connect to the others as one story, end with a
+conclusion, and let a confused reader hover a word for its explanation and click through to
+where it is defined.
+
+**One module for the furniture, `qccd/site/learn.py`.** The five pages (Physics, Language,
+Rules, Compilation, Evaluation) are one story in that order, and each now carries the `.story`
+strip under its title with the current page marked; an "On this page" `.sum` box before the
+first section, saying what the reader will learn and where the page sits in the story; a `.ask`
+box (a question and its one-sentence answer) before the technical parts; `.sum.sec` lead-ins at
+the head of the long sections and `.bridge` sentences between them; and a "What to remember"
+`.recap` at the end with the way on to the next page and back to the previous. `physics.md`
+writes these as `!!sum`, `!!ask q || a` and `!!bridge` paragraphs, which `md.py` renders; its
+closing "Where to go next" became the recap. The Compilation page was reorganised: §1 the
+input, §2 the design (five ideas, each a question and its answer: untrusted heuristics and
+trusted checks; hops are the cost; independent gates in lock-step; the rule set is the router's
+search space; the author's gate order is kept), then the nine-step pipeline; §3 the Bell pair;
+§4 every gate; §5 the algorithm, pass by pass (5.1–5.11, each opening with a question and a
+lead-in), and a conclusion. Definition 1 now says `meas` rather than `spam`, names each set in
+words, and is followed by a notation table that reads the tuple off the three example devices
+(computed from the device documents, one column each) above the three drawn at one size
+(`dev_fig(fit=)`), so every later symbol has a value a reader has seen.
+
+**The glossary.** `learn.GLOSSARY` is one table of about a hundred words: title, a plain
+explanation of one or two sentences, the address of the definition (a Definition's anchor on
+Compilation, a section of Physics, a rule's card, a statement's card, an Evaluation heading),
+and the spellings that are matched. `learn.mark` wraps the first mention of each word in each
+section (a new `h2`/`h3` starts the count again) as `<a class="gl">`, never inside code, links,
+headings, drawings, formulas or the studio's own `.h` hover spans; `card_data` appends the
+page's words as JSON, and `learn.JS` (appended to `READING_JS`) shows a card on hover or focus
+with the explanation and a "Go to the definition" link, and on a touch screen explains on the
+first tap and goes on the second. One table means the five pages cannot explain a word five
+ways; `tests/test_learn_pages.py` holds that every anchor the table names is one a page builder
+writes.
+
+**Play.** Headless and headed Chrome played every embed on request, programmatically and by
+real click, so the reported failure was not reproduced; what was true is that a Learn page
+loaded nineteen full Studio pages at once and gave each a 41 px Play button in a stage bar.
+Every runbox is now a poster, the device drawn with its ions where the programme starts and
+one large Play button (`learn.runbox`, `build.poster`); pressing it loads the Studio page in
+embed mode with `&go`, which `HASH_JS` reads as "play once from the start, at 1x while the
+programme is short enough to follow", after which Step, Reset and the slider are the
+reader's. A page now loads only the page the reader asked for.
+
+**Labels.** The hardware labels were drawn at a fraction of the lattice step and hidden when
+that came to less than 7 css px, which in a 360 px embed of a four-site register was always,
+so pressing Labels did nothing visible. `render.py` now draws them between 9 and 13 css px at
+every zoom (`hwlScale`, `hwlPlace`, the geometry kept in `HWLG`, the ion labels following in
+`HWL_FS`) and hides them only when the two nearest nodes stand closer on screen than 2.4 label
+heights, where the names would overlap. That moved the page stamp, so every seed page was
+regenerated in a clean worktree (the untracked compiled artefacts copied in from the shared
+tree, since a clean checkout has none of them).
+
+Checks: `tests/test_learn_pages.py` (the marker, the table's anchors, the physics markers;
+with `QCCD_SITE_DIR` the built pages' links, posters, strip, summary, recap) and
+`tests/learn.mjs` (in Chrome: the card opens on hover with the explanation and the link, a
+poster pressed loads the page and the slider moves by itself, the labels are drawn at 9 px
+or more in the embed, no console errors).

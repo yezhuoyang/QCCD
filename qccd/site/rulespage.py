@@ -15,6 +15,7 @@ from pathlib import Path
 from ..ruleset import RuleSet, catalogue, load, names, rule_order
 from ..ruleset.syntax import KEYWORDS
 from ..ruleset.vocabulary import TERMS
+from . import learn
 
 #: The order and the plain names of the shipped rule sets.
 SETS = (
@@ -155,9 +156,8 @@ def _card(ex: dict, rid: str, device: str | None) -> str:
             f'<p class="why">{ex["why"]}</p>{dev}'
             f'<pre{" class=\"ir\"" if ex.get("ir") else ""}><code>{html.escape(ex["text"])}</code></pre>'
             f'<div class="verdict">{"".join(parts)}</div>'
-            f'<div class="runbox"><iframe class="live" loading="lazy" src="{ex["page"]}#embed&amp;step=1" '
-            f'title="the example, on its page"></iframe></div>'
-            f'<a class="open" href="{ex["page"]}#step=1">open the page, with its Report pane</a></div>')
+            + learn.runbox(ex["page"], ex.get("poster", ""), "the example, on its page")
+            + f'<a class="open" href="{ex["page"]}#step=1">open the page, with its Report pane</a></div>')
 
 
 def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_set: dict) -> str:
@@ -194,12 +194,36 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
          '<div class="na"><b>does not apply</b>the execution has nothing the rule is about, and the page says what</div>'
          '<div class="unk"><b>could not be checked</b>a value the rule needs is missing, and the page says which</div>'
          '</div></div>',
+         learn.strip("rules"),
+         learn.summary([
+             '<b>What a rule is.</b> One sentence of logic about the device and a programme on it, evaluated on '
+             'the replay, true or false. You will be able to read every rule on this page in its own words.',
+             f'<b>What the rules are for.</b> They are the hardware\'s side of the bargain: capacity, junctions, '
+             f'one waveform per cycle, cold ions at a gate. A programme that breaks one is refused, and the page '
+             f'says which values broke it. {len(core)} of the {n_rules} are <span class="core">core</span> and hold '
+             f'on every machine.',
+             '<b>Rule sets.</b> Different machines, and the papers that model them, assume different rules. A rule '
+             'set names the rules and their numbers; the compiler plans with it and the checker judges with it.',
+             '<b>Every rule, with a programme that keeps it and one that breaks it</b>, both playable, so a rule '
+             'is never only a formula.',
+             '<b>Your own rule</b>, in the same language, which the checker then decides without the compiler '
+             'ever having heard of it.',
+         ], lead='The <a href="../language/">Language</a> page gave you the statements a programme is made of. '
+                 'This page is what a programme may and may not do with them.'),
+         learn.ask('Who decides whether a programme could really run on the hardware: the compiler that wrote it, '
+                   'or someone else?',
+                   'Someone else. The compiler is a heuristic that may be wrong; the rules are a short text that '
+                   'anyone can read, and a checker that shares no code with the compiler evaluates exactly that '
+                   'text on the replay. That is why a rule is written as a formula and shown here as one.'),
          '<ul class="toc2"><li><a href="#language">the language</a></li><li><a href="#words">the words</a></li>'
          '<li><a href="#sets">rule sets</a></li><li><a href="#all">every rule</a></li>'
          '<li><a href="#yours">writing a rule</a></li></ul>']
 
     # -- the language
     b += ['<h2 id="language">Reading a rule</h2>',
+          learn.section('the ten shapes a rule can take. They are ordinary logic (for all, for some, and, or, '
+                        'counts and sums) over four finite sets: sites, operations, instants, and the circuit. '
+                        'After this section every rule on the page reads as a sentence.'),
           '<p class="sub">A rule is a formula of first-order logic over finite sets: the sites of the '
           'device, the operations of the execution, the instants at which its state is judged, and the '
           'operations of the input circuit.</p>',
@@ -220,7 +244,12 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
           'none was given) makes the rule not apply, and the page says which word.</p>']
 
     # -- the words
+    b.append(learn.bridge('A formula is only as clear as its words. The next section is the vocabulary: every '
+                          'name a rule may use and what it reads off the replay. Skim it now and come back to it '
+                          'from any rule below; each word is a link.'))
     b.append('<h2 id="words">The words</h2>')
+    b.append(learn.section('the dictionary of the rule language, grouped by what the words are about: the device, '
+                           'the execution, the instants, the circuit.'))
     b.append('<p class="sub">Every word a rule may use, with what it means. Two kinds of execution are '
              'judged by the same rules: a <b>programme</b>, run one step at a time with everything in a step '
              'happening together (what this website&rsquo;s compiler produces), and a paper&rsquo;s <b>timed '
@@ -249,7 +278,13 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
         b.append('</table>')
 
     # -- the rule sets
+    b.append(learn.ask('Is there one list of rules for every trapped-ion machine?',
+                       'No. A machine with a signal per electrode has no one-waveform rule; a swap-or-stay lattice '
+                       'has rules no ring has. So the rules come in sets, and a design is judged by the set its '
+                       'machine declares.'))
     b.append('<h2 id="sets">Rule sets</h2>')
+    b.append(learn.section('the shipped rule sets, each with the rules it contains and the numbers it fixes, and '
+                           'which boards and papers each one judges. The standard set is this website\'s machine.'))
     b.append('<p class="sub">Each rule set names the rules it assumes and the numbers they read. The '
              'standard set is this website&rsquo;s machine: every compiled programme and every leaderboard '
              'design is checked against it. Each paper&rsquo;s set says what that paper&rsquo;s model assumes, '
@@ -272,7 +307,15 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     b.append('</tbody></table>')
 
     # -- every rule
-    b.append(f'<h2 id="all">Every rule</h2><p class="sub">All {n_rules} rules the website knows, each with '
+    b.append(learn.bridge('Now the rules themselves. Each card is one rule: the formula the checker evaluates, a '
+                          'sentence on what it protects, where it comes from, and two small programmes, one that '
+                          'keeps it and one that breaks it. Press Play on either to watch the cycle the verdict '
+                          'names.'))
+    b.append(f'<h2 id="all">Every rule</h2>'
+             + learn.section(f'all {n_rules} rules, grouped by what they are about (the device\'s geometry, '
+                             f'occupancy, transport, control, gates, heat, cost, correctness), in the reader\'s '
+                             f'browser. The group headings are the map; the cards are the territory.')
+             + f'<p class="sub">All {n_rules} rules the website knows, each with '
              'the assertion the checker evaluates. Where a rule has examples, one programme that keeps it and '
              'one that breaks it are judged here by the standard rule set (the C2LR rules by the set c2lr, on '
              'a C2LR lattice), and each opens as the page the studio would open on it.</p>')
@@ -312,6 +355,8 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
                '  about "C3 is under repair."\n'
                '  for all i in ions, t in instants: position(i, t) != "C3"\n')
     b += ['<h2 id="yours">Writing a rule</h2>',
+          learn.section('a rule set is a text file you can write. One example: a machine without broadcast '
+                        'control, with one rule of its own.'),
           '<p class="sub">A rule set is a text file. It may start from another set (<code>include</code>), '
           'pick rules by name (<code>use R1, R2</code>), remove them (<code>drop</code>), set their numbers '
           '(<code>param</code>) and add rules of its own, in the language above and with the words above, '
@@ -322,11 +367,23 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
           'each (R22 is gone), lets a gate chain grow to twenty ions, and keeps everything else as on the '
           'standard machine. X1 is a rule it has never seen: it does not plan for it, and the check '
           'afterwards decides it all the same, naming every instant an ion stands in C3.</p>']
+    b.append(learn.recap([
+        'A rule is one formula over four finite sets, evaluated on the replay of a programme. It holds, fails '
+        '(naming the values), does not apply, or could not be checked; it is never trusted on anyone\'s word.',
+        f'The rules are the hardware\'s constraints made explicit: capacity (R1), junctions (R2), one waveform per '
+        f'cycle (R22), cold ions at a gate (R7), and the rest. {len(core)} core rules hold on every machine; the '
+        f'others come in rule sets, one per machine model.',
+        'The compiler plans with a rule set and is then judged by it, including rules it never saw. A failed '
+        'rule on a compiled programme is a compiler bug made visible, not a programme a machine would refuse.',
+        'You can write a rule set. The checker decides a new rule the same way it decides the shipped ones.',
+    ], "rules", more='The Compilation page shows the other side: how the compiler keeps a programme inside '
+                     'these rules while it routes, and which checks run on its output afterwards.'))
     # "Every rule" grouped into categories in the reader's browser, the cards and ids unchanged
-    b.append("<script>\n" + (CATEGORIES / "rules.js").read_text(encoding="utf-8") + "\n</script>")
+    page_body = learn.apply("\n".join(b), "rules/", 1)
+    page_body += "<script>\n" + (CATEGORIES / "rules.js").read_text(encoding="utf-8") + "\n</script>"
     return PAGE.format(title="Rules - QCCD studio", style=STYLE,
                        extra_css="main{max-width:1120px}" + CSS + (CATEGORIES / "rules.css").read_text(encoding="utf-8"),
-                       body="\n".join(b))
+                       body=page_body)
 
 
 #: the rules' categories (qccd/workspace/web/rules.js), which the workspace's mirror of the site

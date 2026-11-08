@@ -697,9 +697,11 @@ def build_example(ex: dict, m: Machine, model_name: str, page_path, *, kicker: s
         text, ir = text_of(ex["program"]), False
     model = deck_model() if model_name == "deck" else corrected_model()
     m.render(prog, page_path, model=model, kicker=kicker, headline=headline, lede=lede, open_pane="R")
+    # where the ions start, for the poster the page shows before the programme is played
+    init = next((dict(i.placement) for i in prog.instructions if i.type == "init" and i.placement), {})
     return {"text": text, "ir": ir, "why": ex.get("why", ""), "expect": ex.get("expect"),
             "tag": ex.get("tag"), "verdict": judge(m, prog, model_name, focus, check_metrics),
-            "rules": judge_by_rules(m, prog, model, focus, check_metrics, ruleset)}
+            "rules": judge_by_rules(m, prog, model, focus, check_metrics, ruleset), "init": init}
 
 
 def judge_by_rules(m: Machine, prog, model, focus: str | None, check_metrics: bool,

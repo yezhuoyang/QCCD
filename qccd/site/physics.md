@@ -4,6 +4,10 @@ Everything on this website is a picture of a real machine: ions held in a trap, 
 
 ## Trapping a single ion
 
+!!ask How do you hold a single charged atom still in empty space, for hours, without touching it? || With an oscillating electric field: a static one cannot do it. Everything else on this page, from the qubit to the noise, sits inside the well that field makes.
+
+!!sum the Paul trap, the wells along it that are the **trapping sites**, and the number that measures how hot an ion is, n̄. Keep n̄ in mind: almost every cost on this website is counted in it.
+
 An ion is a charged atom, so an electric field pushes on it. But a static field cannot hold a charge in place: Earnshaw's theorem says a potential with no charges inside it has no minimum, only saddles. The Paul trap escapes this with an oscillating field. A radio-frequency (RF) voltage at a frequency Ω of tens of megahertz is applied to one set of electrodes, and the ion, too heavy to follow the oscillation, feels only its time average. That average is a **pseudopotential** proportional to the square of the RF field amplitude, `Ψ = q²·‖E_rf‖² / (4·m·Ω²)`, which is smallest where the RF field vanishes. The line along which the RF field is zero is the **RF null**, and the ion sits on it.
 
 {{photo:nist_ion_trap_chip.jpg|A surface-electrode ion trap in its mount at NIST|A surface-electrode ion trap in its vacuum mount. The square gold chip at the centre carries the electrodes; two beryllium ions float about 40 µm above it, 40 µm apart, and the copper enclosure and gold mesh around it keep stray charge away from them.|Photo: Y. Colombe/NIST, public domain.}}
@@ -16,17 +20,25 @@ Inside the well the ion oscillates like a mass on a spring at a **secular freque
 
 ## The qubit inside the ion
 
+!!sum which two states of the ion are the qubit, why they keep their state for minutes, and how a qubit is prepared and read out with light (the SPAM errors).
+
 The qubit is two internal electronic states of the ion. In a hyperfine qubit both states belong to the electronic ground level and differ only in the orientation of the nuclear spin, which makes them extraordinarily insensitive to noise: coherence times of minutes are measured. The default document names Ba⁺ as the qubit ion and carries a coherence time `T_coh` of 600 s; a second species, Sr⁺, is loaded alongside it as a **coolant**, for a reason explained under cooling.
 
 Preparing and reading the qubit both use light. Optical pumping drives the ion into one of the two states, which is a **reset** (50 µs, with an error of 0.5% in the document). Reading it out shines a laser that makes one state fluoresce and the other stay dark, and a detector counts the photons; this is a **measurement** (120 µs, 99.84% correct). Together these are the state preparation and measurement (SPAM) errors, and they enter the fidelity estimate directly, once per measurement.
 
 ## Gates, and why they need cold ions
 
+!!ask Two ions each hold a qubit. How does one make them interact? || Through their shared motion in one trap, pushed by a laser. That one fact fixes the whole design: the ions must be in the same trap, and the motion must be cold.
+
+!!sum the single-qubit pulse, the Mølmer–Sørensen two-qubit gate, and the Lamb–Dicke condition that ties the gate's quality to the ions' heat. Two rules fall out of it: R6b and R7.
+
 A single-qubit gate is a resonant pulse that rotates the qubit; in the document it takes 5 µs and fails once in forty thousand times. The two-qubit gate is the **Mølmer–Sørensen** (MS) gate. Two ions in the same well share a motional mode, a normal mode of the chain. A pair of laser beams, detuned close to a motional sideband, exerts a spin-dependent force on both ions; the shared mode is pushed out and back, and the phase it picks up along the way depends on the product of the two spins. When the pulse ends the motion has returned to where it started and only the entangling phase remains.
 
 How strongly the light couples spin to motion is the **Lamb–Dicke parameter** `η = k·√(ħ / (2·m·ω))`, the ratio of the ion's ground-state wavepacket to the laser wavelength, and the gate works cleanly only in the Lamb–Dicke regime `η²·(2n̄ + 1) ≪ 1`. That inequality is the physics behind the two consequences that shape the whole design. The ions must share a mode, so they must be in the same trap, and a trap where the beams can reach is a **gate zone**; rule [R6b](../rules/#R6b) says a two-qubit gate acts only on ions co-located in one. And the motion must be cold: the gate's error grows with the number of quanta in the mode, because a hot mode blurs the spin-dependent displacement. Quantinuum's H2 processor measured a two-qubit infidelity of 1.84e-3 with cold ions, and the document carries that as the gate's error at n̄ = 0.
 
 ## Motion as the currency
+
+!!sum the two kinds of cooling, why the qubit ion is cooled through a second species beside it, and why cooling cannot simply be done all the time.
 
 Every operation on an ion trap is paid for in motional quanta, and the two ways of paying back are the two kinds of **cooling**. Doppler cooling scatters photons from a laser tuned just below an atomic resonance; the ion absorbs photons preferentially when moving towards the beam, and each scattering event removes a little momentum. It stops at the Doppler limit, where the recoil of the scattered photons balances the cooling, at roughly `n̄ ≈ Γ / (2ω)` quanta for a transition of linewidth Γ. It is fast and works on the whole trap at once from sheet beams, which is why the document's **cool** primitive is a single 300 µs operation that cools every ion in the machine and does not have to be scheduled per ion. Sideband cooling goes further, to the ground state, one quantum at a time, down to about `(Γ / 2ω)²`.
 
@@ -35,6 +47,12 @@ Cooling the qubit ion directly would scatter photons off the qubit and destroy i
 Cooling costs time, and time is not free: the qubit dephases against `T_coh`, and, as the noise section explains, the ion warms up just by waiting. So the compiler does not cool after everything. It cools when it must, and knowing when it must is what rule [R7](../rules/#R7) decides.
 
 ## The QCCD idea
+
+!!bridge One trap, then, holds a short chain of cold ions and gates them. A computer needs thousands of qubits and any pair of them able to meet. The next section is the architecture that answers this, and the map the studio draws of it.
+
+!!ask If a long chain in one trap makes gates slow and imprecise, how do you build a large machine? || Many small traps, and ions carried between them: the QCCD. Transport is the price of that answer, and the rest of this page is about paying it.
+
+!!sum where the QCCD idea comes from, and the five words the studio's map is drawn in: **site**, **segment**, **junction**, **transport loop** and **zone type**; then the three geometry rules that say which drawings are surface traps at all.
 
 A single trap can hold a long chain of ions, but every ion added makes the chain's modes denser and the gates slower and less precise; rule [R13](../rules/#R13) records that two-qubit gate time degrades sharply beyond roughly fifteen ions per trap. The **quantum charge-coupled device** (QCCD) keeps the chains short by using many small traps and moving ions between them, so that any two qubits can be brought together for a gate. It was first put forward by Wineland, Monroe, Itano, Leibfried, King and Meekhof at NIST in 1998: a "super-register" of few-ion accumulators, built from segmented traps, in and out of which ions are moved for each logic operation ([Fig. 10 of *J. Res. NIST* **103**, 259](https://tf.nist.gov/general/pdf/1275.pdf)). It is usually cited from the 2002 paper that named it, by Kielpinski, Monroe and Wineland ([*Nature* **417**, 709](https://doi.org/10.1038/nature00784)). The name borrows from the charge-coupled device in a camera, which also shifts charges from cell to cell.
 
@@ -53,6 +71,8 @@ Not every graph is a surface trap, and three rules say which are. A junction is 
 {{device:ring24_8_j|The 24-site ring with 8 dock spurs that the landing page's example runs on, drawn from its device data: the loop sites in yellow hold the data ions, the spur ends in blue are the traps where gates happen, and the dark-ringed loop sites are the degree-3 nodes where a spur meets the loop, each a junction the ions pay to cross. Its four corners are junctions too, as on a real chip: no ion stops in a corner, and a turn of the loop carries an ion round it, from the last site before it to the first after. The BB code's 144-site ring with 24 spurs on the leaderboard is this drawing six times longer.}}
 
 ## Transport primitives, and what each one costs
+
+!!sum the elementary moves (shuttle, split, merge, junction crossing, swap, cool), what each one costs in time and in heat, and where every number comes from. Two of them, the split and the junction, cost far more than the others, and that shapes every design on the leaderboard.
 
 Transport is done by walking the DC voltages. The elementary moves are the **primitives**, and each is a curve of measured points trading speed against motional excitation: run it faster and the ion picks up more quanta. The physics of that trade is the driven oscillator: a well moved with acceleration `a(t)` drives the ion at its secular frequency, and the quanta left behind are the Fourier component of the acceleration at ω, `Δn̄ = (m / (2·ħ·ω)) · ‖∫ a(t)·e^{iωt} dt‖²`, so a slower, smoother waveform can leave almost nothing behind while a fast one leaves a lot. The table below is the default document's operating point, and each row says where its numbers come from. The transport rows are the `qccdsim_jones` table: the times of the QCCDSim simulator of Murali and colleagues, with the heating bound Jones and Murali attach to each in their cost table. The other rows come from other papers. The `transport_excitation` table from Munoz and colleagues offers a slower, colder point for several of them, and the studio lets you choose which point a design runs at.
 
@@ -75,6 +95,8 @@ A **docked** site off a loop is reached by a split at the loop and a merge at th
 
 ### Swap-or-stay: transport without routes
 
+!!sum a different kind of lattice, Quantinuum's C2LR, where nothing is routed: one shared waveform and one bit per crystal. Its own primitives, its own rules (C1 to C10), its own boards.
+
 A **C2LR** lattice ([Delaney and colleagues](https://arxiv.org/abs/2403.00756), Quantinuum) has one leg, a short trap, on every wire between its X-junctions, and each leg holds one crystal: a qubit ion with its coolant ion, one ion in this model. Nothing is routed. One shared waveform plays at every junction at once, for one diagonal (W-S, W-N, E-S or E-N), and the only choice each crystal has is one bit: shifted toward its pair's junction, or away. Both crystals of a pair toward swap; both away stay; one toward into an occupied leg enters it, so that two crystals share a leg for a gate, and leaves again the same way. The rules of such a machine are [C1 to C10](../rules/#C1), in the rule set [c2lr](../rules/#set-c2lr), and the [C2LR boards](../board/#c2lr) rank designs by them.
 
 | primitive | what it is | time | quanta | from |
@@ -90,6 +112,10 @@ Every crystal on the device plays every waveform, so a stay is not free ([C9](..
 
 ## The control system
 
+!!ask Every electrode needs a voltage. A machine with hundreds of traps has tens of thousands of electrodes. Who drives them all? || Shared signals: electrodes with the same job on every trap are wired together. That keeps the control small, at the price that only one kind of motion can happen in a cycle, which is rule R22, the single rule that shapes the compiler most.
+
+!!sum DACs, the control plane, broadcast wiring and its price (R4, R4d, R22), and the optical side.
+
 Under the chip, each DC electrode is driven by a digital-to-analogue converter (DAC), and a transport is a set of voltage waveforms played on the electrodes along the path. The default document's traps have 24 electrodes each and its junctions 48, so a machine with hundreds of sites has tens of thousands of electrodes, and one DAC per electrode is the first thing that does not scale; the fanned leads in the racetrack photograph above are this problem made visible. This is the **control plane** in the studio, and it is what the DAC count on the report measures, against the budget the document declares: at most so many DACs, junctions and square millimetres of trap.
 
 The scalable answer is **broadcast wiring**: electrodes that play the same role on every trap are wired to the same DAC, so that one waveform moves every ion whose site is wired to it. In the WISE scheme this holds the number of dynamic DACs at about a hundred regardless of the size of the machine, at the price that only one kind of motion can happen in a cycle. Rule [R4](../rules/#R4) is that price: at most one movement class is active per cycle, a class fixes a type and a direction, and any ion whose site is wired to the active waveform takes part unless a per-site switch opts it out. Two neighbouring ions cannot simply pass one another, because the waveform that moves one left moves the other left too; moving them past each other is a sequence of sorts, and a compiler for such a machine is scheduling a SIMD processor. Rule [R4d](../rules/#R4d) checks that each cycle can actually be driven by the declared channels, and the wiring tab of the studio is where the channels and switches are declared.
@@ -101,6 +127,10 @@ Rule [R22](../rules/#R22) states the consequence exactly: one transport cycle is
 The optical side is wired the same way: the document uses global beams with a switch per zone, so a gate pulse reaches every gate zone that is switched on. Cooling, being a sheet beam over the whole trap, needs no addressing at all, which is what makes the global cool cheap in control even though it is expensive in time.
 
 ## Where the noise comes from
+
+!!bridge Up to here the machine worked perfectly. It does not. The next three sections are the noise: where it comes from, how a noisy machine is simulated in general, and how this website does it.
+
+!!sum the six things that go wrong on a trapped-ion machine, each with its physics and the rule or noise clause that charges it: anomalous heating, transport heating, gate error growing with heat, dephasing while waiting, SPAM, and ion loss.
 
 Six things go wrong on a trapped-ion machine. The noise models on this website say, each in one clause of a text, which of them reaches a qubit, where, and with what probability; the [Evaluation](../evaluation/#noise) page prints both models whole.
 
@@ -118,6 +148,8 @@ Six things go wrong on a trapped-ion machine. The noise models on this website s
 
 ## Simulating noise, in general
 
+!!sum the three levels at which a noisy quantum computer can be simulated (density matrix, stochastic Pauli, error budget), and which one this website works at.
+
 There are three levels at which a noisy quantum computer can be simulated, and it helps to know which one you are looking at.
 
 The most faithful is to evolve the **density matrix** under a master equation that includes every decoherence channel. It is exact, and it is exponential in the number of qubits, so it serves for a gate or two, not a syndrome round of a code with 288 qubits.
@@ -130,6 +162,8 @@ This website works at the second level, and reports the third beside it: every l
 
 ## How this website simulates noise
 
+!!sum the **replay** that fixes everything noise depends on, the **noise model** as a text that reads it, the stim circuit it produces, and the logical error rate that is sampled from it. Also what the models deliberately do not do.
+
 The compiler turns a circuit into a hardware programme, a list of instructions each of which is one concurrent cycle of the machine. The verifier then **replays** that programme on the device document, instruction by instruction, keeping for every ion its position, its accumulated n̄ split by heating channel, and the clock. A shuttle adds its quanta to the ion shuttled; a junction crossing is charged on entry to the node; a split is charged to the ion that leaves; every ion accrues anomalous heating for the cycle's duration; a cool sets the cooled ions' n̄ back to zero. When a two-qubit gate is reached the replay reads each ion's n̄ and checks it against the gate's budget for rule [R7](../rules/#R7).
 
 The replay fixes everything noise depends on: how long every step takes, how hot every ion is when each gate starts, how many ions share each trap, how long every ion has waited. A **noise model** is a text that reads those facts. Each of its clauses names a Pauli channel, where it goes and its probability, as a term over the replay -- `after g in two_qubit_gates: DEPOLARIZE2(ms_error(gate_nbar(g) + 0.05, gate_chain(g))) on ions(g)` says that every two-ion gate is followed by two-qubit depolarizing noise at the gate law's value for the heat and the chain it meets. The programme's gates, measurements and resets become their stabilizer operations, the clauses put their noise around them, and the result is a stim circuit with the experiment's detectors. stim samples it, a decoder corrects each shot (minimum-weight matching, or BP-OSD where a fault touches three or more detectors), and the fraction of shots left wrong is the **logical error rate**, reported with its 95 % interval. That is what the [Goal 1](../board/goal1/) board ranks, and the [Evaluation](../evaluation/) page recomputes one of its entries, line by line.
@@ -141,6 +175,8 @@ The replay is deterministic, and that buys two things. The **error budget** is e
 What the models do not do is as important as what they do. They do not evolve a density matrix: every channel is a Pauli channel, and a coherent rotation enters as its Pauli twirl. Transport heating is additive, with no interference term. No error is charged per shuttle, junction, split or swap beyond the time and the heat they cost, because no QCCD experiment reports one; no crosstalk from a two-ion gate is charged (Helios detects none); and ion loss is a limit, not a probability. The anomalous heating rate is a constant in the document rather than derived from the electrode geometry, although the electrode layer already solves for the ion height that would set it.
 
 ## The formulas, collected
+
+!!sum every formula of this page in one table, each with where it enters the website. A reference, not a reading.
 
 | quantity | formula | where it enters |
 |---|---|---|
@@ -163,7 +199,3 @@ What the models do not do is as important as what they do. They do not evolve a 
 | rail angle | `θ ≥ 60°` between any two rails at a node | [R20](../rules/#R20): room for both rails' electrodes |
 | planar rails | a rail meets only its own nodes; rails cross only at a shared node | [R21](../rules/#R21): one plane, no wires across the die |
 | one waveform | every moving ion in a cycle has one motion signature | [R22](../rules/#R22): broadcast control, strictly |
-
-## Where to go next
-
-The [Language](../language/) page lists the twelve statements a programme is written in and what each one costs; [Compilation](../compilation/) shows the pipeline from a QASM circuit to a verified hardware programme, gate by gate; the reference page on [the architecture document](adl.md) describes how curves, heating, species and the control plane are declared; and every entry on the [Leaderboard](../board/) is a full replay you can step through. The [studio](../studio.html#design) is where the primitives, the heating rate, the species and the wiring live as editable fields, with a hover card on each.
