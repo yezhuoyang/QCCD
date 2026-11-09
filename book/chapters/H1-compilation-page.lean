@@ -24,20 +24,20 @@ open QCCDC.Cert
 
 The Compilation page compiles 19 circuits and shows what became of each: the Bell pair it
 walks through stage by stage, fourteen basic gates (one each), and four short algorithms.
-They are spread over the four small devices of this tutorial, so that transport is seen on a
+They are spread over the four small machines of this tutorial, so that transport is seen on a
 line (`chain4`), a loop (`race8`), a lattice (`grid2x3`) and a loop with docks (`ring6d`).
 
 For every one of them, two files are published beside this lesson, under `data/`:
 
 * `<id>.qcert.json`: the certificate the compiler wrote;
 * `<id>.qcheck.json`: what the checker reads. It is the certificate's fields together with
-  three facts read out of the **device's own document**, never from the compiler: the traps
+  three facts read out of the **machine's own document**, never from the compiler: the traps
   that can gate (`gate_sites`), the pairs of traps one cycle apart (`hops`), and each closed
-  loop's order (`loops`). The device facts' builder, `mk_qcheck_input`, makes it.
+  loop's order (`loops`). The machine facts' builder, `mk_qcheck_input`, makes it.
 
 Here are the 19, with what is in each checker input:
 
-| example | device | ops | witnesses | moves | rotations |
+| example | machine | ops | witnesses | moves | rotations |
 |---|---|---|---|---|---|
 | `bell` | `chain4` | 4 | 2 | 1 | 0 |
 | `h`, `s`, `rz` | `chain4` | 1 | 1 | 0 | 0 |
@@ -192,7 +192,7 @@ theorem q2_rides_the_loop :
 /-!
 ## 4. Several examples at once
 
-The three basic two-qubit gates were compiled onto three different devices: `cx` on the
+The three basic two-qubit gates were compiled onto three different machines: `cx` on the
 lattice, `cz` on the race track, `swap` on the ring with docks. In each, one ion travels to
 the other, the gate fires, and the travelling ion goes back where it came from. Here is the
 `swap`, at its gate: `q1` came from the dock `A3` round the loop to `A0`, where `q0` waits.
@@ -445,7 +445,7 @@ things tie it to the Compilation page's verdict, and none of them is in these tw
   kind, and the programme's own transport equals the certificate's moves);
 * O2, which gates the pulses make (Part G).
 
-For those you need the circuit, the device and the programme, and the page publishes the
+For those you need the circuit, the machine and the programme, and the page publishes the
 circuit as text but not the programme as a file. Lesson H4 compiles the GHZ chain again, in a
 workspace of your own with the published compiler, has the whole of R10 checked on it, and shows
 that its certificate is the one above.

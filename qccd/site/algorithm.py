@@ -47,7 +47,7 @@ HEADINGS = [
 #: The anchor each formal block carries, so a word on any Learn page can link to where it
 #: is defined (qccd/site/learn.py GLOSSARY).
 IDS = {
-    ("Definition 1", "device"): "def-device", ("Definition 2", "trap graph"): "def-trap-graph",
+    ("Definition 1", "expanded architecture"): "def-device", ("Definition 2", "trap graph"): "def-trap-graph",
     ("Definition 3", "circuit"): "def-circuit", ("Definition 4", "programme and certificate"): "def-programme",
     ("Problem", "compilation"): "def-problem", ("Problem", "placement"): "def-placement",
     ("Definition 5", "ASAP layering"): "def-asap", ("Definition 6", "meeting trap"): "def-meeting-trap",
@@ -754,7 +754,7 @@ def section(by: dict, lowering_text: str = "") -> str:
                   'shows every symbol on the three machines the examples use.')
       + learn.section('four definitions (machine, trap graph, circuit, programme and certificate), the notation '
                       'table that concretises them, and the problem statement: legal, realised, correct, and short.'))
-    A(df("Definition 1", "device",
+    A(df("Definition 1", "expanded architecture",
          'Let <var>M</var> be a machine, the text defined on the <a href="../machine/#def-machine">Machine</a> '
          'page. Its <i>expanded architecture</i> (the compiler&rsquo;s projection of <var>M</var>) is the tuple '
          '<var>A</var>(<var>M</var>) = (<var>V</var>, <var>E</var>, cap, gate, meas, '

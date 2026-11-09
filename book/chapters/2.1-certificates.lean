@@ -24,7 +24,7 @@ open QCCDC.Cert
 ## 1. What the compiler hands you
 
 The circuit is four statements: `h q[0]`, `cx q[0],q[1]`, and a measurement of each qubit.
-The device `chain4` is four traps in a row, `C0 - C1 - C2 - C3`, every one able to gate.
+The machine `chain4` is four traps in a row, `C0 - C1 - C2 - C3`, every one able to gate.
 The compiler put qubit 0 on ion `q0` in trap `C1` and qubit 1 on ion `q1` in `C0`, did the
 Hadamard where `q0` stood, moved `q0` next door, and did the CNOT in `C0`.
 
@@ -35,8 +35,8 @@ Its certificate, as Lean data, is the value `bell` below. Read it field by field
 * `ops`: the circuit, statement by statement (`idx` is its position, `qubits` its operands).
 * `moves`: each hop, at the machine cycle `t` it happens in.
 * `gates`: one **witness** per gate: the op it realises (`dag`), the cycle, the trap, the ions.
-* `gateSites` and `hops`: facts about the device. These do not come from the compiler; they
-  are read out of the device's own document, so the compiler cannot widen the machine by
+* `gateSites` and `hops`: facts about the machine. These do not come from the compiler; they
+  are read out of the machine's own document, so the compiler cannot widen the machine by
   claiming a hop that is not there.
 
 A `structure` in Lean is a record; `⟨3, "q0", "C1", "C0"⟩` builds one positionally (here a
@@ -130,8 +130,8 @@ It is eleven conditions, joined by `∧`. In words:
 2. `MapInjective`: no two qubits share an ion.
 3. `MapTotal`: every qubit has an ion.
 4. `EventsSorted`: moves and rotations are listed in cycle order, so the replay is well defined.
-5. `RotationsKnown`: every rotation names a loop the device has.
-6. `MovesAreHops`: every move is a hop of the device, and departs from where the replay
+5. `RotationsKnown`: every rotation names a loop the machine has.
+6. `MovesAreHops`: every move is a hop of the machine, and departs from where the replay
    says the ion is. No teleporting.
 7. `GatesLegal`: every witness's ions are all in its trap at its cycle, and that trap can gate.
 8. `OwnIons`: those ions are exactly the ions of the op's own qubits.
@@ -240,7 +240,7 @@ theorem late_rejected : check bellLate = false :=
 
 /-!
 **The teleport.** Start `q0` in `C3` (its Hadamard there too) and move it straight to `C0`.
-The device has no such hop,
+The machine has no such hop,
 and the studio, asked to make that move, refuses it: there is no segment between `C3` and `C0`.
 
 {{figure bellTeleport at=3}}

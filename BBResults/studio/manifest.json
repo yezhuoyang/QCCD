@@ -490,7 +490,7 @@
    "date": "2026-11-02",
    "note": "qccdc rotate, then insert_cooling"
   },
-  "claim": "The same loop and docks again, on a rectangle of height 4: once more the same programme, instruction for instruction and cool for cool, on a different device. Drawn at height 4, some dock rails cross without a junction (V100 and V142 among them), so R21 refuses the device and it is listed under Disqualified, never ranked.",
+  "claim": "The same loop and docks again, on a rectangle of height 4: once more the same programme, instruction for instruction and cool for cool, on a different machine. Drawn at height 4, some dock rails cross without a junction (V100 and V142 among them), so R21 refuses the machine and it is listed under Disqualified, never ranked.",
   "status": "ok",
   "page": "ring144_h4_d144.html",
   "instructions": 3929,
@@ -618,7 +618,7 @@
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 3476148,
+  "bytes": 3476152,
   "r10": true,
   "over_budget": [],
   "sites": 432,
@@ -636,7 +636,7 @@
    "date": "2026-11-02",
    "note": "qccdc rotate, then insert_cooling"
   },
-  "claim": "The same loop of 288 slots and the same 144 docks, drawn on a rectangle of height 3. The compiler writes the same programme as for ring(146, 2, 144), instruction for instruction and cool for cool (411 rotations, 11,640 hops, 411 batches); what differs is the device: where its corners turn, and its die.",
+  "claim": "The same loop of 288 slots and the same 144 docks, drawn on a rectangle of height 3. The compiler writes the same programme as for ring(146, 2, 144), instruction for instruction and cool for cool (411 rotations, 11,640 hops, 411 batches); what differs is the machine: where its corners turn, and its die.",
   "status": "ok",
   "page": "ring145_h3_d144.html",
   "instructions": 3929,
@@ -754,7 +754,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3475987,
+  "bytes": 3475989,
   "r10": true,
   "over_budget": [],
   "sites": 432,

@@ -21,13 +21,13 @@ open QCCDC.Cert Lean
 
 | document | written by | what it is |
 |---|---|---|
-| `prog.tsir.json` | the compiler | the programme: instructions in the device's native gates (section 5) |
+| `prog.tsir.json` | the compiler | the programme: instructions in the machine's native gates (section 5) |
 | `prog.qcert.json` | the compiler | the certificate (section 2) |
 | `circuit.qasm` | the user | OpenQASM 2, the source of truth for the semantics |
-| the device, as `chain4.arch.json` | the designer | its traps, rails, junctions and loops |
+| the machine, as `chain4.arch.json` | the designer | its traps, rails, junctions and loops |
 
-and two that are derived, never written by the compiler: the device's expanded form (its
-exporter, `export_arch`) and the checker's input, `prog.qcheck.json` (the device facts' builder,
+and two that are derived, never written by the compiler: the machine's expanded form (its
+exporter, `export_arch`) and the checker's input, `prog.qcheck.json` (the machine facts' builder,
 `mk_qcheck_input`, section 3). The whole verdict is one run of the semantic check (`check_cert`)
 on these: it says R10 `passed`, `partial` or `FAILED`, with the reason (section 6). The official
 grader runs it for every design it grades.
@@ -91,10 +91,10 @@ reader, `Input.ofJson`, the one this page runs, is forgiving: what it cannot rea
 The move stamped `20.0` is gone, and the Lean checker would judge a certificate with one move
 fewer (and refuse it here: the second move departs from `C1`, where the ion never arrived).
 
-## 3. What the device adds
+## 3. What the machine adds
 
-The device facts' builder (`mk_qcheck_input`, its function `build`) copies the certificate's
-fields and adds three facts, each read out of the device's expanded document, never out of the
+The machine facts' builder (`mk_qcheck_input`, its function `build`) copies the certificate's
+fields and adds three facts, each read out of the machine's expanded document, never out of the
 certificate:
 
 * `gate_sites`: the traps whose zone can gate, sorted;
@@ -107,7 +107,7 @@ certificate:
 
 On `chain4` these are the lists of I1. On `grid2x3`, traps sit between junctions, and a hop
 crosses one: `T0_0h` to `T0_0v` is one hop, through the junction `J0_0`. Here are its facts, as
-`build` gives them (computed by running it on the device's expanded document,
+`build` gives them (computed by running it on the machine's expanded document,
 `grid2x3.expanded.json`), and a CNOT across the junction.
 -/
 
@@ -149,7 +149,7 @@ theorem hops_land_on_traps : ∀ h ∈ gridHops, h.1 ∈ gridSites ∧ h.2 ∈ g
   decide +kernel
 
 /-!
-Why must the device, not the compiler, supply these facts? Because they only ever widen what is
+Why must the machine, not the compiler, supply these facts? Because they only ever widen what is
 accepted: a certificate that holds with some hops holds with more. A compiler allowed to add a
 hop could make a teleport legal.
 
@@ -171,7 +171,7 @@ theorem more_hops (inp : Input) (extra : List (String × String)) (h : Implement
 
 On a closed loop the hardware can turn every ion on it at once: a **rotation**, one witness
 `{"t", "loop", "delta"}` rather than a move per ion. The replay advances every ion standing on
-the loop by `delta` slots, in the loop's node order from the device, and leaves every other ion
+the loop by `delta` slots, in the loop's node order from the machine, and leaves every other ion
 where it is: an ion in a dock is off the loop, and the loop turns underneath it (`rotateState`
 in `QCCDC.Cert.Check`).
 
@@ -281,7 +281,7 @@ theorem loop_turns :
   ⟨by decide +kernel, by decide +kernel, by decide +kernel⟩
 
 /-!
-The loop a rotation names must be one the device declares; otherwise the replay would leave every
+The loop a rotation names must be one the machine declares; otherwise the replay would leave every
 ion where it was, and a certificate could claim a rotation that moved nothing.
 
 #### Exercise 6 (★★) `unknown_loop_refused`
@@ -359,7 +359,7 @@ source circuit, op by op: an op on one or two qubits (and every `measure`, `rese
 appears as itself, on the same qubits in the same order, with the same name and angles or the same
 defining unitary; an op on three or more qubits (a `ccx`) appears as a run of ops on its qubits
 whose product is its unitary up to a global phase, which is how a lowering is checked. Then the
-checker's input must be exactly the one `build` makes from this certificate and this device
+checker's input must be exactly the one `build` makes from this certificate and this machine
 (`qcheck_binding`); any other is refused, so the Lean verdict is about this certificate.
 
 The Lean checker does not ask for `0 .. N-1`: indices are labels to it. A compiler that numbers

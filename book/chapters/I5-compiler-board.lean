@@ -5,17 +5,17 @@ import QCCDC.Cert.Sound
 
 *Part I, lesson I5, the last of the tutorial. You need lessons I1 to I4.*
 
-The Leaderboard has two sections. On the **Architecture** boards a person designs a device and
+The Leaderboard has two sections. On the **Architecture** boards a person designs a machine and
 our compiler, `qccdc`, compiles each board's circuit onto it. On the **Compiler** board a person
 submits a compiler, and the grader runs it on every pair of a benchmark suite, a circuit and a
-device, and grades every programme it writes. This lesson is how to enter: the contract a
+machine, and grades every programme it writes. This lesson is how to enter: the contract a
 compiler must keep, how each pair is graded, how an entry is scored and ranked, and how to submit.
 Lean comes in at the end of each part, to state the board's rules exactly and prove what follows
 from them.
 
 The suite, `suite@1`, is every pair of twelve circuits
 (four QEC memory experiments, six Clifford circuits, two small non-Clifford ones) and nine
-reference devices: 108 public pairs, and 8 hidden ones that only the official server generates.
+reference machines: 108 public pairs, and 8 hidden ones that only the official server generates.
 
 ## 1. The contract, `qccd.compiler@1`
 
@@ -45,7 +45,7 @@ in the compiler's directory, with no network, a minimal environment (no credenti
 and memory limit per pair. `suite@1` sets them: 120 s and 4096 MB a pair, 600 s for the build,
 5400 s for the whole suite, at most 500 000 instructions a programme.
 
-The compiler must write `DIR/program.tsir.json`, the programme in the device's **native** gates
+The compiler must write `DIR/program.tsir.json`, the programme in the machine's **native** gates
 (`R`, `VZ`, `MS`), with `meta.qubit_map`, `{"<qubit>": "<ion>"}`, and exit 0. Exit 4 means "I
 cannot compile this pair": a refusal, which costs coverage and nothing else. Any other exit is a
 crash; exit 0 without a programme is `no_output`; running out of time is `timeout`. Cooling is the
@@ -430,8 +430,8 @@ cooling), so the starting point passes the suite as it is; replace its `compile_
 ratio and the reasons the entry could not rank (a local run is never ranked: only the official
 grader's report is), and saves the report: in a workspace, where an agent reads it with
 `qccd_get_bench`, and otherwise to `bench-report.json`. `--only`
-narrows the run to some pairs, circuits or devices; `--jobs` runs compilers in parallel (their
-outputs are graded one at a time). `bench suite` lists the suite's circuits and devices.
+narrows the run to some pairs, circuits or machines; `--jobs` runs compilers in parallel (their
+outputs are graded one at a time). `bench suite` lists the suite's circuits and machines.
 
 Running a compiler runs your code, so it happens in your shell, never through an agent's tools.
 Publishing needs a person at an interactive terminal, signed in (`qccd login`): it packs the

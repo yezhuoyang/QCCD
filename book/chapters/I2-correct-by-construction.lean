@@ -841,7 +841,7 @@ theorem transport (home : Nat → Nat) (n : Nat) (hn : n ≤ 8) (init : List (St
 /-!
 ## 6. Hops and sites
 
-The device halves of `MovesAreHops` and `GatesLegal`: every move is a hop of `chain4` and every
+The machine halves of `MovesAreHops` and `GatesLegal`: every move is a hop of `chain4` and every
 witness's trap can gate, as long as every qubit's home is one of the four traps.
 -/
 
@@ -1085,7 +1085,7 @@ theorem bookkeeping_any_policy (p : Policy) (home : Nat → Nat) (c : Circuit) :
    that is a separate computed check (lesson I4).
 4. **Other routers.** Only `honest`. The jumper and the forgetful router are wrong, and the
    checker says so (I1).
-5. **Bigger devices.** `chain4`, at most eight qubits, homes among its four traps.
+5. **Bigger machines.** `chain4`, at most eight qubits, homes among its four traps.
 
 And it trusts what every proof here trusts: Lean's kernel, and that `Implements` says what you
 want (Part F). It also trusts that the hidden block above is I1's compiler; it is a copy of it.

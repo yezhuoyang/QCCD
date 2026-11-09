@@ -158,11 +158,11 @@ theorem unsorted_detected : ¬ EventsSorted bellUnsorted := by
 /-!
 ## 4. Rotations: `rotateState` and `RotationsKnown`
 
-On a device with a closed loop, the hardware can turn the whole loop at once, carrying every ion
+On a machine with a closed loop, the hardware can turn the whole loop at once, carrying every ion
 that stands on it. A certificate records such a turn as one **rotation** witness `⟨t, loop,
 delta⟩` rather than as one move per ion.
 
-The published certificate `algo_rot` (on the Compilation page) uses two of them. The device is
+The published certificate `algo_rot` (on the Compilation page) uses two of them. The machine is
 `ring6d`: a loop `L0` of six sites `S0 ... S5` that cannot gate, and two docks that can, `A0` off
 `S0` and `A3` off `S3`. The circuit is a parity check: `h q[0]`, three CNOTs from qubit 0 to
 qubits 1, 2 and 3, `h q[0]`, and a measurement of qubit 0. The compiler parks ion `q0` (qubit 0)
@@ -173,7 +173,7 @@ to `S0`.
 Here it is as Lean data, written by the same function (`lean_input`) that writes every published
 input for the panel at the end of lesson F1, from the published file
 [algo_rot.qcheck.json](data/algo_rot.qcheck.json). The
-`loops` field, like `hops` and `gateSites`, is read from the device:
+`loops` field, like `hops` and `gateSites`, is read from the machine:
 -/
 
 def algoRot : Input :=
@@ -264,9 +264,9 @@ theorem rotation_brings_q2 :
   ⟨by decide +kernel, by decide +kernel⟩
 
 /-!
-The loop's node list comes from the device, never from the compiler: if a compiler could supply
+The loop's node list comes from the machine, never from the compiler: if a compiler could supply
 its own order, it could turn ions to wherever its gates needed them. So a rotation must name a
-loop the device has, and condition 5 says exactly that:
+loop the machine has, and condition 5 says exactly that:
 -/
 
 #print RotationsKnown
@@ -286,7 +286,7 @@ def rotUnknown : Input :=
 /-!
 Rename both real turns to `L1` and the damage shows: the replay never turns the loop, `q2` is
 still in `S2` at cycle 12, and the move that should take it from `S0` to the dock departs from the
-wrong site. Ask the studio to play it and it refuses: the device has no loop `L1`.
+wrong site. Ask the studio to play it and it refuses: the machine has no loop `L1`.
 
 {{studio rotRenamedPlay at=6}}
 -/
@@ -299,7 +299,7 @@ def rotRenamedPlay : Play := play rotRenamed
 /-!
 #### Exercise 4 (★★) `unknown_loop_rejected`
 Prove `rotUnknown` refused, with `rejects_unknown_loop`: the rotation is in the list, and no loop
-of the device has its name. As in F1, `by simp [rotUnknown]` shows membership in a literal list;
+of the machine has its name. As in F1, `by simp [rotUnknown]` shows membership in a literal list;
 the second fact is a computation.
 -/
 
@@ -345,7 +345,7 @@ theorem docked_stays (nodes : List String) (delta : Int) (st : List (String × S
 #print MovesAreHops
 
 /-!
-Two halves: the pair `(src, dst)` is a hop of the device, and the ion departs from where the
+Two halves: the pair `(src, dst)` is a hop of the machine, and the ion departs from where the
 replay has it. F1's teleport broke the first. `bellDeparture` breaks only the second: it adds a
 "move" of `q1` from `C1` to `C0` at cycle 5, while `q1` is in `C0`. The hop exists, and after the
 move the replay has `q1` in `C0`, where it already was, so nothing downstream changes. The row

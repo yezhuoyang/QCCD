@@ -256,7 +256,7 @@ Completeness instances so far were single certificates. Here is one for a whole 
 
 #### Exercise 10 (★★★) `empty_accepted`
 Prove that a certificate with no qubits, no operations, no movement and no witnesses is accepted,
-on any device. Apply `check_complete`; give the first condition as `hu` and the other ten as
+on any machine. Apply `check_complete`; give the first condition as `hu` and the other ten as
 `?_`, and let one `simp` call, given the definitions of the conditions and of the replay (`events`,
 `merge`, `sortedByT`, `witnessQubits`) and your hypotheses, close all ten (`<;>` runs it on each).
 -/
@@ -270,7 +270,7 @@ theorem empty_accepted {inp : Input} (hq : inp.qmap = []) (hn : inp.nQubits = 0)
       Covered, Grounded, RespectsOrder, events, merge, sortedByT, witnessQubits, hq, hn, ho, hm, hr, hg]
 
 /-!
-An empty certificate is accepted on any device, and that is right: it claims nothing, so there is
+An empty certificate is accepted on any machine, and that is right: it claims nothing, so there is
 nothing to refuse. What makes an accepted certificate mean something is the rest of the verdict:
 that its circuit is the source circuit, and its programme the one that was run. Those checks are
 computed outside Lean, and lesson F6 lists them. Lesson F5 first turns the rejection lemmas on

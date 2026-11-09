@@ -30,8 +30,8 @@ proved about. It prints `ACCEPTED`, or `REJECTED` with `diagnose`'s list of fail
 it exits with 0 when it accepts, 1 when it refuses, 2 when the file is not JSON.
 
 From a compiler in any language to a verdict is three steps. The compiler writes its
-certificate, `prog.qcert.json` (lesson I4 gives its format). The device facts' builder
-(`mk_qcheck_input`) adds the device's facts, read from the device's own document, and writes the
+certificate, `prog.qcert.json` (lesson I4 gives its format). The machine facts' builder
+(`mk_qcheck_input`) adds the machine's facts, read from the machine's own document, and writes the
 checker's input, `prog.qcheck.json`. Then `qcheck` decides:
 
 ```
@@ -61,7 +61,7 @@ file and, from a malformed one, drops what it cannot read:
 | `rotations` | `rots` | `{"t", "loop", "delta"}` |
 | `gates` | `gates` | the witnesses, `{"dag", "t", "site", "ions"}` |
 | `unrealised` | `unrealised` | op indices the compiler gave up on |
-| `gate_sites`, `hops`, `loops` | `gateSites`, `hops`, `loops` | the device's facts, which the builder adds |
+| `gate_sites`, `hops`, `loops` | `gateSites`, `hops`, `loops` | the machine's facts, which the builder adds |
 
 Every other key is ignored: a certificate's `params`, `line`, `via`, `instr` and `pulses` travel
 in the same file for the other checks (lesson I4), and `qcheck` never reads them. A key that is
@@ -268,7 +268,7 @@ theorem no_map_refused (inp : Input) (hq : inp.qmap = []) (hn : inp.nQubits ≠ 
     exact h3.symm)
 
 /-!
-The same holds of the device's facts. A file without `gate_sites` (a compiler that wrote its own
+The same holds of the machine's facts. A file without `gate_sites` (a compiler that wrote its own
 qcheck input and forgot them) has no trap that can gate, so every certificate with a gate is
 refused.
 
@@ -285,11 +285,11 @@ theorem no_sites_refused (inp : Input) (g : GateW) (hg : g ∈ inp.gates)
 
 The `circuit` and `arch` fields are names for the report. The specification never reads them, so
 a certificate holds or fails the same under any names. That is why the semantic check
-(`check_cert`), which runs `qcheck` for the platform, first rebuilds the input from the certificate and the device it was
+(`check_cert`), which runs `qcheck` for the platform, first rebuilds the input from the certificate and the machine it was
 given and refuses a file that differs from it (lesson I4): the names alone bind nothing.
 
 #### Exercise 5 (★★) `names_are_labels`
-Prove that renaming the circuit and the device does not change the verdict. The two
+Prove that renaming the circuit and the machine does not change the verdict. The two
 specifications are the same proposition by definition (`Iff.rfl`); turn that into equal verdicts
 with `Bool.eq_iff_iff` (two Booleans are equal when they are `true` together) and `check_iff` (F1:
 `check inp = true ↔ Implements inp`).
@@ -346,7 +346,7 @@ theorem duplicate_refused (inp : Input) (o : Op) (g₁ g₂ : GateW) (rest : Lis
 ## 7. Your own certificate
 
 Now be the compiler. The circuit is `h q[0]; cx q[0],q[2]; measure q[0]; measure q[2];` on three
-qubits (qubit 1 is declared and idle), on `chain4`. Its ops are fixed, and so are the device's
+qubits (qubit 1 is declared and idle), on `chain4`. Its ops are fixed, and so are the machine's
 facts; the map, the placement, the moves and the witnesses are yours. Write the `Input` that your
 compiler's file would parse to, inside the proof: the statement only says that one exists.
 
@@ -385,7 +385,7 @@ it, whoever wrote the file and in whatever language. That is the whole of what i
 things are around it, and none is part of the proof:
 
 * **the parse**: `Json.parse` and `qcheck`'s reader `Input.parse` are run, not proved (section 3);
-* **the binding**: that the file is this certificate's, on this device, for this circuit (the
+* **the binding**: that the file is this certificate's, on this machine, for this circuit (the
   names bind nothing, Exercise 5). The semantic check (`check_cert`) checks it, by computation;
 * **the programme**: that the hardware programme does what the certificate says, gate by gate
   and move by move. The certificate's `instr`, `pulses` and `via`, which `qcheck` ignores, are

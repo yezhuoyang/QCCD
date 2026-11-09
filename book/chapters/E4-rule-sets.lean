@@ -23,7 +23,7 @@ reads real rules from it, translates some into Lean over the replay of lessons E
 models a rule set: what its verdicts mean, and two facts every rule set obeys.
 
 The definitions of lessons E1-E3 that this lesson uses are loaded in the page, as they were
-written there: devices, `chain4`, `ring6d`, `isJunction`, programmes, `bell`, `early`,
+written there: machines, `chain4`, `ring6d`, `isJunction`, programmes, `bell`, `early`,
 `whereIs`, `states`, `occupancy`, `gatesOf` and `canGate`.
 -/
 
@@ -144,7 +144,7 @@ rule R1 "A site holds at most its capacity" core
 ```
 
 A rule has an id, a title, a sentence about what it means, its sources, and one **formula**.
-The formula is logic over finite collections -- the sites of the device, the instants of the
+The formula is logic over finite collections -- the sites of the machine, the instants of the
 execution, its operations -- built from `for all x in D where C: B`, `for some`, `and`, `or`,
 `not`, `implies`, comparisons, `count(...)`, `sum(...)` and a few more. Its words (`sites`,
 `instants`, `occupancy`, `capacity`) come from a fixed vocabulary ([the words](../rules/#words)),
@@ -389,7 +389,7 @@ theorem bell_report :
 
 A rule set is a file too. The website's own, the [standard rule set](../rules/#set-standard),
 uses every rule of the catalogue
-that is about a programme, a device drawing or the compiler's claims -- 31 rules, R0 to R25 --
+that is about a programme, a machine drawing or the compiler's claims -- 31 rules, R0 to R25 --
 and sets `max_chain = 15`. Each paper on the Reproduce pages has its own; here is Cyclone's,
 exactly:
 
@@ -455,8 +455,8 @@ it: R13's `max_chain` bounds a gate's chain (without R13 only
 the trap's capacity does), and without R22 a transport cycle may carry unlike motions.
 Everything else it obeys whatever the set says, since a programme that keeps stricter rules
 keeps weaker ones. Then the programme is judged by **every** rule of the set, including rules
-the compiler has never heard of: `python -m qccd.ruleset compile <circuit> --arch <device> -o
-<out> --rules <set>` does both, and `python -m qccd.ruleset check <programme> --arch <device>
+the compiler has never heard of: `python -m qccd.ruleset compile <circuit> --arch <machine> -o
+<out> --rules <set>` does both, and `python -m qccd.ruleset check <programme> --arch <machine>
 --rules <set>` judges a programme you already have.
 
 The compiler's shortcut -- keep the strict rules, and every weaker set is kept too -- rests on a
@@ -592,7 +592,7 @@ theorem judge_right (r : Rule) (d : Device) (p : Programme) :
 /-!
 ## 10. What comes next
 
-Part E has written the machine as data: devices (E1), programmes and their replay (E2), rules
+Part E has written the machine as data: machines (E1), programmes and their replay (E2), rules
 as decidable statements (E3), and rule sets with verdicts proved to mean what they say (E4).
 Part F turns to certificates: what a compiler hands the proved checker, what it means for one
 to hold, and the proof that the checker's yes is right. Start with

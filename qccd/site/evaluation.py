@@ -1022,7 +1022,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         run = r.run
         w('<p>The repetition code&rsquo;s two-basis memory, three rounds, ten ions, on a twelve-site linear '
           'chain: one of the entries on the <a href="../board/goal1/">Goal 1 board</a>, submitted by John '
-          f'Zhuoyang Ye (<code>{html.escape(entry["sid"])}</code>). Its bundle &mdash; the device, the '
+          f'Zhuoyang Ye (<code>{html.escape(entry["sid"])}</code>). Its bundle &mdash; the machine, the '
           'programme and the certificate &mdash; is evaluated here by the text above, and set beside the '
           'official report.</p>')
         if device_svg is not None:

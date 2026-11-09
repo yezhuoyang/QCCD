@@ -31,7 +31,7 @@ with the proved checker, reports as `R10 passed`.
 ## 2. Where the mark comes from
 
 Every mark is computed. The boards are built by scripts that compile the board's circuit onto
-every device, then, for each compiled point, build the checker input (`mk_qcheck_input`) and run
+every machine, then, for each compiled point, build the checker input (`mk_qcheck_input`) and run
 the semantic check (`check_cert`) with the proved checker; `r10` is whether its report says
 `R10 passed`. A point the compiler refused has no programme and no mark. (The memory boards'
 build computes the mark only on a machine where the checker is built.)
@@ -85,7 +85,7 @@ def rep9Chain : Input :=
     loops := [] }
 
 /-!
-This device has no studio page in the tutorial, so there is no figure of it here; the
+This machine has no studio page in the tutorial, so there is no figure of it here; the
 certificate is short enough to read. Two ions start in `C1` (`q0` and the first ancilla `q9`),
 the other fifteen in `C0`. The first ancilla's two CNOTs happen in `C1`, every other gate in
 `C0`. The one ion that moves is `q1`: it goes to `C1` for the first ancilla's second CNOT and
@@ -93,7 +93,7 @@ comes back.
 
 Run through `qcheck`, this input prints `24 circuit ops, 16 gate witnesses, 2 moves, 0 rotations,
 17 qubits` and `ACCEPTED`. Both its circuit (`rep9_esm.qasm`, the board's task circuit) and its
-device (`stationary_chain.arch.json`) are in the repository, and when this lesson was written,
+machine (`stationary_chain.arch.json`) are in the repository, and when this lesson was written,
 compiling the one onto the other with the published compiler gave a checker input identical to
 this one.
 
@@ -228,8 +228,8 @@ theorem fan_reordered_rejected : check fanReordered = false :=
 /-!
 The BB board is where this happened. Until 2026-10-20 its marks were typed, so here is what they
 said that day, beside what the semantic check, with the proved checker, said when re-run on each
-compiled entry's own certificate, circuit and device. That day the board had 21 entries; 6 were
-devices the compiler could not serve, with no programme and no mark. The other 15:
+compiled entry's own certificate, circuit and machine. That day the board had 21 entries; 6 were
+machines the compiler could not serve, with no programme and no mark. The other 15:
 -/
 
 /-- One compiled entry of the BB board: its mark, and whether R10 passed when re-checked on
@@ -280,7 +280,7 @@ theorem a_stale_mark : ∃ e ∈ bbBoard, e.marked = true ∧ e.passesToday = fa
 
 The kernel can prove a certificate of tens of events while you wait; the boards' certificates
 run from that to thousands. Measured on the checker inputs behind the boards (for BB, whose
-build makes none, built from each entry's certificate and device with `mk_qcheck_input`):
+build makes none, built from each entry's certificate and machine with `mk_qcheck_input`):
 
 | entry | checker input | ops | witnesses | moves | rotations |
 |---|---|---|---|---|---|

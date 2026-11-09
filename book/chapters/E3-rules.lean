@@ -7,7 +7,7 @@ import QCCDC.Cert.Sound
 
 In Part R the studio checked every programme against the rules: a site holds what it holds,
 a junction takes one ion at a time, gates happen only where they may. Each rule is a statement
-about a programme and its device, true or false. This lesson writes five of them as Lean
+about a programme and its machine, true or false. This lesson writes five of them as Lean
 statements about lesson E2's replay, has Lean decide each one, proves that the Bell programme
 keeps all five, and proves that a programme whose CX comes too early breaks exactly one.
 
@@ -159,7 +159,7 @@ def occupancy (pos : Pos) (n : String) : Nat :=
 /-!
 Rule R1, as the platform's rule checker states it: "occupancy(site) <= site.capacity at
 every instant". In Lean, over the states of E2's replay: in every state
-`pos` of the programme, every node `n` of the device that is a site holds at most its capacity.
+`pos` of the programme, every node `n` of the machine that is a site holds at most its capacity.
 -/
 
 def R1 (d : Device) (p : Programme) : Prop :=

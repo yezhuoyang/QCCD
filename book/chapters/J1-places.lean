@@ -4,14 +4,14 @@ import QCCDC.Cert.Sound
 # Places: a gadget is a box with doors and a promise
 
 *Part J, lesson J1. You need Parts A and B of this tutorial (sites, rails, shuttles, gates) and
-lesson E1 (a device as data). This lesson starts Part J, where single devices become a whole
+lesson E1 (a machine as data). This lesson starts Part J, where single machines become a whole
 fault-tolerant machine; it uses only lists, records and `decide`.*
 
 A fault-tolerant computer is too big to compile ion by ion. The site builds it the way chips are
-built: from **places**, each a small verified device with a job -- prepare a logical block,
+built: from **places**, each a small verified machine with a job -- prepare a logical block,
 extract its syndrome, measure `Z̄Z̄` between two blocks by lattice surgery, distil a magic state,
 keep a block in memory -- and from **roads** that carry bundles of ions between them. A place is
-compiled and checked once (as hardware, by the device rules of Part E; as logic, by the flows
+compiled and checked once (as hardware, by the machine rules of Part E; as logic, by the flows
 and fault distance its specification states), and then used as a black box with **doors**.
 
 Here is one, the magic-state factory, standing in the town every example runs on. It is
@@ -20,8 +20,8 @@ state -- and the timeline below shows when each place is busy.
 
 {{gadget msf15}}
 
-And here is what the box hides: the factory's one op, `produce`, on its own device, every step
-of it checked by the device rules.
+And here is what the box hides: the factory's one op, `produce`, on its own machine, every step
+of it checked by the machine rules.
 
 {{gadget msf15.produce}}
 

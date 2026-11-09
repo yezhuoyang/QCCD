@@ -26,7 +26,7 @@ A **bundle** is a directory of canonical JSON files:
 
 | file | what it is |
 |---|---|
-| `device.arch.json` | the device, as the design document |
+| `device.arch.json` | the machine, as the design document |
 | `certified.tsir.json` | the programme the compiler emitted, which the certificate speaks about |
 | `program.tsir.json` | the programme that is graded: the certified one, with at most cooling inserted |
 | `certificate.qcert.json` | the compiler's certificate |
@@ -45,13 +45,13 @@ status: `passed`, `failed`, `partial`, `skipped`, `unsupported`, `timeout`, `can
 | stage | what it establishes | what refuses |
 |---|---|---|
 | `bundle` | every file hashes to its manifest digest; no stray or unknown file; the manifest names **this** task release, id and digest | any mismatch; grading stops here |
-| `device` | the device loads under the schema and structure checks, within the release's node limit | a device that does not load; grading stops |
-| `physics_lock` | the device's `primitives`, `heating`, `species` and `budget` equal the release's physics | changed physics: an exploratory design, graded but never eligible |
+| `device` | the machine loads under the schema and structure checks, within the release's node limit | a machine that does not load; grading stops |
+| `physics_lock` | the machine's `primitives`, `heating`, `species` and `budget` equal the release's physics | changed physics: an exploratory design, graded but never eligible |
 | `program` | the final programme is well-formed TSIR within the release's instruction limit | grading stops |
-| `rules` | the final programme, replayed on the device under the task's model, passes every rule the replay checks | a failed rule; a skip other than R7b, R9, R10 or a partial other than R15 makes it `partial` |
+| `rules` | the final programme, replayed on the machine under the task's model, passes every rule the replay checks | a failed rule; a skip other than R7b, R9, R10 or a partial other than R15 makes it `partial` |
 | `correspondence` | the final programme is the certified one with only the allowed insertions (`cool`, fresh ids), every certified instruction kept in order and unchanged | anything else |
 | `certificate_binding` | the certificate's `circuit_ops` are the **task's** circuit op by op (`check_cert.check_binding`), with its qubit count and a one-to-one map; nothing unrealised; every witness names a certified instruction with the same op stamp | any disagreement |
-| `lean_certificate` | `qcheck` accepts the certificate, against hops, gate sites and loops re-derived from the **submitted** device (`export_arch`, `mk_qcheck_input`) | `REJECTED`; `skipped` when the binding did not pass; `unsupported` with no `qcheck` installed |
+| `lean_certificate` | `qcheck` accepts the certificate, against hops, gate sites and loops re-derived from the **submitted** machine (`export_arch`, `mk_qcheck_input`) | `REJECTED`; `skipped` when the binding did not pass; `unsupported` with no `qcheck` installed |
 | `semantics` | the semantic check (`check_cert`, run without the proved checker): O1, no unrealised op, the order of each qubit's ops in the programme, and O2 against the task's circuit | a problem in any of them; `partial` when O2 is not established |
 | `ler` | (memory boards) the programme runs the memory experiment; its logical error rate | a programme that does not run it |
 | `metrics` | the leaderboard's numbers | |

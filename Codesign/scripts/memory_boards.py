@@ -540,7 +540,7 @@ def pages(board: str, release, exp, rows: list[dict], out: Path, *,
     from qccd.workspace.tasks import FIXED_BLOCKS, physics_mismatch
     own = physics_mismatch({b: _template_doc(None).get(b) for b in FIXED_BLOCKS}, release)
     physics = ("the board's own physics, which every design is entered with" if own
-               else "each device's own physics")
+               else "each machine's own physics")
     idx = B.write_index(
         manifest, out, title=title,
         subtitle=f"{release.manifest.get('description', '')} Every design ran the same experiment, compiled by "

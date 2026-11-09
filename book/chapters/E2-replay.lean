@@ -34,7 +34,7 @@ inductive Instr where
   deriving Repr
 
 /-!
-A programme names its device, places its ions (the `p.init` statement, kept as a list of
+A programme names its machine, places its ions (the `p.init` statement, kept as a list of
 pairs ion, node), and lists its statements.
 -/
 

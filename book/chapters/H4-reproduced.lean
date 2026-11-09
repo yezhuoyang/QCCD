@@ -169,7 +169,7 @@ Three things tie your grade to the Compilation page's GHZ chain.
   `sha256:7b1db8a631b93bd4bc22daca3babc1afd918ffd71803d191a215855b9d1668c6` -- and that is also
   the SHA-256 of the published [algo_ghz.qcert.json](data/algo_ghz.qcert.json) written the same
   way: the same certificate, field for field.
-* **The checker's input.** The Lean stage built its input from your bundle's device and
+* **The checker's input.** The Lean stage built its input from your bundle's machine and
   certificate; rebuilt the same way, it equals the published
   [algo_ghz.qcheck.json](data/algo_ghz.qcheck.json). So `qccd toolchain check algo_ghz.qcheck.json`
   (lesson H1, step 4) checks exactly what your grade's Lean stage checked, and lesson H1's proofs
@@ -204,7 +204,7 @@ inductive R10 where
 
 /-- What the semantic check decides R10 from. -/
 structure Verdict where
-  unbound : Bool          -- the checker input was not made from this certificate on this device
+  unbound : Bool          -- the checker input was not made from this certificate on this machine
   qcheck : Option Bool    -- the proved checker's verdict
   binding : List String   -- the certificate against the circuit
   o1 : List String        -- co-location, the witnesses against the programme, its transport
@@ -246,7 +246,7 @@ theorem ghz_verdict_passed : r10 ghzVerdict = .passed := by
 /-!
 #### Exercise 2 (★★) `refused_input_fails`
 Given a checker input it did not build, the semantic check builds its own from the certificate
-and the device and refuses one that differs: the proved checker is not run on it, and R10 fails,
+and the machine and refuses one that differs: the proved checker is not run on it, and R10 fails,
 whatever else holds. Prove it for every verdict.
 -/
 
@@ -331,7 +331,7 @@ qcheck circuit on chain4
 ```
 
 with exit status 1. Nothing you can submit reaches the grader this way: it never reads a checker
-input you supply. It builds its own from your bundle's device and certificate -- Exercise 2's
+input you supply. It builds its own from your bundle's machine and certificate -- Exercise 2's
 case, ruled out by construction. To lie to the grader you must change the certificate itself, as
 the tampered bundle of lesson H3 did, and the checker refuses that.
 
@@ -394,7 +394,7 @@ theorem smoke_bad_rejected : check smokeBad = false :=
 
 Every check above runs the same proved `check`, and every R10 the same semantic check. What that
 leaves you trusting is what Part F lists: Lean's kernel for what you prove in the page, and Lean's
-compiler too for `qcheck`; and the computed half -- the semantic check (`check_cert`), the device
+compiler too for `qcheck`; and the computed half -- the semantic check (`check_cert`), the machine
 facts' builder (`mk_qcheck_input`, with `export_arch`) that makes the checker's input, and the
 qiskit and stim they use -- which is computed, not proved.
 -/

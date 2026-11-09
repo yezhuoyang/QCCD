@@ -8,7 +8,7 @@ import QCCDC.Cert.Commute
 
 Lesson F1 ended on a warning: a proof is exactly as strong as what it is about. `check_sound` is
 about a Lean value of type `Input`. The verdict the site reports, R10, is about files: a certificate,
-a programme, a device and a circuit. Between the two sits code that is run and believed, not proved.
+a programme, a machine and a circuit. Between the two sits code that is run and believed, not proved.
 This lesson lists all of it, layer by layer, as the code has it today, and wherever Lean can show
 something, uses Lean to show what a fault in that layer would let through.
 
@@ -242,24 +242,24 @@ theorem dropped_ion_refused {inp : Input} {g : GateW} {rest : List GateW} {i : S
 ## 3. Is this input this certificate's?
 
 `qcheck` decides whatever file it is given. A verdict reported for a certificate must be about that
-certificate on that device. The semantic check makes sure with `qcheck_binding`: it rebuilds the input
-from the certificate and the device, with the same function that made it, and refuses a file that
+certificate on that machine. The semantic check makes sure with `qcheck_binding`: it rebuilds the input
+from the certificate and the machine, with the same function that made it, and refuses a file that
 differs. Lesson F5 ran it: an input whose witness differed from the certificate's was refused, "not
 this certificate's input", and R10 failed. The official grader does not need the comparison: its
-Lean stage builds the input itself, from the submitted certificate and the submitted device, and
+Lean stage builds the input itself, from the submitted certificate and the submitted machine, and
 runs `qcheck` on that.
 
-## 4. The device facts
+## 4. The machine facts
 
-`gateSites`, `hops` and `loops` are not the compiler's. The device facts' builder
-(`mk_qcheck_input`) reads them out of the device's document: the gate sites are the nodes whose zone
+`gateSites`, `hops` and `loops` are not the compiler's. The machine facts' builder
+(`mk_qcheck_input`) reads them out of the machine's document: the gate sites are the nodes whose zone
 can gate; the
-loops are the device's closed loops, in their node order; the hops are computed by `trap_hops`, a
+loops are the machine's closed loops, in their node order; the hops are computed by `trap_hops`, a
 search that leaves a site, crosses only junctions (a junction node, or a site where three or more
 rails meet), at most three of them, and lands on a site. On `ring6d`, `S0` has three rails, so
 `("S1", "A0")` is a hop: an ion may cross `S0` into the dock. This is Python, run and believed.
 
-The checker is exactly as right as these facts. Here is F1's teleport judged against a device
+The checker is exactly as right as these facts. Here is F1's teleport judged against a machine
 whose hop list has one entry too many:
 -/
 
@@ -268,15 +268,15 @@ def bellTeleportWide : Input := { bellTeleport with hops := bellTeleport.hops ++
 /-!
 {{figure bellTeleportWide at=3}}
 
-Lean accepts it, and the row says the move is "a hop of the device": the row reads the same hop
-list. The figure trusts it too. It draws every move that the hop list admits along the device's
+Lean accepts it, and the row says the move is "a hop of the machine": the row reads the same hop
+list. The figure trusts it too. It draws every move that the hop list admits along the machine's
 rails, so it walks `q0` from `C3` through `C2` and `C1` to `C0` in one step, and the studio plays
 that without complaint. Only the hop list claimed that crossing two traps is one hop; nothing on
 this row can tell. (In lesson F1 the same move, against the true hop list, was drawn straight and
 refused by the studio: no segment between `C3` and `C0`.)
 
 #### Exercise 5 (★★) `device_decides`
-Prove both: the same certificate is refused on the true device and accepted on the widened one.
+Prove both: the same certificate is refused on the true machine and accepted on the widened one.
 -/
 
 theorem device_decides : check bellTeleport = false ∧ check bellTeleportWide = true :=
@@ -284,7 +284,7 @@ theorem device_decides : check bellTeleport = false ∧ check bellTeleportWide =
 
 /-!
 Which way can a wrong hop list fail? The builder's own documentation argues that if its search and the
-compiler's idea of the device disagree, the checker sees moves that are not in its hop set and
+compiler's idea of the machine disagree, the checker sees moves that are not in its hop set and
 refuses: the safe direction. The next exercise proves the other half of that argument: extra hops
 never turn an acceptance into a refusal. So a missing hop can only cost a refusal; an extra hop is
 the dangerous mistake.
@@ -393,10 +393,10 @@ theorem commuting_invisible (s : Nat → Bool) :
 | `qcheck` | `check`, compiled by Lean's compiler; the published binary pinned by its SHA-256 | believed |
 | `Input.parse` (`qcheck`'s reader) | the file as an `Input`; a missing field or an unreadable entry refused by name | believed |
 | `Input.ofJson` (this page's reader) | the same `Input` from a well-formed file; malformed entries dropped, missing fields empty | believed |
-| `qcheck_binding`, or the grader's own build of the input | the input is this certificate's, on this device | computed |
-| the device facts' builder (`mk_qcheck_input`, `trap_hops`) | gate sites, hops, loops, read from the device | computed |
+| `qcheck_binding`, or the grader's own build of the input | the input is this certificate's, on this machine | computed |
+| the machine facts' builder (`mk_qcheck_input`, `trap_hops`) | gate sites, hops, loops, read from the machine | computed |
 | the semantic check (`check_cert`) | shape, binding, transport, replay, witnesses, order, readout, tableau or unitary | computed |
-| the rules (Part E) | the programme is physically legal on the device | computed |
+| the rules (Part E) | the programme is physically legal on the machine | computed |
 
 The second row is the only proved one, and it is the one that would be hardest to get right by
 testing: every certificate there will ever be, every way of being wrong. The rest are short programs

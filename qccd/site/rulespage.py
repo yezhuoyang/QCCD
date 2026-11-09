@@ -151,7 +151,7 @@ def _card(ex: dict, rid: str, device: str | None) -> str:
     tag = ex.get("tag") or {"pass": "holds", "fail": "fails", "skip": "does not apply"}[cls]
     if ex.get("expect") == "any":
         cls = "any"
-    dev = f'<p class="src">device: {html.escape(device)}</p>' if device else ""
+    dev = f'<p class="src">machine: {html.escape(device)}</p>' if device else ""
     return (f'<div class="ex {cls}"><span class="tag">{html.escape(tag)}</span>'
             f'<p class="why">{ex["why"]}</p>{dev}'
             f'<pre{" class=\"ir\"" if ex.get("ir") else ""}><code>{html.escape(ex["text"])}</code></pre>'
@@ -177,7 +177,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     b = ['<h1>The rules</h1>',
          '<div class="rules-intro">',
          f'<p class="sub">A rule is one assertion about a machine and what a programme does on it. The machine is '
-         f'itself a text, defined on the <a href="../machine/">Machine</a> page: a rule&rsquo;s device words '
+         f'itself a text, defined on the <a href="../machine/">Machine</a> page: a rule&rsquo;s machine words '
          f'(sites, rails, capacity, degree) are read off that text, and its execution words (operations, '
          f'instants, occupancy) off the programme&rsquo;s replay. A rule is written in a small language you can '
          f'read on this page: '

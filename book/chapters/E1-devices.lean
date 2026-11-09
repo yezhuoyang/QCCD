@@ -1,17 +1,17 @@
 import QCCDC.Cert.Sound
 
 /-!
-# Devices are graphs
+# Machines are graphs
 
 *Part E, lesson E1. You need Parts A-D of this tutorial: sites, junctions, rails, shuttles,
 gates and the rules, as the studio shows them. You do not need to know Lean; this lesson
 teaches the Lean it uses.*
 
-In the studio a device is a drawing: traps on rails, rails meeting at junctions. Underneath the
+In the studio a machine is a drawing: traps on rails, rails meeting at junctions. Underneath the
 drawing is a document, a list of **nodes** and a list of **segments** (the rails), and every
 tool on this site works from that document: the studio, the rules, the compiler, and, through
 facts read out of it, the proved checker of Part F. This lesson writes three of the site's
-devices as Lean data and computes from them what the rules and the checker read off a device:
+machines as Lean data and computes from them what the rules and the checker read off a machine:
 who is next to whom, how many rails meet at a node, which nodes are junctions, and which moves
 the machine allows.
 
@@ -20,9 +20,9 @@ Part E goes on the same way: programmes as data (E2), the rules as statements Le
 -/
 
 /-!
-## 1. A device document
+## 1. A machine document
 
-Here is one node, one segment and one zone type of the device `chain4`, from its document
+Here is one node, one segment and one zone type of the machine `chain4`, from its document
 (`chain4.arch.json`; `...` marks fields left out):
 
 ```
@@ -75,7 +75,7 @@ structure Device where
   deriving Repr
 
 /-!
-## 2. Three devices
+## 2. Three machines
 
 `def` gives a name to a value. `⟨"C0", .site, 2, true⟩` builds a `Node` from its fields in
 order (id, kind, capacity, gate); `.site` is short for `Kind.site`, since Lean knows the type
@@ -144,7 +144,7 @@ def sites (d : Device) : List String :=
 #eval sites grid2x3
 
 /-!
-The page draws any value with two fields, `arch` (a device of the site) and `src` (a programme
+The page draws any value with two fields, `arch` (a machine of the site) and `src` (a programme
 in the studio's language), in the studio. Lesson E2 is about programmes; here a programme only
 places ions, with one `p.init` statement. `ionsAt k ns` names one ion per node, `q0`, `q1`, ...;
 `initSrc` writes the statement. (`"\""` is a string holding one double quote; `++` joins
@@ -191,7 +191,7 @@ The rails at a node `n`: every segment with `n` at one end, paired with the node
 end. `flatMap` maps each segment to a list (here of zero, one or two entries) and joins the
 lists. A node's **neighbours** are the other ends; its **degree** is how many rails meet at it.
 A rail from a node to itself would count twice, as it does in the platform's `Device.degree`
-(no device here has one).
+(no machine here has one).
 -/
 
 def railsAt (d : Device) (n : String) : List (String × String) :=
@@ -210,7 +210,7 @@ def degree (d : Device) (n : String) : Nat :=
 
 /-!
 The document records a `"degree"` for every node (`C0` 1, `C1` 2, `J0_1` 3, `J0_0` 2, `S0` 3);
-the values computed here agree with it, node for node, on all three devices.
+the values computed here agree with it, node for node, on all three machines.
 
 For statements that compute with strings this lesson uses `decide +kernel`. It proves a
 statement by having Lean's **kernel**, the small trusted core that checks every proof, compute
@@ -229,7 +229,7 @@ theorem c1_neighbours : neighbours chain4 "C1" = ["C0", "C2"] := by
 
 Rule R18, as the platform's rule checker states it, says: "a node is a junction only if
 three or more trap axes meet at it". The rule language says it more bluntly: "Whatever a node is called,
-it is a junction exactly when three or more rails meet at it." The platform's device keeps its
+it is a junction exactly when three or more rails meet at it." The platform's machine keeps its
 junctions that way, as the nodes of degree at least three, and the junction rule R2 and the
 cost of crossing a junction both read that degree, never the node's `kind`.
 -/
@@ -259,7 +259,7 @@ theorem junctions_by_degree :
   decide +kernel
 
 /-!
-The rest of this section is about every device, not one. `{ d with segments := s ::
+The rest of this section is about every machine, not one. `{ d with segments := s ::
 d.segments }` is `d` with one more segment `s` in front of its list (`::` puts an element in
 front of a list).
 
@@ -278,9 +278,9 @@ theorem degree_more (d : Device) (s : Segment) (n : String) :
   omega
 
 /-!
-The platform's device module says why R18 is written this way: drawing a spur onto a rail makes
+The platform's machine module says why R18 is written this way: drawing a spur onto a rail makes
 the rail node degree 3, and it *becomes* a junction (that is how `S0` and `S3` became
-junctions on `ring6d`). Prove it, for every device.
+junctions on `ring6d`). Prove it, for every machine.
 
 #### Exercise 5 (★★) `spur_makes_junction`
 A node of degree 2 that gains a segment at one of its ends is a junction. (`simp [isJunction,
@@ -294,12 +294,12 @@ theorem spur_makes_junction (d : Device) (s : Segment) (n : String)
   omega
 
 /-!
-## 5. Hops: what the checker is told about a device
+## 5. Hops: what the checker is told about a machine
 
 Part F's checker decides whether a compiler's account of a programme holds. It never takes the
-compiler's word for what the machine can do: the moves a device allows, its **hops**, are read
-out of the device document by a short Python function, `trap_hops`, in the builder of the
-checker's device facts (`mk_qcheck_input`). A hop is an ordered pair of sites one machine cycle
+compiler's word for what the machine can do: the moves a machine allows, its **hops**, are read
+out of the machine document by a short Python function, `trap_hops`, in the builder of the
+checker's machine facts (`mk_qcheck_input`). A hop is an ordered pair of sites one machine cycle
 apart. In the function's own words: an ion never rests on a junction, so a hop leaves a trap,
 crosses only junctions, and lands on a trap -- where a junction is what R18 says it is, a bare
 junction node or a site where three or more rails meet.
@@ -351,7 +351,7 @@ def hops (d : Device) : List (String × String) :=
 
 /-!
 The Bell pair that lesson F1 proves was compiled for `chain4`, and its certificate carries the
-device's hops in the field `hops`. Here is that list, copied from the certificate
+machine's hops in the field `hops`. Here is that list, copied from the certificate
 ([bell.qcheck.json](data/bell.qcheck.json), and `bell` in [lesson F1](2.1-certificates.html)).
 -/
 
@@ -417,16 +417,16 @@ def swapHops : List (String × String) :=
 #### Exercise 7 (★) `published_hops`
 Prove that the walk computes exactly the hops of both published certificates. Those lists
 were written by the Python `trap_hops`, so this proves the Lean walk agrees with it on both
-devices.
+machines.
 -/
 
 theorem published_hops : hops grid2x3 = cxHops ∧ hops ring6d = swapHops := by
   decide +kernel
 
 /-!
-## 6. Facts about every device
+## 6. Facts about every machine
 
-The theorems so far were about one device each. These two hold for every device there will
+The theorems so far were about one machine each. These two hold for every machine there will
 ever be, and their proofs are about the definitions, not about any list.
 
 `∈` is membership in a list. A hypothesis `h : m ∈ neighbours d n` is a proof you may use;
@@ -489,7 +489,7 @@ theorem walk_sites (d : Device) (src : String) :
 /-!
 ## 7. What comes next
 
-A device is now a value you can compute with and prove things about. Lesson E2 does the same
+A machine is now a value you can compute with and prove things about. Lesson E2 does the same
 for programmes: the studio's statements as Lean data, and the replay that says where every ion
 is after every step. Lesson E3 then states the rules of Part R as propositions about that
 replay, and has Lean decide them.

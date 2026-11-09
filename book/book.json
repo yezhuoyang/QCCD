@@ -4,11 +4,11 @@
     {
       "part": "E",
       "title": "The machine as data",
-      "about": "Devices as graphs, programmes as data, replay as a function, and the rules as statements Lean can decide.",
+      "about": "Machines as graphs, programmes as data, replay as a function, and the rules as statements Lean can decide.",
       "lessons": [
         {
           "id": "E1",
-          "title": "Devices are graphs",
+          "title": "Machines are graphs",
           "status": "live",
           "slug": "E1-devices",
           "source": "chapters/E1-devices.lean",

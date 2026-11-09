@@ -114,16 +114,16 @@ CATALOG: tuple[dict, ...] = (
      "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc rotate, then insert_cooling"},
      "claim": ("The same loop of 288 slots and the same 144 docks, drawn on a rectangle of height 3. The "
                "compiler writes the same programme as for ring(146, 2, 144), instruction for instruction "
-               "and cool for cool (411 rotations, 11,640 hops, 411 batches); what differs is the device: "
+               "and cool for cool (411 rotations, 11,640 hops, 411 batches); what differs is the machine: "
                "where its corners turn, and its die.")},
     {"key": "ring144_h4_d144", "family": "ring + docks",
      "title": "ring(144, 4, 144) with junction corners: the same 288-slot loop and 144 docks, height 4",
      "arch": BB2 / "ring144_h4_d144.arch.json", "prefix": BB2 / "ring144_h4_d144",
      "compiled": {"compiler": QCCDC, "date": "2026-11-02", "note": "qccdc rotate, then insert_cooling"},
      "claim": ("The same loop and docks again, on a rectangle of height 4: once more the same programme, "
-               "instruction for instruction and cool for cool, on a different device. Drawn at height 4, "
+               "instruction for instruction and cool for cool, on a different machine. Drawn at height 4, "
                "some dock rails cross without a junction (V100 and V142 among them), so "
-               "R21 refuses the device and it is listed under Disqualified, never ranked.")},
+               "R21 refuses the machine and it is listed under Disqualified, never ranked.")},
     {"key": "ring218_h2_d144", "family": "ring + docks",
      "title": "ring(218, 2, 144) with junction corners: a roomier loop of 432 slots, 144 docks",
      "arch": BB2 / "ring218_h2_d144.arch.json", "prefix": BB2 / "ring218_h2_d144",
@@ -1845,7 +1845,7 @@ def board_intro(rows: list[dict]) -> str:
         "it, the one change the release allows, and R10 is decided by the proved Lean checker and the "
         f"stabilizer tableau (passed on {len(lean)} of {len(compiled)}).</p>",
         f"<p><b>What is ranked.</b> {n(len(ranked), 'design', 'designs')} whose programme passes every "
-        "rule on the replay and whose device fits the task's hardware budget"
+        "rule on the replay and whose machine fits the task's hardware budget"
         + (": " + "; ".join(html.escape(words.get(f, f)) for f in fams) if fams else "")
         + ". " + _fastest(ranked) + "Pick a measure to rank by, and click a dot for its numbers and the "
         "steps where each claim can be checked."

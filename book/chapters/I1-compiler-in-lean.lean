@@ -89,12 +89,12 @@ theorem bell_ops :
   rfl
 
 /-!
-## 2. The device
+## 2. The machine
 
 `chain4` is four traps in a row, `C0 - C1 - C2 - C3`, each able to hold two ions and to gate
 (its document is `chain4.arch.json`). The certificate carries two facts about it: the traps
 that can gate, and the ordered pairs of traps one hop apart. The compiler does not get to state
-these. The device facts' builder (`mk_qcheck_input`) reads them out of the device's own
+these. The machine facts' builder (`mk_qcheck_input`) reads them out of the machine's own
 document, and for `chain4` it gives exactly the two lists below.
 
 We number the traps and the qubits, and name them the way the certificate does: trap `k` is
@@ -155,12 +155,12 @@ one other, so a trap's capacity of two holds on every hop and at every gate. Kee
 mind. It is an argument about the *rules*, and the certificate checker never checks it: section
 7 breaks it and watches what happens.
 
-Every route the compiler can take on `chain4` is made of the device's own hops. There are only
+Every route the compiler can take on `chain4` is made of the machine's own hops. There are only
 sixteen pairs of traps, so Lean can try them all.
 
 #### Exercise 2 (★★) `routes_are_hops`
 Prove that for every two traps `a` and `b` of `chain4`, every hop of `route a b` is a hop of the
-device. `List.range 4` is `[0, 1, 2, 3]`, and a statement that quantifies over the members of a
+machine. `List.range 4` is `[0, 1, 2, 3]`, and a statement that quantifies over the members of a
 list is one `decide +kernel` can check: it runs through them.
 -/
 
@@ -230,7 +230,7 @@ def witnessesFrom (p : Policy) (home : Nat → Nat) (i T : Nat) : List Gate → 
 /-!
 Now the certificate. Every field is one F1 read: the map (qubit `k` on ion `qk`), the initial
 placement, the ops, the moves, no rotations (`chain4` has no closed loop to turn), the witnesses,
-nothing left unrealised, and the device's two lists. `List.range n` is `[0, 1, ..., n - 1]`.
+nothing left unrealised, and the machine's two lists. `List.range n` is `[0, 1, ..., n - 1]`.
 -/
 
 def compileWith (p : Policy) (home : Nat → Nat) (c : Circuit) : Input :=
@@ -268,7 +268,7 @@ The second output is a programme in the studio's own language (the platform's `P
 heats it, and a two-qubit gate needs cold ions (rule R7). The certificate says nothing about
 cooling; the programme must.
 
-A studio figure needs a value with two fields, the device and the programme's text, so that is
+A studio figure needs a value with two fields, the machine and the programme's text, so that is
 what we build. The text comes from the same placement and the same routes as the certificate.
 -/
 
@@ -394,7 +394,7 @@ def jumper : Policy := ⟨jump, true⟩
 def jumpCert : Input := compileWith jumper id4 farSwap
 
 /-!
-Its first move takes `q0` from `C0` straight to `C3`. The device has no such hop, and the studio,
+Its first move takes `q0` from `C0` straight to `C3`. The machine has no such hop, and the studio,
 asked to make it, finds no rail between the two.
 
 {{figure jumpCert}}
