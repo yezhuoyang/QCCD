@@ -1946,7 +1946,12 @@ Apache 2.0; their generator rewrites their record's d2 = 15 circuit character fo
   `tools/gidney_surgery.py page` cuts the prime into windows of 120 s, each with the gadgets still at work from the window before (its
   `lead`).  Every program's ions (`tools/gidney_surgery.py ions`, replayed, no rules: `compile` checked them) are QIO2, each distinct cycle
   stored once: a merge's 462 cycles are 31 bodies, about 430 MB for all, against about 4.6 GB written cycle by cycle.  Each prep and read
-  item now names its program (the listing's `basis=`, the factory gadget's shape).
+  item now names its program (the listing's `basis=`, the factory gadget's shape).  Every merge has the same cycles on one clock, so 715 of
+  the merges' files take the reference merge's cooling and cycle times with their own instructions (12 s instead of 75 for a 9,500-ion
+  program); `ions` checks the smallest, the median and the largest merge byte for byte against cooling and replaying them before it does,
+  and it was checked so on eight sizes from 504 to 29,543 ions.  Live at qccd.academy/gadgets/rsa2048/gidney/ since 2026-11-09 (613e565,
+  661f9ac): 412 MB of data; a reader's browser holds 6 to 14 MB and fetches about 3 MB for a tour of every level; the landing and the S9
+  page link it.  A full gadgets build needs `--rsa-gidney out/s10/surgery/page/data` (not in git) or it drops the page and its line.
   Against S9 (21.56 years on 19.0 million ions): 1.37 x its time on 28 x fewer ions.
   Factories that cost nothing would give 10.78 h a prime on the same floorplan; the cultivated ones add about 13 %.  Still composed in that figure:
   a cold access (a merge counted at a hot round, the block held), the yoked outer checks, a decode taken as one round.  And one physical question:
