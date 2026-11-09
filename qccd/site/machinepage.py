@@ -440,7 +440,7 @@ def build_examples(out, put) -> dict:
     programme on it, and return what the page shows.  A programme that cannot be replayed on
     its machine, or that fails a rule, stops the build: the page says these programmes are
     well-typed and legal on their machines."""
-    from .build import HASH_JS, poster
+    from .build import poster
     ms = _machines()
     check_round_trips(ms)
     built: dict = {}
@@ -452,7 +452,7 @@ def build_examples(out, put) -> dict:
         if r["verdict"]["failed"] or r["rules"]["fails"]:
             raise RuntimeError(f"machine page: the programme on {key!r} is not legal: "
                                f"{r['verdict']['failed']} {r['rules']['fails']}")
-        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "machine", app=True, extra=HASH_JS)
+        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "machine", app=True)
         built[key] = {**r, "page": f"ex/{key}.html", "poster": poster(m, r.get("init"), fit=(640, 300))}
     return built
 

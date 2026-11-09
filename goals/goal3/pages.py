@@ -94,17 +94,18 @@ def build(row: dict, work: Path, rel, exp, out: Path, *, max_frames: int = 20000
             f"{'all pass' if not failed else 'FAILED ' + ' '.join(failed)}")
     page = out / row["code"] / f"{row['point']}.html"
     page.parent.mkdir(parents=True, exist_ok=True)
+    numbers = {"compiled": f"compiled by {row['compiler']}; the sweep skips the Lean step, so R10 is not "
+                           f"claimed here"}
     render_html(B._publishable(arch), prog, report.result, model, page,
                 kicker=f"GOAL 3 · {rel.title.removeprefix('Goal 3: ').upper()}",
                 headline=f"{rel.title} on {row['point']}", lede=lede, source=source,
                 template_stems="*", max_frames=max_frames,
                 ruleset={"ruleset": rs.name, "title": rs.title, "results": judged.to_json()["rules"],
                          "note": "A family is judged by its own rule set; the badges below are this "
-                                 "website's machine, for comparison."})
-    numbers = {"compiled": f"compiled by {row['compiler']}; the sweep skips the Lean step, so R10 is not "
-                           f"claimed here"}
-    # the page is served as board/goal3/p/<code>/<point>.html: Goal 3's page is two folders up
-    B._inject(page, {"key": row["point"], "claim": claim}, [], numbers, f"../../#{rel.manifest['task']}")
+                                 "website's machine, for comparison."},
+                # the page is served as board/goal3/p/<code>/<point>.html: Goal 3's page is two folders up
+                notes=B.study_notes({"key": row["point"], "claim": claim}, [], numbers,
+                                    f"../../#{rel.manifest['task']}"))
     if row["status"] == "ok":
         lr = json.loads((work / "ler_report.json").read_text(encoding="utf-8"))
         # the sweep's noise model, on the experiment the release fixes

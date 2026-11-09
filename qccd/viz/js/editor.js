@@ -4632,6 +4632,10 @@ var HINTS = {
   'region:prog':  { t: '3 \u00b7 Program', d: 'The hardware programme one instruction per row, and the circuit it was compiled from, beside the animation: the executing instruction is marked and the next ones are in view. Hardware, Gates or Both.' },
   'progview': { t: 'Hardware \u00b7 Gates \u00b7 Both', d: 'What the Program pane shows: the hardware instructions, the circuit statements they realise, or both side by side. Only a compiled page has a circuit.' },
   'progpin': { t: 'Beside the animation', d: 'Keep the programme in its own column next to the canvas, the whole height, or put it back among the panels to give the canvas the width.' },
+  'stagenow': { t: 'Executing', d: 'The step the animation is on: its hardware instruction, what it costs, and the circuit statement it discharges when the page carries a circuit. Hover it for what the instruction means.' },
+  'qlabels': { t: 'q labels', d: 'Write each ion’s virtual qubit above it, in the circuit’s spelling: ion q45 carries q[45]. Off by default; the choice is remembered.' },
+  'notes:pill': { t: 'Study notes', d: 'This page’s own remarks on its programme: the facts it was judged by and the steps worth stopping at. Click a note to jump to its step; #step=N in the address opens any step.' },
+  'notes:box': { t: 'Study notes', d: 'The steps worth stopping at, in order. Click one to jump there; prev and next walk them.' },
   'ruleset': { t: 'The paper’s rules', d: 'This schedule was written for another machine model: a paper’s. Its rule set, judged rule by rule when the page was built, comes first; hover a rule for its first counterexample or for why it does not apply. The badges after it are this website’s own rules, which the paper did not assume.' },
   // the picture, element by element
   'el:site':       { t: 'Trapping site', d: 'A pocket in the electric field where ions sit still. Each site holds a few ions (its capacity), and its zone says what may happen there: a gate, a measurement, cooling.', k: 'press the tile, then click the canvas' },

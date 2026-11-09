@@ -1077,6 +1077,80 @@ text-transform:uppercase;margin-right:4px}
 .row:not([data-layout="narrow"]) #paneP[data-view="both"] .pblock{grid-row:2;min-width:0}
 .row:not([data-layout="narrow"]) .progcol[data-view="both"],
 .row:not([data-layout="narrow"]) .dock[data-view="both"]{width:min(760px,46vw)}
+/* THE EXECUTING INSTRUCTION, top-left of the stage, on every page: the hardware line and,
+   when the page carries a circuit, the statement it discharges.  It replaced the grey
+   "now" boxes above each listing, which squeezed the listings and said it twice. */
+#stageNow{position:absolute;left:8px;top:8px;z-index:4;max-width:min(52%,560px);
+  background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);
+  border-radius:8px;padding:6px 10px;box-shadow:0 2px 8px rgba(0,0,0,.10);
+  font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);
+  max-height:9.4em;overflow:hidden}
+#stageNow:empty{display:none}
+#stageNow .k{color:var(--muted);font:11px ui-sans-serif,system-ui,sans-serif;
+  letter-spacing:.02em;text-transform:uppercase;margin-bottom:2px}
+#stageNow b{color:var(--navy)} #stageNow .mut{color:var(--muted);font-style:normal}
+#stageNow .no{color:var(--z);font-weight:650} #stageNow .yes{color:var(--cold);font-weight:650}
+/* the panel edges are grips: the programme column and the dock, as the rail's */
+.edgegrip{position:absolute;z-index:30;background:transparent;touch-action:none}
+.edgegrip[data-axis="x"]{width:8px;cursor:col-resize;margin-left:-4px}
+.edgegrip[data-axis="y"]{height:8px;cursor:row-resize;margin-top:-4px}
+.edgegrip:hover,.edgegrip[data-drag="1"]{background:color-mix(in srgb,var(--accent) 25%,transparent)}
+/* qubit labels over the ions (the transport bar's "q labels") */
+#qLabels text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:600;
+  fill:var(--ink);paint-order:stroke;stroke:var(--panel);stroke-width:0.35em;
+  stroke-linejoin:round;pointer-events:none}
+#tQLab{display:inline-flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
+/* what an instruction means, on hover over a listing row or the stage card */
+#opTip{position:fixed;z-index:95;max-width:460px;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.16);
+  padding:8px 11px;font:12.5px/1.45 ui-sans-serif,system-ui,sans-serif;color:var(--ink);
+  pointer-events:none;display:none}
+#opTip[data-open="1"]{display:block}
+#opTip .op{display:inline-block;font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-weight:700;color:#fff;border-radius:4px;padding:1px 6px;margin-right:6px;vertical-align:1px}
+#opTip b.n{font-size:13px} #opTip .what{margin:4px 0 2px} #opTip .mut{color:var(--muted)}
+#opTip code{display:block;background:var(--soft);border-radius:5px;padding:4px 7px;margin:4px 0;
+  font:11.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap}
+#opTip .this{color:var(--muted);font-size:12px;border-top:1px solid var(--line);
+  margin-top:5px;padding-top:4px}
+/* STUDY NOTES: a page's own remarks on its programme (`render_html(notes=...)`), closed
+   behind a pill until asked for; absent from a page that has none */
+#notes{position:fixed;right:12px;bottom:12px;z-index:60;max-width:380px;
+  background:#141a29;color:#e6ecf7;border:1px solid #3a4a72;border-radius:10px;
+  box-shadow:0 8px 28px rgba(0,0,0,.45);font:12.5px/1.45 ui-sans-serif,system-ui,sans-serif}
+#notes[data-open="0"]{display:none}
+#notes .nhead{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #263353}
+#notes .nhead b{flex:1}
+#notes .nx{background:none;border:0;color:#8b9ab5;font-size:16px;cursor:pointer;padding:0 4px;line-height:1}
+#notes .nx:hover{color:#fff}
+#notes .nbody{padding:8px 10px;max-height:44vh;overflow:auto}
+#notes .nfacts{color:#8b9ab5;margin-bottom:6px}
+#notes .nnow{padding:8px 10px;border-radius:8px;background:#0e1320;margin-bottom:8px;border-left:3px solid #5b7cfa}
+#notes .nnow[data-kind="fail"]{border-left-color:#ff6b6e}
+#notes .nnow[data-kind="warn"]{border-left-color:#f2b84b}
+#notes .nnow .t{color:#8b9ab5;font-size:11px}
+#notes ul{list-style:none;margin:0;padding:0}
+#notes li{padding:4px 6px;border-radius:6px;cursor:pointer;display:flex;gap:8px}
+#notes li:hover{background:#1b2436}
+#notes li[data-here="1"]{background:#22304f}
+#notes li .n{color:#8b9ab5;font-variant-numeric:tabular-nums;min-width:52px}
+#notes li[data-kind="fail"] .n{color:#ff6b6e}
+#notes li[data-kind="warn"] .n{color:#f2b84b}
+#notes .nnav{display:flex;gap:6px;margin-top:8px}
+#notes button.nn{background:#1b2436;color:#e6ecf7;border:1px solid #3a4a72;border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit}
+#notes a{color:#9db4ff}
+#notesPill{position:fixed;right:12px;bottom:12px;z-index:59;background:var(--panel);color:var(--navy);
+  border:1px solid var(--line);border-radius:999px;padding:5px 12px;
+  font:12.5px ui-sans-serif,system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+#notesPill[data-open="1"]{display:none}
+/* EMBED MODE (#embed): the page as an example shows it -- the stage and its transport;
+   the head, tools bar, rail, dock, notes and the editing tools go.  Watched, never edited. */
+body[data-embed="1"] .head,body[data-embed="1"] #tools,body[data-embed="1"] #notesPill,
+body[data-embed="1"] #notes,body[data-embed="1"] #stageNow{display:none!important}
+body[data-embed="1"] main{height:100vh!important}
+body[data-embed="1"] #ebar,body[data-embed="1"] #glide,body[data-embed="1"] #phase,body[data-embed="1"] #mode,
+body[data-embed="1"] #stagebar label,body[data-embed="1"] #rail,body[data-embed="1"] #toasts,
+body[data-embed="1"] #eCount,body[data-embed="1"] #eProb{display:none!important}
 .stage{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;
   grid-column:2;grid-row:1}
 .stage[data-drop="1"] svg{outline:2px dashed var(--accent);outline-offset:-4px}
@@ -1477,7 +1551,10 @@ font:12px/22px ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",mono
 .al{grid-template-columns:30px 1fr}
 .ln>i,.al>i{font-style:normal;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .ln:hover,.al:hover{background:var(--soft)}
-.ln.cur,.al.cur{background:var(--soft);box-shadow:inset 3px 0 0 var(--accent)}
+.al.cur{background:var(--soft);box-shadow:inset 3px 0 0 var(--accent)}
+/* the executing row, loud: it is what the eye follows down a listing */
+.ln.cur,.ql.cur{background:color-mix(in srgb,#ffd84d 35%,var(--panel));
+  box-shadow:inset 4px 0 0 var(--accent);font-weight:600}
 .ln.sel,.al.sel{outline:1px solid var(--accent);outline-offset:-1px}
 .ln.bnd,.al.bnd{border-top-color:var(--line)}
 .ln .i,.al .i{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
@@ -1696,9 +1773,7 @@ textarea.src.out{min-height:120px;opacity:.85}
     </div>
   </div>
   <!-- THE TOOLS BAR.  Each button shows one of the rail's sections as a popover; the
-       search box finds any control, hint or lesson.  `#bbtools` is a marker only: the
-       BBResults overlay (Codesign/scripts/bb_studio.py) builds its own bar unless an
-       element by that id exists, and this page already has the native one. -->
+       search box finds any control, hint or lesson. -->
   <div class="tools" id="tools" data-hint="region:tools">
     <div class="cap" id="capTools"></div>
     <button class="tb" id="tbStart" aria-expanded="false" data-pop="start" data-hint="tools:start">Start</button>
@@ -1711,7 +1786,6 @@ textarea.src.out{min-height:120px;opacity:.85}
          right-click menu's now; the inspector stays in the rail, where it is read. -->
     <div class="sw"><input id="search" type="search" placeholder="find any feature&hellip;  (Ctrl+K)"
          autocomplete="off" data-hint="search"><div class="sres" id="sres"></div></div>
-    <span id="bbtools" hidden></span>
   </div>
   <div class="row" id="row" data-dock="1">
     <!-- THE PALETTE.  Generated from `D.schema` (every CLOSED object, field for field)
@@ -1734,6 +1808,9 @@ textarea.src.out{min-height:120px;opacity:.85}
            refusal is drawn over the picture it refers to and not below the legend. -->
       <div class="canvas" id="canvas">
         <svg id="svg" preserveAspectRatio="xMidYMid meet"></svg>
+        <!-- THE EXECUTING INSTRUCTION, filled by `syncCursor()`: #snHw the hardware line,
+             #snQ the circuit statement (empty without a circuit). -->
+        <div id="stageNow" data-hint="stagenow"></div>
         <div class="cap" id="capStage"></div>
         <div class="cap" id="capBar"></div>
         <div class="hud off" id="hud"></div>
@@ -1793,7 +1870,10 @@ textarea.src.out{min-height:120px;opacity:.85}
         <button id="zOut" data-hint="zoom:out" title="zoom out" aria-label="zoom out">−</button>
         <input type="range" id="slider" min="0" value="0" data-hint="slider">
         <select id="speed" data-hint="speed"><option value="1">1x</option>
-        <option value="4" selected>4x</option>
+        <option value="1.5">1.5x</option><option value="2">2x</option>
+        <option value="2.5">2.5x</option><option value="3">3x</option>
+        <option value="3.5">3.5x</option><option value="4" selected>4x</option>
+        <option value="6">6x</option><option value="8">8x</option>
         <option value="16">16x</option><option value="64">64x</option>
         <option value="256">256x</option></select>
         <select id="mode" title="colour the marks by role or by heating" data-hint="colour">
@@ -1804,6 +1884,10 @@ textarea.src.out{min-height:120px;opacity:.85}
              embeds hide); the choice is remembered (`qccd.studio.hwlabels`). -->
         <button class="tgl on" id="tLabels" aria-pressed="true" data-hint="hwlabels"
                 title="the names a hardware program uses, beside every site, junction and ion">Labels</button>
+        <!-- QUBIT LABELS: each ion's virtual qubit in the circuit's spelling (q45 -> q[45]),
+             off by default, remembered (`qccd.studio.qlabels`) -->
+        <label id="tQLab" title="write each ion's virtual qubit above it"><input
+               type="checkbox" id="tQLabels" data-hint="qlabels">q labels</label>
       </div>
       <div class="ebar" id="ebar">
         <span class="etools" id="etools">
@@ -1883,7 +1967,6 @@ textarea.src.out{min-height:120px;opacity:.85}
               <button class="tgl on" id="pFollow" aria-pressed="true" data-hint="follow"
                       title="keep the executing instruction in view (f)">Follow</button>
             </div>
-            <div class="now" id="pNow"></div>
             <div class="wrapl">
               <div class="lst" id="pScroll">
                 <div class="pad" id="pPad"><div class="win" id="pWin"></div></div>
@@ -1898,7 +1981,6 @@ textarea.src.out{min-height:120px;opacity:.85}
               <button class="tgl on" id="qFollow" aria-pressed="true"
                       title="keep the statement being executed in view">Follow</button>
             </div>
-            <div class="now" id="qNow"></div>
             <div class="wrapl">
               <div class="lst" id="qScroll">
                 <div class="pad" id="qPad"><div class="win" id="qWin"></div></div>
@@ -3307,6 +3389,7 @@ function draw(){
     refused ? refused + ' · see the Write pane' + (why ? ' · ' + why : '') : why;
   slider.value=String(frame);
   syncCursor();
+  paintQLabels();
 }
 
 // ---------- drop a design onto the page ----------
@@ -3929,8 +4012,10 @@ renderSide();
 // One wall-clock rAF loop: speed changes the RATE, never the continuity.  The old page
 // pinned phase=1 above 4x -- which is the default -- so `pointOnPath` was never called
 // and every ion teleported.
-const MS={1:900, 4:225, 16:56, 64:40, 256:40};
-const STRIDE={1:1, 4:1, 16:1, 64:4, 256:16};
+// ANY FACTOR, half steps included: below 64x every frame is played for 900 ms over the
+// factor (floored at 40); from 64x up frames are skipped instead of slowing the clock.
+const STRIDE={64:4, 256:16};
+const speedK=()=>parseFloat(speedSel.value)||4;
 let raf=null, t0=0;
 const playBtn=document.getElementById('play');
 const speedSel=document.getElementById('speed');
@@ -3961,10 +4046,9 @@ function onProgramValidity(){
 }
 // A 46-hop rigid rotation should take visibly longer than a one-hop shuttle, but not
 // 46x longer: sqrt, capped, keeps both readable.
-const durOf=i=>{ const k=parseInt(speedSel.value,10)||4;
-  return Math.max(40, (MS[k]||225)*Math.min(6, Math.sqrt(hopsIn(i)))); };
+const durOf=i=>Math.max(40, (900/speedK())*Math.min(6, Math.sqrt(hopsIn(i))));
 function tick(now){
-  const k=parseInt(speedSel.value,10)||4, stride=STRIDE[k]||1;
+  const stride=STRIDE[speedK()]||1;
   // `lastFrame()`, never `P.frames.length-1`: a tick that lands after the programme was
   // emptied under it would otherwise write -1 into `frame`
   if(stride>1){                       // fast-forward: skip frames, do not slow the clock
@@ -4382,9 +4466,18 @@ function nowHTML(f){
       +(q!=null?' &middot; &Delta;n&#772; '+(q>=0?'+':'')+fmt(q,1):'')
       +(pt?' &middot; '+esc(pt):'')+'</span>';
   }
-  h += qInlineHTML(f);
   h += ctlHTML(f);
   return h;
+}
+// THE STAGE CARD: the step, the hardware instruction, and (with a circuit) the statement
+// it discharges.  The one place the page says what is executing.
+function paintStageNow(f){
+  const el = document.getElementById('stageNow');
+  if(!el) return;
+  const q = SRC ? qNowHTML(f) : '';
+  el.innerHTML = '<div class="k">executing &middot; step '+(frame+1)+' / '+P.frames.length+'</div>'
+    + '<div id="snHw">'+nowHTML(f)+'</div>'
+    + (q ? '<div id="snQ"><span class="mut">circuit:</span> '+q+'</div>' : '<div id="snQ"></div>');
 }
 function ctlHTML(f){
   if(!CTLD || f.ctl==null) return '';
@@ -4555,14 +4648,14 @@ function syncCursor(force){
   const f = P.frames[frame] || {};
   PLIST.setCursor(VIEWPOS[frame]);
   ALIST.setCursor(archRowFor(f));
-  document.getElementById('pNow').innerHTML = nowHTML(f);
   document.getElementById('pFoot').innerHTML = srcHTML(f);
   if(QLIST){
     QMARK = qMarksFor(f);
     const ln = qFirstLine(QMARK);
     QLIST.setCursor(ln>0 ? ln-1 : -1);      // setCursor always re-marks, so qRowCls runs
-    document.getElementById('qNow').innerHTML = qNowHTML(f);
   }
+  paintStageNow(f);
+  paintNotes();
   updateChip();
   const ph=document.getElementById('playhead');
   if(ph) ph.style.left = (100*frame/Math.max(1,P.frames.length-1))+'%';
@@ -4638,18 +4731,6 @@ function qNowHTML(f){
   return '<i class="mut">no circuit statement &mdash; '+esc(f.type)
     + ' is the compiler&#39;s own bookkeeping</i>';
 }
-// the one-line version, for the hardware pane, so the answer is there without changing
-// tabs -- which is the whole point of putting the two side by side
-function qInlineHTML(f){
-  const S = circuitOf();
-  if(!S) return '';
-  const now = S.realises[f.id] || [], soon = S.toward[f.id] || [],
-        past = (S.after||{})[f.id] || [];
-  if(now.length) return '<br><span class="mut">circuit &rarr;</span> '+qListHTML(now,2);
-  if(soon.length) return '<br><span class="mut">circuit &rarr; towards</span> '+qListHTML(soon,2);
-  if(past.length) return '<br><span class="mut">circuit &rarr; after</span> '+qListHTML(past,2);
-  return '';
-}
 function qRowCls(row){
   const L=row+1, k=(QMARK||{})[L];
   return (k===2?' qh':(k===1?' qw':'')) + (QOPLINE[L]?'':' qz');
@@ -4681,14 +4762,11 @@ function pickSrc(row){
 // ---------- the programme column ----------
 // WHERE THE PROGRAM PANE LIVES is a layout decision, not a pane: beside the animation
 // (the whole height, so a long programme reads as a listing and the next instructions
-// are in view) or among the dock's panes.  The wide regime always puts it beside; the
-// tall regime pins it there when the window has room (>= 1500 px) or when the user says
-// so; the narrow regime never does.  One DOM node moves; nothing is rendered twice.
+// are in view) or among the dock's panes.  The wide and tall regimes put it beside unless
+// the user moved it into the panels (`qccd.studio.progpin` = '0'); the narrow regime never
+// does.  One DOM node moves; nothing is rendered twice.
 let PROG_COL = false, PROG_PIN = null, PROG_VIEW = 'hw';
-function progPinDefault(){
-  const w = (typeof window !== 'undefined' && window.innerWidth) || 1600;
-  return w >= 1500;
-}
+function progPinDefault(){ return true; }
 function placeProgram(){
   const mode = document.getElementById('row').getAttribute('data-layout');
   if(PROG_PIN === null){
@@ -5190,12 +5268,280 @@ sizeLists();
     setPane(D.open_pane);
   }
   syncMenu();
+  // `?view=hw|gates|both` in the address opens the column on that view
+  try { const qv = /(?:\?|&)view=(hw|gates|both)/.exec(location.search || ''); if(qv) setProgView(qv[1]); } catch(e){}
 }
+
+// ---------- qubit labels over the ions ----------
+// The ion IS the virtual qubit in a compiled programme (`q45` carries q[45]), so the label
+// is the ion's name in the circuit's spelling, above its mark at a size that stays readable
+// at any zoom.  `var`, not `let`: `draw()` calls this before the line below has run.
+var QLAB_G = null, QLAB = {};
+function qLabelsOn(){ try { return localStorage.getItem('qccd.studio.qlabels') === '1'; } catch(e){ return false; } }
+function paintQLabels(){
+  const svgEl = document.getElementById('svg');
+  if(!svgEl || !document.createElementNS) return;
+  if(!qLabelsOn()){ if(QLAB_G) QLAB_G.setAttribute('display', 'none'); return; }
+  if(!QLAB_G){ QLAB_G = document.createElementNS('http://www.w3.org/2000/svg', 'g'); QLAB_G.setAttribute('id', 'qLabels'); svgEl.appendChild(QLAB_G); }
+  QLAB_G.removeAttribute('display');
+  const scale = (svgEl.clientWidth || 1000) / ((VB && VB.w) || 1000);     // css px per user unit
+  for(const ion in IONP){
+    const c = IONP[ion].c; if(!c) continue;
+    let t = QLAB[ion];
+    if(!t){ t = document.createElementNS('http://www.w3.org/2000/svg', 'text'); t.setAttribute('text-anchor', 'middle');
+      t.textContent = /^q\d+$/.test(ion) ? ion.replace(/^q(\d+)$/, 'q[$1]') : ion; QLAB_G.appendChild(t); QLAB[ion] = t; }
+    if(c.getAttribute('display') === 'none'){ t.setAttribute('display', 'none'); continue; }
+    const cx = parseFloat(c.getAttribute('cx')), cy = parseFloat(c.getAttribute('cy')), r = parseFloat(c.getAttribute('r')) || 4;
+    const fs = Math.max(0.95 * r, 10 / scale);
+    t.setAttribute('x', cx); t.setAttribute('y', cy - 1.15 * r - 0.25 * fs); t.setAttribute('font-size', fs); t.removeAttribute('display');
+  }
+}
+{
+  const cb = document.getElementById('tQLabels');
+  if(cb){ cb.checked = qLabelsOn();
+    cb.onchange = () => { try { localStorage.setItem('qccd.studio.qlabels', cb.checked ? '1' : '0'); } catch(e){} draw(); }; }
+}
+
+// ---------- the programme column's and the dock's edges are grips ----------
+// A strip over each panel's edge; dragging writes the panel's width (the dock's height in
+// the wide regime, where it is the strip under the canvas), remembered per panel.  The
+// rail's own grip is `#railEdge` above.
+(function(){
+  const rowEl = document.getElementById('row'), pc = document.getElementById('progcol'), dock = document.getElementById('dock');
+  if(!rowEl || !pc || !dock || !rowEl.getBoundingClientRect || !rowEl.appendChild) return;
+  const store = (k, v) => { try { localStorage.setItem('qccd.studio.w.' + k, v); } catch(e){} };
+  const read = k => { try { return parseInt(localStorage.getItem('qccd.studio.w.' + k) || '', 10) || 0; } catch(e){ return 0; } };
+  const px = v => Math.round(v) + 'px';
+  const GRIPS = [];
+  function place(){
+    const R = rowEl.getBoundingClientRect(), mode = rowEl.getAttribute('data-layout');
+    for(const g of GRIPS){
+      const el = g._el, vis = el.offsetWidth > 0 && el.getAttribute('data-collapsed') !== '1' && mode !== 'narrow';
+      if(!vis){ g.style.display = 'none'; continue; }
+      g.style.display = '';
+      const yAxis = g._name === 'dock' && mode === 'wide';
+      g.setAttribute('data-axis', yAxis ? 'y' : 'x');
+      const B = el.getBoundingClientRect();
+      if(yAxis){ g.style.top = px(B.top - R.top); g.style.left = px(B.left - R.left); g.style.width = px(B.width); g.style.height = ''; }
+      else { g.style.left = px(B.left - R.left); g.style.top = px(B.top - R.top); g.style.height = px(B.height); g.style.width = ''; }
+    }
+  }
+  function grip(name, el){
+    const g = document.createElement('div'); g.className = 'edgegrip'; g.setAttribute('data-grip', name); g.setAttribute('data-axis', 'x');
+    g._name = name; g._el = el; rowEl.appendChild(g); GRIPS.push(g);
+    let x0 = 0, y0 = 0, w0 = 0, h0 = 0;
+    g.addEventListener('pointerdown', ev => {
+      x0 = ev.clientX; y0 = ev.clientY; const B = el.getBoundingClientRect(); w0 = B.width; h0 = B.height;
+      g.setAttribute('data-drag', '1'); try { g.setPointerCapture(ev.pointerId); } catch(e){}
+      ev.preventDefault();
+    });
+    g.addEventListener('pointermove', ev => {
+      if(g.getAttribute('data-drag') !== '1') return;
+      if(g.getAttribute('data-axis') === 'y'){
+        const h = Math.max(90, Math.min(window.innerHeight * 0.8, h0 - (ev.clientY - y0)));
+        rowEl.style.gridTemplateRows = 'minmax(0,1fr) ' + px(h); store('dockh', String(Math.round(h)));
+      } else {
+        const w = Math.max(120, Math.min(window.innerWidth * 0.85, w0 - (ev.clientX - x0)));
+        el.style.setProperty('width', px(w), 'important'); store(name, String(Math.round(w)));
+      }
+      place();
+    });
+    const end = ev => { if(g.getAttribute('data-drag') !== '1') return; g.removeAttribute('data-drag');
+      try { g.releasePointerCapture(ev.pointerId); } catch(e){}
+      sizeStage(); sizeLists(); place(); };
+    g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+  }
+  grip('prog', pc); grip('dock', dock);
+  const wp = read('prog'); if(wp) pc.style.setProperty('width', px(wp), 'important');
+  const wd = read('dock'); if(wd) dock.style.setProperty('width', px(wd), 'important');
+  const hd = read('dockh'); if(hd && rowEl.getAttribute('data-layout') === 'wide') rowEl.style.gridTemplateRows = 'minmax(0,1fr) ' + px(hd);
+  window.addEventListener('resize', () => setTimeout(place, 60));
+  setTimeout(place, 80); setTimeout(place, 500);
+  const spv = setProgView; setProgView = function(v){ const r = spv.apply(this, arguments); setTimeout(place, 30); return r; };
+})();
+
+// ---------- what every hardware instruction means: hover a listing row or the stage card ----------
+// The definitions are the compiler's own: the instruction types and fields are `docs/tsir.md`,
+// the native pulses R / VZ / MS and their decompositions are proved in Lean (Compiler/lean),
+// the SIMD classes are what this machine declares (`A.classes`), and the costs are the physics
+// package this page was priced with (`PH`).
+const OPS = {
+  INIT:  { name: 'init — place every ion', what: 'The first instruction of every programme: it declares which trap each ion starts in, with zero motional quanta. Nothing moves and nothing costs.', formal: '{ "type": "init", "id": 0, "placement": { "<ion>": "<site>", ... }, "quanta": { "<ion>": 0.0, ... } }', costk: '' },
+  SHUT:  { name: 'shuttle — move ions one trap to the next', what: 'A transport cycle in which each listed ion travels its own path: from its trap, through the named segments (and any junction on the way), to the next trap. Every participant moves in the same machine cycle; the instruction is charged at its slowest rider.', formal: '{ "type": "simd", "class": "shuttle", "mode": "inter",\n  "participants": [ { "ion": "q45", "from": "S242", "to": "A242", "via": ["S242.a", "A242.b"] }, ... ] }', costk: 'shuttle' },
+  'ROT.CW': { name: 'rotate_cw — rigid rotation of the whole loop', what: 'One movement template turns EVERY ion on the loop by the same number of slots with one broadcast waveform (± hops in the listing). The riders keep their cyclic order, so a rotation never brings two of them together — that is what the docks are for. A shift by k is the unit hop driven k times.', formal: '{ "type": "simd", "class": "rotate_cw", "mode": "inter",\n  "template": { "kind": "loop_shift", "loop": "L0", "delta": 13 },\n  "holds": ["L0", ...], "meta": { "batch": 7, "kind": "rotate", "hops": 13 } }', costk: 'shuttle' },
+  'ROT.CCW': { name: 'rotate_ccw — rigid rotation, the other way', what: 'The same template with a negative delta.', formal: '{ "type": "simd", "class": "rotate_ccw", "template": { "kind": "loop_shift", "loop": "L0", "delta": -1 } }', costk: 'shuttle' },
+  DOCK:  { name: 'dock — riders pull into their spurs', what: 'Each listed ion leaves the rail into the dock trap beside it, where a gate can happen. It entails a split at the source and a merge at the destination, and the rail node it leaves through is degree 3, so it is charged as a junction crossing too.', formal: '{ "type": "simd", "class": "dock", "mode": "inter",\n  "participants": [ { "ion": "q18", "from": "S74", "to": "A74", "via": ["V74"] }, ... ] }', costk: 'splitmerge' },
+  UNDOCK:{ name: 'undock — riders return to the rail', what: 'The reverse of dock: the ions leave their dock traps and rejoin the loop, split + merge again, through the same degree-3 node.', formal: '{ "type": "simd", "class": "undock", "mode": "inter", "participants": [ ... ] }', costk: 'splitmerge' },
+  'SORT.M': { name: 'sort_merge — one step of an odd–even sort', what: 'One ion of a neighbouring pair joins the other’s chain (a merge); with sort_split it realises a transposition on a loop with no docks.', formal: '{ "type": "simd", "class": "sort_merge", ... }', costk: 'splitmerge' },
+  'SORT.S': { name: 'sort_split — the other half of the transposition', what: 'The partner splits back out.', formal: '{ "type": "simd", "class": "sort_split", ... }', costk: 'splitmerge' },
+  R:     { name: 'R(θ, φ) — one single-qubit laser pulse', what: 'A rotation by θ about an axis at angle φ in the equatorial plane of the Bloch sphere: the one physical single-qubit pulse this hardware has. Every single-qubit gate of the circuit (h, x, s, t, u3…) compiles to exactly one R plus one VZ — the identity u3(θ,φ,λ) = VZ(φ+λ)·R(θ, π/2−λ), proved in Lean. Many R pulses on different ions are driven together in one instruction.', formal: '{ "type": "gate", "gate": "R", "mode": "intra", "ions": ["q45", ...], "params": [[θ, φ], ...], "sites": ["A10", ...] }', costk: 'gate' },
+  VZ:    { name: 'VZ(λ) — a virtual Z: a frame update, not a pulse', what: 'Advances the phase reference of every later pulse on that ion by λ. No laser fires, so it takes no time and adds no heating; it is what makes a single-qubit gate cost one pulse rather than three.', formal: '{ "type": "gate", "gate": "VZ", "mode": "intra", "ions": ["q45", ...], "params": [[λ], ...] }', costk: '' },
+  MS:    { name: 'MS(θ) — the Mølmer–Sørensen entangling pulse', what: 'The only two-qubit primitive: a shared motional mode couples two ions that sit in the SAME trap, so the pair must already be co-located (R6b checks this). A circuit CX compiles to four R pulses around one MS(π/2), proved in Lean (cx_decomp). Every pair listed is driven in the same instruction, one pair per trap.', formal: '{ "type": "gate", "gate": "MS", "mode": "intra",\n  "pairs": [["q153", "q18"], ["q152", "q20"], ...], "sites": ["A10", ...] }', costk: 'gate' },
+  COOL:  { name: 'cool — remove motional quanta', what: 'Sympathetic cooling of the listed ions (or every ion, when broadcast). Transport heats an ion, so the cooling pass inserts one before the gates that need it. The first cool is the state preparation.', formal: '{ "type": "cool", "broadcast": true }   or   { "type": "cool", "ions": ["q18", ...] }', costk: 'gate' },
+  RESET: { name: 'reset — prepare ancillas in |0⟩', what: 'Re-initialises the listed ions, mid-circuit; an ancilla is reset before every check it serves.', formal: '{ "type": "reset", "ions": ["q153", ...] }', costk: 'gate' },
+  MEAS:  { name: 'measure — read the ancillas out', what: 'Projective readout of the listed ions into classical bits; the syndrome.', formal: '{ "type": "measure", "ions": ["q153", ...] }', costk: 'gate' },
+  BARRIER: { name: 'barrier — an explicit synchronisation', what: 'Costs nothing; marks a point everything before must finish by.', formal: '{ "type": "barrier" }', costk: '' }
+};
+function opCost(kind){
+  try {
+    if(kind === 'shuttle' && PH.shuttle) return 'one hop: ' + PH.shuttle.us + ' µs, +' + PH.shuttle.quanta + ' quanta; entering a junction: ' + Object.keys(PH.junction_by_degree || {}).map(d => { const j = PH.junction_by_degree[d]; return 'degree ' + d + ' ' + j.us + ' µs / +' + j.quanta; }).join(', ');
+    if(kind === 'splitmerge' && PH.split && PH.merge) return 'split ' + PH.split.us + ' µs / +' + PH.split.quanta + ' quanta, merge ' + PH.merge.us + ' µs / +' + PH.merge.quanta + ' quanta, plus the junction crossing of the rail node';
+    if(kind === 'gate' && PH.scalars) return Object.keys(PH.scalars).filter(k => /gate|ms|beam|cool|measure|readout|reset|spam/i.test(k)).map(k => { const v = PH.scalars[k]; const t = (v && typeof v === 'object') ? [(v.us != null ? v.us + ' µs' : ''), (v.quanta != null ? '+' + v.quanta + ' quanta' : '')].filter(Boolean).join(' / ') : String(v); return k.replace(/_/g, ' ') + ' = ' + t; }).join(', ');
+  } catch(e){}
+  return '';
+}
+function opKey(f){
+  try { const t = opText(f); if(OPS[t]) return t; } catch(e){}
+  if(!f) return null;
+  if(f.type === 'init') return 'INIT'; if(f.type === 'cool') return 'COOL'; if(f.type === 'reset') return 'RESET';
+  if(f.type === 'measure') return 'MEAS'; if(f.type === 'barrier') return 'BARRIER';
+  if(f.type === 'gate') return OPS[f.gate] ? f.gate : 'MS';
+  if(f.type === 'simd'){ const c = String(f.cls || '');
+    return { rotate_cw: 'ROT.CW', rotate_ccw: 'ROT.CCW', dock: 'DOCK', undock: 'UNDOCK', sort_merge: 'SORT.M', sort_split: 'SORT.S' }[c] || 'SHUT'; }
+  return null;
+}
+function opClassNote(f){
+  try { const c = f && f.cls && A.classes && A.classes[f.cls]; if(!c) return '';
+    const bits = []; if(c.orbit) bits.push('orbit ' + c.orbit); if(c.delta != null) bits.push('delta ' + c.delta); if(c.direction) bits.push(c.direction); if(c.entails) bits.push('entails ' + c.entails.join('+'));
+    return 'declared class ' + c.id + (bits.length ? ' (' + bits.join(', ') + ')' : '') + (c.note ? ': ' + c.note : ''); } catch(e){ return ''; }
+}
+function opTipHTML(f, withThis){
+  const k = opKey(f); if(!k) return '';
+  const o = OPS[k], cost = opCost(o.costk), cn = opClassNote(f);
+  let col = '#52514e'; try { col = opColour(f); } catch(e){}
+  let h = '<span class="op" style="background:' + col + '">' + esc(k) + '</span><b class="n">' + esc(o.name) + '</b>'
+    + '<div class="what">' + esc(o.what) + '</div>'
+    + (cn ? '<div class="what mut">' + esc(cn) + '</div>' : '')
+    + '<code>' + esc(o.formal) + '</code>'
+    + (cost ? '<div class="what mut">on this machine: ' + esc(cost) + '</div>' : '');
+  if(withThis && f){ try { h += '<div class="this">this instruction: ' + nowHTML(f) + '</div>'; } catch(e){} }
+  return h;
+}
+(function(){
+  if(!document.body || !document.body.appendChild) return;
+  const tip = document.createElement('div'); tip.id = 'opTip'; document.body.appendChild(tip);
+  const show = (h, x, y) => { if(!h){ hide(); return; } tip.innerHTML = h; tip.setAttribute('data-open', '1');
+    const W = window.innerWidth || 1600, H = window.innerHeight || 900, w = Math.min(460, W - 24);
+    tip.style.left = Math.round(Math.min(x + 14, W - w - 8)) + 'px'; tip.style.top = Math.round(y + 16 > H - 220 ? Math.max(8, y - 220) : y + 16) + 'px'; };
+  const hide = () => tip.setAttribute('data-open', '0');
+  const rowFrame = el => { for(let r = el; r && r !== document.body; r = r.parentElement)
+    if(r.className && String(r.className).split(' ').indexOf('ln') >= 0 && typeof r._i === 'number') return r._i >= 0 ? P.frames[r._i] : null;
+    return null; };
+  const pwin = document.getElementById('pWin'), card = document.getElementById('stageNow');
+  if(pwin && pwin.addEventListener){ pwin.addEventListener('mousemove', ev => { const f = rowFrame(ev.target); f ? show(opTipHTML(f, true), ev.clientX, ev.clientY) : hide(); });
+    pwin.addEventListener('mouseleave', hide); }
+  if(card && card.addEventListener){ card.addEventListener('mousemove', ev => { const f = P.frames[frame]; if(f) show(opTipHTML(f, false), ev.clientX, ev.clientY); });
+    card.addEventListener('mouseleave', hide); }
+})();
+
+// ---------- study notes: the page's own remarks on its programme ----------
+// `D.notes` (`render_html(notes=...)`): a title, the facts line, the claim, a link back to
+// the index, and marks -- {frame, id, label, note, kind} -- each a step worth stopping at.
+// Absent on a page without notes; closed behind its pill until asked for, remembered.
+var NOTES = D.notes || null;
+function paintNotes(){
+  if(!NOTES) return;
+  const M = NOTES.marks || [], f = frame;
+  let here = null, next = null;
+  for(const m of M){ if(m.frame === f) here = m; if(m.frame > f && !next) next = m; }
+  const now = document.getElementById('nNow');
+  if(now){
+    if(here){ now.setAttribute('data-kind', here.kind || 'note');
+      now.innerHTML = '<div class="t">step ' + (f + 1) + ' &middot; instruction ' + esc(here.id) + '</div><b>' + esc(here.label) + '</b><div>' + esc(here.note) + '</div>'; }
+    else { now.setAttribute('data-kind', 'note');
+      now.innerHTML = '<div class="t">step ' + (f + 1) + '</div><div>' + (next ? 'next note at step ' + (next.frame + 1) + ' &middot; ' + esc(next.label) : 'no further notes') + '</div>'; }
+  }
+  const ul = document.getElementById('nList');
+  if(ul) for(const li of (ul.children || [])) li.setAttribute('data-here', +li.getAttribute('data-f') === f ? '1' : '0');
+}
+(function(){
+  if(!NOTES || !document.body || !document.body.appendChild) return;
+  const M = NOTES.marks || [];
+  const box = document.createElement('div'); box.id = 'notes'; box.setAttribute('data-hint', 'notes:box');
+  box.innerHTML = '<div class="nhead"><b>Study notes &middot; ' + esc(NOTES.title || '') + '</b>'
+    + (NOTES.index ? '<a href="' + esc(NOTES.index) + '">index</a>' : '')
+    + '<button class="nx" id="nClose" title="close the notes">&times;</button></div>'
+    + '<div class="nbody">' + (NOTES.facts && NOTES.facts.length ? '<div class="nfacts">' + esc(NOTES.facts.join(' · ')) + '</div>' : '')
+    + (NOTES.claim ? '<div style="margin-bottom:8px">' + esc(NOTES.claim) + '</div>' : '')
+    + '<div class="nnow" id="nNow"></div><ul id="nList">'
+    + M.map(m => '<li data-kind="' + esc(m.kind || 'note') + '" data-f="' + m.frame + '"><span class="n">step ' + (m.frame + 1) + '</span><span>' + esc(m.label) + '</span></li>').join('')
+    + '</ul><div class="nnav"><button class="nn" id="nPrev">&#9664; prev note</button><button class="nn" id="nNext">next note &#9654;</button>'
+    + '<span style="color:#8b9ab5;align-self:center">or open <code>#step=N</code></span></div></div>';
+  const pill = document.createElement('button'); pill.id = 'notesPill'; pill.setAttribute('data-hint', 'notes:pill');
+  pill.title = "the study's notes on this programme"; pill.textContent = 'Study notes';
+  document.body.appendChild(box); document.body.appendChild(pill);
+  const open = on => { box.setAttribute('data-open', on ? '1' : '0'); pill.setAttribute('data-open', on ? '1' : '0');
+    try { localStorage.setItem('qccd.studio.notes', on ? '1' : '0'); } catch(e){} };
+  let was = null; try { was = localStorage.getItem('qccd.studio.notes'); } catch(e){}
+  open(was === '1');
+  pill.onclick = () => open(true);
+  document.getElementById('nClose').onclick = () => open(false);
+  document.getElementById('nPrev').onclick = () => { let p = null; for(const m of M) if(m.frame < frame) p = m; if(p) seek(p.frame); };
+  document.getElementById('nNext').onclick = () => { for(const m of M) if(m.frame > frame){ seek(m.frame); return; } };
+  const ul = document.getElementById('nList');
+  if(ul && ul.addEventListener) ul.addEventListener('click', ev => { for(let t = ev.target; t && t !== ul; t = t.parentElement)
+    if(t.getAttribute && t.getAttribute('data-f') != null){ seek(+t.getAttribute('data-f')); return; } });
+  window.NOTES_UI = { open, isOpen: () => box.getAttribute('data-open') === '1' };
+})();
+
+// ---------- the deep links ----------
+// #step=N (1-based) or #id=<instruction id> opens that instruction.  #learn opens the
+// course, #learn=B2 a lesson; #design is the canvas with a lesson left open folded away.
+// #embed is the page as the website's examples show it (the stage and its transport, see
+// the CSS), with &play it runs on a loop, with &go it plays once as soon as the page is up.
+// Under the test shim there is no `location`, and nothing here runs.
+var EMBED_LOOP = false, EMBED_WENT = false;
+function embedMode(autoplay, go){
+  document.body.setAttribute('data-embed', '1');
+  try { if(window.EDITOR && EDITOR.setViewOnly) EDITOR.setViewOnly(true); } catch(e){}
+  foldPanel(document.getElementById('rail'), true);
+  foldPanel(document.getElementById('dock'), true);
+  relayout();
+  const reset = document.getElementById('reset'), atEnd = () => +slider.max > 0 && +slider.value >= +slider.max;
+  if(!autoplay && !playBtn.getAttribute('data-replay')){
+    playBtn.setAttribute('data-replay', '1');
+    // a short example at 4x is over in a fifth of a second: it plays at 1x
+    if(+slider.max > 0 && +slider.max <= (go ? 24 : 8)){ speedSel.value = '1'; speedSel.dispatchEvent(new Event('change')); }
+    // Play on the last frame plays it again from the start, as a player does (a capture
+    // listener runs before the page's own)
+    playBtn.addEventListener('click', () => { if(!playBtn.disabled && playBtn.textContent === 'Play' && atEnd()) reset.click(); }, true);
+  }
+  if(go && !EMBED_WENT){
+    EMBED_WENT = true;
+    setTimeout(() => { if(playBtn.disabled) return; if(atEnd()) reset.click(); if(playBtn.textContent === 'Play') playBtn.click(); }, 350);
+  }
+  if(EMBED_LOOP || !autoplay) return;
+  EMBED_LOOP = true;
+  setTimeout(() => { if(!playBtn.disabled && playBtn.textContent === 'Play') playBtn.click(); }, 400);
+  // the transport stops on the last frame and says Play again: start over
+  setInterval(() => { if(!playBtn.disabled && playBtn.textContent === 'Play' && atEnd()){ reset.click(); playBtn.click(); } }, 700);
+}
+function fromHash(){
+  if(typeof location === 'undefined' || !window.addEventListener) return;
+  const h = (location.hash || '').replace(/^#/, ''), parts = h.split('&'), dk = document.getElementById('dock');
+  let m;
+  if(parts.indexOf('embed') >= 0) embedMode(parts.indexOf('play') >= 0, parts.indexOf('go') >= 0);
+  else if(h === 'design'){
+    // the canvas, not the course: a lesson left open is folded away, the canvas untouched
+    const pl = document.getElementById('paneL');
+    if(pl && /\bon\b/.test(pl.className)) foldPanel(dk, true);
+  } else if((m = /^learn(?:=([A-Za-z]\d+))?$/.exec(h))){
+    try { if(m[1] && window.EDITOR && EDITOR.lessonLoad) EDITOR.lessonLoad(m[1]); } catch(e){}
+    foldPanel(dk, false); setPane('L');
+  }
+  if((m = /(?:^|&)step=(\d+)/.exec(h))) seek(parseInt(m[1], 10) - 1);
+  else if((m = /(?:^|&)id=([^&]+)/.exec(h))){ const k = decodeURIComponent(m[1]);
+    for(let i = 0; i < P.frames.length; i++) if(String(P.frames[i].id) === k){ seek(i); break; } }
+}
+try { window.addEventListener('hashchange', fromHash); } catch(e){}
 
 relayout();
 fit();
 HWL_LIVE = true;
 draw();
+fromHash();
+// the column's lists measure once the layout has settled, and the executing row comes into view
+setTimeout(() => { sizeLists(); if(PLIST && PLIST.follow && VIEWPOS[frame] >= 0) PLIST.scrollToRow(VIEWPOS[frame]); syncCursor(true); }, 50);
 </script>
 __EDITOR__
 </body></html>
@@ -5221,11 +5567,21 @@ def render_html(
     open_pane: str | None = None,
     tech=None,
     ruleset: dict | None = None,
+    notes: dict | None = None,
 ) -> Path:
     """Write the self-contained page.  Returns the path written.
 
-    `open_pane` names the dock pane the page opens on (`"L"` for the course); the default
-    is none -- the page opens on the canvas and the menu in the head opens a pane."""
+    THIS IS THE ONE DESIGN-PAGE TEMPLATE.  Every page that shows a programme on a machine is
+    written here and nowhere else: no caller rearranges, restyles or patches the page's
+    layout afterwards (tests/test_one_template.py fails on any that does).  A page-specific
+    feature is a parameter of this function.
+
+    `source` is the circuit the programme was compiled from (`qccd.ir.source_map.build`):
+    pass it whenever there is one -- it is what gives the Program column its Gates view --
+    and `source=None` only for a programme no circuit stands behind.  `notes` is a page's
+    study notes: {title, index (a link back), facts: [str], claim, marks: [{frame, id,
+    label, note, kind}]}.  `open_pane` names the dock pane the page opens on (`"L"` for the
+    course); the default is none -- the page opens on the canvas."""
     view = build_view_model(arch, prog, res, model, max_frames=max_frames,
                             kicker=kicker, headline=headline, lede=lede,
                             control=control, provenance=provenance,
@@ -5235,6 +5591,8 @@ def render_html(
     if ruleset:
         # absent unless given, so every other page is byte-identical to before
         view["ruleset"] = ruleset
+    if notes:
+        view["notes"] = notes
     # names come from the device and programme files, which can be anyone's (a leaderboard entry)
     html = _TEMPLATE.replace("__TITLE__", _escape_text(f"{arch.name} - {prog.name}"))
     html = html.replace("__STAMP__", page_stamp())

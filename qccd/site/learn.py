@@ -112,7 +112,7 @@ def recap(items: list[str], active: str, depth: int = 1, title: str = "What to r
 def runbox(src: str, poster_svg: str, title: str, cls: str = "", what: str = "") -> str:
     """An animation as a poster with a Play button.  `src` is the Studio page (without
     its hash); pressing Play loads it in embed mode and plays the programme once
-    (`#embed&step=1&go`, see HASH_JS), after which Step, Reset and the slider are the
+    (`#embed&step=1&go`, the page's own deep links in qccd/viz/render.py), after which Step, Reset and the slider are the
     reader's.  `poster_svg` is the machine with its ions where the programme starts."""
     what = what or "the programme, played once; then step it or scrub it"
     return (f'<div class="runbox {cls}" data-src="{html.escape(src)}" data-title="{html.escape(title)}">'

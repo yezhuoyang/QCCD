@@ -608,9 +608,7 @@ def studio_pages(dst: Path) -> list[Path]:
     out = []
 
     def embed(p: Path) -> None:
-        s = p.read_text(encoding="utf-8")
-        i = s.rindex("</body>")
-        p.write_text(s[:i] + site.HASH_JS + s[i:], encoding="utf-8")
+        # the page answers #embed itself (qccd/viz/render.py's deep links)
         out.append(p)
 
     for f in sorted(COMPILED.glob("*.arch.json")):

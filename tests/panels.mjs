@@ -35,7 +35,7 @@ const driver = `
     cursor: PLIST.cursor(), archCursor: ALIST.cursor(),
     pool: document.getElementById('pWin').children.length,
     archPool: document.getElementById('aWin').children.length,
-    now: document.getElementById('pNow').innerHTML,
+    now: document.getElementById('stageNow').innerHTML,
     foot: document.getElementById('pFoot').innerHTML,
     live, arch,
   };

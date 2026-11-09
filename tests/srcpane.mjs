@@ -24,8 +24,9 @@ const driver = `
   return {
     lines: QLIST ? QLIST.rows() : 0,
     cursor: QLIST ? QLIST.cursor() : -2,
-    now: document.getElementById('qNow').innerHTML || '',
-    inline: document.getElementById('pNow').innerHTML || '',
+    // the stage card: its circuit line (#snQ) and the whole card
+    now: ((/<div id="snQ">([\\s\\S]*)<\\/div>$/.exec(document.getElementById('stageNow').innerHTML || '')) || ['', ''])[1],
+    card: document.getElementById('stageNow').innerHTML || '',
     marks: QMARK || {},
     rows,
   };

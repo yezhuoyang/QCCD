@@ -29,10 +29,10 @@ KNOWN_DEBT = {
     "/web/gadgets/": {"app", "stageTools"},
     # the QEC-cycle panel (qccd/site/qec_cycle.js)
     "/web/studio.html": {"qcShowOn"},
-    # leaderboards: the chart's controls (the board index), and on entry pages the Study-notes overlay,
-    # its label box, the QEC-cycle panel and two pane close buttons of the compiled pages
-    "/web/board/": {"ysel", "xsel", "log", "vchart", "vtable", "qcShowOn", "bblab", "pHw", "paneQ", "bbreopen",
-                    "bbhead", "bbnotes", "bbpill"},
+    # leaderboards: the chart's controls (the board index) and the QEC-cycle panel.  The entry pages'
+    # Study-notes overlay is gone: the notes, the q-labels box and the stage card are the page
+    # template's own, declared there (2026-11-09)
+    "/web/board/": {"ysel", "xsel", "log", "vchart", "vtable", "qcShowOn"},
 }
 EXTRA = ["studio.html#learn=A1", "studio.html#learn=D1"]
 

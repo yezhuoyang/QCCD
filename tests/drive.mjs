@@ -558,9 +558,11 @@ export const PAGE_HOOK = `
   // the window title -- every one of them used to describe the SHIPPED programme while
   // an authored one was on the stage
   pCount: () => document.getElementById('pCount').textContent || '',
-  pNow: () => document.getElementById('pNow').innerHTML || '',
-  // the Circuit lane's NOW strip: joined to the shipped walk only, never to an authored frame
-  qNow: () => document.getElementById('qNow').innerHTML || '',
+  // the stage card's two lines (#stageNow: #snHw the instruction, #snQ the circuit
+  // statement, joined to the shipped walk only, never to an authored frame); the shim holds
+  // innerHTML as a string, so the lines are cut out of it
+  pNow: () => { const m = /<div id="snHw">([\\s\\S]*)<\\/div><div id="snQ">([\\s\\S]*)<\\/div>$/.exec(document.getElementById('stageNow').innerHTML || ''); return m ? m[1] : ''; },
+  qNow: () => { const m = /<div id="snHw">([\\s\\S]*)<\\/div><div id="snQ">([\\s\\S]*)<\\/div>$/.exec(document.getElementById('stageNow').innerHTML || ''); return m ? m[2] : ''; },
   pwErr: () => (document.getElementById('pwErr').innerHTML || '')
     .replace(/<\\/div>/g, '\\n').replace(/<[^>]*>/g, '').trim(),
   counters: () => ({ steps: document.getElementById('cSteps').textContent || '',

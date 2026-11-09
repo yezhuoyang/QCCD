@@ -61,7 +61,7 @@ PARTS = (("learn", "Tutorial", "learn/", "the course, the reference docs, and wo
          ("discuss", "Discuss", "discuss/", "rules, bugs and features, on GitHub Discussions"))
 
 #: The running example on the landing: one seed entry, embedded as the page it is, in
-#: embed mode (HASH_JS) so only its stage and transport show.
+#: embed mode (the page's own #embed) so only its stage and transport show.
 EXAMPLE = {"task": "five_qubit", "device": "ring24_8_j",
            "what": "The five-qubit code's syndrome round on a 24-site ring with 8 docks and junction corners"}
 
@@ -322,7 +322,9 @@ table.formulas td:first-child{white-space:nowrap;color:var(--ink)} table.formula
 """
 
 
-APP_CSS = "<style>main{height:calc(100vh - 40px)!important}</style>"
+# the site's bar goes in embed mode too (the studio page's #embed, qccd/viz/render.py)
+APP_CSS = ("<style>main{height:calc(100vh - 40px)!important}"
+           "body[data-embed=\"1\"] #sitenav{display:none!important}</style>")
 
 # The footer on every document page: who leads the project and who funds it, with the
 # three marks.  The wordmarks are the public-domain text logos; CIQC's is its own header
@@ -364,85 +366,6 @@ h2,h3{font-family:var(--serif);color:#1a2540}
 </style>"""
 STYLE = STYLE + FOOTER_CSS + learn.CSS
 
-HASH_JS = """<script>
-(function(){
-  // The site's deep links into an app page: #learn opens the course, #learn=B2 a lesson,
-  // #design is the blank canvas (the default), and #embed (with &step=N) is the page as
-  // the examples show it -- head, tools bar, rail and dock folded away, the stage and its
-  // transport waiting at the step named; with &play it runs on a loop (the landing).  It
-  // is the same page, not a picture of it.  With &go (the Learn pages' posters, 2026-11-07)
-  // the programme plays once as soon as the page is up, at 1x while it is short enough
-  // to follow, and the transport is the reader's afterwards.  Under the test shim there
-  // is no `location`, and nothing here runs.
-  if(typeof location === 'undefined' || typeof window === 'undefined' || !window.addEventListener) return;
-  var looping = false, went = false;
-  function embed(play, go){
-    document.body.setAttribute('data-embed', '1');
-    // the website's embedded examples run and are watched, never edited
-    try { if(window.EDITOR && EDITOR.setViewOnly) EDITOR.setViewOnly(true); } catch(e){}
-    try { var rail = document.getElementById('rail'); if(rail && typeof foldPanel === 'function') foldPanel(rail, true); } catch(e){}
-    try { var dk = document.getElementById('dock'); if(dk && typeof foldPanel === 'function') foldPanel(dk, true); } catch(e){}
-    try { if(typeof relayout === 'function') relayout(); } catch(e){}
-    var autoplay = play;
-    play = document.getElementById('play'); var reset = document.getElementById('reset'), slider = document.getElementById('slider');
-    if(play && !autoplay && !play.getAttribute('data-replay')){
-      play.setAttribute('data-replay', '1');
-      // a short example at the default 4x is over in a fifth of a second, too fast to see: it
-      // plays at 1x, a step every second or so
-      try { var sp = document.getElementById('speed');
-            if(sp && slider && +slider.max > 0 && +slider.max <= (go ? 24 : 8)){ sp.value = '1'; sp.dispatchEvent(new Event('change')); } } catch(e){}
-      // and Play on the last frame plays it again from the start, as a player does, instead
-      // of doing nothing until Reset is pressed (a capture listener runs before the page's own)
-      play.addEventListener('click', function(){ try {
-        if(!play.disabled && play.textContent === 'Play' && slider && +slider.max > 0 && +slider.value >= +slider.max && reset) reset.click();
-      } catch(e){} }, true);
-    }
-    if(go && play && !went){
-      // pressed on the poster: play it once, from the start, now
-      went = true;
-      setTimeout(function(){ try {
-        if(play.disabled) return;
-        if(slider && +slider.max > 0 && +slider.value >= +slider.max && reset) reset.click();
-        if(play.textContent === 'Play') play.click();
-      } catch(e){} }, 350);
-    }
-    if(looping || !play || !autoplay) return;
-    looping = true;
-    setTimeout(function(){ try { if(!play.disabled && play.textContent === 'Play') play.click(); } catch(e){} }, 400);
-    // the transport stops on the last frame and says Play again: start over
-    setInterval(function(){ try {
-      if(play.disabled || !slider) return;
-      if(play.textContent === 'Play' && +slider.max > 0 && +slider.value >= +slider.max){ if(reset) reset.click(); play.click(); }
-    } catch(e){} }, 700);
-  }
-  function apply(){
-    var h = (location.hash || '').replace(/^#/, ''), m = /^learn(?:=([A-Za-z]\\d+))?$/.exec(h);
-    var dk = document.getElementById('dock'), pl = document.getElementById('paneL');
-    if(h.split('&').indexOf('embed') >= 0){ embed(h.split('&').indexOf('play') >= 0, h.split('&').indexOf('go') >= 0); return; }
-    if(h === 'design'){
-      // the canvas, not the course: the course remembers itself across visits, so a lesson
-      // left open is folded away here -- the work on the canvas is untouched
-      try { if(pl && /\\bon\\b/.test(pl.className) && dk && typeof foldPanel === 'function') foldPanel(dk, true); } catch(e){}
-      return;
-    }
-    if(!m) return;
-    try { if(m[1] && window.EDITOR && EDITOR.lessonLoad) EDITOR.lessonLoad(m[1]); } catch(e){}
-    try { if(dk && typeof foldPanel === 'function') foldPanel(dk, false);
-          if(typeof setPane === 'function') setPane('L'); } catch(e){}
-  }
-  window.addEventListener('hashchange', apply); apply();
-})();
-</script>
-<style>
-body[data-embed="1"] #sitenav,body[data-embed="1"] .head,body[data-embed="1"] #tools,body[data-embed="1"] #bbpill,
-body[data-embed="1"] #bbnotes,body[data-embed="1"] #bbtools,body[data-embed="1"] #bbnow{display:none!important}
-body[data-embed="1"] main{height:100vh!important}
-/* view-only: the transport stays (play, step, reset, fit, speed); the editing tools, the
-   display modes, the element rail and the guide go */
-body[data-embed="1"] #ebar,body[data-embed="1"] #glide,body[data-embed="1"] #phase,body[data-embed="1"] #mode,
-body[data-embed="1"] #stagebar label,body[data-embed="1"] #rail,body[data-embed="1"] #toasts,
-body[data-embed="1"] #eCount,body[data-embed="1"] #eProb{display:none!important}
-</style>"""
 
 # The reading furniture every document page carries: the contents rail and the code
 # blocks.  It is appended to `<body>`, never woven into the words, so a comment pinned to
@@ -1281,7 +1204,7 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
         rel = f"language/ex/{v['verb']}.html"
         r = build_example({"program": v["example"]}, m, "corrected", out / rel, kicker="THE LANGUAGE",
                           headline=f'p.{v["verb"]}', lede=v["what"], check_metrics=v.get("check_metrics", False))
-        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "language", app=True, extra=HASH_JS)
+        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "language", app=True)
         lang[v["verb"]] = {**r, "page": f"ex/{v['verb']}.html", "poster": poster(m, r.get("init"), fit=(640, 380))}
         if v.get("kind") == "shorthand":
             # the page says a shorthand is judged exactly as its core statements: hold it to that
@@ -1308,7 +1231,7 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
                               headline=f"{R['id']}: {'passes' if which == 'pass' else 'fails'}" if not ex.get("expect") else f"{R['id']}: {ex.get('tag') or ex['expect']}",
                               lede=R["checks"], focus=R["id"], check_metrics=R.get("check_metrics", False),
                               ruleset=R.get("ruleset", "standard"))
-            put(rel, (out / rel).read_text(encoding="utf-8"), 2, "rules", app=True, extra=HASH_JS)
+            put(rel, (out / rel).read_text(encoding="utf-8"), 2, "rules", app=True)
             entry[which] = {**r, "page": f"ex/{R['id']}_{which}.html", "model": model,
                             "device": (ex.get("device") or R["device"])["about"],
                             "poster": poster(m, r.get("init"))}
@@ -1833,7 +1756,7 @@ def build_compiled_pages(out: Path, put) -> list[dict]:
         rel = f"compilation/ex/{g['id']}.html"
         render_html(arch, prog, res, model, out / rel, kicker="COMPILED", headline=f'{g["meta"]["title"]} on {dev}',
                     lede=g["meta"]["note"], source=source, open_pane="Q")
-        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "compilation", app=True, extra=HASH_JS)
+        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "compilation", app=True)
     return built
 
 
@@ -2153,7 +2076,7 @@ def build_phys_runs(out: Path, put) -> dict[str, dict]:
         recs = [rec(meth, *args, **kw) for meth, args, kw in spec["program"]]
         r = build_example({"program": recs}, m, spec.get("model", "corrected"), out / rel, kicker="PHYSICS",
                           headline=spec["headline"], lede=spec["lede"])
-        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "physics", app=True, extra=HASH_JS)
+        put(rel, (out / rel).read_text(encoding="utf-8"), 2, "physics", app=True)
         built[rid] = {**r, "page": f"ex/{rid}.html", "device": spec["device"]}
     return built
 
@@ -2487,7 +2410,7 @@ def build(out: Path) -> int:
     # and the panel reads the page's own priced round (qccd/site/qec_cycle.py); the Agent
     # button is the way from this page to a local co-design workspace (qccd/site/cowork.py)
     put("studio.html", studio.read_text(encoding="utf-8"), 0, None, app=True,
-        extra=HASH_JS + qec_cycle.studio_block() + cowork.studio_block())
+        extra=qec_cycle.studio_block() + cowork.studio_block())
 
     # the compiled companion Part D steps through.  A lesson with `page:` set runs on a
     # COMPILED page, and says so; it links to this one by bare file name, beside the
@@ -2502,7 +2425,7 @@ def build(out: Path) -> int:
         qccd_main(["studio", "-o", str(companion),
                    "--tsir", str(comp_tsir), "--qasm", str(comp_qasm)])
         put("micro_grid9x9.html", companion.read_text(encoding="utf-8"), 0, None,
-            app=True, extra=HASH_JS)
+            app=True)
         print("  companion    micro_grid9x9.html, the page Part D runs on")
     else:
         missing = comp_tsir if not comp_tsir.exists() else comp_qasm
@@ -2541,7 +2464,7 @@ def build(out: Path) -> int:
         for rel, page_, depth in reproduce.document_pages(PAGE, STYLE):
             put(rel, page_, depth, "reproduce")
         for rel, page_, card in reproduce.studio_pages(out / ".reproduce_tmp"):
-            put(rel, page_, 2, "reproduce", app=True, extra=HASH_JS + card)
+            put(rel, page_, 2, "reproduce", app=True, extra=card)
         shutil.rmtree(out / ".reproduce_tmp", ignore_errors=True)
         # the files a paper's page links to: its timed schedules, theirs and ours
         for rel, blob in getattr(reproduce, "downloads", lambda: ())():
@@ -2604,7 +2527,7 @@ def build(out: Path) -> int:
             # an entry page IS a circuit: it gets the classical layer and the cycle panel
             # too, so the half of the machine that reads the ions is visible there as well
             put(f"board/{t['id']}/{r['page']}", (src / r["page"]).read_text(encoding="utf-8"), 2, "board",
-                app=True, extra=HASH_JS + qec_cycle.studio_block())
+                app=True, extra=qec_cycle.studio_block())
             n_pages += 1
             gif = r.get("gif")
             if gif and (src.parent / gif).exists():

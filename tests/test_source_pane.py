@@ -183,17 +183,20 @@ def test_marks_distinguish_executing_from_travelling(report):
             assert (" qw" in row["cls"]) == (want == 1), row
 
 
-def test_the_hardware_pane_names_the_statement_too(report):
-    """Without this you have to change tabs to answer "which gate is this?"."""
+def test_the_stage_card_names_the_instruction_and_the_statement(report):
+    """Without this you have to change views to answer "which gate is this?": the one card on
+    the stage carries the hardware instruction and the statement it discharges."""
     r, source = report
     for p in r["probes"]:
         iid = r["frameIds"][p["frame"]]
+        assert f"<b>#{iid}</b>" in p["card"], p["card"]
+        assert "circuit:" in p["card"], p["card"]
         if source["realises"].get(str(iid)):
-            assert "circuit &rarr;" in p["inline"]
+            assert "executing" in p["now"]
         elif source["toward"].get(str(iid)):
-            assert "towards" in p["inline"]
+            assert "towards" in p["now"]
         elif source["after"].get(str(iid)):
-            assert "after" in p["inline"]
+            assert "after" in p["now"]
 
 
 def test_clicking_a_statement_lands_on_the_instruction(report):

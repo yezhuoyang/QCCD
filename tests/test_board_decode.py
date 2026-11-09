@@ -76,14 +76,14 @@ def page(tmp_path_factory):
     sys.path.insert(0, str(SCRIPTS))
     import bb_studio as B
     from qccd.site import qec_cycle
-    from qccd.site.build import HASH_JS, with_nav
+    from qccd.site.build import with_nav
     out = tmp_path_factory.mktemp("board_decode")
     res = B.build_one(dict(entry), out, max_frames=20000)
     assert res["status"] == "ok", res
     p = out / res["page"]
     # the classical layer, exactly as the site build gives an entry page it
     p.write_text(with_nav(p.read_text(encoding="utf-8"), 2, "board", "[]", app=True,
-                          extra=HASH_JS + qec_cycle.studio_block()),
+                          extra=qec_cycle.studio_block()),
                  encoding="utf-8", newline="")
     return p
 

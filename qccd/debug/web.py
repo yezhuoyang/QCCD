@@ -104,6 +104,7 @@ def render_page(arch: str, program: str, model: str = "null") -> str:
         res = replay(P, A, M, check_rules=True, keep_cycles=True)
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "page.html"
-            render_html(A, P, res, M, out)
+            # an uploaded programme: no certificate comes with it
+            render_html(A, P, res, M, out, source=None)
             return {"html": out.read_text(encoding="utf-8")}
     return _answer(go)

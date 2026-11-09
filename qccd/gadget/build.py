@@ -212,7 +212,8 @@ def _studio_pages(lib, leaves: LeafLibrary, gir: dict, out: Path, log, where: Pa
         if not target.exists():
             prog = TSIR.from_json(data["programs"][op])
             res = verify(prog, arch, model, check_metrics=False).result
-            render_html(arch, prog, res, model, target, kicker="logical gadget",
+            # a leaf's programs come from its generator, not from a circuit through the compiler
+            render_html(arch, prog, res, model, target, source=None, kicker="logical gadget",
                         headline=f"{mname} · {op}", lede=lib[mname].ops[op].title)
             log(f"  studio page {target.name}")
         pages[f"{mname}.{op}"] = os.path.relpath(target, out).replace(os.sep, "/")

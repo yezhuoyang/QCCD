@@ -1292,13 +1292,13 @@ class Machine:
 
     def render(self, program: "Program | TSIR", path, *,
                model: "str | CostModel" = "corrected", table: str = "qccdsim_jones",
-               **kw) -> Path:
+               source: dict | None = None, **kw) -> Path:
         from .viz import render_html
 
         prog = program.build() if isinstance(program, Program) else program
         m = _resolve_model(model, table)
         res = self.run(prog, model=m, check_metrics=False).report.result
-        return render_html(self.arch, prog, res, m, path, **kw)
+        return render_html(self.arch, prog, res, m, path, source=source, **kw)
 
     def compile(self, code, *, policy=None, model: "str | CostModel" = "corrected"):
         """Run the PLAN §7 pipeline: a code in, a verified program out."""

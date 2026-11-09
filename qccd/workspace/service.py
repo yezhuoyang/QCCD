@@ -1310,7 +1310,8 @@ def _render(ws: Workspace, snapshot_id: str | None) -> str:
     report = verify(prog, arch, model)
     with tempfile.TemporaryDirectory() as td:
         out = Path(td) / "page.html"
-        render_html(arch, prog, report.result, model, out, tech=tech, kicker="QCCD STUDIO",
+        # a run's bundle or the live design: no certificate names a circuit for it
+        render_html(arch, prog, report.result, model, out, source=None, tech=tech, kicker="QCCD STUDIO",
                     headline=headline, lede=None, template_stems="*")
         return out.read_text(encoding="utf-8")
 

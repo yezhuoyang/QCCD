@@ -156,7 +156,7 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
     """Write `gadgets/` under the site directory `out` through the site's `put`.  `fullstack`:
     "all" runs every program of FULLSTACK, "small" leaves out the big ones, "none" none.  `rsa`:
     the packed data of gadgets/rsa2048/ (`rsa.pack`), or None for no such page."""
-    from ..site.build import HASH_JS, PAGE, STYLE
+    from ..site.build import PAGE, STYLE
     from .floorplan import FLOORPLANS_DIR, load_file
     from .library import LeafLibrary
     from .verified import build_algorithm
@@ -201,11 +201,11 @@ def build_section(out: Path, put, *, cache_dir="out/gadgets/cache", log=print,
         put(f"{SECTION}/{key}/index.html", page, 2, SECTION, app=True)
         beta[key] = res
 
-    # the studio pages are app pages: the bar, the comment layer and the hash handler, once each
+    # the studio pages are app pages: the bar and the comment layer, once each
     for page_path in sorted(studio.glob("*.html")) if studio.exists() else []:
         page = page_path.read_text(encoding="utf-8")
         if 'id="sitenav"' not in page:
-            put(f"{SECTION}/studio/{page_path.name}", page, 2, SECTION, app=True, extra=HASH_JS)
+            put(f"{SECTION}/studio/{page_path.name}", page, 2, SECTION, app=True)
 
     town_lib = next(iter(algs.values()))["library"] if algs else None
     put(f"{SECTION}/index.html",
@@ -1016,7 +1016,8 @@ def embed_page(name: str, dst: Path, *, focus: str | None = None,
         prog = TSIR.from_json(data["programs"][op])
         model = corrected_model("qccdsim_jones")
         res = verify(prog, arch, model, check_metrics=False).result
-        render_html(arch, prog, res, model, dst, kicker="logical gadget",
+        # a leaf's programs come from its generator, not from a circuit through the compiler
+        render_html(arch, prog, res, model, dst, source=None, kicker="logical gadget",
                     headline=f"{master} · {op}", lede=m.ops[op].title if op in m.ops else op)
         return dst
     raise KeyError(f"no gadget page {name!r}: 'algorithms/<example>', a place "

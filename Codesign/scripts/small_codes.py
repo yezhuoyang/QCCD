@@ -420,33 +420,9 @@ def main(argv=None) -> int:
     ap.add_argument("--code", default=None, help="one code key")
     ap.add_argument("--device", default=None, help="one device key")
     ap.add_argument("--pages-only", action="store_true", help="rebuild pages from rows.json")
-    ap.add_argument("--overlay-only", action="store_true",
-                    help="re-inject the notes/tools overlay into the rendered pages and rewrite the indexes")
     a = ap.parse_args(argv)
     specs = codes()
     all_rows: dict[str, list[dict]] = {}
-    if a.overlay_only:
-        marker = "<style>\n#bbnotes"
-        for k, spec in specs.items():
-            out = OUT / k
-            mf = out / "manifest.json"
-            if not mf.exists():
-                continue
-            manifest = resolve(json.loads(mf.read_text(encoding="utf-8")))
-            for r in manifest:
-                if r.get("status") != "ok":
-                    continue
-                page = out / r["page"]
-                src = page.read_text(encoding="utf-8")
-                if marker in src:
-                    page.write_text(src[: src.index(marker)] + "</body></html>", encoding="utf-8", newline="")
-                B._inject(page, r, r.get("marks") or [], r.get("numbers") or {}, "index.html")
-            B.write_index(manifest, out, title=f"{spec['title']} on QCCD — every architecture, ranked",
-                          subtitle=f"One syndrome-extraction round of the {spec['title']} compiled onto every architecture, "
-                                   f"shipped and from the study's families; the circuit checked in stim, every program checked "
-                                   f"against the 20 rules and, where it passed, by the proved Lean checker (R10).")
-            print(f"   overlay -> {k}: {sum(1 for r in manifest if r.get('status') == 'ok')} pages")
-        return 0
     for k, spec in specs.items():
         out = OUT / k
         if a.code and k != a.code:

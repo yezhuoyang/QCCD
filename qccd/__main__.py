@@ -200,7 +200,8 @@ def cmd_run(args) -> int:
             print(f"    {v}")
 
     if args.html:
-        path = render_html(arch, prog, res, model, args.html,
+        # a programme file on its own: no certificate names the circuit behind it
+        path = render_html(arch, prog, res, model, args.html, source=None,
                            max_frames=args.max_frames)
         print(f"  wrote          {path}")
     if args.json:
@@ -518,7 +519,8 @@ def cmd_open(args) -> int:
     for v in report.rules.violations[:10]:
         print(f"    {v}")
     if args.html:
-        path = render_html(arch, prog, report.result, model, args.html,
+        # a programme file on its own: no certificate names the circuit behind it
+        path = render_html(arch, prog, report.result, model, args.html, source=None,
                            max_frames=args.max_frames)
         print(f"  wrote          {path}")
     return 0 if report.ok() else 1
@@ -600,7 +602,7 @@ def cmd_phys(args) -> int:
         view = build_view_model(arch, prog, rep.result, model)
         metal = metal_view_model(layout, width=view["layout"]["W"],
                                  height=view["layout"]["H"])
-        out = render_html(arch, prog, rep.result, model, args.html,
+        out = render_html(arch, prog, rep.result, model, args.html, source=None,
                           tech=tech,
                           kicker="ELECTRODES",
                           headline=f"{arch.name} - {tech.name}",
@@ -775,7 +777,8 @@ def cmd_demo(args) -> int:
         # summary()['passed'] came back [] and every page printed an empty Rules panel
         res = verify(prog, arch, model, check_metrics=False).result
         out = OUT / f"{device}__{kind}__{model_name}.html"
-        render_html(arch, prog, res, model, out, max_frames=args.max_frames)
+        # the shipped hand-written programmes (`program_for`): no circuit behind them
+        render_html(arch, prog, res, model, out, source=None, max_frames=args.max_frames)
         rules = res.rules.summary()
         rows.append({
             "device": device, "program": prog.name, "model": model_name,
