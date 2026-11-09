@@ -59,7 +59,7 @@ unchanged, since the C2LR boards judge by it.
 | S7 step shape | C4, C5, C7 |
 | S8 swap-or-stay | C6, and the R2, R3, R5, R22 exemption |
 | S9 constant frequency | C8, 1.4 MHz recorded on the primitive |
-| S10 reorder-or-not | the device prices it (93 us); the router has no use for it, since nothing tracks chain order here |
+| S10 reorder-or-not | the machine prices it (93 us); the router never reorders a crystal: it keeps each leg's order (`qccd.verify.chains`) and splits a layer's pulses by the position they address (R34, F2) |
 | **S11 enter and exit (open)** | the platform's existing reading: C1's enter-exit window, one crystal enters by a step and leaves by the same type, merge + MS + split between. Marked open, as the deck has it |
 | HW1, HW7 | `grid(Cx, Cy)`; one pair of gate beams per leg, in the census |
 | HW2-HW6 | the census (`c2lr.deck_census`); C10 for HW3, HW4 |
@@ -80,7 +80,7 @@ unchanged, since the C2LR boards judge by it.
 | S2 zone parity | W2 |
 | S3 one bit per zone | R22 as written: each half of a swap is one motion, so nothing needs relaxing |
 | S4 one operation kind per step | W4, R4b |
-| S5 switchable swap | W2: a step's pairs are one kind and one parity, the same pairing the device derives |
+| S5 switchable swap | W2: a step's pairs are one kind and one parity, the same pairing the machine derives |
 | S6 swap mechanism | **one step (F4):** the pair exchanges its ions in the step, priced by kind (`wise_swap`): t0 between neighbours, a junction step of C2LR's 400 us across a junction zone or between rows (F1). The replay calls it an exchange only where every move is the chip's own pair of that kind, so R2, R3, R5 and R22 leave the crossing alone as for a C2LR exchange |
 | S7 odd-even sort | an algorithm, so no rule. The router takes real steps from the same step types; the deck's worst case is reported beside it (`reconfiguration_ms`) |
 | S8 junction occupancy | R2, R23. See "Readings" |

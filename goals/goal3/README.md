@@ -40,7 +40,7 @@ here, and lists the readings taken where the documents leave a gap, each open or
 definitions and the sizes tried are data in [families.py](families.py). The Goal 3 page's cost table
 (feedback F1) lists every term each family pays.
 
-| family | device | swept, per the deck | rule set | compiler |
+| family | machine | swept, per the deck | rule set | compiler |
 |---|---|---|---|---|
 | C2LR | Cx x Cy cells, an X-junction and two legs each, one crystal per leg, moved by swap-or-stay steps (Yb-Ba, the demonstrated diagonals) | Cx, Cy | `c2lr-deck` | the baseline C2LR router |
 | WISE | Cx x Cy cells, a junction zone and h gate zones each, sorted by parallel switched swaps (a pair exchanges in one step), one kind of operation across the chip in a step | h, Cx, Cy | `wise` | the baseline WISE router |
@@ -99,7 +99,7 @@ The site page draws the same points live, with the official entries on each code
 (`qccd/site/goal3.py`; the server's `GET /official/v1/goals/goal3`).
 
 **Every point opens its own page.** A reference point opens its studio page: the ions moving on
-its device, the program against the circuit, the rules, and the noise model's stim program
+its machine, the program against the circuit, the rules, and the noise model's stim program
 block by block. An official entry opens its page on the server. A size whose program broke a
 rule has a page too, listed under "The sizes that failed". [pages.py](pages.py) builds the
 pages from the sweep's `work/` folders. Each page replays its program, and the replayed time
@@ -126,7 +126,7 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
 - **The official boards are not on this model yet.** `goal3_<code>_mem` releases still fix qccd-physics@2 and
   qccd-noise@2, and their physics lock has no way to give each family its own prices. They hold no entries.
   This sweep uses their circuits, detectors, budgets and seeds. Moving them means new releases, and a lock
-  that recomputes a family's prices from its parameters rather than trusting a device's own.
+  that recomputes a family's prices from its parameters rather than trusting a machine's own.
 - **[DECK.md](DECK.md), "Readings":** answered on 2026-11-07: the idle leakage rate (the report's), crosstalk
   under parallel readout (a simulation assumption, kept and labelled), the cooling (the same for every family),
   the GateSwap's error (3 x the two-qubit gate's) and C2LR's enter and exit (fine for now). Open: the values the
