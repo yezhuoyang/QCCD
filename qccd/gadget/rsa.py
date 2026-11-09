@@ -34,6 +34,20 @@ PRIMES = 21_640
 MOVE, PAIR, PULSE, MEASURE, RESET, COOL, VIRTUAL = 1, 2, 3, 4, 5, 6, 7
 
 
+def theme_script() -> str:
+    """The studio's palette and shape ratios for the player (qccd/viz/theme.py): it draws a trap, a junction, a rail
+    and an ion by the same numbers as a design page and the gadget town."""
+    from ..viz.theme import GEOMETRY, PALETTE
+    return f"<script>window.QCCD_THEME = {json.dumps({'palette': dict(PALETTE), 'geometry': dict(GEOMETRY)})};</script>"
+
+
+def ion_key() -> tuple:
+    """The ions' colours, as the gadget town's legend names them (qccd/gadget/web/app.js)."""
+    from ..viz.theme import PALETTE
+    return (("an ion", PALETTE["data"]), ("in a gate", PALETTE["x"]), ("measured or reset", PALETTE["z"]),
+            ("the site in play", PALETTE["active"]))
+
+
 def ion_bytes(arch, prog, cycles, distinct: bool = False) -> bytes:
     """One program's ions for the viewer: every ion's trap at the start and, cycle by cycle as the
     replay timed it (`cycles`: its `CycleRecord`s), every move and pulse.  Little-endian:
@@ -397,8 +411,7 @@ def page(dst, gidney: dict | None = None) -> str:
     js = (WEB / "rsa.js").read_text(encoding="utf-8")
     key = "".join(f'<span><i style="background:{c}"></i>{n}</span>' for n, c in
                   (("merge", "#2e6fd8"), ("preparation", "#12a150"), ("readout", "#e08a00"), ("H̄", "#8b3fd0"),
-                   ("held patch", "#8d96a8"), ("data ion", "#24324a"), ("measure ion", "#d1495b"),
-                   ("ion at rest", "#b9bfcb"), ("factory", "#e7e9ee"), ("dlog", "#7cc4a4"), ("help", "#b39ddb"),
+                   ("held patch", "#8d96a8"), *ion_key(), ("factory", "#e7e9ee"), ("dlog", "#7cc4a4"), ("help", "#b39ddb"),
                    ("acc", "#f4a7a7"), ("res", "#f2cf86"), ("pp", "#8fb3e8"), ("addr", "#5b7fc7"),
                    ("exponent", "#d6dbe4")))
     idle = next((p for p in progs if p["kind"] == "idle"), None)
@@ -510,6 +523,7 @@ machine could do (a frame, a |Ȳ>, a T); the 29 from k = 4 need a resource state
 They run once, for seconds.</li>
 </ul>
 <script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {{}}, {hints});</script>
+{theme_script()}
 <script>{js}</script>
 """
 

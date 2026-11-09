@@ -17,7 +17,7 @@ import json
 import shutil
 from pathlib import Path
 
-from .rsa import CSS, HINTS as RSA_HINTS, KEY as RSA_KEY, WEB, _years
+from .rsa import CSS, HINTS as RSA_HINTS, KEY as RSA_KEY, WEB, _years, ion_key, theme_script
 
 __all__ = ["KEY", "page", "build", "standalone", "summary", "index_entry"]
 
@@ -32,7 +32,7 @@ HINTS = {**RSA_HINTS,
 #: what each kind of gadget is drawn in, as the player draws it
 KINDS = (("merge", "#2e6fd8"), ("preparation", "#12a150"), ("readout", "#e08a00"), ("cultivated |T>", "#c2185b"),
          ("|Ȳ>", "#0f9d9a"), ("transversal H", "#8b3fd0"), ("cold access (composed)", "#795548"), ("held patch", "#8d96a8"),
-         ("data ion", "#24324a"), ("measure ion", "#d1495b"), ("ion at rest", "#b9bfcb"), ("factory slot", "#e7e9ee"))
+         ("factory slot", "#e7e9ee"))
 
 
 def summary(dst) -> dict:
@@ -65,7 +65,7 @@ def page(dst, ours: dict | None = None) -> str:
         + "</td></tr>" for p in order)
     hints = json.dumps({k: {"t": a, "d": b} for k, (a, b) in HINTS.items()}, ensure_ascii=False)
     js = (WEB / "rsa.js").read_text(encoding="utf-8")
-    key = "".join(f'<span><i style="background:{c}"></i>{n}</span>' for n, c in KINDS)
+    key = "".join(f'<span><i style="background:{c}"></i>{n}</span>' for n, c in (*KINDS, *ion_key()))
     speeds = "".join(f'<option value="{v}"{" selected" if v == "auto" else ""}>{n}</option>' for v, n in
                      (("auto", "Auto"), ("0.0001", "0.1 ms a second"), ("0.001", "1 ms a second"),
                       ("0.01", "10 ms a second"), ("0.1", "0.1 s a second"), ("1", "1 s a second"),
@@ -173,6 +173,7 @@ The schedule takes every T attempt as kept: with six T tiles a slot, 0.44 % of f
 run the patches go on and only the corridor is read.</li>
 </ul>
 <script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {{}}, {hints});</script>
+{theme_script()}
 <script>{js}</script>
 """
 

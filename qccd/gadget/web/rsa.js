@@ -37,10 +37,10 @@
   const G = 24;                        // grid units a tile: 2 (d + 1), d = 11
   const SNAP = 16;                     // a program's ion positions kept every SNAP cycles
   const LEVELS = ["machine", "patches", "gadgets", "ions"];
-  const AUTO_AT = {patches: 4, gadgets: 16, ions: 70};          // px a tile where Auto moves on
-  const LEAST = {machine: 0, patches: 2.5, gadgets: 9, ions: 40};
+  const AUTO_AT = {patches: 4, gadgets: 16, ions: 160};         // px a tile where Auto moves on
+  const LEAST = {machine: 0, patches: 2.5, gadgets: 9, ions: 96};
   const AUTO_SPEED = {machine: 10, patches: 10, gadgets: 0.1, ions: 0.001};
-  const ZMIN = 0.2, ZMAX = 640;
+  const ZMIN = 0.2, ZMAX = 1200;
   const COLOR = {merge: "#2e6fd8", prep: "#12a150", read: "#e08a00", ht: "#8b3fd0", idle: "#7a8496",
                  "|T>": "#c2185b", "|Y+>": "#0f9d9a", h: "#8b3fd0", cold: "#795548"};
   const HOLDS = new Set(["prep", "|T>", "|Y+>", "h", "cold", "idle"]);   // a tile holds a block once one of these is done
@@ -50,9 +50,25 @@
   const NAMES = {dlog: "dlog", help: "help", acc: "acc", res: "res", pp: "powerProduct (pp)", addr: "addr",
                  exp: "the exponent", D: "dlog's factories", H: "help's factories", A: "acc's factories",
                  P: "powerProduct's factories"};
-  const ION = {data: "#24324a", measure: "#d1495b", rest: "#b9bfcb"};
   const MOVE = 1, PAIR = 2, PULSE = 3, MEASURE = 4, RESET = 5, COOL = 6;
-  const FLASH = {[PAIR]: "#ff8c1a", [PULSE]: "#f2b705", [MEASURE]: "#d1495b", [RESET]: "#12a150"};
+  // A trap, a junction, a rail and an ion are drawn by the studio's numbers (qccd/viz/theme.py's PALETTE and
+  // GEOMETRY, shipped into the page as QCCD_THEME), as a design page and the gadget town draw them
+  // (qccd/viz/render.py, qccd/gadget/web/app.js::drawDevice): a trap is a capsule on its axis with a ring a
+  // slot, a junction a white square, a rail a butt-capped line, an ion a white-outlined disc coloured by what
+  // the machine does to it now.  Every trap of the machine is a `trap` zone of 2 slots.
+  const THEME = window.QCCD_THEME || {}, PAL = THEME.palette || {}, GEO = THEME.geometry || {};
+  const pal = (k, v) => PAL[k] || v;
+  const INK = {rail: pal("rail", "#f2b8b5"), trap: pal("zone_trap", "#0f766e"), grid: pal("grid", "#8a94a6"),
+               panel: pal("panel", "#ffffff"), ion: pal("data", "#475467"), gate: pal("x", "#0f766e"),
+               read: pal("z", "#b42318"), active: pal("active", "#f6c34a"), well: pal("anc", "#4338ca"),
+               stroke: pal("ion_stroke", "#ffffff")};
+  const RAIL_W = GEO.RAIL_W_FRAC || 0.083, K_ION = (GEO.ION_D_FRAC_ACTIVE || 0.175) + 0.065, K_REST = GEO.ION_D_FRAC || 0.13;
+  const CAP = 2, SITE_LEN = Math.min(0.88, 0.30 + 0.15 * CAP), PITCH = SITE_LEN / CAP;   // layout.py::_site_len, grid units
+  const OFF = [[]];                                   // render.py::slotOffsets: k ions' places along a trap's axis
+  for (let k = 1; k <= 8; k++) {
+    const s0 = Math.floor((CAP - k) / 2), step = Math.min(PITCH, 0.86 / k);
+    OFF.push([...Array(k)].map((_, j) => (k <= CAP ? (s0 + j - (CAP - 1) / 2) * PITCH : (j - (k - 1) / 2) * step)));
+  }
   let meta, progs, layout, kindOf, durOf, maxDur, ionsOf, W, H, X0, Y0, idleId = -1;
   const steps = new Map();            // step -> {promise, data, live}
   const ionFiles = new Map();         // program -> {promise, data}
@@ -235,45 +251,78 @@
     }
     mAt[nm] = np;
     // what, mOff and gOff are a body's; bodyOf maps a cycle to its body (QIO1: itself)
-    const P = {n, nc, us, kind, home, t0, t1, bodyOf, what, mOff, gOff, mIon, mAt, pts, gIon, snaps: []};
-    const cur = new Float32Array(home);
+    const P = {n, nc, us, kind, home, t0, t1, bodyOf, what, mOff, gOff, mIon, mAt, pts, gIon, snaps: [], sides: [], arrs: []};
+    const cur = new Int16Array(home), side = new Int8Array(n), arr = new Int32Array(n).fill(-1);
     for (let c = 0; c < nc; c++) {
-      if (c % SNAP === 0) P.snaps.push(new Int16Array(cur));
-      settle(P, c, cur);
+      if (c % SNAP === 0) { P.snaps.push(new Int16Array(cur)); P.sides.push(new Int8Array(side)); P.arrs.push(new Int32Array(arr)); }
+      settle(P, c, cur, side, arr);
     }
-    P.pos = new Float32Array(2 * n);
+    P.cur = new Int16Array(2 * n); P.side = new Int8Array(n); P.arr = new Int32Array(n);
+    P.offs = new Map();
     return P;
   }
 
-  function settle(P, c, pos) {                        // every move of cycle c, done
+  function settle(P, c, pos, side, arr) {             // every move of cycle c, done; a mover's side is the end of its trap it came in by
     const b = P.bodyOf[c];
     for (let m = P.mOff[b]; m < P.mOff[b + 1]; m++) {
-      const e = P.mAt[m + 1] - 1, i = P.mIon[m];
-      pos[2 * i] = P.pts[2 * e]; pos[2 * i + 1] = P.pts[2 * e + 1];
+      const a = P.mAt[m], e = P.mAt[m + 1] - 1, i = P.mIon[m];
+      const x = P.pts[2 * e], y = P.pts[2 * e + 1];
+      const x0 = e > a ? P.pts[2 * e - 2] : pos[2 * i], y0 = e > a ? P.pts[2 * e - 1] : pos[2 * i + 1];
+      side[i] = Math.sign((x & 1) ? y0 - y : x0 - x); arr[i] = c;      // a trap at odd x runs up and down
+      pos[2 * i] = x; pos[2 * i + 1] = y;
     }
   }
 
-  function at(P, tau) {                               // every ion's place tau µs into the program; the cycle running
-    const pos = P.pos;
+  function at(P, tau) {                               // the traps tau µs into the program (P.cur), the cycle running and, mid-move, how far (P.f)
     let lo = 0, hi = P.nc - 1, c = -1;
     while (lo <= hi) { const m = (lo + hi) >> 1; if (P.t0[m] <= tau) { c = m; lo = m + 1; } else hi = m - 1; }
     const s = c < 0 ? 0 : Math.floor(c / SNAP);
-    pos.set(P.snaps[s]);
-    for (let k = s * SNAP; k < c; k++) settle(P, k, pos);
+    P.cur.set(P.snaps[s]); P.side.set(P.sides[s]); P.arr.set(P.arrs[s]);
+    for (let k = s * SNAP; k < c; k++) settle(P, k, P.cur, P.side, P.arr);
+    P.c = c; P.f = -1; P.done = c < 0 ? 0 : c;
     if (c >= 0) {
-      const b = P.bodyOf[c];
-      if (tau >= P.t1[c]) settle(P, c, pos);
-      else if (P.what[b] === MOVE) {
-        const f = (tau - P.t0[c]) / (P.t1[c] - P.t0[c]);
-        for (let m = P.mOff[b]; m < P.mOff[b + 1]; m++) {
-          const a = P.mAt[m], k = P.mAt[m + 1] - a, i = P.mIon[m];
-          const u = Math.min(k - 1e-6, f * k), j = Math.floor(u), r = u - j;
-          const x0 = j === 0 ? pos[2 * i] : P.pts[2 * (a + j - 1)], y0 = j === 0 ? pos[2 * i + 1] : P.pts[2 * (a + j - 1) + 1];
-          pos[2 * i] = x0 + (P.pts[2 * (a + j)] - x0) * r; pos[2 * i + 1] = y0 + (P.pts[2 * (a + j) + 1] - y0) * r;
-        }
-      }
+      if (tau >= P.t1[c]) { settle(P, c, P.cur, P.side, P.arr); P.done = c + 1; }
+      else if (P.what[P.bodyOf[c]] === MOVE) P.f = (tau - P.t0[c]) / (P.t1[c] - P.t0[c]);
     }
     return c;
+  }
+
+  // Where in its trap each ion sits, as the studio rests ions (render.py::slotOffsets, transit.js's law): a lone ion
+  // in the first ring, two side by side, the order carried forward -- an arrival takes the end it came in by.  Mid-move
+  // both ends' places: a mover flies from its place in one trap to its place in the next, and an ion that stays slides
+  // between its two places over the same interval.
+  const trapKey = (x, y) => (x + 8192) * 16384 + (y + 8192);
+
+  function slotted(P, pos, side, arr) {
+    const off = new Float32Array(P.n).fill(OFF[1][0]), at = new Map();
+    for (let k = 0; k < P.n; k++) {
+      const key = trapKey(pos[2 * k], pos[2 * k + 1]), a = at.get(key);
+      if (a === undefined) at.set(key, k); else if (typeof a === "number") at.set(key, [a, k]); else a.push(k);
+    }
+    const rank = (i) => side[i] * (1e7 + arr[i]);
+    for (const a of at.values()) {
+      if (typeof a === "number") continue;
+      a.sort((i, j) => rank(i) - rank(j) || i - j);
+      const o = OFF[Math.min(a.length, OFF.length - 1)];
+      for (let q = 0; q < a.length; q++) off[a[q]] = o[Math.min(q, o.length - 1)];
+    }
+    return off;
+  }
+
+  function places(P) {                                // [before, after] for the state at() left; one array when nothing is flying
+    const key = P.f >= 0 ? -1 - P.c : P.done;
+    let v = P.offs.get(key);
+    if (v) return v;
+    const a = slotted(P, P.cur, P.side, P.arr);
+    if (P.f < 0) v = [a, a];
+    else {
+      const nx = new Int16Array(P.cur), sd = new Int8Array(P.side), ar = new Int32Array(P.arr);
+      settle(P, P.c, nx, sd, ar);
+      v = [a, slotted(P, nx, sd, ar)];
+    }
+    if (P.offs.size >= 24) P.offs.delete(P.offs.keys().next().value);
+    P.offs.set(key, v);
+    return v;
   }
 
   function ions(p) {                                  // a program's ion file, fetched once
@@ -329,7 +378,7 @@
       g.fillStyle = BASE.seat;
       for (const [x, y] of layout.seats) g.fillRect(px(x), py(y), w, w);
     }
-    if (gap) {                                       // the tiles' edges, once a tile is big enough to see
+    if (gap && lv !== "ions") {                      // the tiles' edges, once a tile is big enough to see (not across the rails)
       const [ax, ay, bx, by] = area();
       g.strokeStyle = "rgba(60,70,90,.13)"; g.lineWidth = gap;
       g.beginPath();
@@ -347,18 +396,58 @@
     return off;
   }
 
+  function marks(g) {                                 // app.js::marks: the studio's sizes at g px a grid unit (junction to trap)
+    const rIon = Math.min(26, Math.max(Math.min(3, 0.45 * g), K_ION * g));
+    const rRest = Math.min(rIon, Math.max(Math.min(1.6, 0.30 * g), K_REST * g)), room = 0.44 * PITCH * g;
+    return {g, siteT: RAIL_W * 2.4 * g, swNode: Math.max(1.0, 0.05 * g), swRail: Math.max(1.2, RAIL_W * g),
+            swHalo: Math.max(0.7, 0.055 * g), slotR: 0.085 * g, rJunc: 0.30 * g, rActive: 0.46 * g,
+            wellRx: 0.44 * g, wellRy: 0.30 * g, rIon,
+            // core.js::ionRadius in a trap of 2 slots: at rest, in a gate, and swelling to rIon mid-flight
+            rest: Math.max(0.6, Math.min(rRest, room)), busy: Math.max(0.6, Math.min(rIon, room))};
+  }
+
+  function drawTrap(g, x, y, across, mk, lit) {       // app.js::drawSite: a capsule on the trap's axis, a ring a slot
+    const len = SITE_LEN * mk.g, t = mk.siteT, r = Math.min(t / 2, len / 2);
+    g.save(); g.translate(x, y);
+    if (across) g.rotate(Math.PI / 2);
+    g.beginPath();
+    g.moveTo(-len / 2 + r, -t / 2); g.lineTo(len / 2 - r, -t / 2); g.arc(len / 2 - r, 0, r, -Math.PI / 2, Math.PI / 2);
+    g.lineTo(-len / 2 + r, t / 2); g.arc(-len / 2 + r, 0, r, Math.PI / 2, -Math.PI / 2); g.closePath();
+    g.globalAlpha = 0.16; g.fillStyle = INK.trap; g.fill();
+    g.globalAlpha = lit ? 0.95 : 0.55; g.strokeStyle = lit ? INK.active : INK.trap;
+    g.lineWidth = lit ? mk.swNode * 1.7 : mk.swNode; g.stroke();
+    const sr = Math.min(mk.slotR, 0.36 * len / CAP);
+    if (sr > 0.6) {
+      g.globalAlpha = 0.55; g.strokeStyle = INK.trap; g.lineWidth = Math.max(0.7, mk.swNode * 0.8);
+      for (let i = 0; i < CAP; i++) { g.beginPath(); g.arc(((i + 0.5) / CAP - 0.5) * len, 0, sr, 0, 2 * Math.PI); g.stroke(); }
+    }
+    g.globalAlpha = 1; g.restore();
+  }
+
   function tilePattern(s) {                           // one tile's rails, junctions and traps at s px a tile
     if (tilePattern.s === s) return tilePattern.img;
     const n = Math.ceil(s), off = document.createElement("canvas"); off.width = n; off.height = n;
-    const g = off.getContext("2d"), u = s / G, at = (v) => (v + 0.5) * u;
-    g.strokeStyle = "#dde1e8"; g.lineWidth = Math.max(0.6, u * 0.18);
-    g.beginPath();
+    const g = off.getContext("2d"), u = s / G, mk = marks(u), at = (v) => (v + 0.5) * u;
+    g.strokeStyle = INK.rail; g.lineWidth = mk.swRail; g.lineCap = "butt";
+    g.beginPath();                                   // a junction at odd x, even y; a trap between two junctions
     for (let y = 0; y < G; y += 2) { g.moveTo(0, at(y)); g.lineTo(s, at(y)); }
     for (let x = 1; x < G; x += 2) { g.moveTo(at(x), 0); g.lineTo(at(x), s); }
     g.stroke();
-    g.fillStyle = "#ccd2dc";
-    const j = Math.max(1, u * 0.45);
-    for (let y = 0; y < G; y += 2) for (let x = 1; x < G; x += 2) g.fillRect(at(x) - j / 2, at(y) - j / 2, j, j);
+    if (u < 4) {                                     // too small for the real shapes: a dot a node, as app.js keeps it cheap
+      g.globalAlpha = 0.45;
+      for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+        const junction = (x & 1) && !(y & 1), trap = !((x ^ y) & 1);
+        if (!junction && !trap) continue;
+        g.fillStyle = junction ? INK.grid : INK.trap; g.fillRect(at(x) - 1, at(y) - 1, 2, 2);
+      }
+      g.globalAlpha = 1;
+    } else {
+      g.fillStyle = INK.panel; g.strokeStyle = INK.grid; g.lineWidth = mk.swNode;
+      for (let y = 0; y < G; y += 2) for (let x = 1; x < G; x += 2) {
+        g.beginPath(); g.rect(at(x) - mk.rJunc, at(y) - mk.rJunc, 2 * mk.rJunc, 2 * mk.rJunc); g.fill(); g.stroke();
+      }
+      for (let y = 0; y < G; y++) for (let x = y & 1; x < G; x += 2) drawTrap(g, at(x), at(y), (y & 1) === 1, mk, false);
+    }
     tilePattern.s = s; tilePattern.img = off;
     return off;
   }
@@ -463,7 +552,7 @@
   }
 
   function drawIons(g, d, lo, us, r, idle) {          // every ion in view, each where its program has it now
-    const s = view.s, u = s / G, dot = Math.max(1.6, u * 0.62), half = dot / 2;
+    const s = view.s, u = s / G, mk = marks(u), tiny = u < 4;
     const taken = new Set(), jobs = [];
     const key = (X, Y) => (X + 20000) * 8192 + (Y + 2000);
     for (let i = lo; i < d.n && d.start[i] <= us; i++) {
@@ -482,40 +571,70 @@
       j.P = P;
       for (let k = 0; k < P.n; k++) taken.add(key(j.o[0] * G + P.home[2 * k], j.o[1] * G + P.home[2 * k + 1]));
     }
-    g.fillStyle = ION.rest;                          // a free trap's ion, at rest
+    // every ion as a disc, batched by colour: [x, y, r] triples for at rest, in a gate (or moving), read or reset
+    const disc = [[], [], []], lit = [], wells = [];
     const ax = Math.max(r[0], X0), ay = Math.max(r[1], Y0), bx = Math.min(r[2], X0 + W), by = Math.min(r[3], Y0 + H);
-    for (let y = ay; y < by; y++) for (let x = ax; x < bx; x++) {
+    for (let y = ay; y < by; y++) for (let x = ax; x < bx; x++) {           // a free trap's ion, at rest in its first ring
       for (let gy = 0; gy < G; gy++) for (let gx = gy & 1; gx < G; gx += 2) {
         if (taken.has(key(x * G + gx, y * G + gy))) continue;
-        g.fillRect(px(x + (gx + 0.5) / G) - half, py(y + (gy + 0.5) / G) - half, dot, dot);
+        const o = OFF[1][0] / G, up = gy & 1;
+        disc[0].push(px(x + (gx + 0.5) / G + (up ? 0 : o)), py(y + (gy + 0.5) / G + (up ? o : 0)), mk.rest);
         stats.drawn++;
       }
     }
     for (const j of jobs) {
       if (!j.P) continue;
-      const P = j.P, c = at(P, Math.min(j.tau, P.us)), pos = P.pos, ox = j.o[0], oy = j.o[1];
-      const sx = (k) => px(ox + (pos[2 * k] + 0.5) / G), sy = (k) => py(oy + (pos[2 * k + 1] + 0.5) / G);
+      const P = j.P, c = at(P, Math.min(j.tau, P.us)), cur = P.cur, ox = j.o[0], oy = j.o[1];
+      const [offA, offB] = places(P), f = P.f;
       const b = c >= 0 ? P.bodyOf[c] : 0, live = c >= 0 && j.tau < P.t1[c] ? P.what[b] : 0;
-      if (live === COOL) { g.fillStyle = "rgba(106,169,255,.10)"; g.fillRect(px(ox), py(oy), s, s); }
+      const X = (gx) => px(ox + (gx + 0.5) / G), Y = (gy) => py(oy + (gy + 0.5) / G);
+      const fly = new Map();                         // a mover: its path's first point in pts
+      if (live === MOVE) for (let m = P.mOff[b]; m < P.mOff[b + 1]; m++) fly.set(P.mIon[m], m);
+      const doing = new Map();                       // an ion in this cycle's gate (1), readout or reset (2)
+      if (live && live !== MOVE && live !== COOL) for (let m = P.gOff[b]; m < P.gOff[b + 1]; m++) doing.set(P.gIon[m], live === MEASURE || live === RESET ? 2 : 1);
       for (let k = 0; k < P.n; k++) {
-        g.fillStyle = P.kind[k] ? ION.measure : ION.data;
-        g.fillRect(sx(k) - half, sy(k) - half, dot, dot);
+        const x = cur[2 * k], y = cur[2 * k + 1], up = x & 1;
+        const m = fly.get(k);
+        if (m === undefined) {                       // standing: its place in its trap, sliding if a trap-mate comes or goes
+          const o = f >= 0 ? offA[k] + (offB[k] - offA[k]) * f : offA[k], st = doing.get(k) || 0;
+          disc[st].push(X(up ? x : x + o), Y(up ? y + o : y), st ? mk.busy : mk.rest);
+          if (st && !tiny) lit.push(X(x), Y(y), up);
+          continue;
+        }
+        // flying: from its place in the trap it leaves, through the junctions, to its place in the trap it enters
+        const a = P.mAt[m], e = P.mAt[m + 1] - 1, n = e - a + 1, dx = P.pts[2 * e], dy = P.pts[2 * e + 1];
+        const sx0 = up ? x : x + offA[k], sy0 = up ? y + offA[k] : y;
+        const ex = (dx & 1) ? dx : dx + offB[k], ey = (dx & 1) ? dy + offB[k] : dy;
+        const v = Math.min(n - 1e-6, f * n), q = Math.floor(v), w = v - q;
+        const x0 = q === 0 ? sx0 : P.pts[2 * (a + q - 1)], y0 = q === 0 ? sy0 : P.pts[2 * (a + q - 1) + 1];
+        const x1 = a + q === e ? ex : P.pts[2 * (a + q)], y1 = a + q === e ? ey : P.pts[2 * (a + q) + 1];
+        const fx = X(x0 + (x1 - x0) * w), fy = Y(y0 + (y1 - y0) * w);
+        disc[1].push(fx, fy, mk.rest + (mk.rIon - mk.rest) * 4 * f * (1 - f));
+        if (!tiny && fly.size <= 40) wells.push(fx, fy);
       }
       stats.drawn += P.n;
-      if (FLASH[live]) {                             // the cycle at work: its gate, pulse, readout or reset lit
-        g.strokeStyle = FLASH[live]; g.lineWidth = Math.max(1, dot * 0.35);
-        g.beginPath();
-        for (let m = P.gOff[b]; m < P.gOff[b + 1]; m++) {
-          const k = P.gIon[m];
-          g.moveTo(sx(k) + dot, sy(k)); g.arc(sx(k), sy(k), dot, 0, 2 * Math.PI);
-        }
-        if (live === PAIR) for (let m = P.gOff[b]; m + 1 < P.gOff[b + 1]; m += 2) {
-          g.moveTo(sx(P.gIon[m]), sy(P.gIon[m])); g.lineTo(sx(P.gIon[m + 1]), sy(P.gIon[m + 1]));
-        }
-        g.stroke();
-      }
-      if (!j.idle) outline(g, d, j.i, card && card.g === j.i ? "#ff8c1a" : COLOR[kindOf[j.p]], Math.max(1.5, s / 60));
     }
+    if (lit.length) {                                // the halo under a trap in play, the trap drawn over it lit
+      g.fillStyle = INK.active; g.globalAlpha = 0.5; g.beginPath();
+      for (let i = 0; i < lit.length; i += 3) { g.moveTo(lit[i] + mk.rActive, lit[i + 1]); g.arc(lit[i], lit[i + 1], mk.rActive, 0, 2 * Math.PI); }
+      g.fill(); g.globalAlpha = 1;
+      for (let i = 0; i < lit.length; i += 3) drawTrap(g, lit[i], lit[i + 1], lit[i + 2] === 1, mk, true);
+    }
+    if (wells.length) {                              // the potential well under a moving ion
+      g.fillStyle = INK.well; g.globalAlpha = 0.16; g.beginPath();
+      for (let i = 0; i < wells.length; i += 2) { g.moveTo(wells[i] + mk.wellRx, wells[i + 1]); g.ellipse(wells[i], wells[i + 1], mk.wellRx, mk.wellRy, 0, 0, 2 * Math.PI); }
+      g.fill(); g.globalAlpha = 1;
+    }
+    [INK.ion, INK.gate, INK.read].forEach((ink, st) => {
+      const a = disc[st];
+      if (!a.length) return;
+      g.fillStyle = ink; g.strokeStyle = INK.stroke; g.lineWidth = mk.swHalo;
+      g.beginPath();
+      for (let i = 0; i < a.length; i += 3) { g.moveTo(a[i] + a[i + 2], a[i + 1]); g.arc(a[i], a[i + 1], a[i + 2], 0, 2 * Math.PI); }
+      g.fill();
+      if (mk.rest >= 1.6) g.stroke();                // the white edge, once a disc is big enough to carry one
+    });
+    for (const j of jobs) if (j.P && !j.idle) outline(g, d, j.i, card && card.g === j.i ? "#ff8c1a" : COLOR[kindOf[j.p]], Math.max(1.5, s / 60));
   }
 
   function map(data, local) {                        // the whole machine, small, and where the view is
