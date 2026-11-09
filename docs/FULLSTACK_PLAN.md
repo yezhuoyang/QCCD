@@ -1953,6 +1953,17 @@ Apache 2.0; their generator rewrites their record's d2 = 15 circuit character fo
   661f9ac): 412 MB of data; a reader's browser holds 6 to 14 MB and fetches about 3 MB for a tour of every level; the landing and the S9
   page link it.  A full gadgets build needs `--rsa-gidney out/s10/surgery/page/data` (not in git) or it drops the page and its line.
   Against S9 (21.56 years on 19.0 million ions): 1.37 x its time on 28 x fewer ions.
+- **Each program's design page (2026-11-09, the user: "each gadget of the full Shor's algorithm program should have a separate,
+  debuggable page"; then, by the one-template rule of the same day, on `render_html` and up to 5,600 ions):** `tools/gidney_surgery.py
+  pages` makes each program's page as gadgets/rsa2048/'s are made (`tools/lattice_programs.py page`): cooled, every rule replayed for its
+  panels, `source=` the circuit it was compiled from (Hardware / Gates / Both), in page/data/pages/KEY.html.gz, linked from the table and
+  the player's card.  Its `notes` say where the prime first uses it: `firsts` traces one prime with the listing's reader and the plan
+  keeping where each item comes from (a tracer reads `SurgeryPlan._at`), 960 of 960 programs with their listing line.  The template cannot
+  carry the big merges: a page grows by about 15 kB raw and 2 kB gzipped an ion (a 3,137-ion merge: 48 MB, 5.8 MB gzipped, 22 min to
+  write, most of it the page's own evaluation), so 961 pages would be about 19 GB and the largest about 450 MB.  `rsa_gidney.PAGE_IONS =
+  5600` (gadgets/rsa2048/'s largest) gives 296 programs, 96 % of the copies in a prime, about 1.9 GB; a bigger program's row says it has
+  none, and the player draws its ions.  `web/ions.js` is the ion file reader and the drawing of the player (traps, junctions, rails and
+  ions by the studio's numbers, 19956b5).
   Factories that cost nothing would give 10.78 h a prime on the same floorplan; the cultivated ones add about 13 %.  Still composed in that figure:
   a cold access (a merge counted at a hot round, the block held), the yoked outer checks, a decode taken as one round.  And one physical question:
   a T tile runs a program of its own while the chip around it runs rounds, so the six T tiles of a slot need drive lines of their own.

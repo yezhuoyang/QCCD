@@ -34,11 +34,12 @@ PRIMES = 21_640
 MOVE, PAIR, PULSE, MEASURE, RESET, COOL, VIRTUAL = 1, 2, 3, 4, 5, 6, 7
 
 
-def theme_script() -> str:
-    """The studio's palette and shape ratios for the player (qccd/viz/theme.py): it draws a trap, a junction, a rail
-    and an ion by the same numbers as a design page and the gadget town."""
+def ion_scripts() -> str:
+    """The studio's palette and shape ratios (qccd/viz/theme.py) and `web/ions.js`, which reads a program's ion file and draws a trap, a
+    junction, a rail and an ion by those numbers, as a design page and the gadget town do: inlined before the player or a gadget's page."""
     from ..viz.theme import GEOMETRY, PALETTE
-    return f"<script>window.QCCD_THEME = {json.dumps({'palette': dict(PALETTE), 'geometry': dict(GEOMETRY)})};</script>"
+    return (f"<script>window.QCCD_THEME = {json.dumps({'palette': dict(PALETTE), 'geometry': dict(GEOMETRY)})};</script>\n"
+            f"<script>{(WEB / 'ions.js').read_text(encoding='utf-8')}</script>")
 
 
 def ion_key() -> tuple:
@@ -147,9 +148,10 @@ _TITLES = {("idle",): "a held patch's syndrome round", ("ht",): "H̄ (Gehér et 
 
 def title(shape) -> str:
     """A program's name, for a reader."""
-    if shape[0] == "merge":
-        return (f"a {shape[1]}̄{shape[1]}̄ merge of {len(shape[2])} patches"
-                + (f" through a corridor of {len(shape[3])} tiles" if shape[3] else " face to face"))
+    if shape[0] == "merge":                     # the product, its letter on each patch
+        n, k = len(shape[2]), len(shape[3])
+        return (f"{'an' if shape[1] == 'X' else 'a'} {(shape[1] + '̄') * n} merge of {n} patch{'es' if n != 1 else ''}"
+                + (f" through a corridor of {k} tile{'s' if k != 1 else ''}" if k else " face to face"))
     return _TITLES[tuple(shape)]
 
 
@@ -523,7 +525,7 @@ machine could do (a frame, a |Ȳ>, a T); the 29 from k = 4 need a resource state
 They run once, for seconds.</li>
 </ul>
 <script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {{}}, {hints});</script>
-{theme_script()}
+{ion_scripts()}
 <script>{js}</script>
 """
 

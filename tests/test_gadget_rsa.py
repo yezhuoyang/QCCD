@@ -250,3 +250,26 @@ def test_our_page_links_gidneys_compilation_once_it_exists(tmp_path):
     assert "next run" in rsa.page(tmp_path / "data") and 'gidney/' not in rsa.page(tmp_path / "data")
     body = rsa.page(tmp_path / "data", {"years": 29.48, "ions": 679_898})
     assert "href='gidney/'" in body and "29.48 years on 0.68 million ions" in body
+
+
+def test_gidneys_page_links_each_programs_design_page_and_says_which_have_none(tmp_path):
+    """A program up to `PAGE_IONS` ions has a design page of the one template (`tools/gidney_surgery.py pages`) and the table and the player
+    link it as gadgets/rsa2048/ does; a bigger one has none, and its row says why."""
+    from qccd.gadget import rsa_gidney
+    d = _gidney_data(tmp_path)
+    progs = json.loads((d / "programs.json").read_text(encoding="utf-8"))
+    big = ["merge", "Z", [[[0, 0], "top"], [[30, 4], "bottom"]], [[0, 1], [1, 1]]]
+    progs.append({"id": 3, "kind": "merge", "shape": big, "dur_us": 61032, "us": 61032.0, "ions": 9000, "instructions": 463, "key": "dd",
+                  "title": rsa.title(big), "d11": "pass", "check": "checked at d = 11", "uses": 2, "steps": [0], "page": False})
+    (d / "programs.json").write_text(json.dumps(progs), encoding="utf-8")
+    (d / "pages").mkdir()
+    (d / "pages" / "aa.html.gz").write_bytes(gzip.compress(b"<!doctype html>"))
+    pages = {}
+    rsa_gidney.build(tmp_path / "site", lambda rel, page, depth, active, app=False, extra="": pages.update({rel: page}), d)
+    got = json.loads((tmp_path / "site" / rsa_gidney.KEY / "data" / "programs.json").read_text(encoding="utf-8"))
+    assert [p["page"] for p in got] == [True, False, False, False]
+    body = pages["gadgets/rsa2048/gidney/index.html"]
+    assert 'href="data/pages/aa.html"' in body and 'href="data/pages/dd.html"' not in body
+    assert "no design page: 9,000 ions" in body and rsa_gidney.PAGE_IONS == 5600
+    assert rsa.title(big) == "a Z̄Z̄ merge of 2 patches through a corridor of 2 tiles"
+    assert rsa.title(["merge", "X", [[[0, 0], "right"]], [[1, 0]]]) == "an X̄ merge of 1 patch through a corridor of 1 tile"

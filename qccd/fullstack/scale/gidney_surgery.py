@@ -405,6 +405,7 @@ class SurgeryPlan(Plan):
         factories = 0
         while i < n:
             it = items[i]
+            self._at = it           # the listing's item the work yielded now comes from (a tracer reads it; nothing here does)
             k = it[0]
             if k in ("guard", "endguard", "decode"):
                 yield it

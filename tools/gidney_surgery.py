@@ -9,6 +9,8 @@ Reads the listing `tools/gidney_concrete.py` read, from OUT (`out/s10`), and wor
     gidney_surgery.py run OUT                         one prime and the program on those programs: concrete.json
     gidney_surgery.py ions OUT [WORKERS] [--full]     every program the schedule places, its ions for the page: page/ions/
     gidney_surgery.py page OUT [WINDOW_S]             one prime's schedule as the page plays it, window by window: page/data/
+    gidney_surgery.py firsts OUT                      where each program is first used, its FormalRV gadgets and listing lines: page/data/firsts.json
+    gidney_surgery.py pages OUT [WORKERS]             each program's design page (the one template), up to rsa_gidney.PAGE_IONS ions: page/data/pages/
 
 Each program is written when it is checked, and a rerun builds only what is missing.
 """
@@ -593,6 +595,203 @@ def run(out: Path) -> None:
         print(f"{v / 1e6:>12,.0f} s  {100 * v / total:5.1f} %  {k}")
 
 
+def _tracers(out: Path):
+    """The listing's reader and the plan, each keeping where its items come from: the reader the listing line of the statement that made an item
+    (`where[id(item)]`, the innermost one), the plan the listing's item a work item comes from (`origin[id(work)]`).  Neither changes what is
+    read or planned."""
+    import gidney_concrete as GC
+    from qccd.fullstack.scale import gidney as G
+    from qccd.fullstack.scale import listing as L
+    from qccd.fullstack.scale.gidney_surgery import SurgeryPlan
+
+    class Lines(G.Reader):
+        def __init__(self, lst):
+            super().__init__(lst)
+            self.where = {}
+
+        def _mark(self, out, k, line, before=()):
+            for j, old in enumerate(before):            # an item replaced in place (an H turning a preparation) keeps its line
+                if out[j] is not old and id(old) in self.where:
+                    self.where.setdefault(id(out[j]), (out[j], self.where[id(old)][1]))
+            for it in out[k:]:
+                self.where.setdefault(id(it), (it, line))
+
+        def _stmt(self, s, env, reqs, out):
+            k = len(out)
+            super()._stmt(s, env, reqs, out)
+            self._mark(out, k, s.line)
+
+        def _call(self, n, env, reqs, out):
+            k = len(out)
+            super()._call(n, env, reqs, out)
+            self._mark(out, k, n.line)
+
+        def _for(self, n, env, reqs, out):
+            k, before = len(out), list(out)
+            super()._for(n, env, reqs, out)
+            self._mark(out, k, n.line, before)
+
+    class Origins(SurgeryPlan):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, **kw)
+            self.origin = {}
+
+        def _resolve(self, key):
+            got = self._walked.get(key)
+            if got is None:
+                got = []
+                for w in self._walk(key):
+                    got.append(w)
+                    self.origin[id(w)] = (w, getattr(self, "_at", None))
+                self._walked[key] = got
+            return got
+
+    lst = L.read(out / "g25.sysprog", L.read_inputs(GC.INPUTS))
+    R = Lines(lst)
+    rows = json.loads((_dir(out) / "labels.json").read_text(encoding="utf-8"))
+    return lst, R, Origins(R, {int(k): v for k, v in rows["labels"].items()}, **FLOOR)
+
+
+def _listing_ends(lst) -> dict:
+    """Each statement's last line: a loop's, the last line of its body."""
+    from qccd.fullstack.scale import listing as L
+    ends: dict = {}
+
+    def last(n):
+        body = getattr(n, "body", None) or [s for arm in getattr(n, "arms", {}).values() for s in arm]
+        return max([n.line] + [last(s) for s in body])
+
+    for g in lst.gadgets.values():
+        for n in L._walk_nodes(g.body):
+            ends[n.line] = last(n)
+    return ends
+
+
+def firsts(out: Path) -> None:
+    """Where each program of the page is first used in one prime, as `page_data` traces it: the call path through FormalRV's gadgets (each with the
+    formals that shape it), the listing lines of the statement it comes from, its start -- its design page's notes (`pages`).
+    OUT/surgery/page/data/firsts.json."""
+    import bisect
+
+    import gidney_concrete as GC
+    from qccd.fullstack.scale import listing as L
+    d = _dir(out)
+    lst, R, plan = _tracers(out)
+    ends = _listing_ends(lst)
+    heads = sorted((g.line, name) for name, g in lst.gadgets.items())
+    key = GC._keys(lst, R)
+    got: dict = {}
+    t0 = time.time()
+
+    def trace(path, it, t, e):
+        kind = it[4]
+        if kind in ("rounds", "|AutoCCZ>") or e <= t:
+            return
+        if kind == "merge":
+            prog = it[5]
+        else:
+            extra = it[5] if len(it) > 5 else None
+            prog = _KIND_PROGRAM.get(kind) or (tuple(extra) if extra else (kind, "?"))
+            if prog == ("prep", "T"):
+                prog = ("T",)
+        if prog[0] in ("h", "cold") or "?" in prog:
+            return
+        k = program_key(prog)
+        if k in got:
+            got[k]["uses"] += 1
+            return
+        src = plan.origin.get(id(it))
+        line = None
+        if src and src[0] is it and src[1] is not None:
+            w = R.where.get(id(src[1]))
+            line = w[1] if w and w[0] is src[1] else None
+        gad = heads[max(0, bisect.bisect_right(heads, (line, "~")) - 1)][1] if line else None
+        got[k] = {"t_us": t, "path": [[p[0], dict(p[1])] for p in path if p], "line": line, "last": ends.get(line, line), "gadget": gad,
+                  "item": str(src[1])[:300] if src else None, "uses": 1}
+
+    end = plan.flat(key, {}, {}, trace=trace)[0]
+    # a formal FormalRV's VM reads as unknown (`listing.TOP`, a table it abstracts) is written as the VM's word for it
+    (d / "page" / "data" / "firsts.json").write_text(json.dumps(got, default=lambda v: "TOP" if v is L.TOP else str(v)), encoding="utf-8")
+    lined = sum(1 for v in got.values() if v["line"])
+    print(f"one prime {end / 3.6e9:.2f} h; {len(got)} programs, {lined} with their listing line; {time.time() - t0:.0f} s", flush=True)
+
+
+def _page_one(args) -> str:
+    """One program's design page, made as gadgets/rsa2048/'s are (`tools/lattice_programs.py page`): on the studio's stage (`render_html`, the
+    one template), every rule replayed for its panels, the hardware program beside the circuit it was compiled from (Hardware / Gates / Both);
+    its notes say where the prime first uses it in FormalRV's listing.  page/data/pages/KEY.html.gz."""
+    import gzip
+    text, page, title, notes = args
+    shape = ast.literal_eval(text)
+    key = program_key(shape)
+    f = Path(page) / "data" / "pages" / f"{key}.html"
+    t0 = time.time()
+    try:
+        from qccd.fullstack.scale import programs as PR
+        from qccd.ir.source_map import build as build_source
+        from qccd.verify import verify
+        from qccd.viz import render_html
+        b = _built(shape)
+        prog = PR.cooled(b)
+        rep = verify(prog, b.arch, PR._model(), check_metrics=False)
+        with tempfile.TemporaryDirectory() as tmp:
+            qasm = Path(tmp) / f"{key}.qasm"
+            qasm.write_text(b.qasm, encoding="utf-8")
+            source = build_source(prog, b.cert, qasm)
+        render_html(b.arch, prog, rep.result, PR._model(), f, kicker="RSA-2048 at d = 11, as Gidney compiles it", headline=title,
+                    lede=f"{b.ions:,} ions, {rep.result.total_us / 1000:,.3f} ms: one of the programs a prime copies",
+                    source=source, template_stems="*", notes=notes)
+        raw = f.stat().st_size
+        f.with_name(f.name + ".gz").write_bytes(gzip.compress(f.read_bytes(), 9, mtime=0))
+        f.unlink()
+        return (f"{key}  {b.ions:>6} ions  {raw / 1e6:7.1f} MB  {f.with_name(f.name + '.gz').stat().st_size / 1e6:6.2f} MB gz  "
+                f"{time.time() - t0:6.0f} s  {text[:80]}")
+    except Exception as exc:        # a program stays without a page, listed, and the rest go on
+        return f"FAILED {key} {text[:120]}: {exc!r}"
+
+
+def pages(out: Path, workers: int) -> None:
+    """Every program of the page's programs.json up to `rsa_gidney.PAGE_IONS` ions, its design page (`_page_one`): page/data/pages/, the
+    smallest first; a rerun makes only what is missing.  Its notes: the prime's first use of it (firsts.json) and its check at d = 11."""
+    import multiprocessing as mp
+
+    from qccd.gadget.rsa_gidney import PAGE_IONS
+    page = _dir(out) / "page"
+    data = page / "data"
+    (data / "pages").mkdir(exist_ok=True)
+    progs = json.loads((data / "programs.json").read_text(encoding="utf-8"))
+    meta = json.loads((data / "meta.json").read_text(encoding="utf-8"))
+    firsts_ = json.loads((data / "firsts.json").read_text(encoding="utf-8"))
+    todo = []
+    for p in sorted(progs, key=lambda p: p["ions"]):
+        if not p.get("key") or p["ions"] > PAGE_IONS or (data / "pages" / f"{p['key']}.html.gz").exists():
+            continue
+        facts, first = [], firsts_.get(p["key"])
+        if first:
+            t_s = first["t_us"] / 1e6
+            win = max((k for k, st in enumerate(meta["steps"]) if st["t0"] <= t_s), default=0)
+            facts.append(f"first used {t_s:,.6f} s into the prime ({meta['steps'][win]['label']}); {p['uses']:,} copies in a prime")
+            facts.append("called through FormalRV's gadgets " + " › ".join(g for g, _ in first["path"]))
+            if first.get("line"):
+                facts.append(f"FormalRV's listing g25.sysprog, line {first['line']}"
+                             + (f"–{first['last']}" if first.get("last", first["line"]) > first["line"] else "") + f", gadget {first['gadget']}")
+        elif p["kind"] == "idle":
+            facts.append("run under every held patch, every round")
+        facts.append(p["check"])
+        notes = {"title": "where the prime uses it", "index": f"../../#show={p['key']}", "facts": facts,
+                 "claim": "Every copy of this program in the prime runs exactly this; the index link opens the prime at its first copy."}
+        todo.append((repr(_tuple(p["shape"])), str(page), p["title"], notes))
+    print(f"{len(todo)} pages to make (programs up to {PAGE_IONS:,} ions), {workers} workers", flush=True)
+    with mp.Pool(workers) as pool:
+        for line in pool.imap_unordered(_page_one, todo):
+            print(line, flush=True)
+
+
+def _tuple(x):
+    """A shape as JSON gives it, as the plan makes it."""
+    return tuple(_tuple(v) for v in x) if isinstance(x, list) else x
+
+
 def main(argv) -> None:
     if len(argv) < 2:
         sys.exit(__doc__)
@@ -611,6 +810,10 @@ def main(argv) -> None:
         ions(out, int(argv[2]) if len(argv) > 2 and argv[2].isdigit() else 2, "--full" not in argv)
     elif what == "page":
         page_data(out, float(argv[2]) if len(argv) > 2 else 120.0)
+    elif what == "firsts":
+        firsts(out)
+    elif what == "pages":
+        pages(out, int(argv[2]) if len(argv) > 2 else 2)
     else:
         sys.exit(__doc__)
 

@@ -17,7 +17,7 @@ import json
 import shutil
 from pathlib import Path
 
-from .rsa import CSS, HINTS as RSA_HINTS, KEY as RSA_KEY, WEB, _years, ion_key, theme_script
+from .rsa import CSS, HINTS as RSA_HINTS, KEY as RSA_KEY, WEB, _years, ion_key, ion_scripts
 
 __all__ = ["KEY", "page", "build", "standalone", "summary", "index_entry"]
 
@@ -29,6 +29,9 @@ HINTS = {**RSA_HINTS,
          "rsa-fit": ("Whole machine", "shows the whole floorplan"),
          "rsa-programs": ("Every program", "each distinct compiled program the prime places, its ions, its exact time, how often a "
                           "prime runs it and its check at d = 11")}
+#: the most ions a program's design page is made for: a page of the one template (`render_html`) grows with its ions, about 15 kB raw and 2 kB
+#: gzipped each, and a bigger program is played by the player only (the user, 2026-11-09: as gadgets/rsa2048/'s largest)
+PAGE_IONS = 5600
 #: what each kind of gadget is drawn in, as the player draws it
 KINDS = (("merge", "#2e6fd8"), ("preparation", "#12a150"), ("readout", "#e08a00"), ("cultivated |T>", "#c2185b"),
          ("|Ȳ>", "#0f9d9a"), ("transversal H", "#8b3fd0"), ("cold access (composed)", "#795548"), ("held patch", "#8d96a8"),
@@ -61,7 +64,10 @@ def page(dst, ours: dict | None = None) -> str:
         f"<tr><td>{e(p['title'])}</td><td>{p['ions']:,}</td><td>{p['us'] / 1000:,.3f} ms</td><td>{p['dur_us'] / 1000:,.3f} ms</td>"
         f"<td>{'every held patch, every round' if p['kind'] == 'idle' else format(p['uses'], ',')}</td>"
         f"<td>{'pass' if p['d11'] == 'pass' else e(p['check'])}</td><td>"
-        + ("" if p["kind"] == "idle" or not p["uses"] else f'<button data-show="{p["id"]}" data-hint="rsa-show">Show one</button>')
+        + ("" if p["kind"] == "idle" or not p["uses"] else f'<button data-show="{p["id"]}" data-hint="rsa-show">Show one</button> ')
+        + (f'<a href="data/pages/{p["key"]}.html" target="_blank" rel="noopener" data-hint="rsa-page">Design page</a>' if p.get("page") is True
+           else f'<span class="muted">no design page: {p["ions"]:,} ions, more than the {PAGE_IONS:,} one is made for</span>'
+           if p.get("key") and p["ions"] > PAGE_IONS else "")
         + "</td></tr>" for p in order)
     hints = json.dumps({k: {"t": a, "d": b} for k, (a, b) in HINTS.items()}, ensure_ascii=False)
     js = (WEB / "rsa.js").read_text(encoding="utf-8")
@@ -142,12 +148,15 @@ logical qubit is 241 ions.</p>
 <p>Where the time goes, as if nothing ran at once ({total_work / prime:.2f} programs run at once on average):</p>
 <table><tr><th>work</th><th>a prime</th><th></th></tr>{wrows}</table>
 
-<h2>Every program</h2>
+<h2 id="programs">Every program</h2>
 <p>A gadget is a translated copy of one compiled program, so these are all the machine runs in a prime: {len(merges):,} merges,
 the cultivated |T>, the |Ȳ> made and read in place, the preparations, the readouts and the round a held patch runs, each checked at
 d = 11 ({passed} of {len(compiled)} pass). "Its time" is the program's own; "in the schedule" is what a copy holds its tiles for (a
 preparation the slower basis's slot, a |T> until its gap is decided, a Ȳ read until it is decoded). "Show one" takes the map to the
-next copy and draws its ions.</p>
+next copy and draws its ions. "Design page" opens the program on the studio's stage, as every compiled program on this site is shown:
+every ion cycle by cycle, the hardware program beside the circuit it was compiled from, every rule replayed, and its notes say where
+in FormalRV's listing the prime first uses it. A program of more than {PAGE_IONS:,} ions (a merge with a long corridor) has no design page,
+since the page would weigh hundreds of MB; the player draws its ions.</p>
 <div class="rsa-progs" data-hint="rsa-programs"><table><tr><th>program</th><th>ions</th><th>its time</th><th>in the schedule</th>
 <th>copies in a prime</th><th>d = 11</th><th></th></tr>{prow}</table></div>
 
@@ -173,7 +182,7 @@ The schedule takes every T attempt as kept: with six T tiles a slot, 0.44 % of f
 run the patches go on and only the corridor is read.</li>
 </ul>
 <script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {{}}, {hints});</script>
-{theme_script()}
+{ion_scripts()}
 <script>{js}</script>
 """
 
@@ -186,6 +195,11 @@ def build(base, put, data, ours: dict | None = None) -> None:
     if (where / "data").exists():
         shutil.rmtree(where / "data")
     shutil.copytree(data, where / "data")
+    progs = json.loads((where / "data" / "programs.json").read_text(encoding="utf-8"))
+    for p in progs:                              # each program's design page, where `tools/gidney_surgery.py pages` made one
+        p["page"] = bool(p.get("key")) and (where / "data" / "pages" / f"{p['key']}.html.gz").exists()
+    (where / "data" / "programs.json").write_text(json.dumps(progs, ensure_ascii=False), encoding="utf-8")
+    data = where / "data"
     put(f"{SECTION}/{KEY}/index.html",
         PAGE.format(title="Factoring RSA-2048 at d = 11, as Gidney compiles it - QCCD studio", style=STYLE,
                     extra_css=EXTRA_CSS + CSS + "#rsa-map{height:84px}", body=page(data, ours)), 3, SECTION)
