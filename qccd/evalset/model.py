@@ -384,6 +384,9 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     def same(d: dict, prev: dict) -> dict:
         return prev if d == prev else d
 
+    # the order inside every chain (`qccd.verify.chains`): whom a gate swap acts on
+    from ..verify.chains import Chains
+    chains = Chains(arch.device)
     t = 0.0
     for k, ins in enumerate(prog.instructions):
         st = Step(k, ins, ins.type)
@@ -394,6 +397,7 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
         st.nbar0 = last_nbar = same(start, last_nbar)
         st.t0 = t
         if ins.type == "init":
+            chains.start(ins.placement)
             pos, occ = dict(pos), dict(occ)      # the steps before keep theirs
             for ion, node in ins.placement.items():
                 if ion not in ions:
@@ -435,6 +439,15 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
             by_ion: dict[str, list] = {}
             for m in st.moves:
                 by_ion.setdefault(m.ion, []).append(m)
+            # a step that pays for gate swaps (the Cyclone deck's S7) swaps each ion that leaves
+            # from inside its chain with the ion at the end it leaves by: a `gate_swap` on the two,
+            # before the moves (the team's feedback F1: three two-ion gates)
+            moved = chains.move([(ion, ms[0].src, ms[-1].dst, ms[0].seg.id, ms[-1].seg.id)
+                                 for ion, ms in by_ion.items()],
+                                gate_swaps=bool((ins.meta or {}).get("gate_swaps")))
+            for ion, partner in moved["swaps"]:
+                ops.append(Op(len(ops), st, "gate_swap", (ion, partner), st.pos0.get(ion), "SWAP"))
+                st.ops.append(ops[-1])
             for ion, ms in by_ion.items():
                 path = [ms[0].src] + [m.dst for m in ms]
                 ops.append(Op(len(ops), st, "move", (ion,), None, ins.cls, (), "Z", path))

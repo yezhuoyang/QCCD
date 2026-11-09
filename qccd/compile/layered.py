@@ -35,6 +35,9 @@ class Emitter:
     moves: list[dict] = field(default_factory=list)
     gates: list[dict] = field(default_factory=list)
     cycle: dict[int, int] = field(default_factory=dict)
+    #: the order inside every chain (`qccd.verify.chains`), kept as instructions are written, so a
+    #: layer's pulses can be packed by the chain position they address (R34); None keeps no order
+    chains: object = None
 
     def emit(self, **kw) -> Instruction:
         ins = Instruction(id=self.prog.next_id(), **kw)
@@ -42,8 +45,19 @@ class Emitter:
         for p in ins.participants:
             self.moves.append({"t": t, "ion": p.ion, "from": p.src, "to": p.dst, "via": list(p.via)})
             self.pos[p.ion] = p.dst
+        if self.chains is not None:
+            if ins.type == "init":
+                self.chains.start(ins.placement)
+            elif ins.type == "simd" and ins.participants:
+                self.chains.move([(p.ion, p.src, p.dst, *self.chains.route_rails(p.src, p.dst, p.via))
+                                  for p in ins.participants],
+                                 gate_swaps=bool((ins.meta or {}).get("gate_swaps")))
         self.prog.add(ins)
         return ins
+
+    def pattern(self, ions: Sequence[str]):
+        """The chain position a laser must address to reach `ions` (R34), or None if no order is kept."""
+        return self.chains.pattern(ions) if self.chains is not None else None
 
     def witness(self, op: SourceOp, ins: Instruction, ions: Sequence[str]) -> None:
         """Op `op` ran at instruction `ins`, with `ions` standing together where the first is."""
@@ -75,6 +89,8 @@ class Emitter:
                 if k < len(seqs[op.i]):
                     gate, operands, params = seqs[op.i][k]
                     key = (gate, tuple(params)) if self.one_kind and gate != "VZ" else (gate, ())
+                    if gate != "VZ":
+                        key += (self.pattern(operands),)
                     ready.setdefault(key, []).append((op, operands, params))
             if not ready:
                 break
@@ -90,6 +106,54 @@ class Emitter:
             for op in ops:
                 self.witness(op, last[op.i], [ion[q] for q in op.qubits])
         return last
+
+    def play_queues(self, queues: Sequence[Sequence[SourceOp]], ion: Mapping[int, str]) -> None:
+        """Ops in queues that run side by side, one op at a time in each and in its order (a
+        trap's ops, R12): every instruction plays the next pulse, readout or reset of the queues
+        that share one gate and one chain position (R34), the most queues first.  A frame change
+        costs nothing, so a ready one goes first.  Each op's witness is its last instruction."""
+        seqs: dict[int, list] = {}
+        for q in queues:
+            for op in q:
+                if op.name in ("measure", "reset"):
+                    seqs[op.i] = [(op.name, (ion[op.qubits[0]],), ())]
+                else:
+                    seqs[op.i] = list(pulses(op, ion))
+        head = [0] * len(queues)          # the op each queue is on
+        at = [0] * len(queues)            # its next pulse
+        last: dict[int, Instruction] = {}
+        while True:
+            ready: dict[tuple, list] = {}
+            for n, q in enumerate(queues):
+                while head[n] < len(q) and at[n] >= len(seqs[q[head[n]].i]):
+                    head[n] += 1
+                    at[n] = 0
+                if head[n] >= len(q):
+                    continue
+                op = q[head[n]]
+                gate, operands, params = seqs[op.i][at[n]]
+                key = (gate, tuple(params)) if self.one_kind and gate not in ("VZ", "measure", "reset") else (gate, ())
+                if gate != "VZ":
+                    key += (self.pattern(operands),)
+                ready.setdefault(key, []).append((n, op, operands, params))
+            if not ready:
+                break
+            key = min(ready, key=lambda k: (k[0] != "VZ", -len(ready[k]), ready[k][0][1].i))
+            group = ready[key]
+            gate = key[0]
+            if gate in ("measure", "reset"):
+                ins = self.emit(type=gate, ions=tuple(o[0] for _, _, o, _ in group),
+                                meta={"kind": "readout" if gate == "measure" else "reset",
+                                      "op": sorted(op.i for _, op, _, _ in group)})
+            else:
+                ins = self.pulse_group(gate, [(o, p) for _, _, o, p in group], [op.i for _, op, _, _ in group])
+            for n, op, _, _ in group:
+                at[n] += 1
+                last[op.i] = ins
+        for q in queues:
+            for op in q:
+                if op.name not in ("measure", "reset"):      # as `play`: the gates' witnesses
+                    self.witness(op, last[op.i], [ion[x] for x in op.qubits])
 
 
 def certificate(prog: TSIR, ops: Sequence[SourceOp], name: str, arch_name: str, n: int,

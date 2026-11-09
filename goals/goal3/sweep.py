@@ -21,7 +21,7 @@ stay in `work/<code>/<point>/`, and a point already in the results file is not r
 `--cool-us` is a sensitivity run: the same sweep with another cooling time, whose rows and compile
 outputs go to `results/variants/cool<us>us/` and `work_cool<us>us/`.  The noise model's two cooling
 figures, 3 ms and Studio's 300 us, "use different reset assumptions"; the main figure takes its 3 ms.
-Cyclone's cooling takes no time (the deck's S10), so the option does not change a Cyclone point.
+Every family cools by the same rule and time, Cyclone included (the team's feedback, Q2).
 """
 
 from __future__ import annotations
@@ -82,14 +82,13 @@ def device_doc(point: dict, exp) -> dict:
         doc = wise.device_doc(p["h"], p["cx"], p["cy"], name=point["name"])
         prims, species = wise.primitives(phys["primitives"]), phys["species"]
     elif point["generator"] == "cyclone":
+        # Cyclone heats and cools as the other two do (feedback Q2: S10's free cooling is a paper
+        # assumption, not hardware)
         doc = cyclone.device_doc(p["x"], p["n"], name=point["name"])
         prims, species = cyclone.primitives(phys["primitives"], p["n"]), phys["species"]
-        heating = {**phys["heating"], "anomalous_rate_quanta_per_ms": 0.0,
-                   "note": "sympathetic cooling is assumed after every gate, so heat is not tracked",
-                   "source": "QCCD Transport Architectures deck, Cyclone S10"}
     else:
         raise KeyError(point["generator"])
-    if point.get("cool_us") is not None and point["generator"] != "cyclone":
+    if point.get("cool_us") is not None:
         prims = {**prims, "cool": {**prims["cool"], "us": point["cool_us"]}}
     doc.update(primitives=prims, heating=heating, species=species, budget=phys["budget"])
     doc["description"] = point.get("about", "")
@@ -110,7 +109,8 @@ def census(point: dict, exp) -> dict:
 def compile_point(point: dict, exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
     from qccd.compile import c2lr_router, cyclone_router, wise_router
     if point["generator"] == "grid":
-        return c2lr_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE, reads_together=True)
+        return c2lr_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE, reads_together=True,
+                                               positions=True, lazy_cooling=True)
     if point["generator"] == "wise":
         return wise_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE)
     return cyclone_router.compile_with_router(exp.qasm, arch_p, work, n_data=exp.n_data, table=TABLE)
@@ -176,6 +176,9 @@ def grade(code: str, point: dict, work_root: str) -> dict:
             # LER is not sampled
             return {**row, "status": "rules_failed", "seconds": round(time.time() - t0, 1)}
         budget = dict((rel.manifest["qec"].get("ler")) or {})
+        if point.get("ler_batch"):
+            # the same seed and stop; only the batch is smaller, so a rate near 1 stops after one small batch
+            budget["batch"] = point["ler_batch"]
         lr = evaluate_memory(str(cooled), str(arch_p), exp, noise_id=NOISE, cert=cert,
                              ler_budget={k: v for k, v in budget.items() if k != "seed"},
                              seed=budget.get("seed"))
@@ -204,6 +207,9 @@ def main() -> int:
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--work", default=None)
     ap.add_argument("--cool-us", type=float, default=None, help="a sensitivity run at this cooling time")
+    ap.add_argument("--ler-batch", type=int, default=None,
+                    help="sample in batches of this many shots, not the release's (a point past threshold "
+                         "otherwise decodes a whole batch of failing shots, for hours under BP-OSD)")
     a = ap.parse_args()
     tag = f"cool{a.cool_us:g}us" if a.cool_us is not None else None
     a.work = a.work or str(HERE / (f"work_{tag}" if tag else "work"))
@@ -215,7 +221,9 @@ def main() -> int:
         ps = points_for(fam, meta)
         pts += ps[:a.max_points] if a.max_points else ps
     if tag:
-        pts = [{**p, "cool_us": a.cool_us} for p in pts if p["generator"] != "cyclone"]
+        pts = [{**p, "cool_us": a.cool_us} for p in pts]
+    if a.ler_batch:
+        pts = [{**p, "ler_batch": a.ler_batch} for p in pts]
     if a.list:
         for p in pts:
             print(f"{p['family']:9s} {p['name']:24s} {p['generator']}({p['params']})")

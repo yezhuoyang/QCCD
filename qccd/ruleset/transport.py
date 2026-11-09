@@ -121,11 +121,29 @@ def _helios_ring_control(ctx: Ctx):
             and classes.get("helios_rotate_ccw", {}).get("delta") == -1)
 
 
-@term("one_parity(k)", "true or false", "Whether WISE step k plays one kind of pair at one parity "
-      "in one direction: its class names them, each of its moves is one of the machine's pairs of "
-      "that kind, and no zone takes part twice.", "execution", kinds=("programme",))
+@term("one_parity(k)", "true or false", "Whether WISE step k plays one kind of pair at one parity: "
+      "its class names them, and each of its moves is one of the machine's pairs of that kind.  A "
+      "swap step's pairs each exchange their two ions, or move one into an empty partner, and no "
+      "zone is in two of them; a gate's merge or split half moves one way, and no zone takes part "
+      "twice.", "execution", kinds=("programme",))
 def _one_parity(ctx: Ctx, k):
+    from ..arch.wise import swap_kind
     ins = _step(ctx, k, "one_parity")["instruction"]
+    kind = swap_kind(ins.cls)
+    if kind is not None:
+        allowed = {frozenset(m) for m in _wise_pairs(ctx).get((kind, "a"), set())}
+        used: dict[frozenset, list] = {}
+        for p in ins.participants:
+            e = frozenset((p.src, p.dst))
+            if e not in allowed:
+                return False
+            used.setdefault(e, []).append(p)
+        zones: set[str] = set()
+        for e, ps in used.items():
+            if len(ps) > 2 or (len(ps) == 2 and (ps[0].src != ps[1].dst or ps[0].ion == ps[1].ion)) or zones & e:
+                return False
+            zones |= e
+        return True
     key = _half(ins.cls)
     if key is None:
         return False
@@ -149,9 +167,10 @@ def _one_kind(ctx: Ctx, k):
 
 
 @term("pairs_only_to_gate_or_split(k)", "true or false", "Whether, once step k is over, a zone that "
-      "holds two ions is on its way to a gate or a split: step k is a swap step's half (one parity "
-      "merging or splitting while another waits), their two-ion gate, or their cooling, and any "
-      "other step leaves every zone holding one.", "execution", kinds=("programme",))
+      "holds two ions is on its way to a gate or a split: step k is a gate's merge or split half (one "
+      "parity merging or splitting while another waits), their two-ion gate, or their cooling, and "
+      "any other step, a swap step included, leaves every zone holding one.", "execution",
+      kinds=("programme",))
 def _pairs_only(ctx: Ctx, k):
     st = _step(ctx, k, "pairs_only_to_gate_or_split")
     if not st["holds_two"]:
@@ -233,6 +252,25 @@ def _lockstep(ctx: Ctx, k):
             moved.append(p.ion)
     times = Counter(moved)
     return set(times) == {i.id for i in ctx.exe.ions} - _data(ctx) and len(set(times.values())) == 1
+
+
+@term("laser(o)", "true or false", "Whether operation o needs a laser to reach its ions: a pulse, a "
+      "two-ion gate, a readout or a reset.  A frame change and an identity are no pulse.",
+      "execution", kinds=("programme",))
+def _laser(ctx: Ctx, o):
+    from .vocabulary import _op
+    return bool(_op(o, "laser").facts.get("laser"))
+
+
+@term("pattern(o)", "a name", "What a laser must address to reach operation o's ions: their positions "
+      "in their chain and the chain's length, as \"1,2 of 3\".  Position 1 is the end of a trap toward "
+      "the previous node of its ring, or on any other site the end with the smaller coordinate; the "
+      "order is kept step by step from the start (`qccd.verify.chains`).", "execution",
+      kinds=("programme",))
+def _pattern(ctx: Ctx, o):
+    from ..verify.chains import pattern_text
+    from .vocabulary import _op
+    return pattern_text(_op(o, "pattern").facts.get("pattern"))
 
 
 @term("traps_within_thirty()", "true or false", "Whether no trap of the ring holds more than 30 ions.",

@@ -346,10 +346,13 @@ def test_wise_prices_are_the_deck_s(wise_prog):
     assert uniq(lambda i: i.type == "measure") == {150.0 + 384}
     assert uniq(lambda i: i.type == "reset") == {20.0 + 384}
     assert uniq(lambda i: i.type == "cool") == {3000.0}
-    # T1: t0 = 100 us a swap, 50 a half; across a junction zone 2 t0; between rows 3 t0 (S6)
-    assert uniq(lambda i: str(i.cls).startswith(("wise_h0", "wise_h1"))) == {50.0}
-    assert uniq(lambda i: str(i.cls).startswith("wise_x")) <= {100.0}
-    assert uniq(lambda i: str(i.cls).startswith(("wise_vr", "wise_vl"))) <= {150.0}
+    # T1 and feedback F4: a swap is one step, t0 = 100 us between neighbours; a junction step, across a
+    # junction zone or between rows, is C2LR's 400 us (feedback F1); a gate's merge or split half is t0 / 2
+    assert uniq(lambda i: i.cls in ("wise_h0", "wise_h1")) == {100.0}
+    assert uniq(lambda i: i.cls == "wise_x") <= {400.0}
+    assert uniq(lambda i: i.cls in ("wise_vr0", "wise_vr1", "wise_vl0", "wise_vl1")) <= {400.0}
+    assert uniq(lambda i: str(i.cls).endswith(("_a", "_b"))) == {50.0}
+    assert any(i.cls in ("wise_h0", "wise_h1") and len(i.participants) >= 2 for i in prog.instructions)
 
 
 def test_cyclone_prices_are_the_deck_s(cyclone_prog):
@@ -362,9 +365,10 @@ def test_cyclone_prices_are_the_deck_s(cyclone_prog):
     # round the ring's short side two degree-2 crossings of 10 each (T1, T2)
     assert uniq == {80 + 3 * g + 80 + 10 + 2 * 10}
     assert set(_us(prog, arch, lambda i: i.gate == "MS")) == {g}
-    assert set(_us(prog, arch, lambda i: i.type == "cool")) == {0.0}
+    # feedback Q2: Cyclone cools by the other families' rule and time, so its ions heat and a cool takes 3 ms
+    assert set(_us(prog, arch, lambda i: i.type == "cool")) == {3000.0}
     res = replay(prog, arch, corrected_model(TABLE), check_rules=False, keep_cycles=False)
-    assert res.max_gate_quanta_seen == 0.0     # S10: nothing heats
+    assert 0.0 < res.max_gate_quanta_seen <= 1.0
 
 
 def test_c2lr_prices_are_the_deck_s():
@@ -455,3 +459,158 @@ def test_the_idle_window_is_one_channel_over_the_whole_wait():
     assert "exp(0 - idle_s(i, o) / t_lin - pow(idle_s(i, o) / t_g, 2))" in chan["idle_dephasing"].text
     # the two-ion gate's excess reads the ledger, which counts from the last cooling
     assert "slope * gate_nbar(g)" in chan["ms"].text
+
+
+# ------------------------------------------------------------------ the feedback (Ke, 2026-11-07)
+
+
+def _ring(arch):
+    dev = arch.device
+    lid = next(iter(dev.loops))
+    return dev, lid, list(dev.loop_slots(lid))
+
+
+def test_a_ring_trap_counts_its_chain_from_the_end_toward_the_previous_trap(cyclone_prog):
+    from qccd.verify.chains import frames
+    _exp, arch, _prog, _cert, _work = cyclone_prog
+    dev, lid, _slots = _ring(arch)
+    fr = frames(dev)
+    nodes = dev.loops[lid].nodes
+    for i, s in enumerate(nodes):
+        if dev.nodes[s].kind != "site":
+            continue
+        prev, nxt = nodes[i - 1], nodes[(i + 1) % len(nodes)]
+        assert fr[s][dev.segment_between(s, prev).id] == 0
+        assert fr[s][dev.segment_between(s, nxt).id] == 1
+
+
+def test_an_ion_leaving_from_inside_its_chain_swaps_with_the_end_it_leaves_by(cyclone_prog):
+    from qccd.verify.chains import Chains
+    from qccd.verify.replay import bend_vias
+    _exp, arch, _prog, _cert, _work = cyclone_prog
+    dev, lid, slots = _ring(arch)
+    s0, s1 = slots[0], slots[1]
+    first, last = Chains(dev).route_rails(s0, s1, bend_vias(dev, lid, 1).get(s0, ()))
+    plain = Chains(dev)
+    plain.start({"a": s0, "d1": s0, "d2": s0})
+    assert plain.pattern(["a"]) == (3, (1,)) and plain.pattern(["a", "d2"]) == (3, (1, 3))
+    assert plain.move([("a", s0, s1, first, last)]) == {"swaps": [], "from_inside": ["a"]}
+    paid = Chains(dev)
+    paid.start({"a": s0, "d1": s0, "d2": s0})
+    assert paid.move([("a", s0, s1, first, last)], gate_swaps=True) == {"swaps": [("a", "d2")], "from_inside": []}
+    # the ion that took the ancilla's place stands where it stood; the ancilla enters its next trap at position 1
+    assert paid.chain(s0) == ["d2", "d1"] and paid.chain(s1) == ["a"]
+    paid.start({"b": s1})
+    assert paid.chain(s1) == ["a", "b"] and paid.chain(s0) == ["d2", "d1"]
+
+
+
+def test_the_chain_order_keeps_every_ion_through_a_placement_it_missed(cyclone_prog):
+    from qccd.verify.chains import Chains
+    _exp, arch, _prog, _cert, _work = cyclone_prog
+    dev, _lid, slots = _ring(arch)
+    c = Chains(dev)
+    c.start({"a": slots[0]})
+    # "z" was never placed: its move still lands it, and "a" moving where it already is changes nothing
+    c.move([("z", slots[1], slots[2], None, None), ("a", slots[0], slots[0], None, None)])
+    assert c.chain(slots[2]) == ["z"] and c.chain(slots[0]) == ["a"]
+    # an ion the order holds in the wrong place is moved, not copied
+    c.at["a"] = slots[0]
+    c.move([("a", slots[3], slots[2], None, None)])
+    assert sorted(c.chain(slots[2])) == ["a", "z"] and c.chain(slots[0]) == []
+    # an ion listed twice in one step (R8's to refuse) moves once, by its first listing, and nothing raises
+    c.move([("a", slots[2], slots[3], None, None), ("a", slots[2], slots[1], None, None)])
+    assert c.chain(slots[3]) == ["a"] and c.chain(slots[1]) == []
+
+def _two_traps(arch, ions):
+    dev, _lid, slots = _ring(arch)
+    prog = TSIR(name="x", arch_spec="a")
+    placement = {i: slots[k] for i, k in ions}
+    prog.add(Instruction(type="init", id=prog.next_id(), placement=placement, quanta={i: 0.0 for i in placement}))
+    return prog, {"circuit_ops": [], "map": {str(n): i for n, i in enumerate(placement)}}
+
+
+def test_r34_refuses_two_chain_positions_in_one_laser_step(cyclone_prog):
+    _exp, arch, _prog, _cert, _work = cyclone_prog
+    half = (math.pi / 2, 0.0)
+    for ions, ok in ((("a", "c"), True), (("a", "d"), False)):
+        prog, cert = _two_traps(arch, [("a", 0), ("b", 0), ("c", 1), ("d", 1)])
+        prog.add(Instruction(type="gate", id=prog.next_id(), gate="R", mode="intra", arity=1,
+                             params=(half, half), ions=ions))
+        assert ("R34" in _judge("cyclone-deck", prog, arch, cert)) is not ok, ions
+    # a frame change is no pulse
+    prog, cert = _two_traps(arch, [("a", 0), ("b", 0), ("c", 1), ("d", 1)])
+    prog.add(Instruction(type="gate", id=prog.next_id(), gate="VZ", mode="intra", arity=1,
+                         params=((math.pi,), (math.pi,)), ions=("a", "d")))
+    assert "R34" not in _judge("cyclone-deck", prog, arch, cert)
+
+
+def test_a_wise_swap_is_one_step_and_its_class_alone_earns_nothing(wise_prog):
+    from qccd.verify.replay import replay
+    _exp, arch, _prog, _cert, _work = wise_prog
+    e = wise.Zones(arch).edges["h0"][0]
+    for cls, ok in (("wise_h0", True), ("wise_h1", False)):
+        prog = TSIR(name="x", arch_spec="a")
+        prog.add(Instruction(type="init", id=prog.next_id(), placement={"p": e.u, "q": e.v},
+                             quanta={"p": 0.0, "q": 0.0}))
+        prog.add(Instruction(type="simd", id=prog.next_id(), cls=cls, mode="inter",
+                             participants=(Participant("p", e.u, e.v), Participant("q", e.v, e.u))))
+        failed = _judge("wise", prog, arch, {"circuit_ops": [], "map": {"0": "p", "1": "q"}})
+        res = replay(prog, arch, corrected_model(TABLE), check_rules=False, keep_cycles=True)
+        us = [c.t1 - c.t0 for c in res.cycles if c.instr_id == prog.instructions[-1].id]
+        if ok:
+            # the device's own pair, exchanging: t0, and R3, R5 and R22 leave its crossing alone
+            assert us == [pytest.approx(wise.SWAP_US)] and not {"R3", "R5", "R22", "W2"} & set(failed), failed
+        else:
+            # the same moves under another kind's class are plain moves, judged in full
+            assert us != [pytest.approx(wise.SWAP_US)] and {"R5", "W2"} <= set(failed), failed
+
+
+def test_the_lazy_cooling_pass_never_cools_more_and_keeps_r7(cyclone_prog):
+    from qccd.compile.cooling import CoolingPolicy, insert_cooling
+    _exp, arch, _prog, _cert, work = cyclone_prog
+    raw = TSIR.load(str(work / "prog.tsir.json"))
+    every = insert_cooling(raw, arch, corrected_model(TABLE))
+    lazy = insert_cooling(raw, arch, corrected_model(TABLE), policy=CoolingPolicy(lazy=True))
+    assert lazy.r7_violations_after == 0 == every.r7_violations_after
+    assert 0 < lazy.n_cools < every.n_cools
+
+
+def test_c2lr_packs_by_chain_position_only_when_asked(tmp_path):
+    import boards
+    import sweep
+    exp = boards.experiment("surface3")
+    point = {"family": "C2LR", "name": "c2lr5x4", "generator": "grid", "params": {"a": 5, "b": 4}, "species": "Yb-Ba"}
+    arch = Architecture.from_json(sweep.device_doc(point, exp))
+    rs = tmp_path / "r34.rules"
+    rs.write_text('ruleset "r34"\ntitle "R34"\nabout "R34 alone"\nuse R34\n', encoding="utf-8")
+    got = {}
+    for positions in (False, True):
+        prog, cert = c2lr_router.compile_c2lr(exp.qasm, arch, reads_together=True, positions=positions)
+        got[positions] = _judge(str(rs), prog, arch, cert).get("R34", 0)
+    # the C2LR boards' packing (by kind) pulses a leg's two crystals together; Goal 3's does not
+    assert got[False] > 0 and got[True] == 0
+    assert set(load_rules("c2lr-deck").ids) - set(load_rules("c2lr-demonstrated").ids) == {"R34"}
+
+
+def test_a_gate_swap_is_charged_on_the_ancilla_and_the_ion_it_changes_places_with(cyclone_prog, wise_prog):
+    from qccd.evalset.model import build_run
+    _exp, arch, prog, _cert, _work = cyclone_prog
+    run = build_run(prog, arch, TABLE)
+    swaps = [o for o in run.ops if o.kind == "gate_swap"]
+    data = set(prog.meta["data_ions"])
+    assert swaps and all(o.ions[0] not in data for o in swaps)
+    assert all(o.step.pos0[o.ions[0]] == o.step.pos0[o.ions[1]] for o in swaps)
+    _exp, warch, wprog, _cert, _work = wise_prog
+    assert not [o for o in build_run(wprog, warch, TABLE).ops if o.kind == "gate_swap"]
+
+
+def test_the_cost_table_reads_what_the_sweep_runs_on():
+    from qccd.site import goal3_costs
+    n = goal3_costs._numbers()
+    assert n["us_cool"] == PHYS["primitives"]["cool"]["us"] == 3000
+    assert (n["split_q"], n["merge_q"], n["rail_q"], n["junction_q"]) == (2.0, 0.0, 0.1, 0.014)
+    assert n["c2lr_us"] == c2lr.C2LR_DECK["Yb-Ba"]["swap_or_stay"]["us"] == 400
+    assert n["r_2q"] == pytest.approx(5.39e-4) and n["leak_transport_per_s"] == pytest.approx(4.0e-4 / 55e-3)
+    html = goal3_costs.section()
+    assert html.count("<table") == 3 and goal3_costs.PENDING in html and "simulation assumption" in html

@@ -14,13 +14,17 @@ of sides' traps, so x is even.
   degree-2 crossing, 10 us more (T1, T2);
 * a split is 80 us and carries the GateSwap that brings the ancilla to the trap's edge, 3 CX (S7,
   T3).  A trap's ancillas leave in turn, so a rotation pays A x (s + t) where T5 prints s + A x t.
-  The GateSwap costs time only: the replay does not track chain order, and neither the deck nor
-  the noise model gives it an error;
+  Every trap of a lockstep step waits for the slowest, so the step's time always carries it.  Its
+  error, 3 x the two-qubit gate's (the team's feedback F1), lands on the ancilla and the ion it
+  changes places with, where the chain order (`qccd.verify.chains`) says there is one: the noise
+  model's `gate_swap` channel;
 * a gate's time grows with the trap's capacity by the QCCDSim law the deck's T4 names.  The noise
   model's 70 us is its flat part: the law's 100 us at up to 12 ions is scaled to it.
 
-**Heat is not modelled** (S10): sympathetic cooling is assumed after every gate, and the paper's
-time model has no term for it, so here cooling takes no time and nothing heats.
+**Heat and cooling are the other families'** (the team's feedback Q2: S10's free cooling is a paper
+assumption, not hardware): the noise model's 2 quanta a split, 0.1 a rail and 3 quanta a second in
+the background, and the same 3 ms cooling, which the cooling pass adds before any batch of gates
+over the budget (R7).  A corner pays its two rails.
 """
 
 from __future__ import annotations
@@ -104,26 +108,31 @@ def device_doc(x: int, n: int, *, name: str | None = None) -> dict:
 def primitives(base: Mapping, n: int) -> dict:
     """The deck's prices on `base` (qccd-physics@3's primitives), for a trap of `n` ions."""
     out = copy.deepcopy(dict(base))
-    table = out["split"]["curve"][0]["table"]
+    point = lambda key: out[key]["curve"][0]                     # noqa: E731
+    table = point("split")["table"]
+    split_q, merge_q, rail_q = (float(point(k)["quanta"]) for k in ("split", "merge", "shuttle_segment"))
     g = chain_gate_us(n, float(out["ms_gate"]["us"]))
     swaps = 3
     out["ms_gate"]["us"] = g
     out["ms_gate"]["note"] = f"{out['ms_gate']['note']}. In a trap of {n}: deck T4's law, scaled to 70 us"
-    out["split"] = {"curve": [{"us": SPLIT_US + swaps * g, "quanta": 0.0, "table": table,
-                               "label": "split 80 us, carrying its ancilla's GateSwap, 3 CX (time only)",
-                               "source": f"{_DECK} T1, T3; S7"}]}
-    out["merge"] = {"curve": [{"us": MERGE_US, "quanta": 0.0, "table": table, "label": "merge, 80 us",
-                               "source": f"{_DECK} T1"}]}
-    out["shuttle_segment"] = {"curve": [{"us": MOVE_US, "quanta": 0.0, "table": table,
+    noise = "Helios Nominal Noise Model Sec. 5"
+    out["split"] = {"curve": [{"us": SPLIT_US + swaps * g, "quanta": split_q, "table": table,
+                               "label": "split 80 us, carrying its ancilla's GateSwap, 3 CX; the noise model's split "
+                                        "heat",
+                               "source": f"{_DECK} T1, T3; S7; {noise}"}]}
+    out["merge"] = {"curve": [{"us": MERGE_US, "quanta": merge_q, "table": table,
+                               "label": "merge, 80 us; the noise model's heat (grouped with the split)",
+                               "source": f"{_DECK} T1; {noise}"}]}
+    out["shuttle_segment"] = {"curve": [{"us": MOVE_US, "quanta": rail_q, "table": table,
                                          "label": "the move between traps, 10 us; a corner is two rails: "
-                                                  "the move and its degree-2 crossing",
-                                         "source": f"{_DECK} T1, T2"}]}
+                                                  "the move and its degree-2 crossing. The noise model's shuttle heat",
+                                         "source": f"{_DECK} T1, T2; {noise}"}]}
     out["junction_cross"] = {"curve_by_degree": {
         d: [{"us": us, "quanta": 0.0, "table": table, "label": f"degree {d}; Cyclone uses only degree 2",
              "source": f"{_DECK} T2"}] for d, us in (("3", 100.0), ("4", 120.0))}}
-    out["cool"] = {**out["cool"], "us": 0,
-                   "note": "sympathetic cooling assumed after every gate, in no time: the paper's time model "
-                           "has no term for it", "source": f"{_DECK} S10"}
+    out["cool"] = {**out["cool"],
+                   "note": f"{out['cool'].get('note', '')}. Cyclone cools as the other families do (feedback Q2: "
+                           "S10's free cooling is a paper assumption)".strip(". ")}
     return out
 
 

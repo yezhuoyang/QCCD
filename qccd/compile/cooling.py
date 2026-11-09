@@ -41,7 +41,7 @@ from typing import Mapping
 from ..arch import Architecture
 from ..cost.models import CostModel
 from ..ir import provenance as prov
-from ..ir.tsir import TSIR, Instruction
+from ..ir.tsir import TSIR, Instruction, iter_pairs
 from ..verify.replay import replay
 
 __all__ = ["CoolingPolicy", "CoolingResult", "insert_cooling", "ION_LOSS_ROUND_TRIPS"]
@@ -65,6 +65,11 @@ class CoolingPolicy:
     broadcast: bool = True
     #: Guard on the ion-loss fixed point.
     max_iterations: int = 12
+    #: Count a gate's heat from the last cool this pass puts in, not from the start: a broadcast
+    #: cool before the first gate over the budget cools every ion, so the next one comes only when
+    #: a gate is over the budget again.  False (the default) cools before every gate the uncooled
+    #: programme finds over it, which on a ring whose traps gate in turn cools before each.
+    lazy: bool = False
 
 
 @dataclass
@@ -217,10 +222,23 @@ def insert_cooling(
     )
     r7_before = sum(1 for v in before.rules.violations if v.rule == "R7")
     offenders = {v.instr_id: "R7_gate" for v in before.rules.violations if v.rule == "R7"}
+    if policy.lazy and policy.broadcast and offenders:
+        offenders = _lazy_offenders(prog, arch, model, budget, rule_config)
     gates_total = sum(1 for i in prog.instructions if i.type == "gate")
     all_ions = tuple(sorted(before.per_ion_quanta))
 
     cooled = _rebuild(prog, prog.arch_spec, offenders, policy, name, base_meta, all_ions)
+    if policy.lazy and policy.broadcast:
+        # what the count left over -- the anomalous heat a cool's own time adds before its reset,
+        # say -- gets a cool of its own, as the default pass would give it
+        for _ in range(policy.max_iterations):
+            left = replay(cooled, arch, model, check_rules=True, only_rules=["R7"], keep_cycles=False,
+                          rule_config=rule_config)
+            more = {v.instr_id: "R7_gate" for v in left.rules.violations if v.rule == "R7"}
+            if not more:
+                break
+            offenders.update(more)
+            cooled = _rebuild(cooled, prog.arch_spec, more, policy, name, base_meta, all_ions)
     triggers = {"R7_gate": len(offenders), "ion_loss": 0}
     iterations = 1
     converged = True
@@ -373,6 +391,36 @@ def insert_cooling(
         unfixable=sorted(unfixable),
         notes=notes,
     )
+
+
+def _lazy_offenders(prog: TSIR, arch: Architecture, model: CostModel, budget: float,
+                    rule_config: Mapping) -> dict[int, str]:
+    """The gates a broadcast cool must precede, counting each ion's heat from the last such cool:
+    one replay of the uncooled programme.  Heat adds up whatever an ion already holds, so an ion's
+    heat at a gate after a cool is its running total there less its total when the cool came.  R7's
+    test, on that difference: each ion of each pair, against the budget."""
+    snap: dict[str, float] = {}
+    at_start: dict[str, float] = {}
+    marks: dict[int, str] = {}
+
+    def probe(instr: Instruction, current: Mapping[str, float]) -> None:
+        if instr.type == "gate":
+            at_start.clear()
+            at_start.update(current)
+
+    def on_cycle(v) -> None:
+        nonlocal snap
+        if v.instr.type != "gate":
+            return
+        for a, b in iter_pairs(v.instr):
+            if any(v.quanta.get(i, 0.0) - snap.get(i, 0.0) > budget for i in (a, b)):
+                marks[v.instr.id] = "R7_gate"
+                snap = dict(at_start)
+                return
+
+    replay(prog, arch, model, check_rules=False, keep_cycles=False, probe=probe, on_cycle=on_cycle,
+           rule_config=rule_config)
+    return marks
 
 
 def _junction_quanta(arch: Architecture, model: CostModel) -> float:

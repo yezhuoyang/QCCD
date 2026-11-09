@@ -281,6 +281,7 @@ for _nm, _sig, _kinds, _txt in (
         ("resets", "resets", ("reset",), "Every reset of an ion to |0⟩."),
         ("coolings", "coolings", ("cool",), "Every cooling operation."),
         ("moves", "moves", ("move",), "Every transport of one ion in one step, from where it stood to where it stops."),
+        ("gate_swaps", "gate_swaps", ("gate_swap",), "Every gate swap a step pays for (the Cyclone deck's S7): the ion leaving its chain from inside it and the ion at the end it leaves by, which change places by three two-ion gates."),
         ("preparations", "preparations", ("prepare",), "The preparation of every ion in |0⟩ before the first step: one operation.")):
     word(_sig, "a set of operations", _txt, "execution", domain=True, name=_nm)(_kind_domain(*_kinds))
 
@@ -310,7 +311,7 @@ def _ions(c: Ctx):
 
 
 @word("kind(x)", "a name", "What operation x is (\"gate2\", \"gate1\", \"measure\", \"reset\", "
-      "\"cool\", \"move\", \"prepare\"), or what instruction step x is (\"init\", \"simd\", \"gate\", "
+      "\"cool\", \"move\", \"gate_swap\", \"prepare\"), or what instruction step x is (\"init\", \"simd\", \"gate\", "
       "\"measure\", \"reset\", \"cool\", \"barrier\", and \"readout\" for the appended readout).",
       "execution")
 def _kind(c: Ctx, x):

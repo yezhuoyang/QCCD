@@ -9,7 +9,9 @@ at a step with t = p - s mod x.
 THE GATES ARE NEVER REORDERED.  Each op runs at the first step that is no earlier than the last
 op on any of its qubits and at which its qubits stand together; an ancilla that passes a data
 qubit it may not touch yet comes round again.  Within a step a trap runs its ops one at a time, in
-circuit order (S5), and different traps run together.  Cyclone's paper assigns stabilizers on the
+circuit order (S5), and different traps run together as far as a broadcast laser allows: one
+instruction reaches one chain position in every trap it plays in (R34, the team's feedback F2), the
+position most traps are ready for first.  Cyclone's paper assigns stabilizers on the
 fly, every X check in one rotation and every Z check in the next (S6); that reorders the circuit,
 so here a round takes as many rotations as the circuit's order needs.
 
@@ -35,6 +37,7 @@ from typing import Mapping, Sequence
 
 from ..arch import Architecture
 from ..ir.tsir import TSIR, Participant
+from ..verify.chains import Chains
 from ..verify.replay import bend_vias
 from .c2lr_router import GATES_2Q, U3, Refused, RouteError, SourceOp, _parse
 from .layered import Emitter, certificate
@@ -176,7 +179,7 @@ def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: st
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)},
                       "data_ions": [ion[q] for q in range(n_data)]})
-    em = Emitter(prog, dict(placement))
+    em = Emitter(prog, dict(placement), chains=Chains(dev))
     em.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
             meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     em.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -191,10 +194,14 @@ def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: st
         _run_step(em, by_step.get(t, ()), pl, t, ion)
         if t < last_step:
             # a trap does one thing at a time and a rail holds one ion (S5, HW3), so the ancillas
-            # of one trap leave in turn: the j-th of every trap goes together
+            # of one trap leave in turn: the j-th of every trap goes together, the one nearest the
+            # end it leaves by first, so the fewest pay a gate swap to reach it
             by_trap: dict[str, list[str]] = {}
             for a in ancillas:
                 by_trap.setdefault(em.pos[a], []).append(a)
+            for here, group in by_trap.items():
+                chain = em.chains.chain(here)
+                group.sort(key=lambda a: len(chain) - 1 - chain.index(a))
             for j in range(max((len(v) for v in by_trap.values()), default=0)):
                 parts = []
                 for here, group in by_trap.items():
@@ -207,32 +214,20 @@ def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: st
 
 
 def _run_step(em: Emitter, ops: Sequence[SourceOp], pl: Plan, t: int, ion: Mapping[int, str]) -> None:
-    """One step's ops: a trap runs one at a time, in circuit order; traps run together."""
-    slots: list[list[SourceOp]] = []
-    used: dict[int, int] = {}
+    """One step's ops: a trap runs one at a time, in circuit order; traps run together, each
+    instruction reaching one chain position in every trap it plays in (R34)."""
+    queues: dict[int, list[SourceOp]] = {}
     for op in ops:
-        trap = pl.trap(op.qubits[0], t)
-        k = used.get(trap, 0)
-        used[trap] = k + 1
-        while len(slots) <= k:
-            slots.append([])
-        slots[k].append(op)
-    for slot in slots:
-        gates = [o for o in slot if o.name in U3 or o.name in GATES_2Q]
-        if gates:
-            em.play(gates, ion)
-        for kind in ("measure", "reset"):
-            group = [o for o in slot if o.name == kind]
-            if group:
-                em.emit(type=kind, ions=tuple(ion[o.qubits[0]] for o in group),
-                        meta={"kind": "readout" if kind == "measure" else "reset", "op": [o.i for o in group]})
+        queues.setdefault(pl.trap(op.qubits[0], t), []).append(op)
+    em.play_queues([queues[k] for k in sorted(queues)], ion)
 
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int, table: str = "helios",
                         name: str = "circuit") -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate).
-    The cooling pass runs as for any device: nothing heats here, so it adds nothing."""
-    from ..compile.cooling import insert_cooling
+    The cooling pass runs as for any device: a rotation's splits heat the ancillas past the
+    budget, so a step's gates follow a cooling (the team's feedback Q2)."""
+    from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model
     t0 = time.time()
     work = Path(workdir)
@@ -248,7 +243,9 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int, tabl
     prog, cert = compile_cyclone(qasm_text, arch, n_data, name=name)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
-    cooled = insert_cooling(prog, arch, corrected_model(table)).program
+    # one broadcast cool before a batch over the budget, counted from the last cool (R7, the
+    # same rule for every Goal 3 family: the team's feedback Q2)
+    cooled = insert_cooling(prog, arch, corrected_model(table), policy=CoolingPolicy(lazy=True)).program
     cooled.meta.update(prog.meta)
     final = work / "prog.cooled.tsir.json"
     cooled.save(str(final), indent=None)

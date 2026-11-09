@@ -230,6 +230,9 @@ CSS = """
 .g3 table.g3r td small{display:block;color:var(--ink2)}
 .g3 table.g3r td a{text-decoration:none}
 .g3 table.g3r span[title]{cursor:help}
+.g3 table.g3-costs td{vertical-align:top}
+.g3 table.g3-costs td:first-child{white-space:nowrap;font-weight:600}
+.g3 table.g3-costs td b{font-weight:600}
 .g3r-ok{color:#1b7f3b;font-weight:600}.g3r-bad{color:#b42318;font-weight:600}.g3r-part{color:#8a5300;font-weight:600}
 .g3r-skip,.g3r-no{color:#8a8985}.g3r-skip{font-size:20px;font-weight:700;line-height:1}
 .g3 p.g3r-why{margin:4px 0;font-size:13px}
@@ -498,7 +501,7 @@ def page(PAGE: str, STYLE: str) -> str | None:
     d = data()
     if d is None:
         return None
-    from . import leaderboard
+    from . import goal3_costs, leaderboard
     cav = "".join(f"<li><b>{_e(f)}*</b> {_e(t)}.</li>" for f, t in d["caveats"].items())
     # each family's own set, as the table's heads name them (a family keeps one set on every code)
     sets_of: dict = {}
@@ -519,10 +522,11 @@ def page(PAGE: str, STYLE: str) -> str | None:
             "crystals move only by swap-or-stay steps, one direction bit a leg (Yb-Ba, the demonstrated diagonals)</td>"
             "<td>Cx, Cy</td></tr>"
             "<tr><td>WISE</td><td>Cx &times; Cy cells, a junction zone and h gate zones each; parallel switched swaps, "
-            "one parity and one kind of operation across the chip in a step, and every layer pays for its shims</td>"
-            "<td>h, Cx, Cy</td></tr>"
+            "each pair exchanging its two ions in one step, one parity and one kind of operation across the chip in a "
+            "step, and every layer pays for its shims</td><td>h, Cx, Cy</td></tr>"
             "<tr><td>Cyclone</td><td>one ring of x traps of up to n ions, L-shaped junctions at its corners; the data "
-            "stands still and the ancillas rotate in lockstep</td><td>x, n &le; 30</td></tr>")
+            "stands still and the ancillas rotate in lockstep, an ancilla swapping its way to its trap&rsquo;s edge "
+            "before it leaves</td><td>x, n &le; 30</td></tr>")
     body = (
         "<h1>Goal 3: one code at a time, every architecture</h1>"
         '<p class="sub">For each fixed QEC code, every architecture family at every size its rules allow. '
@@ -534,9 +538,11 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "its X memory on the same ions, d rounds each, so a round fails when either memory does.</p>"
         "<p>Every point runs under the team&rsquo;s Helios nominal noise model (qccd-noise@3, on qccd-physics@3), and "
         "where that model has no number for an architecture, under the architecture&rsquo;s own time and heat from "
-        "the team&rsquo;s transport deck. The circles are the reference sweep: each family at every size the deck "
-        "allows, compiled by its own baseline compiler, which keeps the circuit&rsquo;s gate order, and judged by "
-        "its own rule set, without the Lean certificate step. The diamonds are entries submitted to the official "
+        "the team&rsquo;s transport deck and its feedback. Every family heats, and cools by the same rule and time. "
+        "A laser step reaches one chain position, in every family. The circles are the reference sweep: each family "
+        "at every size the deck allows, compiled by its own baseline compiler, which keeps the circuit&rsquo;s gate "
+        "order, and judged by its own rule set, without the Lean certificate step. The diamonds are entries "
+        "submitted to the official "
         "server, which ran every check on the board&rsquo;s own physics. "
         "Click any point to open its page: the ions moving on the machine, the program against the circuit, the "
         "rules, and the noise model&rsquo;s stim program block by block.</p>"
@@ -553,6 +559,7 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "submitted entry</span>"
         "<span>Bars: 95% interval</span><span>Click any point to open its page</span></div>"
         '<details><summary>Each family&rsquo;s best, as a table</summary><div id="g3-table"></div></details>'
+        + goal3_costs.section() +
         '<details><summary>The sizes that failed, and why</summary><div id="g3-failed"></div></details>'
         "<details hidden><summary>The rules each submission is judged by</summary>"
         "<p>Every submission is judged by its own rule set, as each paper is on the "

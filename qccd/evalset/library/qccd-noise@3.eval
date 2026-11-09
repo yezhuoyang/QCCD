@@ -80,6 +80,18 @@ channel ms_leakage "Leakage from the two-ion gate"
   after g in two_qubit_gates:
     DEPOLARIZE1(min(3 / 4, scale * leak_fold * leak_2q / 2)) on ions(g)
 
+channel gate_swap "The gate swap that takes an ancilla to its trap's edge"
+  about "On a Cyclone ring an ancilla leaves its trap by the far end. One with ions between it and that end first changes places with the ion there by three two-ion gates, so the two take three of the cooled gate's depolarizing channels, composed exactly. The swap's time is in the split's price; its leakage is gate_swap_leakage; the heat the pair holds is not charged. An ancilla already at the end swaps with nobody."
+  source "QCCD Studio Feedback (Ke, 2026-11-07) F1: GateSwap = 3 CX, 3 x 70 us and 3 x the 2q error; QCCD Transport Architectures deck, Cyclone S7"
+  after s in gate_swaps:
+    DEPOLARIZE2(min(15 / 16, 15 / 16 * (1 - pow(1 - 16 / 15 * scale * 5 / 4 * r_2q, 3)))) on ions(s)
+
+channel gate_swap_leakage "Leakage from the gate swap"
+  about "Three two-ion gates' leakage, each the pair's halved and folded, composed, on each of the two ions."
+  source "Helios Nominal Noise Model Sec. 1 (2Q leakage, folded: 9e-5 on each target), three times (feedback F1)"
+  after s in gate_swaps:
+    DEPOLARIZE1(min(3 / 4, 3 / 4 * (1 - pow(1 - 4 / 3 * scale * leak_fold * leak_2q / 2, 3)))) on ions(s)
+
 channel gate_1q "A one-ion pulse"
   about "Every physical pulse. A frame change is virtual here, so it fails no more than it takes time, and an identity is no pulse at all."
   source "Helios Nominal Noise Model Sec. 1 (1Q computational, p = 3r/2 = 2.07e-5)"

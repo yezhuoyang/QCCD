@@ -226,6 +226,11 @@ class CostModel:
         per moving crystal and one step, as a hop is counted."""
         return Charge(cost=1.0, depth=1), Charge(depth=1)
 
+    def wise_step(self, arch: Architecture, kind: str) -> Charge:
+        """How long one WISE swap step lasts: the pairs exchange in one step, whose time is the
+        step's however many pairs exchange.  A model that prices no time counts one step."""
+        return Charge(cost=1.0, depth=1)
+
     def c2lr_gate(self, arch: Architecture) -> tuple[Charge, Charge]:
         """`(merge, split)` around a two-qubit gate on the two crystals of one leg: they sit
         in two wells after an enter (C1), so the gate is merge, MS, split.  Nothing in a model
@@ -500,6 +505,14 @@ class CorrectedModel(CostModel):
             stayed = float(spec.get("quanta_stay", q))
         return (Charge(cost=1.0, depth=1, us=us, quanta={C2LR_COMPONENT: moved}),
                 Charge(cost=0.0, depth=1, us=us, quanta={C2LR_COMPONENT: stayed}))
+
+    def wise_step(self, arch: Architecture, kind: str) -> Charge:
+        """How long a WISE swap step of `kind` (`h0` ... `vl1`) lasts: the device's `wise_swap`
+        primitive, `us_by_kind` keyed by the kind's letter (`h`, `x`, `v`).  The step is its pairs'
+        exchange, so its rails and any junction between them are inside that time, as a C2LR
+        step's are.  Its heat is its routes', charged as any move's."""
+        spec = arch.primitives.scalar("wise_swap")
+        return Charge(cost=1.0, depth=1, us=float(spec["us_by_kind"][kind[0]]))
 
     def c2lr_gate(self, arch: Architecture) -> tuple[Charge, Charge]:
         """The device's own merge and split curves, at this model's operating point."""

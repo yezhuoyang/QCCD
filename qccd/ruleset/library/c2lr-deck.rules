@@ -1,0 +1,13 @@
+# C2LR as the team's transport deck and its feedback write it for Goal 3: the rule set
+# `c2lr-demonstrated` (one diagonal at every junction in a step, the deck's S4 and the feedback's
+# F3), and R34, the feedback's F2 (Ke, 2026-11-07): a laser step addresses one chain position, so
+# the two crystals of a leg are pulsed one position at a time.  `c2lr-demonstrated` itself is left
+# as it is, since the C2LR boards judge by it.
+
+ruleset "c2lr-deck"
+title "C2LR swap-or-stay, as the deck writes it for Goal 3"
+about "The demonstrated C2LR rules (every junction runs the same single diagonal in a step), and a laser step reaches one chain position: where a leg holds two crystals, a pulse reaches the ones at the same position in every leg it plays in."
+
+include "c2lr-demonstrated"
+
+use R34

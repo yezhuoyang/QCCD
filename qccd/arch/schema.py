@@ -464,6 +464,8 @@ def export_consumers() -> dict:
         F("primitives.<name>.quanta", "number", None,
           "qccd.cost.models.CorrectedModel.c2lr_step (reorder_or_not)"),
         F("primitives.<name>.com_mhz", "number", None, "qccd.verify (C8, recorded)"),
+        F("primitives.<name>.us_by_kind", "any", None,
+          "qccd.cost.models.CorrectedModel.wise_step (wise_swap)"),
         F("control.max_simd_classes_per_cycle", "integer", 1,
           "qccd.verify.rules.r4_simd_classes"),
         F("control.intra_inter_exclusive", "boolean", False, None),

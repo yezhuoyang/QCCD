@@ -167,6 +167,10 @@ class CycleView:
     #: On a C2LR device, what this cycle did to the legs (`qccd.verify.c2lr.C2LRStep`),
     #: computed by the replay and never read from the programme; None on any other device.
     c2lr: object = None
+    #: On a WISE chip, whether this cycle is a swap step the replay found to be the device's own
+    #: pairs of its kind exchanging (`qccd.verify.replay.wise_swap_kind`); never read from the
+    #: programme.  False on any other device.
+    wise_swap: bool = False
 
     def gate_sites(self) -> tuple[str, ...]:
         """Where the gates of this instruction actually happen.
@@ -311,9 +315,13 @@ def device_exchange(v: CycleView) -> bool:
     the two wells nearest it (arXiv:2403.00756) -- and every crystal's motion differs from its
     partner's.  The exemption is earned by where the routes come from, not by what the
     programme calls its step: `CycleView.c2lr` is set by the replay alone, so the same
-    exchange written as plain moves, even under the class `swap_or_stay`, is judged in full."""
+    exchange written as plain moves, even under the class `swap_or_stay`, is judged in full.
+
+    A WISE swap step is the same exchange through a switched swap (arXiv:2305.12773 S5, S6):
+    `CycleView.wise_swap`, which the replay sets only where every move is one of the device's
+    pairs of the step's kind."""
     step = v.c2lr
-    return step is not None and bool(getattr(step, "exchange", False))
+    return (step is not None and bool(getattr(step, "exchange", False))) or bool(v.wise_swap)
 
 
 def r2_junction_exclusive(v: CycleView) -> list[Violation]:

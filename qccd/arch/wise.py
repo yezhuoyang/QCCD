@@ -13,18 +13,25 @@ conflict, which needs no rule dropped: a junction zone is a real junction, every
 inside a step (R2, R23), and no ion rests there.  A machine therefore holds at most `h` qubits per
 cell where the deck's full occupancy is h + 1; its hardware census is the deck's all the same.
 
-**A swap is the deck's S5 and S6.**  It takes two steps of the replay, a merge then a split: one
-ion moves into its partner's zone, and the partner leaves for the zone just vacated.  That passes
-every R-rule as written, and each half is one direction for the whole chip, so S4 and S5 are what
-a step's class says.  Time (deck T1) is on the rails: half a swap step per rail, so a swap between
-neighbours is t0, across a junction zone 2 t0 (a junction zone is a zone), and between rows, by
-the route S6 calls three shuttling steps through the junction, 3 t0.  A move into an empty zone is
-half a swap, having no merge, rotation or split.  Heat comes from the noise model, since the paper
-gives none: 0.1 quanta a shuttle, and 2 for a merge and split together, which the replay deposits
-on each of the two ions as it moves.
+**A swap is one step** (deck S5, S6; the team's feedback F4): the two ions of a pair exchange
+zones in one step of one kind and one parity across the chip, as a C2LR crystal exchange does,
+not one ion moving in and the other moving out.  The replay prices the step by its kind
+(`wise_swap`, `CorrectedModel.wise_step`): between neighbours t0; across a junction zone or between
+rows a junction step, which costs what a C2LR swap-or-stay step costs, 400 us, with its heat
+(feedback F1, "same time and cost as C2LR").  It names the step an exchange only where every move
+is one of the device's pairs of the step's kind, so R2, R3, R5 and R22 leave the pair's crossing
+alone exactly as they do a C2LR exchange.  A move into an empty zone is a step of the same kind.
+Heat comes from the noise model, since the paper gives none, charged by the step's routes as the
+page re-prices them: a split and a merge (the swap classes declare both), 2 + 0 quanta, 0.1 a
+rail and 0.014 a junction crossed, so 2.1 on each ion of a neighbour swap and 2.2 to 2.3 on a
+junction step, where C2LR's step deposits 0.14.  Every layer cools after its gates' splits, so
+the difference moves no cooling.
+
+**A two-qubit gate merges, gates and splits** (S9): one ion moves into its partner's zone (the
+merge half `a`), the MS pulse, and it moves back (the split half `b`), each half t0 / 2.
 
 **A layer is its shim charge and its pulse** (deck T4, T6), so each gate's price includes the
-384 us of shim charging.  A two-qubit gate's merge and split are two halves of a swap.
+384 us of shim charging.
 """
 
 from __future__ import annotations
@@ -35,8 +42,9 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Mapping
 
-__all__ = ["SWAP_US", "SHIM_US", "DYNAMIC_DACS", "device_doc", "primitives", "census", "is_wise", "ctl_classes",
-           "gate_zone", "junction_zone", "gate_zones", "sizes_for", "Edge", "Zones", "NotWise"]
+__all__ = ["SWAP_US", "SHIM_US", "DYNAMIC_DACS", "KINDS", "device_doc", "primitives", "census", "is_wise",
+           "ctl_classes", "swap_kind", "gate_zone", "junction_zone", "gate_zones", "sizes_for", "Edge", "Zones",
+           "NotWise"]
 
 SWAP_US = 100.0              # deck T1, t0
 SHIM_US = 3.0 * 128          # deck T4: 128 shims x 3 us each, before every layer
@@ -59,16 +67,30 @@ def gate_zones(h: int, cx: int, cy: int) -> int:
     return h * cx * cy
 
 
+#: the swap steps' kinds: within a cell at parity 0 or 1, across a junction zone, and between rows
+#: on either side of the junction at parity 0 or 1
+KINDS = ("h0", "h1", "x", "vr0", "vr1", "vl0", "vl1")
+
+
 def ctl_classes() -> list[dict]:
-    """A step's kinds, each one direction across the whole chip (S4, S5): the merge half `a` and
-    the split half `b` of a swap within a cell at parity 0 or 1 (`h0`, `h1`), across a junction
-    zone (`x`), and between rows on either side of the junction at parity 0 or 1 (`vr0` ...)."""
-    out = []
-    for kind in ("h0", "h1", "x", "vr0", "vr1", "vl0", "vl1"):
+    """A step's kinds, each one kind and parity across the whole chip (S4, S5): a swap of each
+    kind (`wise_h0` ... `wise_vl1`), and the merge half `a` and split half `b` of a two-qubit
+    gate's pair within a cell (`wise_h0_a` ...)."""
+    out = [{"id": f"wise_{kind}", "type": "shift", "orbit": "zones", "entails": ["split", "merge"],
+            "note": f"a {kind} swap step: every active pair merges, exchanges its two ions and splits, one "
+                    "waveform for the chip"}
+           for kind in KINDS]
+    for kind in ("h0", "h1"):
         for half, what in (("a", "the merge half"), ("b", "the split half")):
             out.append({"id": f"wise_{kind}_{half}", "type": "shift", "orbit": "zones",
-                        "note": f"{what} of a {kind} swap: one waveform for every active zone"})
+                        "note": f"{what} of a {kind} pair's two-qubit gate: one waveform for every active zone"})
     return out
+
+
+def swap_kind(cls: str | None) -> str | None:
+    """The swap kind a class names (`wise_x` -> "x"), or None for any other class."""
+    parts = str(cls or "").split("_")
+    return parts[1] if len(parts) == 2 and parts[0] == "wise" and parts[1] in KINDS else None
 
 
 def device_doc(h: int, cx: int, cy: int, *, name: str | None = None) -> dict:
@@ -133,6 +155,7 @@ def device_doc(h: int, cx: int, cy: int, *, name: str | None = None) -> dict:
 def primitives(base: Mapping) -> dict:
     """The deck's prices on `base` (qccd-physics@3's primitives).  Where the noise model has a
     number it wins: 70 us for the native gate rather than the deck's 100."""
+    from . import c2lr
     out = copy.deepcopy(dict(base))
     table = out["split"]["curve"][0]["table"]
     def priced(key: str, pulse: float, why: str) -> None:
@@ -144,18 +167,29 @@ def primitives(base: Mapping) -> dict:
     priced("ms_gate", float(base["ms_gate"]["us"]), "384 + 70 us; the noise model's gate rather than the deck's 100")
     priced("measure", float(base["measure"]["us"]), "384 + 150 us")
     priced("reset", float(base["reset"]["us"]), "384 + 20 us")
-    out["shuttle_segment"] = {"curve": [{"us": SWAP_US / 2, "quanta": 0.1, "table": table,
-                                         "label": "half a swap step per rail (t0 = 100 us, swap and stay alike); heat "
-                                                  "from the noise model, as the paper gives none",
+    split_q = 2.0                    # Helios Nominal Noise Model Sec. 5: split 2, merge grouped with it
+    rail_q = float(base["shuttle_segment"]["curve"][0]["quanta"])
+    step = c2lr.C2LR_DECK["Yb-Ba"]["swap_or_stay"]
+    out["wise_swap"] = {
+        "us_by_kind": {"h": SWAP_US, "x": float(step["us"]), "v": float(step["us"])},
+        "note": "a swap step: the pair exchanges its ions in one step (feedback F4), t0 between neighbours and a "
+                "junction step, C2LR's 400 us, across a junction zone or between rows (feedback F1: same time as "
+                "C2LR). Its heat is its routes': a split and a merge (the class declares them), each rail and "
+                "each junction crossed",
+        "source": f"{_DECK} T1, S5, S6; QCCD Studio Feedback (Ke, 2026-11-07) F1, F4; C2LR deck T1"}
+    out["shuttle_segment"] = {"curve": [{"us": SWAP_US / 2, "quanta": rail_q, "table": table,
+                                         "label": "half of t0 per rail: a two-qubit gate's merge half or split half; "
+                                                  "heat from the noise model, as the paper gives none",
                                          "source": f"{_DECK} T1; Helios Nominal Noise Model Sec. 5"}]}
-    grouped = {"us": 0.0, "quanta": 2.0, "table": table, "source": f"{_DECK} T1; Helios Nominal Noise Model Sec. 5",
-               "label": "inside the swap step's time. A merge and split together heat each ion of the pair by 2 "
+    grouped = {"us": 0.0, "quanta": split_q, "table": table, "source": f"{_DECK} T1; Helios Nominal Noise Model Sec. 5",
+               "label": "inside the half's time. A merge and split together heat each ion of the pair by 2 "
                         "quanta; the replay deposits it on the ion that moves in each half"}
     out["merge"] = {"curve": [dict(grouped)]}
     out["split"] = {"curve": [dict(grouped)]}
     out["junction_cross"] = {"curve_by_degree": {
-        d: [{"us": 0.0, "quanta": 0.014, "table": table, "label": "inside the swap step's time; heat is the "
-             "noise model's proxy per crossing", "source": f"{_DECK} T1, S6; Helios Nominal Noise Model Sec. 4"}]
+        d: [{"us": 0.0, "quanta": 0.014, "table": table, "label": "inside a step's time; heat is the "
+             "noise model's proxy per crossing. A swap step's crossing is in its own price",
+             "source": f"{_DECK} T1, S6; Helios Nominal Noise Model Sec. 4"}]
         for d in ("3", "4")}}
     return out
 
@@ -179,9 +213,9 @@ class Edge:
 class Zones:
     """The gate zones as a graph whose edges are the swap steps' pairs."""
 
-    #: a swap's length in t0: a neighbour, across a junction zone, and between rows (S6's three
-    #: shuttling steps through the junction)
-    COST = {"h": 1, "x": 2, "v": 3}
+    #: a swap step's time in t0: a neighbour, and a junction step across a junction zone or
+    #: between rows (C2LR's 400 us, feedback F1)
+    COST = {"h": 1, "x": 4, "v": 4}
 
     def __init__(self, arch):
         p = (arch.device.params if hasattr(arch.device, "params") else {}) or {}

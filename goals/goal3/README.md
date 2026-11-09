@@ -34,16 +34,20 @@ see "open".
 ## The architectures
 
 Three, as the team's transport deck ("QCCD Transport Architectures", Ke, 2026-11-06) defines them:
-their shuttling rules, hardware, parameters and cost models. [DECK.md](DECK.md) maps every item of
-the deck to what happens to it here, and lists the readings taken where the documents leave a gap,
-each open or answered. The definitions and
-the sizes tried are data in [families.py](families.py).
+their shuttling rules, hardware, parameters and cost models, with Ke's feedback on the first sweep
+("QCCD Studio Feedback", 2026-11-07). [DECK.md](DECK.md) maps every item of both to what happens to it
+here, and lists the readings taken where the documents leave a gap, each open or answered. The
+definitions and the sizes tried are data in [families.py](families.py). The Goal 3 page's cost table
+(feedback F1) lists every term each family pays.
 
 | family | device | swept, per the deck | rule set | compiler |
 |---|---|---|---|---|
-| C2LR | Cx x Cy cells, an X-junction and two legs each, one crystal per leg, moved by swap-or-stay steps (Yb-Ba, the demonstrated diagonals) | Cx, Cy | `c2lr-demonstrated` | the baseline C2LR router |
-| WISE | Cx x Cy cells, a junction zone and h gate zones each, sorted by parallel switched swaps, one kind of operation across the chip in a step | h, Cx, Cy | `wise` | the baseline WISE router |
-| Cyclone | one ring of x traps of up to n ions, L-shaped junctions at its corners; data still, ancillas rotating in lockstep | x, n <= 30 | `cyclone-deck` | the baseline Cyclone router |
+| C2LR | Cx x Cy cells, an X-junction and two legs each, one crystal per leg, moved by swap-or-stay steps (Yb-Ba, the demonstrated diagonals) | Cx, Cy | `c2lr-deck` | the baseline C2LR router |
+| WISE | Cx x Cy cells, a junction zone and h gate zones each, sorted by parallel switched swaps (a pair exchanges in one step), one kind of operation across the chip in a step | h, Cx, Cy | `wise` | the baseline WISE router |
+| Cyclone | one ring of x traps of up to n ions, L-shaped junctions at its corners; data still, ancillas rotating in lockstep, each swapping its way to its trap's edge to leave | x, n <= 30 | `cyclone-deck` | the baseline Cyclone router |
+
+Every family heats and cools by the same rule (R7) and time (3 ms), and in every family a laser step
+reaches one chain position (R34).
 
 All three compilers keep the circuit's gate order. For Cyclone that departs from the deck's S6, which
 assigns all X checks to one rotation and all Z checks to the next: Goal 3 runs one circuit per code on
@@ -51,7 +55,9 @@ every architecture (the project owner's decision, 2026-11-06). So Cyclone takes 
 round as the circuit's order needs, about 3 on surface d=3, and judges order by R25, not R26.
 
 The earlier families, a plain Grid, a WISE that was the same grid with broadcast wiring, and a
-Conveyor, are retired. Their rows are in `results/pre_deck/`.
+Conveyor, are retired. Their rows are in `results/pre_deck/`. The first sweep on the deck, before the
+feedback (Cyclone cooling free, its gate swap time only, WISE's swap in two halves, no R34), is in
+`results/deck_r1/`.
 
 ## A point, and what it is scored by
 
@@ -65,7 +71,11 @@ certificate step left out ([sweep.py](sweep.py)):
    that breaks one is recorded and not sampled;
 4. **time per round:** the replayed program divided by the 2d rounds of both memories;
 5. **LER per round:** qccd-noise@3 sampled by stim with the release's budget and seed (matching for the
-   surface code, BP-OSD otherwise), 1 - (1 - p_Z)(1 - p_X), with a 95% interval;
+   surface code, BP-OSD otherwise), 1 - (1 - p_Z)(1 - p_X), with a 95% interval. BB72's Cyclone points
+   sample in batches of 500 shots rather than the release's 10,000 (`--ler-batch 500`), with the same seed and
+   the same stop at 200 failing shots: past threshold, every shot of a batch fails, and BP-OSD took up to 11 hours
+   to decode one 10,000-shot batch of hgp58's (the grader stops a job at an hour). A row's `ler_budget` says
+   which;
 6. **the hardware census:** electrodes, DACs, switches, lasers and area, by the deck's formulas (`census` in each row).
 
 A size a compiler refuses, or that breaks a rule, is recorded with its reason and counted under its family.
@@ -117,12 +127,17 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
   qccd-noise@2, and their physics lock has no way to give each family its own prices. They hold no entries.
   This sweep uses their circuits, detectors, budgets and seeds. Moving them means new releases, and a lock
   that recomputes a family's prices from its parameters rather than trusting a device's own.
-- **[DECK.md](DECK.md), "Readings":** the 3 ms cooling, the GateSwap's error, and others are open. Each is one
-  number here; changing one means sampling again. Two are answered (2026-11-07): the idle leakage rate is the
-  report's, and crosstalk summed over the ions read out together is a simulation assumption, kept and so labelled.
-- **Cooling decides much of the time comparison.** C2LR and WISE pay 3 ms for each batch of gates that needs it.
-  Cyclone pays nothing, as the deck's S10 assumes. `results/variants/cool300us/` is the sweep at Studio's
-  300 us for surface d = 3, 5, 7 and colour d = 3, 5.
+- **[DECK.md](DECK.md), "Readings":** answered on 2026-11-07: the idle leakage rate (the report's), crosstalk
+  under parallel readout (a simulation assumption, kept and labelled), the cooling (the same for every family),
+  the GateSwap's error (3 x the two-qubit gate's) and C2LR's enter and exit (fine for now). Open: the values the
+  feedback leaves to the noise-model team (F1), the chain-position frame R34 reads, and others. Each is one
+  number here; changing one means sampling again.
+- **Cooling decides much of the time comparison.** Every family pays 3 ms for each batch of gates that needs it,
+  Cyclone after every rotation.
+- **The gate swap decides Cyclone's error.** At 3 x the two-qubit gate's error on every hop where a data ion stands
+  in the way, it is most of Cyclone's budget, and every ring larger than the most compressed is past threshold on
+  the larger codes ([DECK.md](DECK.md), reading 4). The paper's logical error rates suggest it does not charge
+  this; the question is with Ke.
 - **The compilers are baselines.** WISE's router is greedy over the deck's step types and takes real steps rather
   than the paper's worst case. Cyclone's placement is annealed over one round. Neither is tuned, and C2LR's router
   still gives the same time on several sizes.

@@ -1,7 +1,8 @@
 """Goal 3's architecture families and the sizes each is swept over.
 
 The three architectures, their rules, their hardware and what may be swept are Ke's transport deck
-("QCCD Transport Architectures", 2026-11-06): recompile on C2LR, WISE and Cyclone only.  Each
+("QCCD Transport Architectures", 2026-11-06) and his feedback on the first sweep ("QCCD Studio
+Feedback", 2026-11-07): recompile on C2LR, WISE and Cyclone only.  Each
 family is data here, a generator and a rule for which sizes to try for a code; its prices are in
 `qccd.arch.c2lr`, `qccd.arch.wise` and `qccd.arch.cyclone`, and its compiler in `qccd.compile`.
 
@@ -26,7 +27,7 @@ from __future__ import annotations
 FAMILIES = ("C2LR", "WISE", "Cyclone")
 #: each family's own rule set (qccd/ruleset/library), which its points are judged by as an entry's
 #: declared set is
-RULES = {"C2LR": "c2lr-demonstrated",   # the deck's S1-S10, its checkerboard form "isn't needed" (S6)
+RULES = {"C2LR": "c2lr-deck",           # the deck's S1-S10 (checkerboard "isn't needed", S6) and F2's R34
          "WISE": "wise",
          "Cyclone": "cyclone-deck"}
 #: which compiler a family's points come from
@@ -37,9 +38,9 @@ CAVEATS = {
     "C2LR": "enter and exit are the platform's reading of the deck's open S11; a merge and split around each "
             "gate are priced from the noise model, which marks that open for C2LR",
     "WISE": "a baseline router, not the paper's worst-case sort; no qubit rests on a junction zone, so a chip "
-            "holds h, not h + 1, qubits per cell",
-    "Cyclone": "keeps the circuit's gate order, so a round takes more than the paper's 2 rotations; cooling takes "
-               "no time, as the deck's S10 assumes",
+            "holds h, not h + 1, qubits per cell; a junction step's heat is its rails', not C2LR's",
+    "Cyclone": "keeps the circuit's gate order, so a round takes about 3 rotations where the paper takes 2 "
+               "(fine with a fixed order, feedback Q1); it heats and cools as the other two do (Q2)",
 }
 #: the plot's order and each family's colour (its best point; every other point is grey)
 COLOURS = {"C2LR": "#54A24B", "WISE": "#F58518", "Cyclone": "#B279A2"}

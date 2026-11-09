@@ -20,7 +20,7 @@
       title: 'Operations & timing',
       blurb: 'What may run at a site and when: capabilities, cooling and heating, gate serialization, circuit correctness, ordering and duration.',
       rules: ['R6', 'R6b', 'R7', 'R7b', 'R7c', 'R8', 'R9', 'R10', 'R12', 'R15', 'R16', 'R17',
-              'R24', 'R25', 'R26', 'R27', 'R29', 'R30', 'R32', 'R33', 'R38']
+              'R24', 'R25', 'R26', 'R27', 'R29', 'R30', 'R32', 'R33', 'R34', 'R38']
     },
     {
       id: 'rules-c2lr',

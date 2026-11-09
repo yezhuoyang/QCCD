@@ -1,8 +1,9 @@
 # Goal 3 and the transport deck: where each item went
 
-This maps every item of the deck "QCCD Transport Architectures" (Ke, 2026-11-06) and of
-"Helios Nominal Noise Model" (the deck's `base-error-model`) to what Goal 3 does with it.
-Where the two documents disagree or leave a gap, the reading taken is under "Readings", each marked
+This maps every item of the deck "QCCD Transport Architectures" (Ke, 2026-11-06), of
+"Helios Nominal Noise Model" (the deck's `base-error-model`) and of Ke's feedback on the first
+sweep ("QCCD Studio Feedback", 2026-11-07, under "The feedback") to what Goal 3 does with it.
+Where the documents disagree or leave a gap, the reading taken is under "Readings", each marked
 open or answered.
 
 The deck's slide 2 sets the order: use the noise model's number where it has one, and the deck's
@@ -15,7 +16,9 @@ transport numbers beat it, and it only fills what the deck also lacks.
 | its physics, table `helios` | [`qccd-physics@3.json`](../../qccd/workspace/physics/qccd-physics@3.json) |
 | prices and hardware census | [`c2lr.py`](../../qccd/arch/c2lr.py), [`wise.py`](../../qccd/arch/wise.py), [`cyclone.py`](../../qccd/arch/cyclone.py) |
 | compilers | [`c2lr_router.py`](../../qccd/compile/c2lr_router.py), [`wise_router.py`](../../qccd/compile/wise_router.py), [`cyclone_router.py`](../../qccd/compile/cyclone_router.py) |
-| rule sets | [`c2lr-demonstrated`](../../qccd/ruleset/library/c2lr-demonstrated.rules), [`wise`](../../qccd/ruleset/library/wise.rules), [`cyclone-deck`](../../qccd/ruleset/library/cyclone-deck.rules) |
+| rule sets | [`c2lr-deck`](../../qccd/ruleset/library/c2lr-deck.rules), [`wise`](../../qccd/ruleset/library/wise.rules), [`cyclone-deck`](../../qccd/ruleset/library/cyclone-deck.rules) |
+| chain order, for R34 and the gate swap | [`chains.py`](../../qccd/verify/chains.py) |
+| the cost table on the Goal 3 page (F1) | [`goal3_costs.py`](../../qccd/site/goal3_costs.py) |
 | families and sizes | [`families.py`](families.py) |
 | tests, the deck's tables included | [`test_goal3_deck.py`](../../tests/test_goal3_deck.py) |
 
@@ -41,14 +44,16 @@ model turns off.
 
 ## C2LR (arXiv:2403.00756)
 
-**Sweep:** Cx x Cy, species Yb-Ba. **Compiler:** the existing baseline router. **Rule set:** `c2lr-demonstrated`.
+**Sweep:** Cx x Cy, species Yb-Ba. **Compiler:** the existing baseline router, packing a layer's pulses by chain
+position (R34). **Rule set:** `c2lr-deck`, which is `c2lr-demonstrated` and R34; `c2lr-demonstrated` itself is
+unchanged, since the C2LR boards judge by it.
 
 | deck | here |
 |---|---|
 | S1 one crystal per leg | C1 |
 | S2 individual control per leg | C2 |
 | S3 everyone heats | C9; the replay heats every crystal |
-| S4 broadcasting limits | C6, with only the four diagonals allowed (`c2lr_forms`) |
+| S4 broadcasting limits | C6, with only the four diagonals allowed (`c2lr_forms`): one diagonal for the whole chip in a step, which is F3 |
 | S5 parallel axes | C3 |
 | S6 multi-well waveforms | inside the step's primitive; the checkerboard form is off, as the deck says it isn't needed |
 | S7 step shape | C4, C5, C7 |
@@ -76,7 +81,7 @@ model turns off.
 | S3 one bit per zone | R22 as written: each half of a swap is one motion, so nothing needs relaxing |
 | S4 one operation kind per step | W4, R4b |
 | S5 switchable swap | W2: a step's pairs are one kind and one parity, the same pairing the device derives |
-| S6 swap mechanism | a merge half and a split half, R5 as written; 1 t0 between neighbours, 2 t0 across a junction zone, 3 t0 between rows |
+| S6 swap mechanism | **one step (F4):** the pair exchanges its ions in the step, priced by kind (`wise_swap`): t0 between neighbours, a junction step of C2LR's 400 us across a junction zone or between rows (F1). The replay calls it an exchange only where every move is the chip's own pair of that kind, so R2, R3, R5 and R22 leave the crossing alone as for a C2LR exchange |
 | S7 odd-even sort | an algorithm, so no rule. The router takes real steps from the same step types; the deck's worst case is reported beside it (`reconfiguration_ms`) |
 | S8 junction occupancy | R2, R23. See "Readings" |
 | S9 transport-assisted gates | R6, R6b, R12: a pair merges into one gate zone, gates, splits |
@@ -106,17 +111,35 @@ model turns off.
 | S4 gates, then rotate | R4b, and the compiler's step |
 | S5 one operation per trap | R27, R12 |
 | **S6 two rotations per round** | **not followed (the project owner's decision, 2026-11-06):** Goal 3 keeps the circuit's gate order, so R25 rather than R26, and a round takes as many rotations as that order needs |
-| S7 swap before leaving, T3 | 3 CX of time on the split; **time only**, see below |
+| S7 swap before leaving, T3 | 3 CX of time on the split, every step (lockstep waits for the slowest trap); its error, 3 x the two-qubit gate's (F1), on the ancilla and the ion it changes places with (`gate_swap`) |
 | S8 flexible trap count | any even x, every trap waiting for the busiest in lockstep |
-| S10 cooling | **no heat and no cooling time**, as the deck says it stays at the paper's default |
+| S10 cooling | **heats and cools as the other two do (Q2):** the noise model's split, merge, rail and background heat, and the same 3 ms cooling by R7 |
 | HW1-HW7 | Y4 and `cyclone.census`, which reproduces the deck's three example columns |
 | HW5, HW6 | not used: variants the paper proposes, outside this sweep |
 | T1, T2 | split 80, move 10, merge 80; each degree-2 crossing 10 |
 | T4 | QCCDSim's law, max(100, 13.33 n - 54), scaled so its flat part is the noise model's 70 us |
 | T5 | reported as `t5_worst_case_ms`; a program's real time comes from its replay |
 | T6 | what the circuit's order needs; 2 rotations under S6 is not reachable here |
-| T7, T8 | the noise model's channels |
+| T7, T8 | the noise model's channels, and `gate_swap` |
 | T9-T11 | the paper's results, not inputs |
+
+## The feedback (Ke, 2026-11-07)
+
+"QCCD Studio Feedback": the first sweep "basically follows the rules"; some fixes, a new table, and the
+answers to the first round's questions.
+
+| item | here |
+|---|---|
+| F1 the cost terms | a table on the Goal 3 page ([`goal3_costs.py`](../../qccd/site/goal3_costs.py)): every term of the error model, cooling, motion and transport, and each architecture's own, beside what the sweep charges, read from the physics, the noise model and the prices the sweep runs on. Values the feedback marks for the noise-model team to verify (split and merge heat 6, junction 3, WISE swap error ~5 x 10⁻³ and heat 12, the per-shuttle and per-junction errors, ion loss) are shown and marked, and the sweep keeps the noise model's own until they are verified (Q3) |
+| F2 a laser step addresses one chain position | **R34**, in all three rule sets. The replay does not keep the order inside a chain (#22), so it is kept beside it ([`chains.py`](../../qccd/verify/chains.py)), the same way for the compilers and the rules; nothing an older rule judges changes. Each compiler packs a layer by chain position: C2LR's when asked (`positions=True`, the boards keep their packing), WISE's by construction, Cyclone's by playing, at each instruction, the position most traps are ready for |
+| F3 one C2LR junction type a step | already so: a step's template names one diagonal for every junction, C6 judges it, and `c2lr-demonstrated` refuses the checkerboard form. C6's text now says "the same diagonal at every junction" |
+| F4 a WISE swap is one step | done (S6 above): one exchange step, t0, not two half steps |
+| F5 WISE is serial | an observation; no change |
+| Q1 three Cyclone rotations a round | fine with the circuit's order kept, as here |
+| Q2 should Cyclone pay for cooling | yes: the same rule (R7) and time (3 ms) for all three families, and Cyclone heats as the others do. The cooling pass now counts a gate's heat from the last cool it put in (`CoolingPolicy.lazy`) for all three, which matters most on Cyclone, whose traps gate in turn: one broadcast cool serves them all |
+| Q3 C2LR's enter and exit (S11) | fine for now; the noise-model team takes the costs up after the F1 table |
+| slide 4, GateSwap | 3 x 70 us and 3 x the two-qubit error: the error is now charged (`gate_swap`, `gate_swap_leakage`) on the ancilla and the ion it changes places with |
+| slide 4, WISE junction step | C2LR's time, 400 us, for a swap across a junction zone or between rows |
 
 ## Readings
 
@@ -133,24 +156,30 @@ Each is open unless it says it was answered.
    strength. It is the largest term in the budget, **44 to 58% of all error on surface d=7**, where 48
    ancillas read out each round, so the logical error rates lean on it. A contribution that falls with
    distance from the measurement light would lower it most on the largest chips.
-2. **Cooling time (noise model Sec. 3, Sec. 6).** Used the 3 ms reference. It dominates C2LR's and WISE's time,
-   while Cyclone pays nothing under S10, so the time comparison leans on it: at 300 us C2LR's surface d=3 round
-   goes from 18.2 to 7.4 ms, ahead of Cyclone's 9.2. The logical error rate barely moves.
-   `results/variants/cool300us/` has this for surface d = 3, 5, 7 and colour d = 3, 5 (colour d = 7 was not run).
+2. **Cooling time (noise model Sec. 3, Sec. 6). Answered by Ke, 2026-11-07 (Q2): every family pays the same
+   rule and time.** Used the 3 ms reference for all three. In the first sweep Cyclone paid nothing under S10,
+   and at 300 us C2LR's surface d=3 round went from 18.2 to 7.4 ms, ahead of Cyclone's 9.2. Those runs, at 300 us
+   for surface d = 3, 5, 7 and colour d = 3, 5, are in `results/deck_r1/variants/cool300us/`.
 3. **Idle leakage rate (noise model Sec. 2). Answered by Zhuangzhuang, 2026-11-07: confirmed.** The model
    names the rate without printing it. Used 0.75 x 4.0e-4 per ion per 55 ms layer = 5.45e-3 /s. Jaewon's
    report gives 1.45e-3 per ion at 200 ms before the Stim conversion, which is 4.0e-4 x 200/55 rounded, and
    applies the 0.75 in `DEPOLARIZE1`, as here. It is also Helios's rate (arXiv:2511.05465 Sec. III B4). It is
    about 60% of the idle error, and 7 to 12% of all error on surface d=7.
-4. **The GateSwap's error (Cyclone S7).** Time only. Neither document gives it an error. Charging its
-   3 CX to the ions would put about 2 x 10⁻³ on an ancilla at every step, which is hard to square
-   with the paper's reported logical error rates, so the paper must not be charging it either. Cyclone's
-   logical error rates depend on this.
+4. **The GateSwap's error (Cyclone S7). Answered by Ke, 2026-11-07: 3 x the two-qubit gate's error.**
+   Charged on the ancilla and the ion it changes places with, three cooled two-ion depolarizing channels composed,
+   and their leakage, where the chain order says an ion stands between the ancilla and the end it leaves by. It is
+   the largest term in Cyclone's budget, about 4 x 10⁻³ on an ancilla and its partner at every hop, which is hard
+   to square with the paper's reported logical error rates, so the paper must not be charging it. An ancilla
+   enters a trap at the end toward the previous trap and leaves by the other, so wherever a data ion sits in the
+   trap every hop pays one, and a ring of x traps makes some x hops per ancilla per rotation. On surface d=7 the
+   50-trap ring charges 29 expected faults a round to gate swaps, against 0.23 to every MS gate together, and its
+   logical error rate is 0.18 a round; the 4-trap ring charges 2.3 and reads 0.018. The compressed rings come
+   first for this reason, and every larger Cyclone is past threshold under this charge.
 5. **Chain length.** Neither document has an error that grows with chain length, so a Cyclone trap of
    30 ions pays for its length only in gate time. The noise model marks longer chains as open. Compressed rings
    are favoured by this.
 6. **C2LR's merge and split.** The paper has none; used the noise model's 80 us and its heat, which it
-   marks as open for C2LR. This is S11's cost.
+   marks as open for C2LR. This is S11's cost; Ke, 2026-11-07 (Q3): fine for now.
 7. **The heat mode.** Used the stretch mode (XSTR) for C2LR, because the noise model counts heat in the
    gate mode and its background rate is the stretch mode's. `docs/c2lr.md` and the C2LR boards use XCOM.
 8. **Split heat (noise model Sec. 5: "2 or 4.16").** Used 2. It should barely matter: a merge trips R7's
@@ -163,6 +192,22 @@ Each is open unless it says it was answered.
 11. **Ancillas sharing a trap leave in turn**, because R3 and R27 require it. A rotation then costs
     A x (s + t), where T5 prints s + A x t.
 12. **WISE's sizes.** h is swept over the deck's three example values, 3, 5 and 7, where it says "sweep freely".
+13. **Which end is position 1 (R34).** On a ring, the end of a trap toward the previous trap, so every trap of
+    a Cyclone ring is the same trap and a step can reach the same position in all of them; on any other site,
+    the end with the smaller coordinate. A pattern is the chain's length and the positions: the 1st of 3 and the
+    1st of 4 are different positions. Read the other way (from the chip's left on a ring, say), the top and bottom
+    rows of a Cyclone ring, mirror images, would seldom play together.
+14. **When a gate swap happens.** Every Cyclone step charges its 3 CX of time, since lockstep waits for the
+    slowest trap; the error lands only where an ion stands between the ancilla and its exit, with that ion. One
+    swap reaches the end however far, since a two-ion gate can pair any two ions of a chain.
+15. **WISE's junction step heat.** Its time is C2LR's (400 us); its heat is its routes', a split, a merge,
+    its rails and its crossings, 2.2 to 2.3 quanta, where C2LR's step deposits 0.14. The page re-prices heat
+    from the routes, and every WISE layer cools after its splits anyway, so no cooling moves.
+16. **Cyclone's corner heat.** The feedback says "shared junction row", where that row's 3 quanta is not yet
+    verified and the noise model's proxy is 0.014. A corner pays its two rails, 0.2.
+17. **The values to verify (F1).** Split and merge 6 quanta each, a junction 3, a WISE swap ~5 x 10⁻³ and 12
+    quanta, an error per shuttle and per junction, ion loss: shown in the cost table, not charged, until the
+    noise-model team confirms them.
 
 ## Differences from the paper the deck may want to check
 

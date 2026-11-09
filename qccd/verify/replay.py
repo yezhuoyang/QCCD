@@ -216,6 +216,47 @@ def _segments_for(arch: Architecture, p: Participant) -> list:
         raise ReplayError(f"ion {p.ion}: {exc}") from None
 
 
+def wise_pairs_of(arch: Architecture) -> dict[str, set[frozenset]] | None:
+    """On a WISE chip that prices its swap steps (`wise_swap`), each swap kind's pairs of zones
+    (`qccd.arch.wise.Zones`); None on any other device."""
+    if (getattr(arch.device, "params", None) or {}).get("family") != "wise":
+        return None
+    if "wise_swap" not in arch.primitives.scalars:
+        return None
+    from ..arch.wise import NotWise, Zones
+    try:
+        z = Zones(arch)
+    except NotWise:
+        return None
+    return {kind: {frozenset((e.u, e.v)) for e in es} for kind, es in z.edges.items()}
+
+
+def wise_swap_kind(pairs: Mapping[str, set[frozenset]], instr: Instruction, subs) -> str | None:
+    """The kind of a WISE swap step, if `instr` is one: its class names a swap kind, it runs in
+    one cycle, and every move is one of that kind's pairs, each pair used once and no zone in two
+    -- its two ions exchanging, or one moving into its empty partner.  Anything else is None, and
+    is priced and judged as plain moves.  The class alone earns nothing (`device_exchange`)."""
+    from ..arch.wise import swap_kind
+    kind = swap_kind(instr.cls)
+    if kind is None or len(subs) != 1:
+        return None
+    allowed = pairs.get(kind, set())
+    used: dict[frozenset, list] = {}
+    for p in subs[0]:
+        e = frozenset((p.src, p.dst))
+        if e not in allowed:
+            return None
+        used.setdefault(e, []).append(p)
+    zones: set[str] = set()
+    for e, ps in used.items():
+        if len(ps) > 2 or (len(ps) == 2 and (ps[0].src != ps[1].dst or ps[0].ion == ps[1].ion)):
+            return None
+        if zones & e:
+            return None
+        zones |= e
+    return kind
+
+
 #: the order the derived primitives are charged in, whatever produced them
 _ENTAIL_ORDER = ("split", "merge")
 
@@ -436,6 +477,10 @@ def replay(
     # programme (C1), and each cycle's account of it rides on its `CycleView`.  None on any
     # other device, where nothing below changes.
     c2lr = tracker_for(arch)
+    # On a WISE chip, the pairs each swap kind may exchange (`qccd.arch.wise.Zones`): a step of a
+    # swap class whose every move is one of them is one exchange, priced by its kind.  None on any
+    # other device, where nothing below changes.
+    wise_pairs = wise_pairs_of(arch)
 
     def _bump(ion: str, component: str, value: float) -> None:
         if value == 0.0:
@@ -531,6 +576,8 @@ def replay(
                         f"arXiv:2403.00756 (assumed)")
             else:
                 subs = _resolve_participants(arch, instr, pos)
+            wise_kind = wise_swap_kind(wise_pairs, instr, subs) if wise_pairs is not None else None
+            wise_c = model.wise_step(arch, wise_kind) if wise_kind is not None else None
             for sub in subs:
                 pos_before = dict(pos)
                 occ_before = Counter(occ)
@@ -597,6 +644,12 @@ def replay(
                         for ion in c2lr_step.reversed:
                             per_ion_charge[ion] = mover_c
                         cycle_cost = mover_c.cost * len(c2lr_step.reversed)
+                if wise_c is not None:
+                    # one exchange: the step lasts its kind's time however its routes run.  Its
+                    # heat stays the routes' (rails, crossings, and the split and merge its class
+                    # declares), which is what the page re-prices frame by frame
+                    cycle_us = wise_c.us
+                    cycle_depth = wise_c.depth
 
                 # keyed by ion: a program that lists one ion twice in a cycle is
                 # illegal (R8 reports it), but it must not be able to corrupt the
@@ -645,6 +698,7 @@ def replay(
                         config=rule_config,
                         transits=dict(transits),
                         c2lr=facts,
+                        wise_swap=wise_c is not None,
                     )
                     if on_cycle is not None:
                         on_cycle(view)

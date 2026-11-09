@@ -14,7 +14,8 @@ delayed and ops in one layer share no qubit; only a run of readouts reads out to
 (`c2lr_router.layers_reading_together`).
 
 A swap step is one kind of pair and one parity across the whole chip (S4, S5), and the kinds are
-`qccd.arch.wise.ctl_classes`'.  The paper's odd-even sort reaches any arrangement in at most
+`qccd.arch.wise.ctl_classes`'.  The two ions of each pair in it exchange zones in that one step
+(the team's feedback F4), not one moving in and the other out.  The paper's odd-even sort reaches any arrangement in at most
 2m + kn steps (S7).  This router takes a real schedule from the same steps rather than that worst
 case: at each step, the kind whose swaps bring the layer's qubits closest per unit of time.  Only
 the qubits of the layer's gates have somewhere to be, and any other qubit may be displaced.  When
@@ -108,21 +109,19 @@ class _Build:
         self.at = {s: i for i, s in self.em.pos.items()}
         self.limit = 60 * len(self.z.sites) + 2000
 
-    # -- a swap step: its merge half, then its split half
+    # -- a swap step: every active pair exchanges its two ions, in one step (feedback F4)
 
     def step(self, kind: str, edges: Sequence[Edge]) -> None:
-        a, b = [], []
+        parts = []
         for e in edges:
             x, y = self.at.get(e.u), self.at.get(e.v)
             if y is not None:
-                a.append(Participant(y, e.v, e.u, via=e.in_))
+                parts.append(Participant(y, e.v, e.u, via=e.in_))
             if x is not None:
-                b.append(Participant(x, e.u, e.v, via=e.out))
-        # an ion joins its partner, then the partner leaves: between steps a zone holds one
-        for half, parts in (("a", a), ("b", b)):
-            if parts:
-                self.em.emit(type="simd", cls=f"wise_{kind}_{half}", mode="inter", participants=tuple(parts),
-                             meta={"kind": "swap_step", "pair_kind": kind, "half": half})
+                parts.append(Participant(x, e.u, e.v, via=e.out))
+        if parts:
+            self.em.emit(type="simd", cls=f"wise_{kind}", mode="inter", participants=tuple(parts),
+                         meta={"kind": "swap_step", "pair_kind": kind})
         self.at = {s: i for i, s in self.em.pos.items()}
 
     # -- a reconfiguration
@@ -319,7 +318,7 @@ def compile_wise(qasm_text: str, arch: Architecture, *, name: str = "circuit", s
 def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "helios",
                         name: str = "circuit") -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate)."""
-    from ..compile.cooling import insert_cooling
+    from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model
     t0 = time.time()
     work = Path(workdir)
@@ -335,7 +334,9 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "hel
     prog, cert = compile_wise(qasm_text, arch, name=name)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
-    cooled = insert_cooling(prog, arch, corrected_model(table)).program
+    # one broadcast cool before a batch over the budget, counted from the last cool (R7, the
+    # same rule for every Goal 3 family: the team's feedback Q2)
+    cooled = insert_cooling(prog, arch, corrected_model(table), policy=CoolingPolicy(lazy=True)).program
     cooled.meta.update(prog.meta)
     final = work / "prog.cooled.tsir.json"
     cooled.save(str(final), indent=None)

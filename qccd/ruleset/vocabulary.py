@@ -683,8 +683,10 @@ def _drivable(ctx: Ctx, k):
 
 @term("exchange(x)", "true or false", "Whether x -- a step, an instant, an operation or a hop -- "
       "belongs to a C2LR swap-or-stay step, whose crystals exchange through the junctions by "
-      "the machine's matching: the routes are derived from the machine, never read from the "
-      "programme, so a programme cannot claim this for a move it wrote itself.", "execution",
+      "the machine's matching, or to a WISE swap step, whose every move the replay found to be "
+      "one of the machine's pairs of the step's kind.  Either is established by the replay from the "
+      "machine, never read from the programme, so a programme cannot claim this for a move it "
+      "wrote itself.", "execution",
       programme="An instant is the one during such a step; an operation or hop is one of its "
                 "moves.",
       schedule="Never: a paper's timed schedule has no swap-or-stay steps, so R2, R3, R5 and "

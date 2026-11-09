@@ -438,10 +438,15 @@ class _Build:
     gates: list[dict] = field(default_factory=list)
     #: the native stages' records, when asked for (`compile_c2lr(stages=...)`)
     stages: list[dict] | None = None
+    #: pack a layer's pulses by the chain position they address (R34), keeping the order inside
+    #: every leg (`qccd.verify.chains`); off for the C2LR boards
+    positions: bool = False
 
     def __post_init__(self) -> None:
         from ..verify.c2lr import C2LRTracker
+        from ..verify.chains import Chains
         self.trk = C2LRTracker(self.arch)
+        self.chains = Chains(self.arch.device) if self.positions else None
         self.at = {leg: ion for ion, leg in self.pos.items()}
         self.cycle: dict[int, int] = {}          # instruction id -> its cycle (its position)
         self._steps: list[dict] = []             # the steps since the last stage record
@@ -489,6 +494,8 @@ class _Build:
         t = self.cycle[ins.id] = len(self.prog.instructions)
         if ins.type == "init":
             self.trk.init({}, self.pos)
+            if self.chains is not None:
+                self.chains.start(ins.placement)
         elif ins.type == "simd":
             if not self._steps:
                 self._steps_from = dict(self.pos)
@@ -499,6 +506,9 @@ class _Build:
                 raise RouteError(f"instruction {ins.id}: {broken[0]}")
             for p in step.participants:
                 self.moves.append({"t": t, "ion": p.ion, "from": p.src, "to": p.dst, "via": list(p.via)})
+            if self.chains is not None:
+                self.chains.move([(p.ion, p.src, p.dst, *self.chains.route_rails(p.src, p.dst, p.via))
+                                  for p in step.participants])
             self.pos = after
             self.at = {}
             for ion, leg in after.items():
@@ -533,10 +543,7 @@ class _Build:
             for op in ops:
                 if k < len(seqs[op.i]):
                     by_gate.setdefault(seqs[op.i][k][0], []).append((op, seqs[op.i][k]))
-            for gate in ("R", "VZ", "MS"):
-                group = by_gate.get(gate)
-                if not group:
-                    continue
+            for gate, group in self._by_position(by_gate):
                 kind = {"R": "beam", "VZ": "virtual_z", "MS": "ms"}[gate]
                 meta = {"kind": kind, "op": [op.i for op, _ in group]}
                 params = tuple(tuple(float(x) for x in p) for _, (_, _, p) in group)
@@ -550,6 +557,33 @@ class _Build:
                     last[op.i] = ins
         for op in ops:
             self.witness(op, last[op.i], [ion[q] for q in op.qubits])
+
+    def _by_position(self, by_gate: Mapping[str, list]):
+        """Each gate kind's pulses in the order R, VZ, MS, one instruction per chain position
+        they address when `positions` is on (R34), the first in the circuit first.  A frame
+        change addresses none."""
+        for gate in ("R", "VZ", "MS"):
+            group = by_gate.get(gate)
+            if not group:
+                continue
+            if self.chains is None or gate == "VZ":
+                yield gate, group
+                continue
+            parts: dict = {}
+            for item in group:
+                parts.setdefault(self.chains.pattern(item[1][1]), []).append(item)
+            for part in sorted(parts.values(), key=lambda g: g[0][0].i):
+                yield gate, part
+
+    def readout(self, kind: str, group: Sequence[SourceOp], ion: Mapping[int, str]) -> None:
+        """A layer's readouts or resets, one instruction per chain position when `positions` is on."""
+        parts: dict = {}
+        for o in group:
+            pat = self.chains.pattern([ion[o.qubits[0]]]) if self.chains is not None else None
+            parts.setdefault(pat, []).append(o)
+        for part in sorted(parts.values(), key=lambda g: g[0].i):
+            self.emit(type=kind, ions=tuple(ion[o.qubits[0]] for o in part),
+                      meta={"kind": "readout" if kind == "measure" else "reset", "op": [o.i for o in part]})
 
     # -- transport
 
@@ -646,13 +680,14 @@ class _Build:
 
 def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
                  seed: int = 0, stages: list[dict] | None = None,
-                 reads_together: bool = False) -> tuple[TSIR, dict]:
+                 reads_together: bool = False, positions: bool = False) -> tuple[TSIR, dict]:
     """`(programme, certificate)` for `qasm_text` on the C2LR device `arch`, uncooled: the
     certified programme (`compile_with_router` inserts the cooling).  Raises `Refused` for a
     pair it cannot compile, `RouteError` if what it built does not replay cleanly.  A list
     passed as `stages` receives the native stages' evidence (`write_stages` saves it).
     `reads_together` lays the ops out by `layers_reading_together`, as Goal 3's compilers do;
-    the C2LR boards keep `layers`."""
+    the C2LR boards keep `layers`.  `positions` packs each layer's pulses, readouts and resets by
+    the chain position they address (R34), as Goal 3's do; the C2LR boards pack them by kind."""
     if not is_c2lr(arch):
         raise Refused(f"{arch.name} does not declare C2LR control; this router plays only "
                       f"swap-or-stay steps")
@@ -664,7 +699,7 @@ def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
     placement = {ion[q]: at[q] for q in range(n)}
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)}})
-    b = _Build(arch, lat, prog, dict(placement), stages=stages)
+    b = _Build(arch, lat, prog, dict(placement), stages=stages, positions=positions)
     # the router's normalization is the parse: every op it accepts is one it lowers itself
     circuit = {"n_qubits": n, "n_clbits": n_clbits, "ops": [o.stage_json() for o in ops]}
     b.record("circuit_normalization", circuit, circuit,
@@ -682,10 +717,7 @@ def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
         for kind in ("measure", "reset"):
             group = [o for o in layer if o.name == kind]
             if group:
-                b.batch(group, ion, lambda kind=kind, group=group: b.emit(
-                    type=kind, ions=tuple(ion[o.qubits[0]] for o in group),
-                    meta={"kind": "readout" if kind == "measure" else "reset",
-                          "op": [o.i for o in group]}))
+                b.batch(group, ion, lambda kind=kind, group=group: b.readout(kind, group, ion))
         two = [o for o in layer if o.name in GATES_2Q]
         if two:
             b.two_qubit(two, ion)
@@ -742,16 +774,18 @@ def compile_with_stages(work, *, name: str = "circuit") -> int:
 
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qccdsim_jones",
-                        name: str = "circuit", reads_together: bool = False) -> tuple[Path, Path]:
+                        name: str = "circuit", reads_together: bool = False, positions: bool = False,
+                        lazy_cooling: bool = False) -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs, from this router: `prog.tsir.json` (certified),
     `prog.qcert.json`, `prog.cooled.tsir.json` (the cooling pass at `table`, the final
     programme), `device.expanded.json`, `circuit.qasm` and `compile.json` in `workdir`.
     Returns (final programme, certificate).  The final programme is checked against every
-    rule before it is returned."""
+    rule before it is returned.  `positions` is `compile_c2lr`'s; `lazy_cooling` counts each gate's
+    heat from the last cool (`CoolingPolicy.lazy`), as Goal 3's compilers do."""
     import subprocess
     import time
 
-    from ..compile.cooling import insert_cooling
+    from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model
     from ..verify import verify
 
@@ -766,11 +800,11 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qcc
                          str(work / "device.expanded.json")], capture_output=True, text=True)
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
-    prog, cert = compile_c2lr(qasm_text, arch, name=name, reads_together=reads_together)
+    prog, cert = compile_c2lr(qasm_text, arch, name=name, reads_together=reads_together, positions=positions)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     model = corrected_model(table)
-    cooled = insert_cooling(prog, arch, model).program
+    cooled = insert_cooling(prog, arch, model, policy=CoolingPolicy(lazy=lazy_cooling)).program
     cooled.meta.update(prog.meta)
     final = work / "prog.cooled.tsir.json"
     cooled.save(str(final), indent=None)

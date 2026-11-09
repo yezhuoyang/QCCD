@@ -162,6 +162,14 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
             pos.set(ion(i), 0, Site(s))
     cur_occ: dict[str, int] = dict(views[0].occ_before) if views else {}
     cur_pos: dict[str, str] = dict(views[0].pos_before) if views else {}
+    # the order inside each chain (`qccd.verify.chains`): what a laser addresses (R34) and whom a
+    # gate swap acts on.  Kept beside the replay; nothing the replay or an older rule reads
+    from ..verify.chains import Chains
+    chains = Chains(dev)
+    # the replay's views skip an `init`: its placement, in the order it lists the ions, starts
+    # the chains, read off the programme as each view's instruction is reached
+    instrs = list(prog.instructions)
+    upto = 0
     t = 0.0
     budget_known = None
     # C2LR: C1's exception per leg (`entered`), and the instants during a swap-or-stay step
@@ -179,6 +187,11 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
 
     for k, v in enumerate(views):
         ins = v.instr
+        while upto < len(instrs) and instrs[upto].id != ins.id:
+            if instrs[upto].type == "init":
+                chains.start(instrs[upto].placement)
+            upto += 1
+        upto += 1
         before = len(instants) - 1
         c2 = v.c2lr
         if c2 is not None and c2.check_before:
@@ -209,6 +222,8 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                 excepted(during, c2.excepted_before | c2.excepted_after)
                 if c2.exchange:
                     exchange_instants.add(during)
+            if v.wise_swap:
+                exchange_instants.add(during)
         after = len(instants)
         instants.append(f"after step {k}")
         times.append(t1)
@@ -244,6 +259,8 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                               "type": ins.type, "cls": ins.cls,
                               "mode": ins.mode, "carries_gates": bool(ins.pairs or ins.gate)
                               if ins.type == "simd" else False}
+        if v.wise_swap:
+            st["exchange"] = True
         if c2 is not None:
             st["exchange"] = c2.exchange
             st["c2lr_template"] = c2.template
@@ -267,6 +284,9 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                     routes.append((m.ion, [m]))
                     last[m.ion] = (len(routes) - 1, m.dst)
             paid = bool((ins.meta or {}).get("gate_swaps"))
+            moved = chains.move([(i, ms[0].src, ms[-1].dst, ms[0].seg.id, ms[-1].seg.id) for i, ms in routes],
+                                gate_swaps=paid)
+            st["gate_swaps_done"] = moved["swaps"]
             for i, ms in routes:
                 path = [Site(ms[0].src)] + [Site(m.dst) for m in ms]
                 entails = ms[0].entails
@@ -274,7 +294,7 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                 o = mk("move", [i], None, motion=motion_signature(v, i),
                        split="split" in entails, merge="merge" in entails,
                        swap_paid=paid, at_chain_end=src_occ <= 2,
-                       exchange=bool(c2 is not None and c2.exchange))
+                       exchange=bool(c2 is not None and c2.exchange) or bool(v.wise_swap))
                 if ms[-1].dst in bends:
                     o.facts["malformed"] = True
                 o.path = tuple(path)
@@ -296,20 +316,24 @@ def programme_execution(prog, arch, model, *, circuit: Sequence[CircuitOpData] |
                                     label_=hop_label(dev, on_loop, m.src, m.dst, m.seg)))
         elif ins.type == "gate":
             declared = tuple(ins.sites)
+            # a frame change and an identity are no pulse: no laser reaches the ion
+            pulse = ins.gate not in ("VZ", "I")
             for operands in iter_operands(ins):
                 site = v.pos_before.get(operands[0])
                 if len(operands) == 2:
-                    o = mk("gate2", operands, site, gate=ins.gate, declared_sites=declared)
+                    o = mk("gate2", operands, site, gate=ins.gate, declared_sites=declared,
+                           laser=True, pattern=chains.pattern(operands))
                     o.text = f"{ins.gate or 'gate'} {operands[0]},{operands[1]}"
                     hk = before
                     for i in operands:
                         heat.setdefault(ion(i), {})[hk] = float(v.quanta.get(i, 0.0))
                 else:
-                    o = mk("gate1", operands, site, gate=ins.gate, declared_sites=declared)
+                    o = mk("gate1", operands, site, gate=ins.gate, declared_sites=declared,
+                           laser=pulse, pattern=chains.pattern(operands))
                     o.text = f"{ins.gate or 'gate'} {operands[0]}"
         elif ins.type in ("measure", "reset"):
             for i in ins.ions:
-                o = mk(ins.type, [i], v.pos_before.get(i))
+                o = mk(ins.type, [i], v.pos_before.get(i), laser=True, pattern=chains.pattern([i]))
                 o.text = f"{ins.type} {i}"
         elif ins.type == "cool":
             cooled = ins.ions or (tuple(v.pos_before) if ins.broadcast else ())

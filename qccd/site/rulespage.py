@@ -37,7 +37,8 @@ SETS = (
     # and refused in the second, which keeps to what arXiv:2403.00756 demonstrated
     ("c2lr", "C2LR swap-or-stay"),
     ("c2lr-demonstrated", "C2LR swap-or-stay, as demonstrated"),
-    # Goal 3's WISE and Cyclone, as the transport deck writes them (goals/goal3/DECK.md)
+    # Goal 3's three families, as the transport deck and its feedback write them (goals/goal3/DECK.md)
+    ("c2lr-deck", "C2LR swap-or-stay, as the deck writes it for Goal 3"),
     ("wise", "WISE"),
     ("cyclone-deck", "Cyclone, as the transport deck writes it"),
     ("conveyor", "Conveyor-belt transport"),
