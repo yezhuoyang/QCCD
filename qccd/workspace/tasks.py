@@ -223,7 +223,7 @@ def _same(a, b) -> bool:
 
 
 def scored_device(arch_doc: Mapping, release: TaskRelease) -> tuple[dict, dict]:
-    """The device a design is scored as on `release`, and what of its own physics that kept.
+    """The machine a design is scored as on `release`, and what of its own physics that kept.
 
     Geometry, zones, control and wiring are the design's.  The fixed blocks are the release's,
     except where the release has no number at all and the design brings one -- a
@@ -231,7 +231,7 @@ def scored_device(arch_doc: Mapping, release: TaskRelease) -> tuple[dict, dict]:
     used, and listed in `added` (dotted paths).  A number the design changed where the release
     has one is not used, and is listed in `ignored`; one it merely kept from the template every
     design starts from is neither.  The `budget` is the release's, whole: what a design declares
-    there is `ignored`.  Lists (a curve's points) are one number each.  A C2LR device keeps its
+    there is `ignored`.  Lists (a curve's points) are one number each.  A C2LR machine keeps its
     C2LR primitives and species pair wherever they differ from the release's, listed in `added`.
 
         doc, note = scored_device(design, release)   # note = {"added": [...], "ignored": [...]}
@@ -303,7 +303,7 @@ def scored_device(arch_doc: Mapping, release: TaskRelease) -> tuple[dict, dict]:
 
 
 def board_device(arch_doc: Mapping, release: TaskRelease) -> dict:
-    """The device a design is entered on `release` with: `scored_device`'s.
+    """The machine a design is entered on `release` with: `scored_device`'s.
 
     A design that never set its own physics takes the board's, so a board with physics of its
     own (`qccd-physics@2`) can be entered by any design; one that adds a number the board does

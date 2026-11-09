@@ -2900,14 +2900,14 @@ function priceFrames(frames, loops, model, classes, opts) {
         var kindC = f.c2lr.kind;
         if (!trk) {
           throw new EngineError('instruction ' + fid + ': a ' + kindC + ' step needs a C2LR ' +
-                                'device; ' + (c2cx ? c2cx.why
-                                  : 'the page priced it with no device to expand it on'));
+                                'machine; ' + (c2cx ? c2cx.why
+                                  : 'the page priced it with no machine to expand it on'));
         }
         var cBefore = _shallow(pos), ex = trk.expand(fid, c2lrTemplate(f), pos), pr;
         try { pr = model.c2lrStep(kindC); }
         catch (err) {
           throw new EngineError('instruction ' + fid + ': ' + err.message +
-                                '; the device prices no ' + kindC + ' step');
+                                '; the machine prices no ' + kindC + ' step');
         }
         var mc = pr[0], sc = pr[1], cst = ex.step, cParts = cst.participants;
         var cPb = {}, cOb = {}, cTr = {}, cWp = [], cN = 0, cCost = 0, ck;
@@ -3363,7 +3363,7 @@ function _c2lrBuild(dev) {
     (dev.nodes[nid].kind === 'site' ? legs : junctions).push(nid);
   }
   legs.sort(_cmpStr); junctions.sort(_cmpStr);
-  if (!legs.length) throw new NotC2LR('the device has no legs: no site to hold a crystal');
+  if (!legs.length) throw new NotC2LR('the machine has no legs: no site to hold a crystal');
   var inc = {};
   for (nid in dev.nodes) if (own(dev.nodes, nid)) inc[nid] = [];
   for (sid in dev.segments) if (own(dev.segments, sid)) {
@@ -3509,7 +3509,7 @@ function c2lrContext(dev, control, name, classes) {
   if (!isC2LR(control)) {
     var model = control && own(control, 'model') ? _pyStrOf(control.model) : 'simd_classes';
     return { on: false, geo: null, offer: null, classes: classes || {},
-             why: 'device ' + label + ' does not declare C2LR control (control.model is ' +
+             why: 'machine ' + label + ' does not declare C2LR control (control.model is ' +
                   pyRepr(model) + ", not 'c2lr')" };
   }
   var hit = _C2LR_CACHE ? _C2LR_CACHE.get(dev) : null;
@@ -3522,7 +3522,7 @@ function c2lrContext(dev, control, name, classes) {
     if (_C2LR_CACHE) _C2LR_CACHE.set(dev, hit);
   }
   return { on: true, geo: hit.geo, offer: c2lrDeclared(control), classes: classes || {},
-           why: hit.why === null ? 'it is one' : 'device ' + label + ': ' + hit.why };
+           why: hit.why === null ? 'it is one' : 'machine ' + label + ': ' + hit.why };
 }
 
 // `template_problems`, for the two C2LR kinds: the template's SHAPE (C2)
@@ -3542,7 +3542,7 @@ function c2lrShape(tpl, participants) {
              '; its only per-crystal choice is the list it names (C2)');
   }
   if (participants && participants.length) {
-    out.push('a ' + kind + " step lists its own participants; its routes are the device's " +
+    out.push('a ' + kind + " step lists its own participants; its routes are the machine's " +
              "matching, never the programme's (C2)");
   }
   var ions = function (v, what) {
@@ -3672,7 +3672,7 @@ C2LRTracker.prototype.observe = function (before, after, instr) {
     c1 = this.exitProblems(leaving, before, null, what);
     if (instr.type === 'simd' && !instr.template && _c2lrClass(this.cx, instr.cls)) {
       c2.push('a ' + instr.cls + " step lists its own routes; a C2LR step's only per-leg " +
-              "choice is the direction bit, and its routes are the device's (C2)");
+              "choice is the direction bit, and its routes are the machine's (C2)");
     }
   }
   for (var m = 0; m < moved.length; m++) { delete this.near[moved[m]]; delete this.entered[moved[m]]; }
@@ -3736,11 +3736,11 @@ C2LRTracker.prototype.expand = function (id, tpl, pos) {
   catch (err) { throw new EngineError('instruction ' + id + ': ' + err.message); }
   var offer = this.cx.offer, c6 = [], c1 = [];
   if (v.form === 'diagonal' && offer.diagonals.indexOf(v.diagonal) < 0) {
-    c6.push('the device does not offer diagonal ' + v.diagonal + ' (it offers ' +
+    c6.push('the machine does not offer diagonal ' + v.diagonal + ' (it offers ' +
             (offer.diagonals.join(', ') || 'none') + ') (C6)');
   }
   if (v.form === 'checkerboard' && offer.checkerboard.indexOf(v.pairing) < 0) {
-    c6.push('the device does not offer the checkerboard pairing ' + v.pairing + ' (it offers ' +
+    c6.push('the machine does not offer the checkerboard pairing ' + v.pairing + ' (it offers ' +
             (offer.checkerboard.join(', ') || 'none') + ') (C6)');
   }
   var contents = this.contents(pos), toward = {}, bits = (tpl.toward || []).map(String);
@@ -3749,7 +3749,7 @@ C2LRTracker.prototype.expand = function (id, tpl, pos) {
     var leg = this._inLeg(id, ion, pos, 'swap_or_stay'), pair = pairs[leg];
     if (pair === undefined) {
       c6.push(ion + ' is shifted toward a junction from leg ' + leg + ', which has no partner ' +
-              'under ' + v.label + " (the device's edge); a crystal there can only stay (C6)");
+              'under ' + v.label + " (the machine's edge); a crystal there can only stay (C6)");
       continue;
     }
     if ((contents[leg] || []).length > 1 && this.near[ion] !== pair[0]) {
@@ -3975,11 +3975,11 @@ function _c9(w) {
 function c2lrDocumentViolations(cx) {
   if (!cx || !cx.on) return [];
   if (!cx.geo) {
-    return [_v('C10', -1, 'the device declares C2LR control but is not a lattice of legs: ' + cx.why)];
+    return [_v('C10', -1, 'the machine declares C2LR control but is not a lattice of legs: ' + cx.why)];
   }
   var d = cx.offer, out = [], sig = unbox(d.shared_signals);
   if (typeof sig === 'boolean' || typeof sig !== 'number' || !Number.isInteger(sig) || sig < 1) {
-    out.push(_v('C10', -1, "the device's control.c2lr declares no number of shared analog " +
+    out.push(_v('C10', -1, "the machine's control.c2lr declares no number of shared analog " +
                            'signals (shared_signals)'));
   }
   var each = [['inputs_per_leg', 'digital input'], ['switches_per_leg', 'switch']];
@@ -3987,7 +3987,7 @@ function c2lrDocumentViolations(cx) {
     // `d.get(key) != 1`, where Python's True and 1.0 both equal 1
     var v = unbox(d[each[i][0]]);
     if (!(v === 1 || v === true)) {
-      out.push(_v('C10', -1, "the device's control.c2lr gives each leg " +
+      out.push(_v('C10', -1, "the machine's control.c2lr gives each leg " +
                              pyRepr(d[each[i][0]]) + ' ' + each[i][1] +
                              '(s) (' + each[i][0] + "); C2LR's per-leg control is exactly one"));
     }
@@ -4338,7 +4338,7 @@ function _parseStatement(text, line) {
   } else if (_isName(p, 'd') && _peekOp(p, 1) === '=') {
     _take(p); _take(p);
     method = _expectName(p);
-    if (method !== 'DeviceBuilder') throw _perr(toks[0].at, 'only DeviceBuilder builds a device');
+    if (method !== 'DeviceBuilder') throw _perr(toks[0].at, 'only DeviceBuilder builds a machine');
   } else if (_isName(p, 'm') && _peekOp(p, 1) === '.') {
     _take(p); _take(p);
     method = _expectName(p);
@@ -4727,7 +4727,7 @@ function geometryViolations(st) {
     if (d > maxDeg) {
       out.push({ rule: 'R19', node: nid,
                  message: 'node ' + nid + ' has degree ' + d + ', but a junction on this ' +
-                          'device may join at most ' + maxDeg +
+                          'machine may join at most ' + maxDeg +
                           ' rails (budget.max_junction_degree)' });
     }
     for (i = 0; i < segs.length; i++) {
@@ -4738,7 +4738,7 @@ function geometryViolations(st) {
           out.push({ rule: 'R20', node: nid,
                      message: 'rails ' + segs[i] + ' and ' + segs[j] + ' meet at ' + nid +
                               ' at ' + ang.toFixed(1) + ' degrees, less than the ' +
-                              _pyG(minAng) + ' degrees the device requires ' +
+                              _pyG(minAng) + ' degrees the machine requires ' +
                               '(budget.min_rail_angle_deg)' });
         }
       }
@@ -6159,7 +6159,7 @@ function _report(chk, frames, priced, ctx, fatal) {
       ? ctx.state.primitives.scalars.swap_or_stay : null;
     var com = sos && own(sos, 'com_mhz') ? sos.com_mhz : null;
     if (com === null || com === undefined) {
-      skipped.C8 = "the device's swap_or_stay primitive records no COM frequency";
+      skipped.C8 = "the machine's swap_or_stay primitive records no COM frequency";
     } else {
       partial.C8 = 'recorded, not decided: the primitive holds the COM mode at ' +
                    _pyFloatRepr(num(com)) + ' MHz during a shift';
@@ -6178,7 +6178,7 @@ function _report(chk, frames, priced, ctx, fatal) {
                 'the browser does not decide which channel drives which site, so R4d is checked when the page is built';
   skipped.R7b = 'no architecture declares a per-zone duty-cycle budget, so there is ' +
                 'nothing to check anywhere -- the checker cannot decide R7b either';
-  skipped.R9 = "the programme's cost and step claims describe the device this page was " +
+  skipped.R9 = "the programme's cost and step claims describe the machine this page was " +
                'built for, not this one; after an edit the only honest verdict is "not ' +
                'applicable"';
   skipped.R10 = 'needs the source circuit: the proved checker holds the programme to its ' +

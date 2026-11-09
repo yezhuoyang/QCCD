@@ -1,5 +1,5 @@
 evaluation "qccd-noise@1"
-title "Gate noise and dephasing, from the device's own physics"
+title "Gate noise and dephasing, from the machine's own physics"
 about "Deliberately simple: two-ion gates priced by the heat they meet and the chain they sit in, one-ion pulses, readout and reset by their infidelities, and every ion dephasing for as long as each step takes. The first preparation is noiseless, and nothing is charged for crosstalk or for the shape of an idle stretch."
 include "metrics"
 clock "qccdsim_jones"
@@ -24,7 +24,7 @@ channel readout_x "A wrong readout, in the X basis"
     Z_ERROR(min(1 / 2, scale * (1 - primitive("measure", "fidelity")))) on ions(m) counted as measure
 
 channel ms "The two-ion gate"
-  about "The device's gate error law at the heat the pair meets and the chain in its trap."
+  about "The machine's gate error law at the heat the pair meets and the chain in its trap."
   after g in two_qubit_gates:
     DEPOLARIZE2(min(15 / 16, scale * ms_error(gate_heat(g), gate_length(g)))) on ions(g)
       counted as ms_base = ms_error(0, 2),

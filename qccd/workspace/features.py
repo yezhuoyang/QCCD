@@ -316,7 +316,7 @@ FEATURES: tuple[Feature, ...] = (
     Feature(
         "qccd_read_reference",
         "Version-matched reference for this QCCD and its evaluator: sections index, "
-        "design (READ FIRST to design a device -- any shape the person describes -- or to put one on a board: "
+        "design (READ FIRST to design a machine -- any shape the person describes -- or to put one on a board: "
         "the structure the board's circuit needs, how a shape becomes it, measured sizes, run-and-fix), "
         "boards (every leaderboard a design can be submitted to: title, circuit, what is ranked; query=a title for "
         "one board with its circuit), interface (everything you may do on a page: places, controls, Studio verbs; nothing "
@@ -580,7 +580,7 @@ FEATURES: tuple[Feature, ...] = (
         "earlier export; a README.txt there says what each file is). what='design': the design (default the current "
         "one; design = its name, revision optional) as a Studio file <name>.studio.json (Studio opens it again with "
         "qccd import) and as the architecture file the compiler reads, <name>.arch.json, plus its compiled program "
-        "and certificate when it has one. what='run' (run_id): the run's device, circuit (QASM), compiled program, "
+        "and certificate when it has one. what='run' (run_id): the run's machine, circuit (QASM), compiled program, "
         "certificate, step times and performance report. Returns the folder and the files. This is how you save "
         "files: unless the person allowed it (qccd_get_context -> files), your own file tools and shell only read.",
         _obj({"what": {"type": "string", "enum": ["design", "run"]}, "design": _S, "revision": _I, "run_id": _S,
@@ -592,7 +592,7 @@ FEATURES: tuple[Feature, ...] = (
         "qccd_estimate_ler",
         "The logical error rate of a design: compiles a QEC memory experiment onto the design with the reference "
         "compiler (qccdc + cooling), checks the program runs it (every detector deterministic with the circuit's "
-        "parity), and samples its logical error rate under the noise model built from the device's physics "
+        "parity), and samples its logical error rate under the noise model built from the machine's physics "
         "(heating- and chain-dependent MS error, gate, measurement, reset and idle errors). experiment: a memory "
         "board's title, or one of rep3, rep5, rep9, surface3, surface5, steane, bb18, bb72 "
         "(qccd_read_reference section='noise' explains each and the model). design: its name (default the "
@@ -659,7 +659,7 @@ FEATURES: tuple[Feature, ...] = (
         "qccd_get_bench",
         "The Compiler board's local reports: without report_id the list (compiler, coverage, speedup over the "
         "reference compiler, LER ratio, wrong pairs); with report_id one report, part summary (default) or pairs "
-        "(each circuit x device pair: status valid|wrong|refused|timeout|crash, the reason, T_jones, speedup, "
+        "(each circuit x machine pair: status valid|wrong|refused|timeout|crash, the reason, T_jones, speedup, "
         "LER; paged with offset/limit). A report is made by running a compiler at the person's terminal, "
         "`qccd bench run --compiler DIR` (it runs their code, so it runs in a shell, never through these tools).",
         _obj({"report_id": _S, "part": {"type": "string", "enum": ["summary", "pairs"]}, "offset": _I, "limit": _I}),

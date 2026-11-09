@@ -69,7 +69,7 @@ CSS = """
 """
 
 HINTS = {
-    "board:try": ("Try your own design", "design a device for this board in your own QCCD workspace (with your AI agent "
+    "board:try": ("Try your own design", "design a machine for this board in your own QCCD workspace (with your AI agent "
                   "if you like), test it there with the reference checks, and submit it under your name"),
     "board:try-close": ("Close", "close the Try your own design box"),
     "board:code": ("Show this code", "show or hide one code's entries in Goal 1's chart and table; one code alone "
@@ -148,7 +148,7 @@ SCRIPT = r"""
     var x = el('button', 'lbx-x', '×'); x.type = 'button'; x.setAttribute('aria-label', 'close'); x.setAttribute('data-hint', 'board:try-close');
     x.onclick = closePop; pop.appendChild(x);
     pop.appendChild(el('h4', null, 'Try your own design: ' + title));
-    pop.appendChild(el('p', null, 'Design the device in your own QCCD workspace, where your AI agent can help. It opens ' +
+    pop.appendChild(el('p', null, 'Design the machine in your own QCCD workspace, where your AI agent can help. It opens ' +
       'the Studio on this board: its ranking, a test with every check the server runs, and Submit, which lists your ' +
       'design here under your name once you sign in with your qccd.academy account.'));
     var go = el('a', 'lbx-go', 'Open in my workspace'); go.href = studioURL(task); go.target = '_blank'; go.rel = 'noopener';

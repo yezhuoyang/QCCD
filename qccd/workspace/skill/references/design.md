@@ -1,4 +1,4 @@
-# Designing a device to the person's shape
+# Designing a machine to the person's shape
 
 The person describes a shape ("a large triangle and a smaller one", "an H", "a ring with
 spokes") and a leaderboard. You draw that shape, then fill in the details the machine needs,
@@ -17,10 +17,10 @@ canvas keeps the physics every board shares.
 
 ## 1. Pick the mechanism the board needs
 
-Two compilers exist, and a submission picks between them by the device's shape. A design with
+Two compilers exist, and a submission picks between them by the machine's shape. A design with
 a closed loop tries the conveyor first, then the router.
 
-| board | mechanism | what the device must have | known to work (measured) |
+| board | mechanism | what the machine must have | known to work (measured) |
 |---|---|---|---|
 | BB [[144,12,12]] | conveyor (rotate) | ONE closed loop that carries the data qubits, plus docks: gate sites one rail off the loop | `ring` width 72, height 2, 24 docks, a trap in each corner (`"corners": "site"`): 522 ms per round, eligible. Drawn: a triangle loop of 144 sites with 24 docks inside it (below): 505.8 ms, eligible |
 | Repetition code, Steane, Surface code | conveyor | the same, smaller | `ring` width 8, height 2, 8 docks, `"corners": "site"`: 9.45, 11.48 and 14.1 ms, all eligible |

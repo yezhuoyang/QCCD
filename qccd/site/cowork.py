@@ -54,7 +54,7 @@ STUDIO_CSS = """
 PANEL_HTML = """
 <button class="qa-x" type="button" aria-label="close">&times;</button>
 <h2>Design with an AI agent</h2>
-<p>Work on a design together with an agent: Codex, Claude Code or Cursor. Select parts of the device,
+<p>Work on a design together with an agent: Codex, Claude Code or Cursor. Select parts of the machine,
 lasso a region, sketch an arrow, or show an edit once, and ask. The agent gets exactly what you
 pointed at and edits the same design through checked changes. You watch each change arrive in
 the Studio. Parts you lock stay locked, and any change can be undone.</p>
@@ -344,13 +344,13 @@ def studio_block(root: str = "") -> str:
 
 
 def board_section() -> str:
-    """The Leaderboard's live Official submissions section for devices (HTML with its style); its
+    """The Leaderboard's live Official submissions section for machines (HTML with its style); its
     script, which also fills the Compiler section's ranking, is `board_script()`, placed after both."""
     return f"<style>{BOARD_CSS}</style>\n{BOARD_HTML}\n"
 
 
 def board_script() -> str:
-    """The script that reads the official server: the device boards in the website's own order (the
+    """The script that reads the official server: the machine boards in the website's own order (the
     releases carry it), and each compiler suite's ranking into the Compiler section (#qo-compiler)."""
     import json
     try:

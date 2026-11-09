@@ -22,7 +22,7 @@
     qccd export [--design NAME | --run ID]   save a design's (or a run's) files into exports/<name>/
     qccd ler --experiment surface3 [--design NAME] [--shots N]
                                              the logical error rate of a design (memory experiment,
-                                             reference compiler, the device's noise model)
+                                             reference compiler, the machine's noise model)
     qccd leaderboard [--board T] [--official] [--track compiler]   local or published rankings
     qccd bench run --compiler DIR [--only X] [--jobs N]   grade a compiler on the suite, locally
     qccd bench run --compiler DIR --board B [--device F]  ...or on one board's circuit (the C2LR boards)
@@ -702,7 +702,7 @@ def cmd_bench(a) -> int:
     if a.action == "suite":
         s = suite.summary()
         print(f"{suite.title} ({suite.id}): {s['pairs']} public pairs, {s['hidden_pairs']} hidden on the server")
-        print(f"  circuits: {', '.join(s['circuits'])}\n  devices:  {', '.join(s['devices'])}")
+        print(f"  circuits: {', '.join(s['circuits'])}\n  machines:  {', '.join(s['devices'])}")
         base = suite.baseline()
         print(f"  the reference compiler: {sum(1 for v in base.values() if v.get('status') == 'valid')} of "
               f"{len(base)} pairs valid; ranked by {s['rank_by']}")
@@ -940,10 +940,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--compiler", default="reference",
                    help="a compiler directory (qccd-compiler.json), 'reference', or 'c2lr' (the baseline C2LR router)")
     p.add_argument("--suite", default=None)
-    p.add_argument("--only", default=None, help="comma-separated pair ids, circuits or devices")
+    p.add_argument("--only", default=None, help="comma-separated pair ids, circuits or machines")
     p.add_argument("--board", default=None, help="grade on one board's circuit instead of the suite (a C2LR board)")
     p.add_argument("--device", action="append", default=None,
-                   help="with --board: a device file to compile onto (repeatable; default the board's suggested start)")
+                   help="with --board: a machine file to compile onto (repeatable; default the board's suggested start)")
     p.add_argument("--jobs", type=int, default=1)
     p.add_argument("--out", default=None)
     p.add_argument("--server", default=None)

@@ -1,10 +1,10 @@
-"""`DeviceBuilder` -- an explicit `Device`, one object at a time.
+"""`DeviceBuilder` -- an explicit `Machine`, one object at a time.
 
 Every shipped architecture is produced by a *generator*: `ring(width=72, verticals=24)`
 expands to 168 nodes and 168 segments, and the compact `.arch.json` stores the two
 parameters rather than the graph.  That is the right default and it is what keeps the
 files readable, but it has a hard edge -- a generator can only produce the family of
-graphs it was written for.  The moment a device gains one node the generator does not
+graphs it was written for.  The moment a machine gains one node the generator does not
 know about, the parameters stop describing it (`Device.reproducible_from_generator()`
 goes False) and the only faithful serialization is the expanded graph.
 
@@ -17,7 +17,7 @@ This is the constructor for that case, and the one a drag-and-drop editor writes
     d.loop("L0", ["S0", "J0", ...], closed=True, kind="ring")
     m = Machine.blank_device(d.build(), name="mine", zones=["data"])
 
-`generator` and `params` are carried through as provenance -- they say what the device
+`generator` and `params` are carried through as provenance -- they say what the machine
 *started* as, which is exactly what a listing wants to print even once it can no longer
 rebuild the graph from them.  Nothing downstream reads them for anything else; every
 consumer takes the expanded graph.
@@ -39,7 +39,7 @@ __all__ = ["DeviceBuilder"]
 def _pos2(who: str, id: str, pos: Sequence[float]) -> tuple[float, ...]:
     """Exactly two coordinates.  The schema admits one to three and nothing reads a third.
 
-    `compute_layout` is two-dimensional, so a 3-D device would draw as a silent
+    `compute_layout` is two-dimensional, so a 3-D machine would draw as a silent
     projection and a 1-D one is unrepresentable in the browser mirror at all (it reads
     `args[1]` and `args[2]` and produces `NaN`).  A design tool must not accept a
     coordinate it will then quietly discard.
@@ -52,7 +52,7 @@ def _pos2(who: str, id: str, pos: Sequence[float]) -> tuple[float, ...]:
 
 
 class DeviceBuilder:
-    """Accumulate nodes, segments and loops, then `build()` the immutable `Device`."""
+    """Accumulate nodes, segments and loops, then `build()` the immutable `Machine`."""
 
     def __init__(self, generator: str = "explicit", **params) -> None:
         self._nodes: dict[str, Node] = {}

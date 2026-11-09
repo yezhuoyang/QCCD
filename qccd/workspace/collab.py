@@ -1311,7 +1311,7 @@ def _event_brief(e: Mapping) -> str:
 
 #: where the design guide is: a live agent asked for "two triangles, submitted to BB" read four other
 #: sections, never this one, and planned the two-loop device the guide rules out (2026-09-24)
-DESIGN_HINT = ("To design a device (any shape the person describes) or to put a design on a leaderboard, read qccd_read_reference(section='design') BEFORE drawing: which structure the board's circuit needs, how their shape becomes it, measured sizes, and the run-and-fix loop; then qccd_submit_local(design, board) submits it.")
+DESIGN_HINT = ("To design a machine (any shape the person describes) or to put a design on a leaderboard, read qccd_read_reference(section='design') BEFORE drawing: which structure the board's circuit needs, how their shape becomes it, measured sizes, and the run-and-fix loop; then qccd_submit_local(design, board) submits it.")
 
 
 def _hints(ctx: Mapping) -> list:

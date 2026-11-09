@@ -54,9 +54,9 @@ DEBUG_API = _REPO_PKG / "site" / "debug" / "debug_api.json"
 #: regions the code GENERATES controls into from a schema or a table; a field or button inside
 #: one is declared by the region (its own label says which field it is).  Selector -> what.
 DECLARED_FORMS = {
-    "#palStart": "the Start panel: pick a generator card (chain, ring, grid, ...), a shipped device, or a blank "
+    "#palStart": "the Start panel: pick a generator card (chain, ring, grid, ...), a shipped machine, or a blank "
                  "canvas, optionally named first; each card says what it makes",
-    "#stageEmpty": "the empty canvas's Start cards (the same generators, shipped devices and blank canvas as the "
+    "#stageEmpty": "the empty canvas's Start cards (the same generators, shipped machines and blank canvas as the "
                    "Start panel)",
     "#palElements": "the rail's forms, generated from the schema: Append a row, Machine settings (primitives, "
                     "heating, species, control, budgets), Components -- each field is labelled with the schema "
@@ -75,14 +75,14 @@ OUT_OF_LINE = {
                "does": "shows which programme the Program pane lists; press it to switch"},
     "#qFollow": {"on": "studio", "name": "Follow (circuit)",
                  "does": "keep the executing circuit statement scrolled into view"},
-    "#aFilter": {"on": "studio", "name": "Filter (device)", "does": "show only the device rows containing this text"},
-    "#eSrc": {"on": "studio", "name": "Device source",
-              "does": "the device as its builder program; edit it and the picture follows"},
-    "#eWhich": {"on": "studio", "name": "Source language", "does": "which listing the Device panel shows (Python, ...)"},
+    "#aFilter": {"on": "studio", "name": "Filter (machine)", "does": "show only the machine rows containing this text"},
+    "#eSrc": {"on": "studio", "name": "Machine source",
+              "does": "the machine as its builder program; edit it and the picture follows"},
+    "#eWhich": {"on": "studio", "name": "Source language", "does": "which listing the Machine panel shows (Python, ...)"},
     "#eCopy": {"on": "studio", "name": "Copy", "does": "copy the listing to the clipboard"},
-    "#eOut": {"on": "studio", "name": "Edited device", "does": "the edited architecture, ready to save as a file"},
+    "#eOut": {"on": "studio", "name": "Edited machine", "does": "the edited architecture, ready to save as a file"},
     "#pwDrive": {"on": "studio", "name": "Test drive",
-                 "does": "write the smallest programme that exercises this device and play it"},
+                 "does": "write the smallest programme that exercises this machine and play it"},
     "#pwText": {"on": "studio", "name": "Write panel text",
                 "does": "a test programme in the Write language (p.init, p.shuttle, p.gate, ...); press Evaluate "
                         "to price, check and play it"},
@@ -93,7 +93,7 @@ OUT_OF_LINE_MAX = len(OUT_OF_LINE)
 WORKSPACE_PLACES = [
     {"url": "/studio", "title": "Your Studio", "about": "the person's own live design (their Design page)"},
     {"url": "/trace", "title": "Agent traces", "about": "what each agent did for each request, as a program (instructions with time, memory and effects, checked against the design store) beside the design it built; and the raw steps"},
-    {"url": "/runview/<run_id>", "title": "A run", "about": "a run's own page: its device, program and animation"},
+    {"url": "/runview/<run_id>", "title": "A run", "about": "a run's own page: its machine, program and animation"},
     {"url": "/compare?runs=<a>,<b>", "title": "Side by side", "about": "two runs on one clock"},
 ]
 

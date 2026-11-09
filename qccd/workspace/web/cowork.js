@@ -155,7 +155,7 @@ function diffOps(cur, base) {
 }
 function summarize(op) {
   var bits = [];
-  if (op.base) bits.push('new device');
+  if (op.base) bits.push('new machine');
   if (op.remove) bits.push('took back ' + op.remove.length + ' edit' + (op.remove.length > 1 ? 's' : ''));
   if (op.append) bits.push(op.append.length + ' edit' + (op.append.length > 1 ? 's' : '') + ' in Studio');
   if (op.program) bits.push('program');
@@ -1360,7 +1360,7 @@ function newFromStarter() {
     if (!made) return;
     return switchDraft(made.name).then(function () {
       return api('POST', '/api/change-sets', { branch: made.name, expected_revision: S.rev, request_id: rid('starter'), mode: 'apply',
-                                               summary: 'start from the ' + bd.title + ' board\'s starting device',
+                                               summary: 'start from the ' + bd.title + ' board\'s starting machine',
                                                operations: [{ type: 'construct', generator: st.generator, params: st.params || {},
                                                               name: st.name || 'design' }] });
     }).then(function (c) {
@@ -1476,8 +1476,8 @@ function renderBoard() {
   body.appendChild(h('div', { cls: 'qcl-row' }, [
     btn(t && t.state !== 'running' ? 'Test again' : 'Test on this board', testOnBoard, t && t.eligible ? '' : 'pri',
         'compile this board\'s circuit onto the design with the reference compiler, and grade it with every check the server runs (rules, the Lean certificate, semantics)'),
-    bd.starter && bd.starter.generator ? btn('New design from the board\'s starting device', newFromStarter, 'qcl-link',
-        'a new design (you name it) holding a device that passes this board: ' + bd.starter.generator) : null]));
+    bd.starter && bd.starter.generator ? btn('New design from the board\'s starting machine', newFromStarter, 'qcl-link',
+        'a new design (you name it) holding a machine that passes this board: ' + bd.starter.generator) : null]));
   if (t && t.state === 'running') body.lastChild.firstChild.disabled = true;
 
   // 2. submit, signed in

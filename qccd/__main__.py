@@ -1,20 +1,20 @@
 """`python -m qccd` -- the toolchain front end.
 
-A programmable design tool for trapped-ion QCCD: describe a device declaratively, load or
+A programmable design tool for trapped-ion QCCD: describe a machine declaratively, load or
 generate a program for it, replay and rule-check it, get a resource report, and render the
 whole thing to one self-contained HTML page.
 
-    python -m qccd devices                     what architectures exist, and their cost
-    python -m qccd show ring144_24v            one device in detail
+    python -m qccd machines                     what architectures exist, and their cost
+    python -m qccd show ring144_24v            one machine in detail
     python -m qccd arch ring144_24v            the ARCHITECTURE as a program you can read
     python -m qccd listing ring144_24v --program deck --depth 0
                                                the HARDWARE PROGRAM, disassembled
     python -m qccd run ring144_24v --html out/ring.html
-    python -m qccd demo                        every device, every program, one index page
+    python -m qccd demo                        every machine, every program, one index page
     python -m qccd phys ring144_24v            the ELECTRODES it implies, and their DRC
     python -m qccd gds ring144_24v -o ring.gds the same metal, for a fab tool
 
-The device / program / verify / report / view split is deliberate: a device description is
+The machine / program / verify / report / view split is deliberate: a machine description is
 independent of the program, a program is independent of the cost model, and the verifier
 judges both. Swapping any one of the three is a flag, not a code change.
 """
@@ -82,7 +82,7 @@ def cmd_devices(args) -> int:
               f"{hw.dacs:6d} {hw.electrodes:10d}  {hw.scheme}")
     print()
     print("DAC count is the headline: a broadcast scheme keeps it flat in array size,")
-    print("a direct scheme pays one per electrode.  `show <device>` for the breakdown.")
+    print("a direct scheme pays one per electrode.  `show <machine>` for the breakdown.")
     return 0
 
 
@@ -304,7 +304,7 @@ def cmd_studio(args) -> int:
     Not a second page kind.  `render_html` is already a renderer over `(arch, prog)`, and
     `(empty arch, empty prog)` became a legal pair the moment `Architecture.from_json`
     started testing for the PRESENCE of `nodes` rather than its truthiness.  What the
-    studio changes is two PARAMETERS: it starts from an empty explicit device, and it
+    studio changes is two PARAMETERS: it starts from an empty explicit machine, and it
     carries every `arch/*.arch.json` as a template so the start gallery has nine physics
     packages to offer rather than a pair.
     """
@@ -361,7 +361,7 @@ def cmd_studio(args) -> int:
                              # back to `arch.description`); only the blank canvas
                              # carries the onboarding sentence
                              None if args.seed else
-                             "an empty canvas: build a device, write a test programme, "
+                             "an empty canvas: build a machine, write a test programme, "
                              "and see what can and cannot be checked here"),
                        template_stems="*" if args.all_templates else None,
                        max_frames=args.max_frames,
@@ -408,12 +408,12 @@ def cmd_tutorial(args) -> int:
 
 
 def _arch_of(prog) -> Path:
-    """The device a compiled program names, as a path that exists.
+    """The machine a compiled program names, as a path that exists.
 
     `arch_spec` is a free-text field and its producers disagree: the compiler records the
     path it was handed (`arch/grid9x9.arch.json`), the Python builders record a bare name
     (`grid9x9`). Rather than pick a winner, resolve both -- and refuse rather than fall
-    back to some default, because opening a compiled program against the WRONG device
+    back to some default, because opening a compiled program against the WRONG machine
     would replay, would draw, and would be nonsense.
     """
     spec = str(prog.arch_spec or "")
@@ -422,7 +422,7 @@ def _arch_of(prog) -> Path:
         if cand.suffix and cand.is_file():
             return cand
     raise SystemExit(
-        f"the program names device {spec!r}, which is not a file and is not in "
+        f"the program names machine {spec!r}, which is not a file and is not in "
         f"{ARCH_DIR}; pass --seed <arch.json>")
 
 
@@ -490,7 +490,7 @@ def cmd_open(args) -> int:
     elif not arch.device.nodes:
         # a snapshot of an empty canvas: there is nothing to replay and nothing to build a
         # programme on, and saying so beats the StopIteration `walk` raises on no nodes
-        print(f"{arch.name}: an empty device -- nothing to replay")
+        print(f"{arch.name}: an empty machine -- nothing to replay")
         print("  nodes 0  segments 0  loops 0")
         return 0
     else:
@@ -555,7 +555,7 @@ def cmd_reach(args) -> int:
 
 
 def cmd_phys(args) -> int:
-    """The electrodes a device implies, and whether they can be fabricated.
+    """The electrodes a machine implies, and whether they can be fabricated.
 
     Everything printed here is derived: no architecture file declares a polygon, and the
     only authored input is the technology sidecar, whose every dimension carries a source.
@@ -833,10 +833,10 @@ code{{background:#0b0f18;padding:1px 5px;border-radius:4px}}
 .ok{{color:#3fb950!important}} .bad{{color:#ff6b6e!important}}
 </style></head><body><main>
 <h1>QCCD design tool</h1>
-<div class="sub">One declarative device description, one control IR, one verifier, one
+<div class="sub">One declarative machine description, one control IR, one verifier, one
 renderer. Each card below is the same toolchain pointed at a different architecture &mdash;
 nothing about the geometry is special-cased. Click one to step through its program with
-per-ion heating, or run <code>python -m qccd devices</code> for the resource table.</div>
+per-ion heating, or run <code>python -m qccd machines</code> for the resource table.</div>
 <div class="grid">{cells}</div></main></body></html>""",
         encoding="utf-8",
     )
@@ -849,7 +849,7 @@ def _load(name: str) -> Architecture:
     if not p.exists():
         avail = ", ".join(sorted(x.stem.replace(".arch", "")
                                  for x in ARCH_DIR.glob("*.arch.json")))
-        raise SystemExit(f"no such device {name!r}; have: {avail}")
+        raise SystemExit(f"no such machine {name!r}; have: {avail}")
     return load(p)
 
 
@@ -871,7 +871,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("devices", help="list architectures with their resource cost")
 
-    p_show = sub.add_parser("show", help="one device in detail")
+    p_show = sub.add_parser("show", help="one machine in detail")
     p_show.add_argument("device")
 
     p_arch = sub.add_parser("arch", aliases=["source"],
@@ -898,7 +898,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="report which records declare or mention this object id")
     p_arch.add_argument("--json", default=None)
 
-    p_run = sub.add_parser("run", help="replay a program on a device and report")
+    p_run = sub.add_parser("run", help="replay a program on a machine and report")
     p_run.add_argument("device")
     p_run.add_argument("--tsir", default=None, metavar="PATH",
                        help="a .tsir.json (e.g. one the browser exported) to run "
@@ -941,20 +941,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("verify", help="render the hand-checkable examples to out/verify/")
 
-    p_demo = sub.add_parser("demo", help="render every device to out/index.html")
+    p_demo = sub.add_parser("demo", help="render every machine to out/index.html")
     p_demo.add_argument("--max-frames", type=int, default=20000)
 
     # one command for all three, because a template change invalidates all three
     p_regen = sub.add_parser("regen", help="regenerate every page: demo, verify, studio")
     p_regen.add_argument("--max-frames", type=int, default=20000)
 
-    p_reach = sub.add_parser("reach", help="what the device can do, with no programme")
+    p_reach = sub.add_parser("reach", help="what the machine can do, with no programme")
     p_reach.add_argument("device")
     p_reach.add_argument("--model", choices=["deck", "corrected"], default="corrected")
     p_reach.add_argument("--metric", choices=["quanta", "us", "cost"], default="quanta")
     p_reach.add_argument("--json", default=None)
 
-    p_phys = sub.add_parser("phys", help="the electrodes a device implies, and their DRC")
+    p_phys = sub.add_parser("phys", help="the electrodes a machine implies, and their DRC")
     p_phys.add_argument("device")
     p_phys.add_argument("--tech", default="eth_junction_2201.12579",
                         help="a shipped preset name, or a path to a .tech.json")
@@ -988,7 +988,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_studio = sub.add_parser("studio", help="the browser design tool, as one page")
     p_studio.add_argument("-o", "--out", default=str(OUT / "studio.html"))
     p_studio.add_argument("--seed", default=None,
-                          help="start from this device instead of an empty canvas")
+                          help="start from this machine instead of an empty canvas")
     p_studio.add_argument("--name", default="studio")
     p_studio.add_argument("--template", default=None,
                           help="the physics package an empty canvas borrows "
@@ -996,7 +996,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_studio.add_argument("--program", default=None,
                           help="with --seed, a built-in program to open on")
     p_studio.add_argument("--tsir", default=None,
-                          help="open on a COMPILED program (a .tsir.json); the device is "
+                          help="open on a COMPILED program (a .tsir.json); the machine is "
                                "taken from arch/ unless --seed says otherwise")
     p_studio.add_argument("--qasm", default=None,
                           help="with --tsir, the circuit it was compiled from -- adds the "

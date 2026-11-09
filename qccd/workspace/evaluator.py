@@ -11,13 +11,13 @@ WHAT A PASSING REFERENCE REPORT ESTABLISHES, stage by stage (and nothing more):
 
   bundle               every file hashes to its manifest digest; the manifest names THIS task
                        release (id and digest); no stray or unknown members.
-  device               the device loads under the architecture schema and structure checks.
-  physics_lock         the device is scored with the release's physics.json: its own number is
+  machine               the machine loads under the architecture schema and structure checks.
+  physics_lock         the machine is scored with the release's physics.json: its own number is
                        used only where the release has none (`tasks.scored_device`), and every
                        such number is listed (`added`), as is every number of its own that was
                        not used (`ignored`); the budget is the release's.
   program              the final program is a well-formed TSIR within the release limits.
-  rules                replaying the final program on the device under the task model, every
+  rules                replaying the final program on the machine under the task model, every
                        rule of the entry's rule set passes: the board's, or the set the bundle
                        declares (`rules.json`, checked in the rule language,
                        `qccd.ruleset.declared`).  The board's set is `standard`, checked by
@@ -37,7 +37,7 @@ WHAT A PASSING REFERENCE REPORT ESTABLISHES, stage by stage (and nothing more):
                        witnesses name instructions of the certified program that carry the
                        same operation stamps (`qccd.ir.source_map`).
   lean_certificate     the proved Lean checker accepts the certificate against facts it
-                       re-derives from the SUBMITTED device (`check_sound`).
+                       re-derives from the SUBMITTED machine (`check_sound`).
   semantics            O1 (transport replay of the certificate) and O2 (the stabilizer
                        tableau composed from the certified program's emitted pulses equals
                        the tableau of the TRUSTED circuit) both hold, and no op is
@@ -294,7 +294,7 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
         for r in over:
             what = {"B1": f"dacs {bvals['dacs']} > max_dacs {budget.get('max_dacs')}",
                     "B2": f"junctions {bvals['n_junctions']} > max_junctions {budget.get('max_junctions')}"}
-            st.diag("DEVICE.OVER_BUDGET", f"the device needs {what.get(r['id'], r['title'])}; the task's "
+            st.diag("DEVICE.OVER_BUDGET", f"the machine needs {what.get(r['id'], r['title'])}; the task's "
                     f"budget is fixed ({r['id']}: {r['text']})", pointer="/device/budget")
         st.done("failed" if over else "passed",
                 "architecture schema, structure, declared zones, hardware budget", nodes=n_nodes,
@@ -303,7 +303,7 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
                                                         if k in budget},
                 wiring_notes=[n for n in hw.notes if "counted at" in n or "count as" in n])
     except (ValueError, KeyError, TypeError) as exc:
-        st.diag("DEVICE.INVALID", f"the device does not load: {exc}", pointer="/device")
+        st.diag("DEVICE.INVALID", f"the machine does not load: {exc}", pointer="/device")
         st.done("failed", "architecture schema and structure")
         return finish()
 
@@ -314,21 +314,21 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
     scored, own = scored_device(b.docs["device"], release)
     ctx["physics"] = own
     for path in own["added"]:
-        st.diag("TASK.PHYSICS_ADDED", f"the task's physics has no {path}; the device's own is used, and the "
+        st.diag("TASK.PHYSICS_ADDED", f"the task's physics has no {path}; the machine's own is used, and the "
                 "entry is listed as bringing physics of its own", severity="warning",
                 pointer="/device/" + path.replace(".", "/"))
     for path in own["ignored"]:
         why = ("the budget is the task's" if path.startswith("budget.") else "the task's number is used")
-        st.diag("TASK.PHYSICS_IGNORED", f"the device's own {path} was not used: {why}", severity="warning",
+        st.diag("TASK.PHYSICS_IGNORED", f"the machine's own {path} was not used: {why}", severity="warning",
                 pointer="/device/" + path.replace(".", "/"))
     try:
         sarch = Architecture.from_json(scored)
     except (ValueError, KeyError, TypeError) as exc:
-        st.diag("TASK.PHYSICS_INVALID", f"the device with the task's physics does not load: {exc}", pointer="/device")
+        st.diag("TASK.PHYSICS_INVALID", f"the machine with the task's physics does not load: {exc}", pointer="/device")
         st.done("failed", "fixed blocks " + ", ".join(FIXED_BLOCKS))
         return finish()
     st.done("passed", "fixed blocks " + ", ".join(FIXED_BLOCKS) + " are the release's"
-            + (f", with {len(own['added'])} number(s) of the device's own where the release has none"
+            + (f", with {len(own['added'])} number(s) of the machine's own where the release has none"
                if own["added"] else ""), added=own["added"], ignored=own["ignored"])
 
     # ---- program
@@ -453,7 +453,7 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
                           for k, v in values.items()}
         ctx["breakdown"] = breakdown
         st.done("passed", "replay under each task table; hardware report; broadcast use"
-                + (" (with the device's own numbers where the task has none)" if ctx["physics"]["added"] else ""))
+                + (" (with the machine's own numbers where the task has none)" if ctx["physics"]["added"] else ""))
     except Exception as exc:
         st.diag("METRICS.FAILED", f"{type(exc).__name__}: {exc}")
         st.done("failed" if isinstance(exc, (ValueError, KeyError)) else "internal_error", "metrics")
@@ -743,7 +743,7 @@ def _lean_stage(st: _Stage, tc: Toolchain, cw: Path, limits: Mapping, cancel) ->
     out = r.stdout
     if "ACCEPTED" in out:
         st.done("passed", "QCCDC.Cert.check (proved sound: check_sound) accepted the certificate against "
-                "hop/gate-site facts re-derived from the submitted device")
+                "hop/gate-site facts re-derived from the submitted machine")
         return
     why = [ln.strip()[2:] for ln in out.splitlines() if ln.strip().startswith("- ")]
     if "REJECTED" in out:

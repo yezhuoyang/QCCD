@@ -53,7 +53,7 @@ def test_direct_wiring_is_counted_at_24_electrodes_a_trap_and_48_a_junction():
     hw = _counted(cheap)
     assert hardware_report(cheap).dacs == hw.n_traps * 1
     assert hw.dacs == hw.n_traps * 24 + hw.n_junctions * 48
-    assert any("electrodes per trap: the device declares 1" in n for n in hw.notes)
+    assert any("electrodes per trap: the machine declares 1" in n for n in hw.notes)
     # declaring MORE is counted at the device's own number
     rich = _with_control(m, {"wiring": {"scheme": "direct", "electrodes_per_trap": 30}})
     assert _counted(rich).dacs == hw.n_traps * 30 + hw.n_junctions * 60

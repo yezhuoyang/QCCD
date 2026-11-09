@@ -93,7 +93,7 @@ channel gate_1q_leakage "Leakage from a one-ion pulse"
     DEPOLARIZE1(min(3 / 4, scale * leak_fold * leak_1q)) on ions(g)
 
 channel residual_drive "Residual drive on inactive zones"
-  about "On a device whose gates share one global drive, a layer of pulses reaches the qubits sitting it out, at a fraction of the strength. The device's 1q_gate says how much that costs each of them; on any other device it says 0. A layer that names one ion is the shim charge a reconfiguration opens with, or too small to count."
+  about "On a machine whose gates share one global drive, a layer of pulses reaches the qubits sitting it out, at a fraction of the strength. The machine's 1q_gate says how much that costs each of them; on any other machine it says 0. A layer that names one ion is the shim charge a reconfiguration opens with, or too small to count."
   source "QCCD Transport Architectures deck, WISE T9 (arXiv:2305.12773 Sec. V B: below 1e-5 at epsilon ~ 0.1, the bound used as the value)"
   after k in steps where kind(k) = "gate" and duration(k) = primitive("1q_gate", "us") and count(j in operated(k)) > 1:
     DEPOLARIZE1(min(3 / 4, scale * primitive("1q_gate", "residual_inactive"))) on {i for i in ions where i not in operated(k)}

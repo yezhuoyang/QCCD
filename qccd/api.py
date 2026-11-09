@@ -14,7 +14,7 @@ Set up a machine::
     m = Machine.ladder(72, rungs=6, highways=2)
     m = Machine.load("arch/ring144_24v.arch.json")
 
-    m.set_zone("data", capacity=4)                       # retune the device
+    m.set_zone("data", capacity=4)                       # retune the machine
     m.set_curve("shuttle_segment", [(5, 0.10), (12, 1.0)])
     m.declare_class("rotate_cw", type="shift", orbit="L0", delta=1)
     m.save("arch/my_ring.arch.json")
@@ -35,7 +35,7 @@ Run it::
     r.cost, r.steps, r.runtime_ms, r.quanta_per_ion, r.rules_failed
     m.render(p, "out/demo.html")       # one self-contained page
 
-**Space and time are explicit.** Space is the node and segment ids of the device; time is
+**Space and time are explicit.** Space is the node and segment ids of the machine; time is
 the sequence of cycles, and a `cycle` is one machine step in which everything happens
 together. `p.cycle(cls)` takes exactly one SIMD class because the machine takes exactly one
 per step (R4) -- so a program that the hardware could not run is one the API will not build,
@@ -346,7 +346,7 @@ class Program:
     def reorder_or_not(self, reverse: Sequence[str] = (), *, cls: str = "reorder_or_not",
                        **meta) -> "Program":
         """One C2LR reorder-or-not step: the listed crystals' wells turn 180 degrees in
-        place, every crystal heated (C9).  Priced only on a device whose physics measures
+        place, every crystal heated (C9).  Priced only on a machine whose physics measures
         it (Yb-Ba in arXiv:2403.00756)."""
         tpl = reorder_or_not(reverse)
         bad = template_problems(tpl)
@@ -575,7 +575,7 @@ class RunResult:
 
 @dataclass
 class Machine:
-    """A device you can retune and program, in Python."""
+    """A machine you can retune and program, in Python."""
 
     arch: Architecture
     spec_path: str = ""
@@ -589,7 +589,7 @@ class Machine:
     @classmethod
     def from_device(cls, device: Device, *, name: str = "custom",
                     template: str | Mapping | None = None, **kw) -> "Machine":
-        """Wrap an expanded `Device` in a full architecture, borrowing a template's
+        """Wrap an expanded `Machine` in a full architecture, borrowing a template's
         zone types, primitive curves and control block so you only describe geometry."""
         doc = _template_doc(template)
         doc = dict(doc)
@@ -629,7 +629,7 @@ class Machine:
     @classmethod
     def blank_device(cls, device: Device, *, name: str = "custom",
                      zones: "Sequence[str] | Mapping[str, Mapping]" = ()) -> "Machine":
-        """`Machine.blank`, wrapping an explicit `Device` instead of a generator."""
+        """`Machine.blank`, wrapping an explicit `Machine` instead of a generator."""
         return cls(Architecture.from_json({
             "name": name, "schema_version": SCHEMA_VERSION,
             "zone_types": _zone_block(zones), "primitives": {},
@@ -654,12 +654,12 @@ class Machine:
         its exit.
 
         Its control is C2LR's (`qccd.arch.c2lr.c2lr_control`): crystals move only by
-        swap-or-stay steps, a direction bit each, so the device declares those classes and
+        swap-or-stay steps, a direction bit each, so the machine declares those classes and
         no other.  Its numbers are the paper's for `species` ("Ba-Sr" or "Yb-Ba"), each with
         its source; reorder-or-not is priced for Yb-Ba only, because the paper measures it
         for that pair alone.  `checkerboard=False` offers the demonstrated diagonals only.
         `wiring` declares the paper's control census as the wiring DACs are counted from
-        (`C2LR_WIRING`: 27 shared signals and two shims a leg); without it the device is
+        (`C2LR_WIRING`: 27 shared signals and two shims a leg); without it the machine is
         counted as wired directly.  Everything else -- zones, gates, measurement, cooling,
         the junction tables a plain move would read -- is the template's."""
         from .arch.c2lr import c2lr_control, c2lr_primitives, c2lr_species
@@ -751,7 +751,7 @@ class Machine:
 
         Only the cost models that opt into `length_scaling=True` read it, so changing a
         length is inert until you ask for it -- which is deliberate: the shipped oracles
-        were calibrated on a unit-pitch device and must keep reproducing exactly.
+        were calibrated on a unit-pitch machine and must keep reproducing exactly.
 
             m.set_segment_length("S0-S1", 4.0)             # one segment
             m.set_segment_length(long_spurs, 2.5)          # several
@@ -901,7 +901,7 @@ class Machine:
         Note it does not touch the lengths of the incident segments: length is an
         independently declared property (only `length_scaling` cost models read it), so
         a design tool that wants drag to change cost has to call `set_segment_length`
-        itself.  After this the device is no longer reproducible from its generator, and
+        itself.  After this the machine is no longer reproducible from its generator, and
         the architecture listing switches from `generator` to `patch` mode.
         """
         if site not in self.arch.device.nodes:
@@ -976,7 +976,7 @@ class Machine:
         """Drop removed sites from an EXPLICIT channel map.
 
         Every other grouping (`direct`, `broadcast`, `row`, `column`) derives its channels
-        from the device, so it follows a topology edit for free.  `explicit` lists site ids
+        from the machine, so it follows a topology edit for free.  `explicit` lists site ids
         by hand, and a dangling id there would silently give a channel a member that no
         longer exists -- which `ControlPlane` counts, so the DAC budget would drift.
         """
@@ -1104,7 +1104,7 @@ class Machine:
 
         The questions an editor asks after every edit that the rule set does not:
         `architecture_violations` checks that every junction the graph made is priceable
-        (R11/R18), but nothing in R1-R18 notices that a device fell into two islands or
+        (R11/R18), but nothing in R1-R18 notices that a machine fell into two islands or
         that a trap has no segment on it.  Both are legal, and both are almost always a
         misplaced click.
         """
@@ -1372,7 +1372,7 @@ _TEMPLATE_CACHE: dict[str, dict] = {}
 def _template_doc(template) -> dict:
     """Zone types, primitive curves and control block to build a new machine on.
 
-    Defaults to `arch/ring144_24v.arch.json`, so `Machine.ring(...)` gives you a device
+    Defaults to `arch/ring144_24v.arch.json`, so `Machine.ring(...)` gives you a machine
     with the corpus's sourced primitive tables rather than an empty one you would have to
     populate before any number meant anything.
     """

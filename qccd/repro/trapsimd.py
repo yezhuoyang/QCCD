@@ -4,7 +4,7 @@ The paper has no artifact, so its reproduction has two parts:
 
 * its two fully specified worked examples (Fig. 6, Fig. 7), written event for event and
   replayed EXACTLY -- 982 / 732 us and 823 / 545 us;
-* model level: its device (a D x D grid of cells, one linear trap of L positions on every
+* model level: its machine (a D x D grid of cells, one linear trap of L positions on every
   internal lattice edge, X-junctions), its timing table (Table 1) and its broadcast rule (one
   JT-SIMD class per inter-trap cycle), with circuits rebuilt from its description and
   scheduled by OUR compiler (`schedule_ours`).  The circuits are not the authors' circuits.
@@ -23,7 +23,7 @@ strict program order.
 
 How the model is written down (MODEL.md in ``Reproduce/ruan2025`` lists every primitive):
 
-    device     every trap POSITION is a site of capacity 1 ({"zone": "gate" | "aux"}); the
+    machine     every trap POSITION is a site of capacity 1 ({"zone": "gate" | "aux"}); the
                positions of a trap are chained by segments; the edge position of a trap is
                joined to the junction node it faces.  Gate zones inside a trap are not placed
                by the paper: `gate_zones` spaces them evenly, which reproduces both worked
@@ -1752,7 +1752,7 @@ PAPER_META = {
     "artifact": {"url": None, "commit": None, "license": None,
                  "note": "No code, schedules or circuits are released (searched 2026-10-07).  The "
                          "reproduction is the two fully specified worked examples, replayed exactly, "
-                         "and a model-level comparison: the paper's device, timing table and broadcast "
+                         "and a model-level comparison: the paper's machine, timing table and broadcast "
                          "rule, circuits rebuilt from its description, scheduled by us."},
     "what": "FluxTrap: a compiler for a 2D grid of linear traps joined by X-junctions whose inter-trap "
             "transport is broadcast (one JT-SIMD class per 250-us cycle) and whose intra-trap "

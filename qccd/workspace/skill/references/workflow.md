@@ -56,7 +56,7 @@ Do not overwrite the demonstrated edit itself or any later edit.
 
 ## Grading, honestly
 
-`qccd_inspect_run(part="stages")` lists: bundle, device, physics_lock, program, rules,
+`qccd_inspect_run(part="stages")` lists: bundle, machine, physics_lock, program, rules,
 correspondence, certificate_binding, lean_certificate, semantics, metrics. Eligibility needs
 every required stage `passed` under the `reference` profile. Metrics are MODELLED execution
 time and resources under the board's physics tables -- never the evaluator's wall-clock time.

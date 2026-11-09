@@ -1,4 +1,4 @@
-"""What an evaluation talks about: one programme, replayed once on its device under a clock.
+"""What an evaluation talks about: one programme, replayed once on its machine under a clock.
 
 The replay is the verifier's own (`qccd.verify.replay`) -- the operational semantics of the
 hardware language -- read through its per-cycle views, so every number here is the number
@@ -136,7 +136,7 @@ class Instant:
 
 @dataclass
 class Run:
-    """One programme on one device under one clock, replayed."""
+    """One programme on one machine under one clock, replayed."""
 
     arch: Any
     prog: Any

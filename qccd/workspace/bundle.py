@@ -3,7 +3,7 @@
 A bundle is a directory (or a deterministic zip of one) holding
 
     manifest.json            kind qccd.submission_bundle v1: task, files + digests, provenance
-    device.arch.json         the normalized, expanded architecture       (authoritative device)
+    device.arch.json         the normalized, expanded architecture       (authoritative machine)
     program.tsir.json        the final hardware program that is graded
     certified.tsir.json      the program the certificate speaks about (the compiler's output)
     certificate.qcert.json   the compiler's certificate

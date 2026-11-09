@@ -112,7 +112,7 @@ def catalogue() -> RuleSetSource:
 
 
 def names(level: str = "device") -> list[str]:
-    """The rule sets the website ships, by name: those about one device (the default), or
+    """The rule sets the website ships, by name: those about one machine (the default), or
     with `level="machine"` those about a floorplan of places and a program scheduled on it."""
     out = []
     for p in LIBRARY.glob("*.rules"):
@@ -293,7 +293,7 @@ def legacy_config(ruleset: RuleSet) -> dict:
 
 
 def check_programme(ruleset: RuleSet | str, prog, arch, model, **kw) -> Report:
-    """Replay a programme on its device and judge it by a rule set."""
+    """Replay a programme on its machine and judge it by a rule set."""
     from .programme import programme_execution
     rs = load(ruleset) if not isinstance(ruleset, RuleSet) else ruleset
     exe = programme_execution(prog, arch, model, **kw)

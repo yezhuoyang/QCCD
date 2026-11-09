@@ -42,19 +42,19 @@ rule R24 "Every two-qubit gate of the circuit is performed, and no other" core
 # ---------------------------------------------------------------- transport
 
 rule R2 "A junction holds one ion at a time"
-  about "Where three or more rails meet, only one ion may be at any moment, resting or passing through. An ion here is a qubit ion with the coolant ion that shares its well: a qubit-coolant pair crosses a junction as one crystal, as the Ba-Yb pair does through an X-junction. Two qubit ions in one junction at once is what the rule refuses -- except during a swap-or-stay exchange on a C2LR device, where the shared junction waveform exchanges the two wells nearest it by design, and the routes are the device's own matching, never the programme's."
+  about "Where three or more rails meet, only one ion may be at any moment, resting or passing through. An ion here is a qubit ion with the coolant ion that shares its well: a qubit-coolant pair crosses a junction as one crystal, as the Ba-Yb pair does through an X-junction. Two qubit ions in one junction at once is what the rule refuses -- except during a swap-or-stay exchange on a C2LR machine, where the shared junction waveform exchanges the two wells nearest it by design, and the routes are the machine's own matching, never the programme's."
   source "deck_v3; arXiv:2510.23519; arXiv:2206.11888; arXiv:2403.00756"
   for all j in junctions, t in instants where not exchange(t):
     occupancy(j, t) <= 1
 
 rule R3 "A rail carries at most its capacity"
-  about "No more ions travel along one rail at once than the rail is built for (one, on most devices). A swap-or-stay exchange on a C2LR device carries its two crystals along the junction's two rails by design, and is not judged here."
+  about "No more ions travel along one rail at once than the rail is built for (one, on most machines). A swap-or-stay exchange on a C2LR machine carries its two crystals along the junction's two rails by design, and is not judged here."
   source "deck_v3; arXiv:2510.23519"
   for all r in rails, t in instants where not exchange(t):
     occupancy(r, t) <= capacity(r)
 
-rule R4 "Every transport step uses a movement the device declares"
-  about "A step's motion is one of the movement classes the device's control system is built to produce."
+rule R4 "Every transport step uses a movement the machine declares"
+  about "A step's motion is one of the movement classes the machine's control system is built to produce."
   source "deck_v3; arXiv:2504.17886"
   for all k in steps where is_transport(k): class_declared(k)
 
@@ -70,13 +70,13 @@ rule R4b "A step either moves ions or gates them, never both"
     mode(k) in {"intra", "inter"} and not carries_gates(k)
 
 rule R5 "No two ions pass each other on a rail in one step"
-  about "Within one step, two ions may not travel the same rail in opposite directions, one from each end: an ion rides the rail's RF null, a single line, so the two would have to pass through each other. Exchanging two ions inside one trap by rotating their crystal is a different operation, the ion swap, and this rule does not concern it; nor does a swap-or-stay exchange on a C2LR device, whose two crystals pass each other through the junction's shared waveform by design."
+  about "Within one step, two ions may not travel the same rail in opposite directions, one from each end: an ion rides the rail's RF null, a single line, so the two would have to pass through each other. Exchanging two ions inside one trap by rotating their crystal is a different operation, the ion swap, and this rule does not concern it; nor does a swap-or-stay exchange on a C2LR machine, whose two crystals pass each other through the junction's shared waveform by design."
   source "deck_v3"
   for all a, b in hops where simultaneous(a, b) and rail(a) = rail(b) and not exchange(a):
     not (from(a) = to(b) and to(a) = from(b))
 
 rule R11 "Along a loop, every ion moves the same way in a step"
-  about "Transport along one loop is one direction at a time; and every junction's crossing time is declared by the device (a junction of five or six rails the device does not price crosses at the X-junction's time and heat, since no table measures one)."
+  about "Transport along one loop is one direction at a time; and every junction's crossing time is declared by the machine (a junction of five or six rails the machine does not price crosses at the X-junction's time and heat, since no table measures one)."
   source "arXiv:2511.15910"
   (for all a, b in hops where simultaneous(a, b) and loop(a) = loop(b) and loop(a) != none:
      shift(a) = shift(b))
@@ -88,7 +88,7 @@ rule R14 "A split takes the ion at the end of its chain, or pays to reorder"
   for all m in splits: at_chain_end(m) or swap_paid(m)
 
 rule R22 "A transport step is one waveform"
-  about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else. A swap-or-stay step on a C2LR device is one shared waveform by construction -- each crystal's only choice is its direction bit -- so the different routes its crystals take are not judged here (C2, C4 are its rules)."
+  about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else. A swap-or-stay step on a C2LR machine is one shared waveform by construction -- each crystal's only choice is its direction bit -- so the different routes its crystals take are not judged here (C2, C4 are its rules)."
   source "collaborator review 2026-09; arXiv:2510.23519; arXiv:2305.12773"
   when control() != "direct":
   for all a, b in transport where simultaneous(a, b) and not exchange(a):
@@ -116,7 +116,7 @@ rule C1 "A leg holds one crystal, or two between an enter and its exit"
   and (for all k in steps: exits_as_entered(k))
 
 rule C2 "A C2LR step's only per-leg choice is its direction bit"
-  about "Every crystal shifts toward its pair's junction or away from it, and that is all a step chooses per leg: the step names the crystals shifted toward and nothing else, and its routes are the device's matching. A step of a C2LR class that writes its own routes is refused."
+  about "Every crystal shifts toward its pair's junction or away from it, and that is all a step chooses per leg: the step names the crystals shifted toward and nothing else, and its routes are the machine's matching. A step of a C2LR class that writes its own routes is refused."
   source "arXiv:2403.00756"
   when c2lr_device():
   for all k in steps where is_transport(k): bits_only(k)
@@ -134,14 +134,14 @@ rule C4 "A step is C2LR, one shared waveform, C2LR back"
   for all k in steps where exchange(k): one_waveform(k)
 
 rule C5 "Every crystal ends a step at a leg centre"
-  about "After every step each crystal rests at the centre of a leg; a C2LR device has nowhere else to hold one."
+  about "After every step each crystal rests at the centre of a leg; a C2LR machine has nowhere else to hold one."
   source "arXiv:2403.00756"
   when c2lr_device():
   for all i in ions, t in instants where position(i, t) != none:
     position(i, t) in legs
 
-rule C6 "A step pairs legs by the device's matching"
-  about "A swap-or-stay step pairs every leg with at most one other, at one junction, by one variation of the device: one diagonal at every junction (W-S, W-N, E-S or E-N, all four demonstrated), or two pairs at the junctions of one checkerboard colour (the proposal's, not demonstrated, so assumed). A crystal shifted toward a junction has a partner leg there, the device offers the variation, and the rule set allows its form (c2lr_forms)."
+rule C6 "A step pairs legs by the machine's matching"
+  about "A swap-or-stay step pairs every leg with at most one other, at one junction, by one variation of the machine: one diagonal at every junction (W-S, W-N, E-S or E-N, all four demonstrated), or two pairs at the junctions of one checkerboard colour (the proposal's, not demonstrated, so assumed). A crystal shifted toward a junction has a partner leg there, the machine offers the variation, and the rule set allows its form (c2lr_forms)."
   source "arXiv:2403.00756"
   when c2lr_device():
   for all k in steps where exchange(k): matched(k) and form(k) in c2lr_forms
@@ -159,13 +159,13 @@ rule C8 "The trap frequency is held during a shift"
   com_frequency_held()
 
 rule C9 "Every crystal is heated by every waveform"
-  about "The shared waveforms play on every leg, so a step heats every crystal on the device: one that moved by the step's swap heat, every other by its stay heat. A crystal that sat a step out is not cold."
+  about "The shared waveforms play on every leg, so a step heats every crystal on the machine: one that moved by the step's swap heat, every other by its stay heat. A crystal that sat a step out is not cold."
   source "arXiv:2403.00756"
   when c2lr_device() and models_heating():
   for all k in steps where c2lr_step(k): heats_every_crystal(k)
 
 rule C10 "Control is shared signals plus one input and one switch per leg"
-  about "A C2LR device is driven by a fixed set of shared analog signals (27 in the paper), plus one digital input and one switch per leg: its document says so, and its drawing is the lattice of legs they drive."
+  about "A C2LR machine is driven by a fixed set of shared analog signals (27 in the paper), plus one digital input and one switch per leg: its document says so, and its drawing is the lattice of legs they drive."
   source "arXiv:2403.00756"
   when control() = "c2lr":
   c2lr_wiring()
@@ -210,7 +210,7 @@ rule W11 "Every layer pays for its shims first"
 # One ring of traps, the data still and the ancillas rotating in lockstep (arXiv:2511.15910), as the
 # team's transport deck writes it.  Each rule applies only to such a device.
 
-rule Y1 "The device is one ring"
+rule Y1 "The machine is one ring"
   about "Traps sit on one closed ring, with L-shaped junctions only at its corners and no X or T junctions. Split loops were rejected: HGP and BB stabilizers share data across any cut. (S1, S9, HW2)"
   source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone S1, S9 and HW2"
   when cyclone_device():
@@ -273,7 +273,7 @@ rule R32 "Single-ion operations run only in the zones the model allows"
     zone(site(o)) in single_ion_zones
 
 rule R33 "A two-ion gate acts on ions in one zone or in neighbouring zones"
-  about "On devices whose gate spans two zones of one rail, the two ions stand in the same zone or in zones next to each other."
+  about "On machines whose gate spans two zones of one rail, the two ions stand in the same zone or in zones next to each other."
   for all g in two_qubit_gates, i, j in ions(g):
     position(i, start(g)) = position(j, start(g))
     or neighbours(position(i, start(g)), position(j, start(g)))
@@ -281,13 +281,13 @@ rule R33 "A two-ion gate acts on ions in one zone or in neighbouring zones"
 # ---------------------------------------------------------------- heat
 
 rule R7 "A two-ion gate starts with cool enough ions"
-  about "Both ions' motional energy at the start of a two-qubit gate is within the device's budget; a cooling operation must come first otherwise. Below the budget the heat is not ignored: it is priced into the gate's error (R16, and the noise model behind every logical error rate). The budget is a hard limit because that error law describes the gate only while the ions stay in the Lamb-Dicke regime; a hotter gate is refused, not priced. A device that declares no budget leaves only the price."
+  about "Both ions' motional energy at the start of a two-qubit gate is within the machine's budget; a cooling operation must come first otherwise. Below the budget the heat is not ignored: it is priced into the gate's error (R16, and the noise model behind every logical error rate). The budget is a hard limit because that error law describes the gate only while the ions stay in the Lamb-Dicke regime; a hotter gate is refused, not priced. A machine that declares no budget leaves only the price."
   source "deck_v3; arXiv:2511.15910"
   for all g in two_qubit_gates, i in ions(g):
     heat(i, start(g)) <= heat_budget()
 
 rule R7b "A gate zone stays within its heat duty cycle"
-  about "A gate zone may absorb only so much heat over time; no device declares such a budget yet."
+  about "A gate zone may absorb only so much heat over time; no machine declares such a budget yet."
   source "arXiv:2504.17886"
   when declares_duty_budget():
   for all s in sites: duty(s) <= duty_budget(s)
@@ -324,12 +324,12 @@ rule R18 "A junction is where three or more rails meet"
   for all n in nodes: (n in junctions) = (degree(n) >= 3)
 
 rule R19 "A junction joins at most max_junction_degree() rails"
-  about "A trap built in more than one layer has junctions of up to six rails, so 6 is the limit unless the device declares a lower one (4 for a surface trap, which has T- and X-junctions and nothing denser). A junction of five or six rails crosses at the X-junction's time and heat unless its device prices that degree itself: no shipped table measures one."
+  about "A trap built in more than one layer has junctions of up to six rails, so 6 is the limit unless the machine declares a lower one (4 for a surface trap, which has T- and X-junctions and nothing denser). A junction of five or six rails crosses at the X-junction's time and heat unless its machine prices that degree itself: no shipped table measures one."
   source "collaborator review 2026-09; collaborator review 2026-10; arXiv:2201.12579"
   for all n in nodes: degree(n) <= max_junction_degree()
 
 rule R20 "Rails meet at a wide enough angle"
-  about "Any two rails meeting at a node make at least the device's minimum angle (60 degrees unless it declares another)."
+  about "Any two rails meeting at a node make at least the machine's minimum angle (60 degrees unless it declares another)."
   source "collaborator review 2026-09; arXiv:2201.12579"
   for all n in nodes, r1, r2 in rails_at(n) where r1 != r2:
     angle(n, r1, r2) >= min_rail_angle()

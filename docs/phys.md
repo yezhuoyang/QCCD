@@ -1,4 +1,4 @@
-# `qccd/phys/` — the electrodes a device implies
+# `qccd/phys/` — the electrodes a machine implies
 
 The layer that turns a trap graph into metal with coordinates, and metal into an ion
 height. Before it, the only "electrodes" anywhere in this project were the authored
@@ -104,7 +104,7 @@ electrodes. arXiv:2305.03828 states the conveyor belt supports "20 wells on each
 can be drawn, because each needs 175 µm of electrode stack on the facing side plus a gap.
 
 These measure different things and they disagree. An isotropic 225 µm was tried first and
-shorts the north control column of every ring device against the opposite rail — the two
+shorts the north control column of every ring machine against the opposite rail — the two
 rows physically do not fit.
 
 ## The collaborator's technology rules
@@ -221,7 +221,7 @@ segments, and that is a larger change than this one.
 
 ### What the rule found
 
-| device | `dc_pairs_per_site` under `eth_junction` | under `surface_default` |
+| machine | `dc_pairs_per_site` under `eth_junction` | under `surface_default` |
 |---|---|---|
 | `chain72`, `stationary_chain` | 0 | 0 |
 | `cyclone_base`, `h2_racetrack` | 8 | 0 |
@@ -231,7 +231,7 @@ segments, and that is a larger change than this one.
 | `cyclone_dual_loop` | 12 | 4 |
 
 Under the published preset a lattice unit is three control electrodes long, so a single pad
-dropped at a corner already starves the site beside it — five devices that were "clean"
+dropped at a corner already starves the site beside it — five machines that were "clean"
 are not, and what changed is the question being asked, not the metal. Under the defaults
 most of that goes away and what is left is **architectural**: `ring144_24v`'s 24 docks hang
 half a lattice unit off the rail, inside the keep-out where a crossing rail's own control
@@ -239,12 +239,12 @@ column sits, so they get one pair and no technology that keeps pads off that col
 give them three. `grid9x9` and `deck_unit_cell` keep 144 each because their sites are one
 lattice unit from a junction in every direction.
 
-## What a device becomes
+## What a machine becomes
 
 Each axis-aligned segment gets two RF rails flanking its axis at `w_g/2`, one segmented
 centre control electrode between them, and two segmented control columns outboard at
 `dc_setback`. A non-axis-aligned segment is **refused by id**, never approximated. All
-1,392 segments of all nine shipped devices are axis-aligned, and no lattice coordinate
+1,392 segments of all nine shipped machines are axis-aligned, and no lattice coordinate
 needs rounding — measured, not assumed.
 
 Two things are interrupted, for the same reason:
@@ -285,10 +285,10 @@ linear-section closed form to 3.6e-4, approaching it monotonically, so agreement
 centre is not a coincidence of arm length. **PLAN §0.5's prose about RF barriers is now
 two checked numbers.**
 
-**No shipped device sits at its design height.** A rail sized for 49.95 µm delivers it
+**No shipped machine sits at its design height.** A rail sized for 49.95 µm delivers it
 only in isolation.
 
-| device | ion height | vs design | off-axis |
+| machine | ion height | vs design | off-axis |
 |---|---|---|---|
 | `chain72` | 49.948 µm | −0.0% | 0.000 µm |
 | `cyclone_base`, `h2_racetrack` | 50.57 | +1.2% | +3.28 |
@@ -343,7 +343,7 @@ strings and asserts it contains no `*`, `/`, `Math.`, `px(` or `py(`.
 
 **The underlay does not register with the schematic, and the page says so.** Registration
 would need the page's `sx/sy` to equal the technology's `nm_per_unit_x / nm_per_unit_y`;
-on `chain72` those are 1.0 and 0.634, and no shipped device matches. One of the two views
+on `chain72` those are 1.0 and 0.634, and no shipped machine matches. One of the two views
 has to misstate a proportion and it is not the one with nanometres in it, so the metal is
 drawn true to scale with a **scale bar** — the one length on the page that means a physical
 distance — and a caption saying which view is which.

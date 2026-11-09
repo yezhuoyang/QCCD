@@ -1,16 +1,16 @@
 """Incremental topology editing: add and remove nodes and segments, safely.
 
-`DeviceBuilder` constructs a device from nothing and `Machine.move_site` drags one that
+`DeviceBuilder` constructs a machine from nothing and `Machine.move_site` drags one that
 already exists.  Between them sits the operation a design tool actually spends its time
 on -- *change the graph* -- and it is the one place where a naive edit silently produces
-a device that still loads, still renders, and prices the wrong thing.
+a machine that still loads, still renders, and prices the wrong thing.
 
 Three things make a topology edit different from a retune.
 
 **`Device.loops` is an ORDERED node list, and `shift_map` walks it by index.**  A loop is
 not "the set of nodes on the ring"; it is the cyclic order in which a rigid rotation
 visits them.  Dropping a trap onto a rail without splicing it into that order leaves a
-device that loads cleanly, draws correctly, and prices `rotate(+1)` as an orbit that skips
+machine that loads cleanly, draws correctly, and prices `rotate(+1)` as an orbit that skips
 the new node -- a wrong number with no error attached.  So every operation here maintains
 the invariant `loop_segments(L)` can walk: *consecutive nodes in a loop's order are joined
 by an actual segment*, and it maintains it for EVERY loop the edit touches, not just the
@@ -29,7 +29,7 @@ may have them), so a disconnection is reported, not rejected -- but it is report
 and the `Machine` wrappers refuse it unless asked, because the overwhelmingly likely cause
 is a misplaced click rather than a deliberate two-island design.
 
-Everything here is pure: `(Device, ...) -> (Device, EditReport)`.  `Device` is frozen and
+Everything here is pure: `(Machine, ...) -> (Machine, EditReport)`.  `Machine` is frozen and
 caches every derived quantity, so an edit always builds a new one -- the same discipline
 `Machine._rebuild` already follows.
 """
@@ -90,7 +90,7 @@ def _check_id(kind: str, value: str) -> str:
 
 
 class TopologyError(ValueError):
-    """An edit that would produce a device the rest of the stack cannot price."""
+    """An edit that would produce a machine the rest of the stack cannot price."""
 
 
 # --------------------------------------------------------------------------- report
@@ -275,7 +275,7 @@ def _split_lengths(dev: Device, seg: Segment, pos: Sequence[float]) -> tuple[flo
 
     Length is an independently declared property (only `length_scaling` cost models read
     it), so it must be *conserved*: subdividing a length-2 segment must give two pieces
-    summing to 2, or a cost model that reads lengths sees the device get longer every
+    summing to 2, or a cost model that reads lengths sees the machine get longer every
     time a trap is dropped onto a rail.
     """
     pa = dev.nodes[seg.ends[0]].pos
@@ -364,7 +364,7 @@ def _finish(dev: Device, report: EditReport, before: dict) -> tuple[Device, Edit
     if len(comps) > 1:
         sizes = ", ".join(str(len(c)) for c in comps)
         warn.append(
-            f"the device is in {len(comps)} disconnected pieces ({sizes} nodes); "
+            f"the machine is in {len(comps)} disconnected pieces ({sizes} nodes); "
             f"no ion can move between them")
     return dev, replace(
         report,
@@ -399,7 +399,7 @@ def add_site(dev: Device, node_id: str, *pos: float, zone: str | None = None,
 
     `capacity=0` means "inherit from `zone_types[zone]["capacity"]`", resolved HERE
     rather than by a later `resolve_capacities` pass, so that the edit either produces a
-    device that already passes `check_structure` or refuses -- there is no intermediate
+    machine that already passes `check_structure` or refuses -- there is no intermediate
     state in which a new site has capacity 0.  That matters for the client-side mirror:
     the page has `arch.zone_types` but has no `resolve_capacities`, and an edit that only
     becomes valid after a second pass is an edit whose validity the two implementations
@@ -637,7 +637,7 @@ def remove_segment(dev: Device, seg_id: str, *,
     * `"delete"` -- drop the loop entirely and clear `Segment.loop` on every segment that
       pointed at it, so nothing is left referring to a loop that is gone.
 
-    Removal can disconnect the device.  That is not a structural error -- two islands are
+    Removal can disconnect the machine.  That is not a structural error -- two islands are
     a legal, if unusual, chip -- so it is reported rather than refused here; the `Machine`
     wrapper refuses it unless asked.
     """
@@ -968,10 +968,10 @@ def apply_edit(dev: Device, edit: Mapping) -> tuple[Device, EditReport]:
 def trace(dev: Device, script: Sequence[Mapping]) -> list[dict]:
     """Run an edit script, recording the full state after every step.
 
-    This is the object the parity test diffs: one record per edit, carrying the device,
+    This is the object the parity test diffs: one record per edit, carrying the machine,
     the derived quantities, the report and the connectivity verdict -- or, when the edit
     was refused, the exact error message.  Diffing the *trace* rather than the final
-    device is what localises a drift to the edit that caused it.
+    machine is what localises a drift to the edit that caused it.
     """
     out: list[dict] = []
     cur = dev

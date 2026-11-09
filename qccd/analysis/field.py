@@ -1,14 +1,14 @@
 """Where the ion sits, how hard it is held, and what the junction costs -- from geometry.
 
 Every other analysis here answers from the graph.  This one answers from the *metal*:
-`qccd/phys/build.py` derives electrode polygons from `(Device, Technology)`, and the
+`qccd/phys/build.py` derives electrode polygons from `(Machine, Technology)`, and the
 gapless-plane solver reads them.  So an architect dragging a site changes a number that a
 measurement could contradict, which is the whole point of the physical layer.
 
 **Three things it reports that nothing else in this project could.**
 
 *The ion is not at its design height.*  The technology sizes its rails for 49.95 um, and
-that is what an isolated rail gives -- `chain72` returns 49.948.  But no shipped device is
+that is what an isolated rail gives -- `chain72` returns 49.948.  But no shipped machine is
 an isolated rail: the opposite row, the dock spurs and the junction metal all pull on the
 null, and the answer ranges from +1.2% (`cyclone_base`) to +15.2% (`ladder_2x72`), with
 `ring144_24v` at +12.7%.  Four of the nine are outside the 5% band 2201.12579 publishes
@@ -149,7 +149,7 @@ class PhysicalAnalysis(QCCDAnalysis):
     """Ion height, secular frequency and the naive-junction cost, from the drawn metal."""
 
     summary = ("where the ion sits and how hard it is held, solved from electrodes "
-               "derived from the device and a technology")
+               "derived from the machine and a technology")
 
     default_setup = {
         "device": "ring144_24v",

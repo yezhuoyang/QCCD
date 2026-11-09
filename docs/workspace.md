@@ -72,10 +72,10 @@ architecture byte for byte. The replay never trusts a client's serialised `arch`
 | generated results | `jobs`, `snapshots`, `submissions`, `approvals` + read-only files under `.qccd/snapshots/` | immutable, bound to an input digest |
 
 `input_digest` covers the design records and programs. It excludes `meta` and constraints,
-so a comment, a zoom or a lock never makes a result stale. Positions in the device are
+so a comment, a zoom or a lock never makes a result stale. Positions in the machine are
 physical inputs and are included; sketch and viewport coordinates live in prompts and are not.
 
-**Identity.** Entities are keyed by their device ids (`node:<id>`, `segment:<id>`,
+**Identity.** Entities are keyed by their machine ids (`node:<id>`, `segment:<id>`,
 `loop:<id>`, `zone:<name>`, `block:<name>`). The studio has no rename verb, so an id is an
 identity. A deleted entity shows up in a frozen prompt as a `missing` anchor, never as
 whatever now sits at its position. Instruction ids come from TSIR and are preserved by the
@@ -189,7 +189,7 @@ page keeps its self-containment scan. What it does:
 - **Presentation.** With Follow on, the view widens to show the target (`reveal`) and flashes
   it. With Follow off, a notification with a Show button appears instead. Either way the page
   reports `displayed` / `notified`.
-- **Run view.** `/run/<snapshot>` renders an immutable snapshot's device and final program,
+- **Run view.** `/run/<snapshot>` renders an immutable snapshot's machine and final program,
   view-only, for comments anchored on generated instructions (`#instr=<id>` focuses one).
 - All text from people or agents is set with `textContent`.
 
@@ -201,7 +201,7 @@ page keeps its self-containment scan. What it does:
   BB [[144,12,12]] syndrome round), or the agent's own OpenQASM. The design is `main` or any
   draft. The job:
   1. exports the design;
-  2. compiles with `qccdc_cli rotate` when the device has closed loops, falling back to
+  2. compiles with `qccdc_cli rotate` when the machine has closed loops, falling back to
      `compile`, and otherwise uses `compile`;
   3. inserts cooling, and replays with the rules checked under the release's cost model and
      under the transport table.
@@ -292,7 +292,7 @@ watch it happen.
   draws with the same verbs (`sketchDraw` a shape, `closeLoop`, `stampComponent`, …).
   The page first syncs the person's pending edits, then runs the verb and commits what it
   drew as the agent's change set (`by_page_action`, checked against the running action).
-  `addSite` / `addSegment` take the path the person's click and shift-drag take: on a device
+  `addSite` / `addSegment` take the path the person's click and shift-drag take: on a machine
   with a builder (a lesson's canvas) a `d.site` / `d.segment`, so a loop closed over them can
   name them.
   Each drawing is therefore attributed, protected and undoable. A verb that refuses fails
@@ -466,7 +466,7 @@ looking.
 - **Files** (2026-10-23). The agent in Studio reads files, and saves them through
   `qccd_export` (`qccd export` at a terminal, `exports.py`). The service writes a design
   (`<name>.studio.json`, which `qccd import` opens again, `<name>.arch.json`, and its compiled
-  program and certificate when it has one) or a run (device, circuit, compiled program,
+  program and certificate when it has one) or a run (machine, circuit, compiled program,
   certificate, step times, performance report). Each export goes into a NEW folder
   `exports/<name>/` with a README.txt, never over an earlier one and never outside the
   workspace.
@@ -561,7 +561,7 @@ looking.
   A movement-heavy certificate (39,940 moves, no rotations) still takes 36 s, because
   `stateIn` scans the snapshot list for each lookup.
 - **A submission reuses its run's compile.** When a finished run compiled the board's circuit
-  (line endings aside) for the device the design has now, the submission adopts that run's
+  (line endings aside) for the machine the design has now, the submission adopts that run's
   program, certified program and certificate instead of compiling again (29 s for BB). Any
   other case compiles as before. The grade checks the frozen bundle either way.
 - **`add_docks`** (an operation): the conveyor's docks from a count. They are spread evenly
@@ -585,13 +585,13 @@ worker all call it.
 | stage | establishes | uses |
 |---|---|---|
 | bundle | manifest schema; every member re-hashed; no stray or unknown files; names **this** release (id and digest) | `bundle.read_bundle` |
-| device | loads under the schema and structure checks; size limit | `Architecture.from_json` |
-| physics_lock | the device is scored with the release's `physics.json`: a number the release has is the release's (the device's own is listed as `ignored`), a number it lacks may be the device's (listed as `added`, and the entry does not conform to the board); the budget is the release's | `tasks.scored_device` |
+| machine | loads under the schema and structure checks; size limit | `Architecture.from_json` |
+| physics_lock | the machine is scored with the release's `physics.json`: a number the release has is the release's (the machine's own is listed as `ignored`), a number it lacks may be the machine's (listed as `added`, and the entry does not conform to the board); the budget is the release's | `tasks.scored_device` |
 | program | well-formed TSIR within limits | `validate_program` |
 | rules | replay under the task model; only R7b, R9 and R10 may be skipped, only R15 may be partial. The board's set is always checked; a bundle with `rules.json` is judged by the set it declares (docs/rule-language.md, "A leaderboard entry's own rules") | `qccd.verify.verify`, `qccd.ruleset.declared` |
 | correspondence | the final program is the certified program with only allowed insertions (`cool`, fresh ids), identical otherwise except the provenance index `meta.call` | new |
 | certificate_binding | the certificate's `circuit_ops` are the **release's** circuit op by op (a composite such as `ccx` as the run of ops whose product is its defining unitary), with its qubit count and a one-to-one qubit map; gate witnesses match certified instructions | `check_cert.check_binding`, `qccd.ir.source_map` |
-| lean_certificate | `QCCDC.Cert.check` (proved sound) accepts, against facts re-derived from the **submitted** device | `mk_qcheck_input.py`, `qcheck` |
+| lean_certificate | `QCCDC.Cert.check` (proved sound) accepts, against facts re-derived from the **submitted** machine | `mk_qcheck_input.py`, `qcheck` |
 | semantics | O1 transport replay, witnesses tied to the program's instructions, and O2: the emitted pulses, measurements and resets equal to the trusted circuit -- a stabilizer tableau, or outside Clifford an exact unitary up to 10 qubits (partial beyond) | `check_cert.py` without `--qcheck` |
 | metrics | `T_jones`, `T_transport` (ms, modelled), `instructions`, `dacs`, `ions_per_instruction` | `metrics.compute_metrics` |
 
@@ -627,10 +627,10 @@ refuses an ambiguous name.
 
 Six boards ship, the five from the website (written by `tools/make_releases.py` from each
 board's own title, description and circuit) plus the GHZ starter. Measured 2026-09-24, each on
-its suggested first device, with the full reference grade (rules, Lean certificate,
+its suggested first machine, with the full reference grade (rules, Lean certificate,
 semantics) eligible:
 
-| board | first device | per round | grade time |
+| board | first machine | per round | grade time |
 |---|---|---|---|
 | BB [[144,12,12]] | ring 72 × 2, 24 docks | 522 ms | about 6 min, mostly Lean |
 | BB [[144,12,12]], drawn in the Studio | a triangle loop of 144 sites, 24 docks inside it ("a large triangle and a smaller one") | 505.8 ms | 451 s |
@@ -705,12 +705,12 @@ leaderboard shows who submitted each design.
 its server scores (the board's own ranking first: the logical error rate per round on a
 memory board). Its detail panel opens what the grader drew from the graded bundle, the studio
 page you step through instruction by instruction (`GET /official/v1/submissions/<id>/page`),
-each bundle file (`.../files/<name>`: the device, the compiled program, the certified program,
+each bundle file (`.../files/<name>`: the machine, the compiled program, the certified program,
 the certificate, the manifest), the whole bundle (`.../bundle.zip`), the official report, and
 the `qccd grade` line that reproduces it. A private entry opens nothing for anyone but its
 owner.
 
-**Signing in** is a device link (`qccd/official/accounts.py`). The password is typed on the
+**Signing in** is a machine link (`qccd/official/accounts.py`). The password is typed on the
 site only; the workspace never sees it.
 
 1. The workspace asks the official server for a code (`POST /official/v1/links`) and opens
@@ -770,7 +770,7 @@ key).
 
 Tests:
 
-- `tests/test_official_accounts.py`: the grant's checks; the device link; keys and revocation;
+- `tests/test_official_accounts.py`: the grant's checks; the machine link; keys and revocation;
   credit; the HTTP routes.
 - `tests/test_leaderboard_grant.py`: the real site server signs a grant that the official
   service accepts, and refuses everything else.
@@ -924,7 +924,7 @@ Claude Code 2.1.199 is installed but its channel was not exercised live.
   from a clone. A standalone wheel is not complete.
 - The BB board's reference check takes about 6 minutes on this machine, mostly the Lean
   checker. The official grader's memory limit has to cover it (see the deploy notes).
-- `studio_sync` build records are hoisted before the seal, as the page does. A device whose
+- `studio_sync` build records are hoisted before the seal, as the page does. A machine whose
   seal changes form between revisions (generator ↔ explicit) makes an in-flight human edit
   unrebaseable. It is refused, and the page shows the current design.
 - `render_html` is called once per service for the design view. The page's other embedded
@@ -1067,7 +1067,7 @@ extension and the ChatGPT app, which carry them.
 | `tests/test_workspace_metrics.py` | the evaluator's metrics equal 12 published board entries | <1 s |
 | `tests/test_workspace_cli.py` | `qccd` commands as a user runs them | ~5 s |
 | `tests/test_official.py` | the official service on SQLite with the inline grader, parity included | ~15 s |
-| `tests/test_official_accounts.py` | signing in with a site account: the grant's checks, the device link, keys and their revocation, the credit on the leaderboard, the HTTP routes | ~35 s |
+| `tests/test_official_accounts.py` | signing in with a site account: the grant's checks, the machine link, keys and their revocation, the credit on the leaderboard, the HTTP routes | ~35 s |
 | `tests/test_leaderboard_grant.py` | the site's accounts service signs a grant the official service accepts, and refuses strangers, bad requests and other sites | ~2 s |
 | `tests/test_workspace_official.py` | the official leaderboard from a workspace, against a real official server on a loopback port: sign in, test, Submit, credit; an agent's request only the person confirms; a stale test refused; sign-out revokes the key | ~60 s |
 | `tests/test_workspace_claude.py` | Claude Code as a chat agent with a stand-in executable: one conversation resumed, only the QCCD and read-only tools, a failed run's reason in the chat; the model and thinking level the person picks reach the command line; a turn's trace step by step (thinking, Skill and MCP calls with results, cost); a Codex turn traced from its item events | ~8 s |
@@ -1079,7 +1079,7 @@ extension and the ChatGPT app, which carry them.
 | `tests/test_feature_registry.py` | **the registry gate**: every capability is one Feature (`features.py`); every route an agent can reach, CLI verb and job kind is tied to one or set aside with a reason; the MCP tools, manifest and skill are generated from it; the skill refreshes on its content digest | <1 s |
 | `tests/test_workspace_ler.py` | a memory board (built in a temporary release) graded with its `ler` stage and ranked by `ler_per_round`; the `ler` job on any design; local/official parity on a stochastic metric | ~30 s |
 | `tests/test_bench.py` | the Compiler board: the `qccd.compiler@1` contract and archive (unsafe zips refused), the reference compiler against itself (speedup 1), broken compilers caught as wrong / refused / crash / no_output / timeout, the hidden split fixed by its seed, the sandbox spool giving the same verdicts, a compiler graded and ranked by the official service, the documents against their schemas | ~10 s |
-| `tests/test_qec_*.py` | the logical error rate (qccd/qec): memory experiments at their code distance, the noise channels from the device's physics, extraction from compiled programs, the noiseless check catching wrong programs, the decoders | ~60 s |
+| `tests/test_qec_*.py` | the logical error rate (qccd/qec): memory experiments at their code distance, the noise channels from the machine's physics, extraction from compiled programs, the noiseless check catching wrong programs, the decoders | ~60 s |
 | `tests/workspace_live_interface.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): every place of the live site through the mirror; fails on an undeclared control not in its known-debt list | ~10 min |
 | `tests/workspace_live_web.py` | **live**, opt-in (`QCCD_LIVE_WEB=1`): the real qccd.academy through the mirror, every kind of page, with console and CSP messages | ~30 s |
 | `tests/workspace_live_page.py` | **live**, opt-in (`QCCD_LIVE_CODEX=1`): a question asked on a website page, answered by a real Codex | ~2 min |

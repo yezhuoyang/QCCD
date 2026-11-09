@@ -42,9 +42,9 @@ class Word:
 WORDS: dict[str, Word] = {}
 
 #: The groups the page lists the words under, in order.
-GROUPS = (("device", "The device"), ("wiring", "The device's wiring"),
+GROUPS = (("device", "The machine"), ("wiring", "The machine's wiring"),
           ("execution", "The programme"), ("state", "Instants and the state"),
-          ("law", "The device's laws"), ("experiment", "The experiment"),
+          ("law", "The machine's laws"), ("experiment", "The experiment"),
           ("sample", "The sample"), ("math", "Arithmetic"))
 
 
@@ -121,18 +121,18 @@ def _show(x) -> str:
 # ============================================================================ the device
 
 @word("sites", "a set of sites", "Every place an ion can stand: the traps, the docks, the slots of "
-      "a loop (the nodes the device declares as sites).", "device", domain=True)
+      "a loop (the nodes the machine declares as sites).", "device", domain=True)
 def _sites(c: Ctx):
     return c.once("sites", lambda: [n for n, nd in c.dev.nodes.items() if nd.kind == "site"])
 
 
-@word("junctions", "a set of nodes", "The nodes where three or more rails meet, whatever the device "
+@word("junctions", "a set of nodes", "The nodes where three or more rails meet, whatever the machine "
       "calls them.", "device", domain=True)
 def _junctions(c: Ctx):
     return c.once("junctions", lambda: list(c.dev.junction_nodes))
 
 
-@word("nodes", "a set of nodes", "Every node of the device: its sites and its junctions.", "device",
+@word("nodes", "a set of nodes", "Every node of the machine: its sites and its junctions.", "device",
       domain=True)
 def _nodes(c: Ctx):
     return list(c.dev.nodes)
@@ -144,7 +144,7 @@ def _rails(c: Ctx):
     return list(c.dev.segments)
 
 
-@word("capacity(x)", "a number", "How many ions the node or rail x may hold at once, as the device "
+@word("capacity(x)", "a number", "How many ions the node or rail x may hold at once, as the machine "
       "declares it.", "device")
 def _capacity(c: Ctx, x):
     if x in c.dev.nodes:
@@ -178,7 +178,7 @@ def _can(c: Ctx, s, a):
 
 # ============================================================================ wiring
 
-@word("wiring(key, d)", "a number or a name", "What the device's wiring block declares for key "
+@word("wiring(key, d)", "a number or a name", "What the machine's wiring block declares for key "
       "(electrodes_per_trap, electrodes_per_junction, compensation_electrodes_per_trap, shim_per_dac, "
       "dacs_dynamic, scheme), or d when it declares nothing.", "wiring")
 def _wiring(c: Ctx, key, default=None):
@@ -187,7 +187,7 @@ def _wiring(c: Ctx, key, default=None):
     return default if v is None else v
 
 
-@word("budget(key, d)", "a number", "The device budget's value for key (max_dacs, max_junctions, "
+@word("budget(key, d)", "a number", "The machine budget's value for key (max_dacs, max_junctions, "
       "junction_electrode_multiplier), or d when it has none.", "wiring")
 def _budget(c: Ctx, key, default=None):
     b = c.arch.budget if isinstance(c.arch.budget, dict) else dict(c.arch.budget or {})
@@ -195,7 +195,7 @@ def _budget(c: Ctx, key, default=None):
     return default if v is None else v
 
 
-@word("channel_map()", "true or false", "Whether the device declares a channel map: which control "
+@word("channel_map()", "true or false", "Whether the machine declares a channel map: which control "
       "channel drives each electrode role of each site.", "wiring")
 def _channel_map(c: Ctx):
     return bool(c.arch.control_plane.declared)
@@ -440,7 +440,7 @@ def _movers(c: Ctx, k):
 
 
 @word("rotation(k)", "true or false", "Whether step k turns a loop as a whole: its movement class is "
-      "one of the device's rotations (named rotate...).", "execution")
+      "one of the machine's rotations (named rotate...).", "execution")
 def _rotation(c: Ctx, k):
     st = _step(k, "rotation")
     return bool(st.kind == "simd" and st.cls and str(st.cls).startswith("rotate"))
@@ -560,10 +560,10 @@ def _prim(c: Ctx, p: str) -> dict:
     try:
         return dict(c.arch.primitives.scalar(p))
     except KeyError:
-        raise WordError(f"the device declares no primitive {p!r}") from None
+        raise WordError(f"the machine declares no primitive {p!r}") from None
 
 
-@word("primitive(p, f)", "a number", "Field f of the device's primitive p, as its physics declares "
+@word("primitive(p, f)", "a number", "Field f of the machine's primitive p, as its physics declares "
       "it: primitive(\"measure\", \"fidelity\"), primitive(\"ms_gate\", \"us\"), ...", "law")
 def _primitive(c: Ctx, p, f):
     v = _prim(c, p).get(f)
@@ -588,7 +588,7 @@ def _chain_ref(c: Ctx, p):
     return float(str(s).split(":", 1)[1])
 
 
-@word("coherence_time()", "seconds", "The qubit's coherence time T₂ as the device's species block "
+@word("coherence_time()", "seconds", "The qubit's coherence time T₂ as the machine's species block "
       "declares it (T_coh_s); none when it declares none.", "law")
 def _t2(c: Ctx):
     v = c.arch.species.get("T_coh_s")

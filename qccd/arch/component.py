@@ -1,4 +1,4 @@
-"""Reusable parametric pieces of a device -- the idea qiskit-metal is built on.
+"""Reusable parametric pieces of a machine -- the idea qiskit-metal is built on.
 
 A user of `qiskit-metal` does not place polygons; they place a `TransmonPocket` with
 options and it draws its own geometry.  Our studio made you place bare `d.site` and

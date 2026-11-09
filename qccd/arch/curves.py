@@ -94,7 +94,7 @@ class Curve:
     """A set of operating points for one primitive.
 
     Points are *not* required to be Pareto-optimal against each other: two different
-    tables describe two different devices, and a point that is dominated within one
+    tables describe two different machines, and a point that is dominated within one
     table may be the only measured point of another.
     """
 
@@ -150,7 +150,7 @@ class DegreeCurve:
     by_degree: Mapping[int, Curve]
 
     def get(self, degree: int) -> Curve | None:
-        """The curve at `degree`; a junction of five or six rails that the device does not
+        """The curve at `degree`; a junction of five or six rails that the machine does not
         price crosses at the X-junction's (`FALLBACK_DEGREE`)."""
         c = self.by_degree.get(degree)
         if c is None and degree in FALLBACK_DEGREE:

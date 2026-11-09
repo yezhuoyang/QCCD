@@ -35,9 +35,9 @@ CHECK_NAMES = [
     ("modes", "one cycle at a time", "a cycle of moves between traps overlaps no other cycle and nothing happening inside a trap"),
     ("zones", "gate zones", "gates and swaps happen in gate zones, one gate per trap at a time"),
     ("program", "the worked example", "the schedule is the paper's worked example, operation for operation"),
-    ("layout", "the layout", "every ion starts in the memory, on a rail the device has"),
+    ("layout", "the layout", "every ion starts in the memory, on a rail the machine has"),
     ("junctions", "junctions", "a junction is passed by one chain at a time"),
-    ("path", "paths", "every move follows rails the device has"),
+    ("path", "paths", "every move follows rails the machine has"),
     ("nodes", "nodes", "a node is passed by one chain in a step, except where the paper's code allows two"),
     ("pz", "processing zone", "ions enter and leave the processing zone by its entry and exit rails, and it is empty at the end"),
     ("gates", "gates", "a gate runs on ions standing on the gate site, one gate at a time"),
@@ -595,7 +595,7 @@ def _ours_box(p: dict, res: dict | None) -> str:
         pill = None
         if pills and all(pills):
             pill = "<br>".join(pills) + f"<br><small>under {_e(names)}, each qubit's order kept</small>"
-        pill = pill or (f'<span class="rp-pill ok" title="strict durations; the circuit; same device and '
+        pill = pill or (f'<span class="rp-pill ok" title="strict durations; the circuit; same machine and '
                 f'ions as the paper\'s run">all {n} checks pass</span><br><small>under {_e(names)}</small>')
         if moves_first:
             al = (o.get("also") or {}).get("measured", {})
@@ -1532,7 +1532,7 @@ def _model_studio_wanted(run: dict) -> bool:
 def _model_section(p: dict) -> str:
     """A model-level reproduction (TrapSIMD): no artifact, so the paper's worked examples
     are replayed event for event, and its results table is compared with our schedules on
-    its device and timing, with every assumption that moves a number said."""
+    its machine and timing, with every assumption that moves a number said."""
     key = p["key"]
     res = _results(key) or {}
     runs = res.get("runs", [])
@@ -1569,7 +1569,7 @@ def _model_section(p: dict) -> str:
                    "website's leaderboard entries.</p>"
                    "<p>The paper's results table (Table 3) gives, for four benchmarks on four grid "
                    "sizes and two trap lengths, the time of its compiler's schedule. With no code "
-                   "or circuits published, this is a model-level comparison: the device, the "
+                   "or circuits published, this is a model-level comparison: the machine, the "
                    "timing table and the rules are the paper's; the circuits are rebuilt from its "
                    "description, and the schedules are ours, each checked under the paper's rules "
                    "(broadcast transport, one waveform at a time, nothing else running during an "
@@ -1744,7 +1744,7 @@ def _ionshuttler_section(p: dict) -> str:
     out.append('<p class="rp-by">Made by <code>schedule_ours</code>, '
                "a scheduler we wrote for this comparison; it is not the compiler that compiles this "
                "website's leaderboard entries.</p>")
-    out.append("<p>Our scheduler works in the heuristic's own model: its device, its processing "
+    out.append("<p>Our scheduler works in the heuristic's own model: its machine, its processing "
                "zone and parking edge, the placement its run of each seed starts from, one edge per "
                "chain per step through one node, one gate at a time. The SAT tool's model differs "
                "(another processing-zone layout, a fixed gate order), so its numbers are not "

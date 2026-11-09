@@ -1,5 +1,5 @@
 {
- "about": "The Studio's API (window.EDITOR, qccd/viz/js/editor.js), declared: every function, what it does, and who may call it. use: agent (an agent's `studio` page action may call it), harness (tests and the pointer adapters only), never (the person's files, storage, or a restart). kind (agent verbs): read, view (changes only what is shown), design (changes the device), program, course (changes the canvas to a lesson's). A function added to the API without an entry here, or an entry naming none, fails tests/test_agent_interface.py.",
+ "about": "The Studio's API (window.EDITOR, qccd/viz/js/editor.js), declared: every function, what it does, and who may call it. use: agent (an agent's `studio` page action may call it), harness (tests and the pointer adapters only), never (the person's files, storage, or a restart). kind (agent verbs): read, view (changes only what is shown), design (changes the machine), program, course (changes the canvas to a lesson's). A function added to the API without an entry here, or an entry naming none, fails tests/test_agent_interface.py.",
  "verbs": {
   "mode": {
    "use": "agent",
@@ -13,12 +13,12 @@
   "edits": {
    "use": "agent",
    "kind": "read",
-   "does": "the edit log: every change made to the device since it was loaded"
+   "does": "the edit log: every change made to the machine since it was loaded"
   },
   "problems": {
    "use": "agent",
    "kind": "read",
-   "does": "what is wrong with the device now (geometry rules, structure, refusals)"
+   "does": "what is wrong with the machine now (geometry rules, structure, refusals)"
   },
   "lints": {
    "use": "agent",
@@ -28,12 +28,12 @@
   "state": {
    "use": "agent",
    "kind": "read",
-   "does": "the whole current state: the device (nodes, segments, loops, zones) and its builder"
+   "does": "the whole current state: the machine (nodes, segments, loops, zones) and its builder"
   },
   "ready": {
    "use": "agent",
    "kind": "read",
-   "does": "whether the page finished loading its device and programme"
+   "does": "whether the page finished loading its machine and programme"
   },
   "why": {
    "use": "agent",
@@ -169,11 +169,11 @@
   "refit": {
    "use": "agent",
    "kind": "view",
-   "does": "fit the whole device to the canvas afresh"
+   "does": "fit the whole machine to the canvas afresh"
   },
   "refitNext": {
    "use": "harness",
-   "does": "make the next rebuild fit the device afresh"
+   "does": "make the next rebuild fit the machine afresh"
   },
   "toUm": {
    "use": "harness",
@@ -559,7 +559,7 @@
   },
   "sealZones": {
    "use": "harness",
-   "does": "the zones the device's seal declares"
+   "does": "the zones the machine's seal declares"
   },
   "canvasHistory": {
    "use": "agent",
@@ -581,7 +581,7 @@
   "setName": {
    "use": "agent",
    "kind": "design",
-   "does": "type the new device's name (what the Start panel's name box does)",
+   "does": "type the new machine's name (what the Start panel's name box does)",
    "args": "text"
   },
   "zone": {
@@ -665,7 +665,7 @@
   "sketchCommit": {
    "use": "agent",
    "kind": "design",
-   "does": "make the device parts a sketch plan describes",
+   "does": "make the machine parts a sketch plan describes",
    "args": "plan"
   },
   "sketchDown": {
@@ -725,22 +725,22 @@
   "price": {
    "use": "agent",
    "kind": "read",
-   "does": "what the programme costs on this device (cost, steps, time, DACs) or why it cannot be priced"
+   "does": "what the programme costs on this machine (cost, steps, time, DACs) or why it cannot be priced"
   },
   "hardware": {
    "use": "agent",
    "kind": "read",
-   "does": "the device's hardware as it is now: electrodes, DACs, switches, junctions, ion capacity"
+   "does": "the machine's hardware as it is now: electrodes, DACs, switches, junctions, ion capacity"
   },
   "programBreaks": {
    "use": "agent",
    "kind": "read",
-   "does": "why the programme no longer fits the device ([] when it fits)"
+   "does": "why the programme no longer fits the machine ([] when it fits)"
   },
   "hardware0": {
    "use": "agent",
    "kind": "read",
-   "does": "the hardware totals of the device as loaded"
+   "does": "the hardware totals of the machine as loaded"
   },
   "repriceNow": {
    "use": "harness",
@@ -754,23 +754,23 @@
   "digest": {
    "use": "agent",
    "kind": "read",
-   "does": "the device's nodes and segments, sorted (a structural summary)"
+   "does": "the machine's nodes and segments, sorted (a structural summary)"
   },
   "source": {
    "use": "agent",
    "kind": "read",
-   "does": "the device as its builder program (the Device panel's source)"
+   "does": "the machine as its builder program (the Machine panel's source)"
   },
   "applySource": {
    "use": "agent",
    "kind": "design",
-   "does": "replace the device's builder program with edited text",
+   "does": "replace the machine's builder program with edited text",
    "args": "src"
   },
   "exportPython": {
    "use": "agent",
    "kind": "read",
-   "does": "the device as a Python listing"
+   "does": "the machine as a Python listing"
   },
   "schemaErrors": {
    "use": "agent",
@@ -780,7 +780,7 @@
   "exportJson": {
    "use": "agent",
    "kind": "read",
-   "does": "the device as .arch.json text"
+   "does": "the machine as .arch.json text"
   },
   "exportEdits": {
    "use": "agent",
@@ -812,13 +812,13 @@
   "newFromGenerator": {
    "use": "agent",
    "kind": "design",
-   "does": "start a new device from a generator (chain, ring, grid, ...)",
+   "does": "start a new machine from a generator (chain, ring, grid, ...)",
    "args": "gen, params, opts?"
   },
   "newFromTemplate": {
    "use": "agent",
    "kind": "design",
-   "does": "open a shipped device as itself",
+   "does": "open a shipped machine as itself",
    "args": "stem, opts?"
   },
   "addNodeAt": {
@@ -853,7 +853,7 @@
   },
   "postSeedZones": {
    "use": "harness",
-   "does": "zones declared after the device's seal"
+   "does": "zones declared after the machine's seal"
   },
   "curveAddPoint": {
    "use": "agent",
@@ -882,17 +882,17 @@
   "explodeToExplicit": {
    "use": "agent",
    "kind": "design",
-   "does": "turn a device made by a generator (ring, grid, chain, ...) into its explicit sites, rails and loops, so shapes and parts can be added to it; the device stays the same (in the workspace this is one change set, undoable like any other)"
+   "does": "turn a machine made by a generator (ring, grid, chain, ...) into its explicit sites, rails and loops, so shapes and parts can be added to it; the machine stays the same (in the workspace this is one change set, undoable like any other)"
   },
   "geom": {
    "use": "agent",
    "kind": "read",
-   "does": "the device's geometry records"
+   "does": "the machine's geometry records"
   },
   "seed": {
    "use": "agent",
    "kind": "read",
-   "does": "the device's seed record"
+   "does": "the machine's seed record"
   },
   "post": {
    "use": "agent",
@@ -996,7 +996,7 @@
   "testDrivePlan": {
    "use": "agent",
    "kind": "read",
-   "does": "the smallest programme that exercises this device"
+   "does": "the smallest programme that exercises this machine"
   },
   "testDrive": {
    "use": "agent",
@@ -1015,12 +1015,12 @@
   "exportPair": {
    "use": "agent",
    "kind": "read",
-   "does": "the device and programme files together"
+   "does": "the machine and programme files together"
   },
   "rules": {
    "use": "agent",
    "kind": "read",
-   "does": "the hardware rules' verdicts for this programme on this device"
+   "does": "the hardware rules' verdicts for this programme on this machine"
   },
   "ruleCoverage": {
    "use": "agent",
@@ -1089,7 +1089,7 @@
   "lessonLoad": {
    "use": "agent",
    "kind": "course",
-   "does": "open a lesson: its device and programme on the canvas",
+   "does": "open a lesson: its machine and programme on the canvas",
    "args": "lesson id"
   },
   "lessonCheck": {
@@ -1190,7 +1190,7 @@
   "fit": {
    "use": "agent",
    "kind": "view",
-   "does": "fit the device to the canvas"
+   "does": "fit the machine to the canvas"
   },
   "snapshot": {
    "use": "agent",

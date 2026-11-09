@@ -124,7 +124,7 @@ def _committed(rel: str) -> bytes | None:
 def python_zip() -> bytes:
     """qccd's own Python, as the worker unpacks it: the packages in `PY_PACKAGES` (sources,
     rule sets, the Studio's scripts and schema), the top-level modules, and the template
-    device the renderer reads."""
+    machine the renderer reads."""
     buf = io.BytesIO()
     pkg = ROOT / "qccd"
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:

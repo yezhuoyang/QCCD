@@ -67,7 +67,7 @@ PAPERS: list[dict] = [
                      "license": None,
                      "note": "No license file: we ran it locally and publish only the schedules it "
                              "produced, never its code."},
-        "what": "Two six-trap devices, a line (L6) and a two-by-three grid (G2x3), trap capacity "
+        "what": "Two six-trap machines, a line (L6) and a two-by-three grid (G2x3), trap capacity "
                 "swept from 14 to 34 ions, six NISQ benchmarks; the simulator every later paper "
                 "in this list builds on.",
         "model": {"profile": "QCCDSIM", "law": "qccdsim"},
@@ -210,7 +210,7 @@ PAPERS: list[dict] = [
                     "same operations by the components' happens-before relation alone, without "
                     "barriers. Both are run here at every distance, with the same driver as "
                     "above. The operations, and each ion's route, are the same as at d235a22."}},
-        "what": "A compiler for surface-code rounds on grid, linear and switch QCCD devices, and a "
+        "what": "A compiler for surface-code rounds on grid, linear and switch QCCD machines, and a "
                 "design-space study of trap capacity, wiring and logical error.",
         "model": {"profile": "JONES", "law": "jones"},
         "figures": [{"run": "grid_rot_d3_c2", "layout": "recorded",
@@ -412,12 +412,12 @@ PAPERS.append({
     "artifact": {"url": "https://arxiv.org/abs/2501.12470", "commit": None, "license": None,
                  "note": "No code or circuits are published (the paper says a link will follow "
                          "acceptance), so this paper is reproduced at the level of its model: its "
-                         "device, its timing table and its baseline simulator."},
+                         "machine, its timing table and its baseline simulator."},
     "what": "A graph of ion positions as the compiler's view of any shuttling machine, and two "
-            "compilers on it (SHAPER, SHAW), compared with QCCDSim on grid devices.",
+            "compilers on it (SHAPER, SHAW), compared with QCCDSim on grid machines.",
     "model": {"profile": "QCCDSIM", "law": "qccdsim"},
     "figures": [{"run": "qft20_G2x3_c5_FM_GS_Greedy", "layout": "qccdsim_g2x3",
-                 "caption": "G2x3 at capacity 5, the device of the paper's QFT-20 comparison"}],
+                 "caption": "G2x3 at capacity 5, the machine of the paper's QFT-20 comparison"}],
     "runs": [
         {"id": "qft20_G2x3_c5_FM_GS_Greedy", "label": "QFT-20 on G2x3, capacity 5: QCCDSim",
          "file": "qft20_G2x3_c5_FM_GS_Greedy.schedule.json.gz", "importer": "qccdsim",
@@ -480,7 +480,7 @@ NOTES["bach2025"] = [
      "text": "The paper transpiles every circuit to Quantinuum's native gates with BQSKit before "
              "scheduling, and its QCCDSim column (70,134 µs for QFT-20 on G2x3 at capacity 5) is "
              "for that transpiled circuit, which is not published. QCCDSim on the textbook QFT-20 "
-             "(380 CNOTs) takes 47,580 µs on the same device. The paper's SHAPER (39,966 µs) and "
+             "(380 CNOTs) takes 47,580 µs on the same machine. The paper's SHAPER (39,966 µs) and "
              "SHAW (39,871 µs) are therefore not directly comparable with any schedule we can "
              "produce; our comparison is with QCCDSim on the same circuit."},
 ]
@@ -558,7 +558,7 @@ OURS: dict[str, dict] = {
     },
     "saki2022": {
         "tool": ("qccd/repro/sched.py", "a list scheduler we wrote for the QCCDSim family's model"),
-        "how": "The same scheduler as for QCCDSim, on the paper's device. It minimises time, "
+        "how": "The same scheduler as for QCCDSim, on the paper's machine. It minimises time, "
                "not shuttles, so it is compared on both.",
         "runs": [{"id": f"{b}_ours", "file": f"ours/{b}_ours.schedule.json.gz",
                   "against": f"qccdsim-{b}", "also": f"mts-{b}-seed0", "profiles": _Q,
@@ -570,7 +570,7 @@ OURS: dict[str, dict] = {
     },
     "bach2025": {
         "tool": ("qccd/repro/sched.py", "a list scheduler we wrote for the QCCDSim family's model"),
-        "how": "The same scheduler as for QCCDSim, on the paper's G2x3 device with QCCDSim's "
+        "how": "The same scheduler as for QCCDSim, on the paper's G2x3 machine with QCCDSim's "
                "primitives. The paper's own compilers are not public, so they are compared by "
                "the numbers the paper prints, under the paper's model rather than this one.",
         "runs": [{"id": "qft20_G2x3_c5_ours", "file": "ours/qft20_G2x3_c5_ours.schedule.json.gz",
@@ -635,7 +635,7 @@ OURS: dict[str, dict] = {
     },
     "jones2025": {
         "tool": ("qccd/repro/sched_jones.py", "a scheduler we wrote for this comparison"),
-        "keeps": "the paper's device, its placement of qubits in traps, its native decomposition of "
+        "keeps": "the paper's machine, its placement of qubits in traps, its native decomposition of "
                  "H and CNOT and its timing law",
         "changes": "each ancilla's tour and the scheduling",
         "theirs_label": "their code, fixed, without barriers",
@@ -704,13 +704,13 @@ TOOK: dict[str, list[str]] = {
         "ion through one segment 5 µs, split and merge 80 µs each, crossing a Y-junction "
         "100 µs and crossing an X-junction 120 µs.",
         "The two-qubit gate's error growing with the chain length N in the gate zone as N/ln N, "
-        "in the default device and the noise model.",
-        "The grid generator and the grid baseline device, a QCCDSim-style grid.",
+        "in the default machine and the noise model.",
+        "The grid generator and the grid baseline machine, a QCCDSim-style grid.",
     ],
     "khan2026cyclone": [
         "Rigid rotation of a ring with the data parked and the ancillas riding, half of the "
         "question this project started from and the pass our compiler's rotate mode runs.",
-        "The base ring device (cyclone_base) and the cyclone timing table: move 10 µs, junction "
+        "The base ring machine (cyclone_base) and the cyclone timing table: move 10 µs, junction "
         "crossings by degree, split and merge 80 µs.",
         "Assigning checks to ancillas as they arrive, in the bivariate-bicycle schedules.",
     ],
@@ -721,7 +721,7 @@ TOOK: dict[str, list[str]] = {
         "next gate; and the heating bound of each transport primitive in its Table 1 (shuttle "
         "below 0.1 quanta, split and merge below 6, junction entry or exit below 3), which the "
         "default timing table, qccdsim_jones, carries with QCCDSim's times.",
-        "The default device's reset (50 µs, error 5×10⁻³), and reordering a chain with a gate "
+        "The default machine's reset (50 µs, error 5×10⁻³), and reordering a chain with a gate "
         "swap of three two-qubit gates.",
         "The question this project started from: what broadcast (WISE) control costs in logical "
         "clock speed, which it puts at up to 25× under odd–even sort. Its first author's WISER "
@@ -740,15 +740,15 @@ TOOK: dict[str, list[str]] = {
         "simd_classes control model, with one class per cycle and variable participation.",
         "Event-scheduled instructions without barriers, and an objective that adds −ln F over "
         "the operations.",
-        "The default device's gate and measurement times (25 µs two-qubit, 5 µs one-qubit, "
+        "The default machine's gate and measurement times (25 µs two-qubit, 5 µs one-qubit, "
         "120 µs measurement) and its 600 s coherence time, from its Table 1 and Sec. 6.1. Our "
-        "device files credit these to H2 and to Jones and Murali, which is wrong; those files "
+        "machine files credit these to H2 and to Jones and Murali, which is wrong; those files "
         "are pinned by the released boards, so the next physics release corrects them.",
     ],
     "moses2023": [
-        "The race-track device and its conveyor: a bend is not a junction, and a few broadcast "
+        "The race-track machine and its conveyor: a bend is not a junction, and a few broadcast "
         "signals drive a conveyor's wells.",
-        "The default device's two-qubit, one-qubit and SPAM fidelities.",
+        "The default machine's two-qubit, one-qubit and SPAM fidelities.",
         "Global Doppler cooling by sheet beams, and the race-track pass of our compiler.",
     ],
 }
@@ -756,11 +756,11 @@ TOOK: dict[str, list[str]] = {
 #: The same in a few words, for the index ("we build on its 7 rules, ...").
 TOOK_SHORT: dict[str, tuple[str, ...]] = {
     "murali2020": ("transport times", "chain-length error", "grid baseline"),
-    "khan2026cyclone": ("rigid rotation", "ring device and timing table"),
+    "khan2026cyclone": ("rigid rotation", "ring machine and timing table"),
     "jones2025": ("objective", "transport heating bounds", "starting question"),
     "schoenberger2024": ("SAT-oracle idea",),
     "ruan2025": ("movement classes", "gate and measurement times"),
-    "moses2023": ("race-track device", "gate fidelities"),
+    "moses2023": ("race-track machine", "gate fidelities"),
 }
 
 #: Papers read in full and not reproduced, with the reason; the page lists them.

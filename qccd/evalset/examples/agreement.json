@@ -6,7 +6,7 @@
  "compared": [
   "the noisy circuit, qubit by qubit",
   "the error budget, channel by channel (1e-9)",
-  "every metric the board shows, and the device stage"
+  "every metric the board shows, and the machine stage"
  ],
  "designs": 54,
  "by_release": {

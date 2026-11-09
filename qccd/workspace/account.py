@@ -1,7 +1,7 @@
 """Signing this computer in to qccd.academy, so what it submits to the official leaderboard is
 credited to its person -- and only after they signed in.
 
-The sign-in is a device link (qccd/official/accounts.py):
+The sign-in is a machine link (qccd/official/accounts.py):
 
   1. the workspace asks the official server for a code (`POST /v1/links`) and opens
      `https://qccd.academy/connect/?code=XXXX-XXXX` in the person's browser;

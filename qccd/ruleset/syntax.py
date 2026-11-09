@@ -1,7 +1,7 @@
 """The rule language: its grammar, its parser, and how a rule is printed.
 
 A rule set is a text file.  Every rule in it is one assertion about the hardware and the
-execution -- a formula of first-order logic over finite domains (the sites of the device,
+execution -- a formula of first-order logic over finite domains (the sites of the machine,
 the operations of the programme, the instants of its execution, ...), written in words a
 reader can check by eye:
 
@@ -339,7 +339,7 @@ class _Parser:
                 self.next()
                 rs.level = self.string()
                 if rs.level not in ("device", "machine"):
-                    self.fail("a rule set's level is \"device\" or \"machine\"")
+                    self.fail("a rule set's level is \"machine\" or \"machine\"")
             elif self.at("include"):
                 self.next()
                 rs.includes.append(self.string())

@@ -113,7 +113,7 @@ def runbox(src: str, poster_svg: str, title: str, cls: str = "", what: str = "")
     """An animation as a poster with a Play button.  `src` is the Studio page (without
     its hash); pressing Play loads it in embed mode and plays the programme once
     (`#embed&step=1&go`, see HASH_JS), after which Step, Reset and the slider are the
-    reader's.  `poster_svg` is the device with its ions where the programme starts."""
+    reader's.  `poster_svg` is the machine with its ions where the programme starts."""
     what = what or "the programme, played once; then step it or scrub it"
     return (f'<div class="runbox {cls}" data-src="{html.escape(src)}" data-title="{html.escape(title)}">'
             f'<div class="poster" role="button" tabindex="0" aria-label="Play: {html.escape(title)}">'
@@ -135,7 +135,7 @@ GLOSSARY: dict[str, dict] = {
     "qubit": {"t": "Qubit", "u": "physics/#the-qubit-inside-the-ion", "a": ["qubit"],
               "d": "Two internal states of an ion, used as the 0 and 1 of a quantum bit. A circuit names qubits; the compiler decides which ion carries each one."},
     "machine": {"t": "Machine", "u": "machine/#def-machine", "a": ["machine"],
-                "d": "The text everything runs on: a document with a geometry (nodes, rails, loops), zone types, primitive curves, a control plane, heating, species and budget, loaded once into a graph with tables. Also called a device. The Machine page defines it; a programme is written in its names, a rule quantifies over its sets."},
+                "d": "The text everything runs on: a document with a geometry (nodes, rails, loops), zone types, primitive curves, a control plane, heating, species and budget, loaded once into a graph with tables. The Machine page defines it; a programme is written in its names, a rule quantifies over its sets."},
     "trap": {"t": "Trap (site)", "u": "machine/#def-node", "a": ["trapping site", "trap site", "trap", "site"],
              "d": "A node of the machine where an ion can stand: site(id, pos, zone, capacity). Ions are moved between sites; a two-qubit gate needs both ions in one site that can gate. In the formal sections the set of traps is T."},
     "junction": {"t": "Junction", "u": "machine/#def-degree", "a": ["junction"],
@@ -207,7 +207,7 @@ GLOSSARY: dict[str, dict] = {
     "noise model": {"t": "Noise model", "u": "physics/#how-this-website-simulates-noise", "a": ["noise model"],
                     "d": "A text whose clauses say which Pauli error goes where, with what probability, read off the replay of a programme. It turns a programme into a noisy stim circuit."},
     "replay": {"t": "Replay", "u": "physics/#how-this-website-simulates-noise", "a": ["replay", "replayed", "replaying"],
-               "d": "Running a programme on the device document instruction by instruction, keeping every ion's position, heat and the clock. Everything the rules and the metrics read is read off the replay."},
+               "d": "Running a programme on the machine document instruction by instruction, keeping every ion's position, heat and the clock. Everything the rules and the metrics read is read off the replay."},
     "stim": {"t": "stim circuit", "u": "evaluation/#circuit", "a": ["stim circuit", "stim"],
              "d": "The stabilizer circuit, in the stim simulator's format, that a programme becomes once its gates are translated and the noise model's clauses are applied. Sampling it gives the logical error rate."},
     "decoder": {"t": "Decoder", "u": "physics/#how-this-website-simulates-noise", "a": ["decoder", "decoding"],
@@ -224,7 +224,7 @@ GLOSSARY: dict[str, dict] = {
                 "d": "The frequency at which an ion oscillates in its well, a few megahertz. The motional quanta are counted in units of this oscillator."},
     # --- the language
     "programme": {"t": "Programme", "u": "language/#semantics", "a": ["hardware programme", "programme"],
-                  "d": "A list of instructions for the device, one per machine cycle: moves, gates, cooling, measurements. Written in the hardware language, produced by the compiler or by hand, judged by the rules."},
+                  "d": "A list of instructions for the machine, one per machine cycle: moves, gates, cooling, measurements. Written in the hardware language, produced by the compiler or by hand, judged by the rules."},
     "instruction": {"t": "Instruction (cycle)", "u": "language/#semantics", "a": ["instruction", "machine cycle", "cycle"],
                     "d": "One step of a programme, and one cycle of the machine: everything in it happens together, and the next starts when it ends. The clock, the heat and the rules are all read per cycle."},
     "statement": {"t": "Statement", "u": "language/#syntax", "a": ["statement"],
@@ -239,7 +239,7 @@ GLOSSARY: dict[str, dict] = {
              "d": "The first statement of every programme: which ion starts in which site. The compiler's certificate records the same map."},
     # --- the rules
     "rule": {"t": "Rule", "u": "rules/#language", "a": ["rule"],
-             "d": "One assertion about the device and what a programme does on it, written in a small logical language and decided by the checker on the replay. A programme that fails any rule of its set is refused."},
+             "d": "One assertion about the machine and what a programme does on it, written in a small logical language and decided by the checker on the replay. A programme that fails any rule of its set is refused."},
     "rule set": {"t": "Rule set", "u": "rules/#sets", "a": ["rule set", "ruleset"],
                  "d": "The rules a machine assumes, with their numbers. The standard set is this website's machine; a paper's set says what that paper's model assumed. The compiler takes one as input."},
     "verifier": {"t": "Verifier (checker)", "u": "rules/#language", "a": ["verifier", "rule checker", "checker"],
@@ -248,7 +248,7 @@ GLOSSARY: dict[str, dict] = {
     "R2": {"t": "Rule R2: junctions", "u": "rules/#R2", "a": ["R2"], "d": "An ion passes through a junction but never rests on one, and one ion transits a junction per cycle."},
     "R3": {"t": "Rule R3: segment capacity", "u": "rules/#R3", "a": ["R3"], "d": "A rail carries at most its capacity of ions in one cycle."},
     "R4": {"t": "Rule R4: one movement class", "u": "rules/#R4", "a": ["R4"], "d": "Under broadcast wiring at most one movement class is active per cycle, and a site wired to it takes part unless switched out."},
-    "R4d": {"t": "Rule R4d: drivable", "u": "rules/#R4d", "a": ["R4d"], "d": "Every cycle's motion can actually be driven by the channels the device declares."},
+    "R4d": {"t": "Rule R4d: drivable", "u": "rules/#R4d", "a": ["R4d"], "d": "Every cycle's motion can actually be driven by the channels the machine declares."},
     "R5": {"t": "Rule R5: no head-on exchange", "u": "rules/#R5", "a": ["R5"], "d": "Two ions never swap places along one rail in one cycle."},
     "R6": {"t": "Rule R6: gates in gate zones", "u": "rules/#R6", "a": ["R6", "R6b"], "d": "A gate happens only in a trap that can gate, and a two-qubit gate only on two ions in the same such trap."},
     "R7": {"t": "Rule R7: the gate budget", "u": "rules/#R7", "a": ["R7", "R7c"],
@@ -270,7 +270,7 @@ GLOSSARY: dict[str, dict] = {
             "d": "Every ion moving in a cycle makes the same motion, hop by hop, because broadcast wiring plays one waveform at a time. The rule that shapes the router most."},
     # --- compilation
     "compiler": {"t": "The compiler", "u": "compilation/#design", "a": ["compiler"],
-                 "d": "The program that takes a circuit and a device and writes the programme the device runs, plus a certificate of what it did. Treated as untrusted: everything it writes is checked afterwards."},
+                 "d": "The program that takes a circuit and a machine and writes the programme the machine runs, plus a certificate of what it did. Treated as untrusted: everything it writes is checked afterwards."},
     "circuit": {"t": "Circuit", "u": "compilation/#def-circuit", "a": ["quantum circuit", "circuit"],
                 "d": "The input: a list of gates on named qubits, in program order, written in OpenQASM. Two gates must keep their order only if they share a qubit."},
     "qasm": {"t": "OpenQASM", "u": "compilation/#input", "a": ["OpenQASM 2.0", "OpenQASM", "QASM"],
@@ -310,7 +310,7 @@ GLOSSARY: dict[str, dict] = {
     "implements": {"t": "Implements", "u": "compilation/#def-implements", "a": ["Implements"],
                    "d": "The ten conditions a certificate must meet for the programme to carry out the circuit: nothing left out, no ion teleports, every gate witnessed once where its ions really are, in the circuit's order. The checker decides exactly this."},
     "proved checker": {"t": "The proved checker (Lean)", "u": "compilation/#thm-checker", "a": ["proved checker", "machine-checked proof", "Lean"],
-                       "d": "The program that decides Implements, together with a proof in the Lean proof assistant that whenever it answers yes, the definition really holds. It reads the device from its document, never from the compiler."},
+                       "d": "The program that decides Implements, together with a proof in the Lean proof assistant that whenever it answers yes, the definition really holds. It reads the machine from its document, never from the compiler."},
     "o1": {"t": "O1: every gate happens where claimed", "u": "compilation/#algo-correct", "a": ["O1"],
            "d": "The first half of R10, decided by the proved checker: every witness names the right ions and finds them together in a trap that can gate, every move is a real hop, in the circuit's order."},
     "o2": {"t": "O2: the pulses compute the circuit", "u": "compilation/#check-semantics", "a": ["O2"],
@@ -336,7 +336,7 @@ GLOSSARY: dict[str, dict] = {
     "asap": {"t": "ASAP layering", "u": "compilation/#def-asap", "a": ["ASAP"],
              "d": "As soon as possible: every operation goes into the layer right after the latest operation it depends on."},
     "notation": {"t": "The notation", "u": "compilation/#notation", "a": ["notation"],
-                 "d": "The symbols the formal sections use: A the device, T the traps, J the junctions, E the rails, cap the capacity, gate and meas the traps where a gate or a measurement may happen, L the loops."},
+                 "d": "The symbols the formal sections use: A the machine, T the traps, J the junctions, E the rails, cap the capacity, gate and meas the traps where a gate or a measurement may happen, L the loops."},
     # --- evaluation
     "metric": {"t": "Metric", "u": "evaluation/#language", "a": ["metric"],
                "d": "A named number an evaluation computes from the replay: runtime, heat, DAC count, size. Every number on the leaderboard is one, and can be recomputed from the three texts."},
@@ -345,7 +345,7 @@ GLOSSARY: dict[str, dict] = {
     "channel": {"t": "Noise channel", "u": "evaluation/#noise", "a": ["noise channel", "channel"],
                 "d": "One clause of a noise model: after (or before) a kind of operation, this Pauli error, on these ions, with this probability read off the replay."},
     "evaluation": {"t": "Evaluation", "u": "evaluation/#texts", "a": ["evaluation"],
-                   "d": "A text in the evaluation language: metrics, requirements and noise channels. Read over the replay of a programme on a device, it yields every number a design is judged by and the noisy circuit it becomes."},
+                   "d": "A text in the evaluation language: metrics, requirements and noise channels. Read over the replay of a programme on a machine, it yields every number a design is judged by and the noisy circuit it becomes."},
     "goal1": {"t": "Goal 1", "u": "board/goal1/", "a": ["Goal 1"],
               "d": "The leaderboard that ranks every memory experiment under 200 ions by logical error rate per round and logical qubit, under the cited noise model qccd-noise@2."},
     "budget": {"t": "Budget", "u": "evaluation/#hardware", "a": ["hardware budget", "budget"],

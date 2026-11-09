@@ -21,11 +21,11 @@ variation it entered by.  This module tracks which crystal entered which leg, at
 junction and by which variation, through every instruction of a programme -- template steps,
 plain moves, re-placements -- because C1 is a fact about the whole history, not one step.
 
-The replay (`qccd.verify.replay`) owns one `C2LRTracker` per run on a C2LR device and hands
+The replay (`qccd.verify.replay`) owns one `C2LRTracker` per run on a C2LR machine and hands
 each cycle's `C2LRStep` to the rules on the `CycleView`; `walk` replays positions alone, for
 the certificate check and the page, so all three expand a template the same way.
 
-Refusals come in two strengths.  A step that cannot be executed at all -- the device is not a
+Refusals come in two strengths.  A step that cannot be executed at all -- the machine is not a
 C2LR lattice, a named crystal is not placed or not in a leg -- raises `ReplayError`.  A step
 that executes but breaks a C rule -- a toward bit on a leg with no partner, an exit by another
 variation, a third crystal in a leg -- is executed as the exchange rule says and reported, so
@@ -46,10 +46,10 @@ __all__ = ["C2LRStep", "C2LRTracker", "StepError", "walk", "tracker_for", "is_c2
 
 @dataclass(frozen=True)
 class C2LRStep:
-    """One cycle on a C2LR device, as the rules see it.
+    """One cycle on a C2LR machine, as the rules see it.
 
     ``kind``      "swap_or_stay" | "reorder_or_not" for a template step, else "other"
-    ``exchange``  True only for a swap-or-stay step: its routes are the device's matching,
+    ``exchange``  True only for a swap-or-stay step: its routes are the machine's matching,
                   derived here and never read from the programme (the R2/R3/R5/R22 exemption)
     ``movers``    the crystals that changed leg; ``stayers`` every other crystal placed
     ``heated``    every crystal the step's waveform plays on (C9: all of them)
@@ -88,7 +88,7 @@ class C2LRStep:
 
 
 def is_c2lr_class(arch, cls: str | None) -> bool:
-    """Is `cls` one of the device's C2LR step classes (a step it plays from a template)?"""
+    """Is `cls` one of the machine's C2LR step classes (a step it plays from a template)?"""
     if not cls:
         return False
     if cls in C2LR_TEMPLATES:
@@ -192,7 +192,7 @@ class C2LRTracker:
         if instr is not None and instr.type == "simd" and not instr.template \
                 and is_c2lr_class(self.arch, instr.cls):
             c2.append(f"a {instr.cls} step lists its own routes; a C2LR step's only per-leg "
-                      f"choice is the direction bit, and its routes are the device's (C2)")
+                      f"choice is the direction bit, and its routes are the machine's (C2)")
         for i in moved:
             self.near.pop(i, None)
             self.entered.pop(i, None)
@@ -232,10 +232,10 @@ class C2LRTracker:
         offer = declared(self.arch)
         c6: list[str] = []
         if var.form == "diagonal" and var.diagonal not in offer["diagonals"]:
-            c6.append(f"the device does not offer diagonal {var.diagonal} (it offers "
+            c6.append(f"the machine does not offer diagonal {var.diagonal} (it offers "
                       f"{', '.join(offer['diagonals']) or 'none'}) (C6)")
         if var.form == "checkerboard" and var.pairing not in offer["checkerboard"]:
-            c6.append(f"the device does not offer the checkerboard pairing {var.pairing} (it "
+            c6.append(f"the machine does not offer the checkerboard pairing {var.pairing} (it "
                       f"offers {', '.join(offer['checkerboard']) or 'none'}) (C6)")
         c1: list[str] = []
         contents = self._contents(pos)
@@ -245,7 +245,7 @@ class C2LRTracker:
             pair = pairs.get(leg)
             if pair is None:
                 c6.append(f"{ion} is shifted toward a junction from leg {leg}, which has no "
-                          f"partner under {var.label} (the device's edge); a crystal there can "
+                          f"partner under {var.label} (the machine's edge); a crystal there can "
                           f"only stay (C6)")
                 continue
             j = pair[0]
@@ -307,7 +307,7 @@ class C2LRTracker:
 
 
 def tracker_for(arch) -> C2LRTracker | None:
-    """A tracker for a C2LR device, None for any other.  A device that declares C2LR control
+    """A tracker for a C2LR machine, None for any other.  A machine that declares C2LR control
     but is not a lattice gets None too: its template steps are refused when they are met, and
     C10 says why."""
     if not is_c2lr(arch):
@@ -321,7 +321,7 @@ def tracker_for(arch) -> C2LRTracker | None:
 def walk(prog: TSIR, arch) -> Iterator[tuple[Instruction, C2LRStep | None, dict[str, str]]]:
     """Replay positions alone: `(instruction, its C2LR step or None, positions after it)`.
 
-    What the certificate check and the page need of a programme on a C2LR device -- where
+    What the certificate check and the page need of a programme on a C2LR machine -- where
     each template sends each crystal -- without a cost model.  A template is expanded by the
     same `C2LRTracker.expand` the replay uses, so the three cannot disagree.  Raises
     ValueError for a template that cannot be executed."""
@@ -343,7 +343,7 @@ def walk(prog: TSIR, arch) -> Iterator[tuple[Instruction, C2LRStep | None, dict[
         if tpl.get("kind") in C2LR_TEMPLATES:
             if trk is None:
                 raise ValueError(f"instruction {ins.id}: a {tpl.get('kind')} step needs a C2LR "
-                                 f"device; {why_not_c2lr(arch)}")
+                                 f"machine; {why_not_c2lr(arch)}")
             try:
                 step, pos = trk.expand(ins, pos)
             except StepError as exc:
@@ -373,7 +373,7 @@ def why_not_c2lr(arch) -> str:
 
 def page_steps(prog: TSIR, arch) -> dict[int, tuple[C2LRStep, dict, dict]]:
     """instruction id -> (its C2LR step, positions before it, positions after it), for each
-    template the device can expand, in order, up to the first it cannot.
+    template the machine can expand, in order, up to the first it cannot.
 
     What the page draws a step from (`qccd.viz.render`) and what `engine.js`'s lowerer
     re-derives for a programme written in the browser (`_c2lrLower`), so the two must stop
@@ -396,7 +396,7 @@ def page_steps(prog: TSIR, arch) -> dict[int, tuple[C2LRStep, dict, dict]]:
 def frame_view(template: Mapping, step: C2LRStep | None, before: Mapping[str, str],
                after: Mapping[str, str], arch) -> dict:
     """The `c2lr` field of a page frame: the template as the programme wrote it, and for a
-    swap-or-stay step the device expanded, `shift` -- every crystal that keeps a leg to
+    swap-or-stay step the machine expanded, `shift` -- every crystal that keeps a leg to
     itself through the step, as `[the junction its C2LR shift is measured from, +1 toward |
     -1 away]`, in ion order.  The movers are the frame's `moves`; a crystal sharing its
     leg sits in its own well at one end and is drawn by its slot, not by a shift."""

@@ -1,6 +1,6 @@
 """Where every mark goes -- computed in Python so it can be tested, not guessed in JS.
 
-The old page fitted every device into a fixed `1000x460` box with one isotropic scale and
+The old page fitted every machine into a fixed `1000x460` box with one isotropic scale and
 then sized every mark from the *node count* (`300/sqrt(n+1)`, clamped to 13). Those two
 numbers are unrelated, so a 71:1 racetrack was drawn as a 912x13 px hairline with 21 px
 ions on a 12.8 px pitch -- ions overlapping their neighbours by 66%, rails wider than the
@@ -11,10 +11,10 @@ This module replaces both with three measured quantities and one rule:
 
 * **the lattice** -- `ux`, `uy`, the minimum positive gap between distinct x (resp. y)
   coordinates, and `gd`, the true minimum nearest-neighbour distance in data units;
-* **the fit** -- a per-axis scale, because 10 of the 12 shipped devices carry 12-72
+* **the fit** -- a per-axis scale, because 10 of the 12 shipped machines carry 12-72
   distinct x coordinates against 1-4 distinct y coordinates, and an isotropic fit hands
   the entire vertical budget to a one-unit-tall band. Anisotropy is safe here and only
-  here: every segment in every shipped device is axis-aligned, so nothing is skewed. The
+  here: every segment in every shipped machine is axis-aligned, so nothing is skewed. The
   moment a diagonal segment appears, or the bounding box is squarer than 2:1, the fit
   locks back to isotropic;
 * **`g`, the minimum nearest-neighbour distance in *drawn pixels*** -- measured after the
@@ -204,7 +204,7 @@ def _lattice_step(vals: Iterable[float]) -> float:
 
 
 def _sample(pts: Sequence[tuple[float, float]], cap: int = 6000):
-    """Subsample deterministically for the nearest-neighbour scan on huge devices."""
+    """Subsample deterministically for the nearest-neighbour scan on huge machines."""
     if len(pts) <= cap:
         return pts
     stride = len(pts) / cap
@@ -222,7 +222,7 @@ def _fit(dx: float, dy: float, ux: float, uy: float, pad: float,
     that ratio, so one screen pixel is the same number of nanometres on both axes and an
     angle measured off the drawing is the angle the metal actually makes.  Without it the
     fit is free to stretch one axis by up to `K_ANISO`, which is legible but lies about
-    every angle -- a 72:1 device is drawn 12:1 and its 90 degree corners are not 90
+    every angle -- a 72:1 machine is drawn 12:1 and its 90 degree corners are not 90
     degrees on screen.  Nothing else changes: the true-scale pair is the largest pair in
     the required ratio that still fits inside the budget both axes already passed, so the
     pitch cap and the viewport ceiling still bind.
@@ -307,7 +307,7 @@ def _bows(nodes, segments, pos, g, pad, clearance=0.0, need=0.0):
     outward into the margin as a quadratic instead -- which also makes the deck's "a
     corner segment costs three hops" visible as a visibly longer path.
 
-    Returns `{segment id: signed midpoint offset in px}`, empty for every device that does
+    Returns `{segment id: signed midpoint offset in px}`, empty for every machine that does
     not need it (seven of the nine shipped ones).
     """
     if g <= _EPS or not pos:

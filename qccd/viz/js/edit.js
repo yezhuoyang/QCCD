@@ -391,7 +391,7 @@ function finish(dev, report, before) {
   const comps = components(dev);
   const warnings = report.warnings.slice();
   if (comps.length > 1) {
-    warnings.push(`the device is in ${comps.length} disconnected pieces ` +
+    warnings.push(`the machine is in ${comps.length} disconnected pieces ` +
                   `(${comps.map((c) => c.length).join(', ')} nodes); no ion can move between them`);
   }
   // Key ORDER matters: the parity harness compares dict order because the listing and

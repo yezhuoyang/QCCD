@@ -1,6 +1,6 @@
 """What an evaluation means: its terms evaluated on a run, and its channels written as stim.
 
-Three things are computed from (device, programme, evaluation) and nothing else:
+Three things are computed from (machine, programme, evaluation) and nothing else:
 
 * every **metric** -- a term, evaluated on the run;
 * every **requirement** -- a formula, which holds or fails on the run;
@@ -148,7 +148,7 @@ class Evaluator:
 
     def under(self, clock: str) -> "Evaluator":
         """The same evaluation on a replay under another operating-point table (a metric that
-        names a clock of its own); each clock is replayed once per run.  A table the device
+        names a clock of its own); each clock is replayed once per run.  A table the machine
         format does not declare is refused: `corrected_model` would price it on another."""
         from ..arch.curves import TABLES
         if clock not in TABLES:

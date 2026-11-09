@@ -75,8 +75,8 @@ DROP_SECTIONS: dict[str, tuple[str, ...]] = {
 #: than cut.  A replacement of ``""`` deletes the text.
 REWRITES: tuple[tuple[str, str], ...] = (
     # --- headings that are a path
-    ("# `qccd/phys/` — the electrodes a device implies",
-     "# The electrodes a device implies"),
+    ("# `qccd/phys/` — the electrodes a machine implies",
+     "# The electrodes a machine implies"),
     ("# `.arch.json` — the architecture description language",
      "# The architecture description language"),
     # --- adl
@@ -184,8 +184,8 @@ REWRITES: tuple[tuple[str, str], ...] = (
     ("**The town** (`town.py`) is the design they run on", "**The town** is the design they run on"),
     ("(`city.py`) runs instructions one after another", "runs instructions one after another"),
     ("**The checks.** `place_checks.py` re-derives G1–G9", "**The checks.** The place model re-derives G1–G9"),
-    ("**The bay.** Every ring place is one device family (`leaves/bay.py`):",
-     "**The bay.** Every ring place is one device family:"),
+    ("**The bay.** Every ring place is one machine family (`leaves/bay.py`):",
+     "**The bay.** Every ring place is one machine family:"),
     ("own silhouette, defined once (`categories.py`) and drawn identically", "own silhouette, defined once and drawn identically"),
     ("- **Stabilizer flows** (`spec.py`, `tableau.py`). A flow", "- **Stabilizer flows.** A flow"),
     ("- **Fault distance** (`experiment.py`, `faults.py`). The op sits", "- **Fault distance.** The op sits"),

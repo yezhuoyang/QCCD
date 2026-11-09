@@ -99,7 +99,7 @@ class ExportsMixin:
         des = run.get("design") or {}
         dtitle = self._design_title_of(des.get("draft") or "main")
         files = []
-        for key, fname, about in (("device", "device.arch.json", "the device the run compiled onto"),
+        for key, fname, about in (("device", "device.arch.json", "the machine the run compiled onto"),
                                   ("circuit", "circuit.qasm", "the circuit (OpenQASM 2.0)"),
                                   ("program", "program.cooled.tsir.json",
                                    "the compiled program with cooling inserted: what the run replayed"),

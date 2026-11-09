@@ -110,7 +110,7 @@ def test_a_device_that_is_not_a_c2lr_lattice_is_refused_with_its_reason():
     with pytest.raises(NotC2LR, match="leg"):
         geometry(Architecture.from_json(doc))
     # and a template on a device that does not declare C2LR control does not replay at all
-    with pytest.raises(ReplayError, match="needs a C2LR device"):
+    with pytest.raises(ReplayError, match="needs a C2LR machine"):
         verify(build([sos("WS", ["q0"])], {"q0": "T0_1h"}), Machine.grid(3, 3).arch,
                corrected_model())
 

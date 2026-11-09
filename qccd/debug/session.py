@@ -1,6 +1,6 @@
 """A programme, step by step: what the debugger reads.
 
-One `Session` is one programme replayed once on one device under one clock.  It answers the
+One `Session` is one programme replayed once on one machine under one clock.  It answers the
 questions a person (or an agent) debugging a compiler or a hand-written programme asks:
 
     what is step k, and what did it do?             step(k)
@@ -20,7 +20,7 @@ every sentence this module returns is renumbered to the page's steps.
 **Rules are the rule language's** (`qccd.ruleset`): the same parser, vocabulary and
 evaluator the grader uses, so a verdict here is the grader's verdict.  What this module adds
 is *where*: every counterexample is turned into the step it happens at, the steps it lasts
-through, and the places on the device it names (sites, junctions, rails, ions), so the page
+through, and the places on the machine it names (sites, junctions, rails, ions), so the page
 can put a red cross on them.
 
 **Conditions and expressions are the rule language too.**  A breakpoint is a formula over
@@ -111,7 +111,7 @@ def _doc(x: Any, what: str) -> dict:
 def open_documents(arch: Any, program: Any, model: Any = None, *, name: str | None = None,
                    certificate: Any = None) -> "Session":
     """A session from an `.arch.json` and a `.tsir.json`, as text or parsed (what a Studio
-    page's Download -> 'device and programme' gives, and what the compiler writes).  With the
+    page's Download -> 'machine and programme' gives, and what the compiler writes).  With the
     compiler's certificate (`.qcert.json`) the circuit it compiled comes along, so the rules
     about the circuit (R24, R25, R26) are judged instead of not applying."""
     from ..arch.device import Architecture
@@ -228,7 +228,7 @@ def _instr_text(ins) -> str:
 # ------------------------------------------------------------------ the session
 
 class Session:
-    """One programme on one device under one clock, replayed once.  Public step numbers
+    """One programme on one machine under one clock, replayed once.  Public step numbers
     count from 1 (the Studio's "Step k / N"); `_p` names an internal 0-based position."""
 
     def __init__(self, arch, prog, model: Any = None, *, name: str | None = None, circuit=None):
@@ -613,7 +613,7 @@ class Session:
     def rules_at(self, step: Any, rules: Any = "standard", assertions: str | None = None, *,
                  budget: int = CASES_PER_STEP) -> dict:
         """Every rule at step k: how many cases it judges there and how many of them fail.  A rule
-        whose cases name no moment (a corner of the device, a rail) judges them at every step."""
+        whose cases name no moment (a corner of the machine, a rail) judges them at every step."""
         p = self._in(step)
         rs, ev, todo = self._rules(rules, assertions)
         out = {"step": p + 1, "instruction": _instr_text(self.prog.instructions[p]), "rules": []}

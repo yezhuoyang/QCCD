@@ -1,8 +1,8 @@
 """The words the WISE and Cyclone rule sets are written in (the transport deck's S-rules).
 
-A WISE step's pairs are the device's own (`qccd.arch.wise.Zones`) and a Cyclone step's
-one trap round its ring, so each word reads the programme's step against the device, never a
-claim of the programme's.  Each answers for one step, or for the device, as the C rules' words
+A WISE step's pairs are the machine's own (`qccd.arch.wise.Zones`) and a Cyclone step's
+one trap round its ring, so each word reads the programme's step against the machine, never a
+claim of the programme's.  Each answers for one step, or for the machine, as the C rules' words
 do; `qccd/ruleset/library/wise.rules` and `cyclone-deck.rules` say what must hold.
 """
 
@@ -30,7 +30,7 @@ def _step(ctx: Ctx, k, fn: str) -> dict:
 
 
 def _wise_pairs(ctx: Ctx) -> dict[tuple[str, str], set[tuple[str, str]]]:
-    """(pair kind, half) -> the moves that kind of step may make, from the device."""
+    """(pair kind, half) -> the moves that kind of step may make, from the machine."""
     def make():
         from ..arch.wise import Zones
         out: dict = {}
@@ -46,20 +46,20 @@ def _half(cls: str | None) -> tuple[str, str] | None:
     return (parts[1], parts[2]) if len(parts) == 3 and parts[0] == "wise" and parts[2] in "ab" else None
 
 
-@term("wise_device()", "true or false", "Whether the device is a WISE chip: its drawing says so, as "
-      "the device's generator parameters do.", "hardware")
+@term("wise_device()", "true or false", "Whether the machine is a WISE chip: its drawing says so, as "
+      "the machine's generator parameters do.", "hardware")
 def _wise_device(ctx: Ctx):
     return _params(ctx).get("family") == "wise"
 
 
-@term("cyclone_device()", "true or false", "Whether the device is a Cyclone ring: its drawing says "
-      "so, as the device's generator parameters do.", "hardware")
+@term("cyclone_device()", "true or false", "Whether the machine is a Cyclone ring: its drawing says "
+      "so, as the machine's generator parameters do.", "hardware")
 def _cyclone_device(ctx: Ctx):
     return _params(ctx).get("family") == "cyclone"
 
 
 @term("one_parity(k)", "true or false", "Whether WISE step k plays one kind of pair at one parity "
-      "in one direction: its class names them, each of its moves is one of the device's pairs of "
+      "in one direction: its class names them, each of its moves is one of the machine's pairs of "
       "that kind, and no zone takes part twice.", "execution", kinds=("programme",))
 def _one_parity(ctx: Ctx, k):
     ins = _step(ctx, k, "one_parity")["instruction"]
@@ -113,7 +113,7 @@ def _shim_opens(ctx: Ctx, k):
     return False
 
 
-@term("shims_in_every_layer()", "true or false", "Whether every layer's price on this device carries "
+@term("shims_in_every_layer()", "true or false", "Whether every layer's price on this machine carries "
       "its shim charge: the time of 128 shims at 3 us each, before the pulse.", "hardware")
 def _shims(ctx: Ctx):
     from ..arch.wise import SHIM_US
@@ -121,7 +121,7 @@ def _shims(ctx: Ctx):
     return all(float(prim[p]["us"]) >= SHIM_US for p in ("1q_gate", "ms_gate", "measure", "reset"))
 
 
-@term("ring_device()", "true or false", "Whether the device is one closed ring: every site on the "
+@term("ring_device()", "true or false", "Whether the machine is one closed ring: every site on the "
       "one loop with two rails, and every junction an L at its corners, of degree 2.", "hardware")
 def _ring_device(ctx: Ctx):
     hw = ctx.hw

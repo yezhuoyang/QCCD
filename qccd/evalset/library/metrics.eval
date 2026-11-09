@@ -1,6 +1,6 @@
 evaluation "metrics"
 title "The numbers every design is measured by"
-about "Speed, heat, hardware, size and logical error, each a term over the device, the programme and the replay of one on the other."
+about "Speed, heat, hardware, size and logical error, each a term over the machine, the programme and the replay of one on the other."
 
 # ------------------------------------------------------------------ the device's own laws
 
@@ -24,7 +24,7 @@ define gate_chain(g) = occupancy(site(g), start(g))
 # ------------------------------------------------------------------ speed
 
 metric T "Execution time" unit "ms" better low group "speed"
-  about "How long the programme runs on the device's clock: its steps one after another, each as long as its slowest participant."
+  about "How long the programme runs on the machine's clock: its steps one after another, each as long as its slowest participant."
   = time(final()) / 1000
 
 metric T_jones "Execution time, on QCCDSim's clock" unit "ms" better low group "speed" clock "qccdsim_jones"
@@ -91,7 +91,7 @@ metric peak_nbar "Hottest any ion gets" unit "quanta" better low group "heat"
   = max(max(nbar(i, end(k)) for i in ions) for k in steps)
 
 metric gate_nbar_max "Hottest a two-ion gate starts" unit "quanta" better low group "heat"
-  about "The hottest pair any two-ion gate meets; rule R7 caps it at the device's heat budget."
+  about "The hottest pair any two-ion gate meets; rule R7 caps it at the machine's heat budget."
   = if count(g in two_qubit_gates) = 0 then 0 else max(gate_nbar(g) for g in two_qubit_gates)
 
 metric gate_nbar_mean "Mean heat at a two-ion gate" unit "quanta" better low group "heat"
@@ -117,7 +117,7 @@ metric n_coolings "Coolings" unit "count" better low group "heat"
   = count(o in coolings)
 
 metric gate_error_sum "Summed two-ion gate error" unit "expected errors" better low group "heat"
-  about "The device's gate error law summed over every two-ion gate, at the heat and chain length each meets: the heat's whole price."
+  about "The machine's gate error law summed over every two-ion gate, at the heat and chain length each meets: the heat's whole price."
   = sum(ms_error(gate_nbar(g), gate_chain(g)) for g in two_qubit_gates)
 
 # ------------------------------------------------------------------ hardware
@@ -144,7 +144,7 @@ metric n_rails "Rails" unit "count" better low group "hardware"
   = count(r in rails)
 
 metric places "Places for ions" unit "ions" better high group "hardware"
-  about "How many ions the device can hold at once: every node's capacity, added up."
+  about "How many ions the machine can hold at once: every node's capacity, added up."
   = sum(capacity(n) for n in nodes)
 
 define scheme = wiring("scheme", "direct")

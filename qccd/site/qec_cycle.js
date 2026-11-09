@@ -33,10 +33,10 @@
       // machine, and a "the decoder keeps up" verdict would be confident nonsense.
       if (P && P.blocked && (P.blocked.length === undefined || P.blocked.length))
         return { us: 0, blocked: true,
-                 from: "the price is blocked — this device does not run the programme" };
+                 from: "the price is blocked — this machine does not run the programme" };
       if (P && P.totals && P.totals.us)
         return { us: P.totals.us,
-                 from: "this device, priced in the browser" +
+                 from: "this machine, priced in the browser" +
                        (P.frameChecked === false ? ", not yet cross-checked against Python" : "") };
     } catch (e) { /* no live price yet */ }
     try {
@@ -128,7 +128,7 @@
     }
     h += '<div class="qc-head">' +
          '<label><input type="checkbox" id="qcLayerOn"' + (LAYER.on ? " checked" : "") +
-         '> show it on the device</label>' +
+         '> show it on the machine</label>' +
          '<label>decoder <select id="qcDec">' + opts + '</select></label>' +
          '<label>the answer <select id="qcMode">' +
          '<option value="store"' + (STATE.mode === "store" ? " selected" : "") + '>stops in the classical memory</option>' +
@@ -696,7 +696,7 @@
     b.id = "qcBtn";
     b.type = "button";
     b.textContent = "QEC cycle";
-    b.title = "the syndrome round this device runs, and the classical feedback loop around " +
+    b.title = "the syndrome round this machine runs, and the classical feedback loop around " +
               "it: does the decoder keep up, and what does acting on its answer cost?";
     // The explain layer is driven by one HINTS table inside the studio, and a `data-hint`
     // with no entry is a hole (the hover card, Explain, the guide and Ctrl+K all go
@@ -713,9 +713,9 @@
     // and beside it, the one switch for the whole classical half (`setShown`)
     var show = document.createElement("label");
     show.id = "qcShow";
-    show.title = "Show the classical half of the machine on the device: the wires from the " +
+    show.title = "Show the classical half of the machine on the machine: the wires from the " +
                  "sites that measure, the decoder and the classical memory. Untick it to " +
-                 "see the device alone.";
+                 "see the machine alone.";
     var cb = document.createElement("input");
     cb.type = "checkbox";
     cb.id = "qcShowOn";

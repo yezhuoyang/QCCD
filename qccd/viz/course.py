@@ -1,8 +1,8 @@
-"""The course's prepared cases: the devices and programmes Python judges when a page is built.
+"""The course's prepared cases: the machines and programmes Python judges when a page is built.
 
 Five of the twenty-seven rules are not re-implemented in the browser (R4d, R7b, R9, R10,
 R16 -- see `docs/TUTORIAL_PLAN.md` §6).  The rule lessons that teach them cannot show a
-verdict the page computed, so they show Python's: each case below is a device the studio
+verdict the page computed, so they show Python's: each case below is a machine the studio
 can rebuild from its generator call and a programme as the same `{method, args, kwargs}`
 records the Write pane produces.  `render.py` runs every case through `verify()` under the
 page's own cost model and ships the cases and the verdicts together as
@@ -121,7 +121,7 @@ _METRICS = ("total_cost", "total_steps", "runtime_us", "peak_quanta", "gate_erro
 
 
 def case_machine(case: Mapping) -> Machine:
-    """The case's device, built the way the studio builds it: the named generator with
+    """The case's machine, built the way the studio builds it: the named generator with
     the same parameters, borrowing the default template's physics and control plane."""
     dev = case["device"]
     ctor = getattr(Machine, str(dev["generator"]))
@@ -227,7 +227,7 @@ def measured(model: CostModel) -> dict:
 
 
 def cases_for_page() -> dict:
-    """The cases as the page needs them to rebuild each one: device call and records."""
+    """The cases as the page needs them to rebuild each one: machine call and records."""
     return {cid: {"device": dict(case["device"]), "program": list(case["program"]),
                   "fixed": list(case.get("fixed") or [])}
             for cid, case in CASES.items()}

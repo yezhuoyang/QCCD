@@ -8,7 +8,7 @@ The ring is `ring(x/2 + 2, 2, 0, corners="junction")`: x traps on its long sides
 junction at each of its four corners, of degree 2 (deck S1, HW2).  A rectangle has an even number
 of sides' traps, so x is even.
 
-**The time model is device numbers** (deck T1-T4), so the replay needs nothing new:
+**The time model is machine numbers** (deck T1-T4), so the replay needs nothing new:
 
 * the rail between two traps is the move, 10 us, and a corner is two rails, the move plus the
   degree-2 crossing, 10 us more (T1, T2);
@@ -69,7 +69,7 @@ def traps_for(data: int, ancillas: int) -> list[tuple[int, int]]:
 
 
 def device_doc(x: int, n: int, *, name: str | None = None) -> dict:
-    """The ring as a device document, before any physics: x traps of capacity n."""
+    """The ring as a machine document, before any physics: x traps of capacity n."""
     from ..api import Machine
     if x < 2 or x % 2:
         raise ValueError(f"a ring has an even number of traps, not {x}")

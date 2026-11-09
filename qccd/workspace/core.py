@@ -578,7 +578,7 @@ class WorkspaceCore:
         constraints = copy.deepcopy(head.constraints)
         if "device:base" in cs["touched"]:
             if later:
-                raise WorkspaceError("conflict", "a new device was built later changes rest on; "
+                raise WorkspaceError("conflict", "a new machine was built later changes rest on; "
                                      "undo those first", status=409,
                                      detail={"dependent": [_cs_brief(c) for c in later]})
             new_state = before.state.copy()

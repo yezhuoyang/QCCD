@@ -1,4 +1,4 @@
-"""The Compiler leaderboard's benchmark: a suite of (circuit, device) pairs, the contract a
+"""The Compiler leaderboard's benchmark: a suite of (circuit, machine) pairs, the contract a
 submitted compiler follows, and the harness that runs and grades it.  docs/PLAN-boards.md, Phase 3.
 
     contract   qccd.compiler@1: a directory with qccd-compiler.json; how it is invoked; exit 4 refuses

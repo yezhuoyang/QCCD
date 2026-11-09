@@ -542,9 +542,10 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
                               "listing, a programme in a grammar of a few method calls and no expressions (section 9), and running "
                               "that listing gives <var>M</var> back. The two texts are interchangeable; the Studio's "
                               "Design page edits the listing, the files on disk are documents."))
-    w("<p>One word first. On this website <i>machine</i> and <i>device</i> name the same object: <i>device</i> is the "
-      "Studio's and the file format's word (a device document, the Design page's device), <i>machine</i> the one the "
-      "definitions use. Wherever another page says <i>the device</i>, it means the <var>M</var> of this page.</p>")
+    w("<p>One word first. Every page of this website, and the Studio, says <i>machine</i> for this object. The file "
+      "format and the code keep an older spelling in their identifiers (a <code>.arch.json</code> document's "
+      "<code>geometry</code>, the Python class that holds it), and the architecture description reference uses that "
+      "spelling where it names those identifiers; it is the same object, the <var>M</var> of this page.</p>")
     w("<p>Why two forms? A document is what a file should be: data, with a schema, that a loader validates and "
       "nobody has to execute. A listing is what an editor should show: statements a person can read top to bottom, "
       "change one of, and run again, which is what the Design page's text lane does and what a Python session does. "
@@ -813,9 +814,9 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
                          "the tables, the proved checker three facts read from the document and never from the compiler."))
     w(tbl(["reader", "what it reads of M", "what it calls it", "where"], [
         ["<b>Language</b>", "sites, hops, closed loops, declared classes, abilities", "the names a statement may use (M15)", '<a href="../language/#semantics">Language · semantics</a>'],
-        ["<b>Rules</b>", "sites, junctions, rails, capacity, degree, zone, can, ends, rails_at, loops, the declared numbers", "the device vocabulary: the Hardware record", '<a href="../rules/#words">Rules · the words</a>'],
+        ["<b>Rules</b>", "sites, junctions, rails, capacity, degree, zone, can, ends, rails_at, loops, the declared numbers", "the machine vocabulary: the Hardware record", '<a href="../rules/#words">Rules · the words</a>'],
         ["<b>Compiler</b>", "traps T, junctions J, rails E, cap, gate, meas, closed loops L; the curves, for cooling insertion", "the trap graph A(M), Definition 1 there", '<a href="../compilation/#def-device">Compilation · 5.1</a>'],
-        ["<b>Evaluation</b>", "the curves under a policy, the wiring and budget, the heating rate, the species", "the device's tables, the device's wiring, the device's laws", '<a href="../evaluation/#words">Evaluation · the words</a>'],
+        ["<b>Evaluation</b>", "the curves under a policy, the wiring and budget, the heating rate, the species", "the machine's tables, the machine's wiring, the machine's laws", '<a href="../evaluation/#words">Evaluation · the words</a>'],
         ["<b>Proved checker</b>", "gate-capable sites, hops(M), each closed loop's slots", "gateSites, hops, loops: facts the compiler cannot widen", '<a href="../compilation/#correctness">Compilation · 5.9</a>'],
     ]))
     w(eg("The three projections of <code>ring6d</code>, read when the site was built."
@@ -830,7 +831,7 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
     w(f'<h2 id="examples">7. {HEADINGS[6][1]}</h2>')
     w(learn.section("the six machines the examples of this website run on, each shown as its drawing, its generator "
                     "line and what that line expands to, with a short programme on it you can play. Pressing Play opens "
-                    "the machine's Studio page, whose Hardware column is this machine as a programme, line by line."))
+                    "the machine's Studio page, whose Machine pane is this machine as a programme, line by line."))
     for key, dev_dict, label, role in MACHINES:
         m = ms[key]
         d = m.arch.device
@@ -853,7 +854,7 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
         w("</div></div>")
         if card:
             w(learn.runbox(card["page"], card["poster"], f"{key}: the programme, played on its machine",
-                           what="the programme on this machine; its Studio page shows the machine as a programme in the Hardware column"))
+                           what="the programme on this machine; its Studio page's Machine pane is the machine as a programme"))
             w(f'<a class="open" href="{card["page"]}#step=1">open the page, with its Report pane</a>')
     w(learn.bridge("Five of the six were written by a generator from two or three numbers. The next section says what "
                    "a generator is, and why the compact form is only kept when it is honest."))
@@ -941,7 +942,7 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
             f"{tee_card['verdict']['us']:g} µs · peak n̄ {tee_card['verdict']['peak_quanta']:.2f}</div>" if tee_card else "")))
     if tee_card:
         w(learn.runbox(tee_card["page"], tee_card["poster"], "tee: two ions brought through the junction to one trap, then gated",
-                       what="the programme on the hand-written machine; its page's Hardware column is the listing above"))
+                       what="the programme on the hand-written machine; its page's Machine pane is the listing above"))
         w(f'<a class="open" href="{tee_card["page"]}#step=1">open the page, with its Report pane</a>')
     w("<p><b>Where to write one.</b> On the <a href=\"../design/\">Design</a> page: its Parts mode places sites, "
       "junctions and rails with the pointer, its Sketch mode turns a drawn shape into sites and rails, and its text "

@@ -806,3 +806,24 @@ hardware and made formal on the next page; R19's default corrected to the code's
 the document declares fewer; a planar chip declares four), in the glossary too.  The adl
 reference's zone example loses "ancilla".  tests/learn.mjs walks six pages and expects a
 six-entry strip; test_learn_pages knows the Machine anchors.
+
+## One word: machine, not device - 2026-11-08
+
+The reader, after the Machine page: "Call it machine, not device."  Every reader-facing
+text now says machine: the six Learn pages, the boards and Goal pages, Reproduce, the
+Debug and Agentic pages, the rule and evaluation vocabularies and the shipped rule and
+evaluation texts (about lines only; an entry's declared set is its own text, so no stored
+digest moves), the Studio's panes, hints, menus, refusal messages and lessons, the agent
+declaration (editor_api.json) and the workspace's messages and skill, and the four
+rendered docs.  Identifiers, JSON keys, file names and URLs keep their spelling (the
+document's geometry, `Device`, `device_svg`, `.arch.json`), as do measured records
+(agentic_measured.json) and the paper titles.  The rename was scripted
+(scratchpad rename_device.py: Python string tokens only, JavaScript and JSON quoted
+literals only, markdown outside code; guards for keys, paths, format fields and the
+QCCD's own name "charge-coupled device"), 916 replacements in 137 files, reviewed from
+its log.  Two Studio panes were renamed by hand, because the words collided: the pane
+that showed the machine as code was "Device" and is now "Machine"; the pane of hardware
+totals was "Machine" and is now "Hardware"; the code pane's middle view is "Parts".  The
+Studio's hint text and the page stamp moved with render.py, so every seed page was
+regenerated once more.  Not renamed: the compiler and checker in Compiler/ (released
+binaries), the bench suite's data (digests), internal modules nobody reads on the site.

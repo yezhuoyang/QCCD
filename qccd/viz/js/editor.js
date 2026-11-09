@@ -1868,7 +1868,7 @@ function canvasStep(from, to) {
   if (r.ok) return;
   to.pop();
   from.push(rec);
-  toast('bad', ((r.problems || [])[0] || {}).message || 'the other device could not be restored');
+  toast('bad', ((r.problems || [])[0] || {}).message || 'the other machine could not be restored');
 }
 function undo() {
   if (EDITS.length) { UNDONE.push(EDITS.pop()); rebuild(); return; }
@@ -2597,7 +2597,7 @@ function metricRows() {
 // used to be able to describe the same break differently -- the stage said nothing at all
 // -- so this is extracted rather than copied.
 function breakMessage(b) {
-  if (!b) return 'the programme does not fit this device';
+  if (!b) return 'the programme does not fit this machine';
   return b.kind === 'unknown_node' ? 'this edit removed ' + b.node + ', which the programme places an ion on'
        : b.kind === 'no_segment' ? 'the programme routes ' + b.src + ' to ' + b.dst + ', which no segment now joins'
        : b.kind === 'missing_loop' ? 'the programme shifts loop ' + b.loop + ', which this edit removed'
@@ -2633,7 +2633,7 @@ function priceHead() {
   if (LENGTH_NOTE) head += ' · ' + LENGTH_NOTE;
   // a device from a gallery card or a blank canvas is NEW, not "unedited": nothing about
   // it shipped with the page, and the word would claim a baseline that does not exist
-  if (same) return head + (shippedSeed() ? ' · unedited' : ' · new device');
+  if (same) return head + (shippedSeed() ? ' · unedited' : ' · new machine');
   return head;
 }
 function priceNote() {
@@ -3617,7 +3617,7 @@ function skVerts(tool, a, b, mod) {
       return { verts: [], closed: true, rule: 'R20',
                why: 'a circle this small polygonises to ' + n + ' sides, whose rails meet ' +
                     'at ' + ang.toFixed(1) + ' degrees -- less than the ' + lim.minAng +
-                    ' this device requires (budget.min_rail_angle_deg): drag a bigger one' };
+                    ' this machine requires (budget.min_rail_angle_deg): drag a bigger one' };
     }
     var ph = Math.atan2((a.y - cy) / ry, (a.x - cx) / rx);
     var verts = [];
@@ -3844,7 +3844,7 @@ function sketchPlan(tool, a, b, mod) {
              w_um: 0, h_um: 0, loop: false };
   };
   if (!tool || !has(SK_TOOLS, tool)) return bad('no shape tool is armed');
-  if (!STATE) return bad('there is no device to draw on');
+  if (!STATE) return bad('there is no machine to draw on');
   var g = skVerts(tool, a, b, mod);
   if (g.why) return bad(g.why, g.rule);
   var verts = g.verts, closed = !!g.closed;
@@ -3863,7 +3863,7 @@ function sketchPlan(tool, a, b, mod) {
     if (Math.abs(ang - 180) > 1e-6) bends++;
     if (ang < lim.minAng - 1e-9) {
       return bad('a corner of ' + ang.toFixed(1) + ' degrees: two rails meeting at one ' +
-                 'node must subtend at least ' + lim.minAng + ' degrees on this device ' +
+                 'node must subtend at least ' + lim.minAng + ' degrees on this machine ' +
                  '(budget.min_rail_angle_deg)', 'R20');
     }
   }
@@ -3900,7 +3900,7 @@ function sketchPlan(tool, a, b, mod) {
   for (i = 0; i < meets.length; i++) {
     if (meets[i].degree > lim.maxDeg) {
       return bad('this would make ' + (meets[i].id || 'the new junction on rail ' + meets[i].on) +
-                 ' degree ' + meets[i].degree + ', and a node on this device may join at ' +
+                 ' degree ' + meets[i].degree + ', and a node on this machine may join at ' +
                  'most ' + lim.maxDeg + ' rails (budget.max_junction_degree)', 'R19');
     }
   }
@@ -3916,7 +3916,7 @@ function sketchPlan(tool, a, b, mod) {
   for (i = 0; i < m; i++) if (pts[i].split && skOnLoop(pts[i].split)) topoSplit = true;
   if (closed && topoSplit) {
     return bad('this ring crosses a rail that already carries an orbit, and the studio ' +
-               'cannot declare a second orbit across a junction added after the device was ' +
+               'cannot declare a second orbit across a junction added after the machine was ' +
                'sealed -- draw the shape to meet that loop at one of its own sites instead',
                'R21');
   }
@@ -3949,14 +3949,14 @@ function sketchCommit(plan) {
   // can join.
   if (!hasBuilder()) {
     return { ok: false, problems: [{ code: 'no_builder',
-      message: 'this device came from a generator, so a sketch cannot be added to it as ' +
+      message: 'this machine came from a generator, so a sketch cannot be added to it as ' +
                'builder statements -- press "explode to explicit…" at the bottom of ' +
                'Elements first' }] };
   }
   var zone = defaultZone();
   if (zone && postSeedZones()[zone]) {
     return { ok: false, problems: [{ code: 'zone_after_seal', targets: [zone],
-      message: "zone '" + zone + "' was added after this device was sealed, so a new site " +
+      message: "zone '" + zone + "' was added after this machine was sealed, so a new site " +
                'cannot use it — pick another zone chip.' }] };
   }
   var missing = componentBlocked({ requires: { zones: zone ? [zone] : [] } });
@@ -4364,8 +4364,8 @@ var KEYMAP = [
   { keys: ['f', '0'], verb: 'fit', label: 'f  0', doc: 'fit the stage' },
   { keys: ['F'], verb: 'follow', label: 'F', doc: 'toggle Follow in the programme listing' },
   { keys: ['1'], verb: 'pane-P', label: '1', doc: 'Program pane' },
-  { keys: ['2'], verb: 'pane-A', label: '2', doc: 'Device pane' },
-  { keys: ['3'], verb: 'pane-M', label: '3', doc: 'Machine pane' },
+  { keys: ['2'], verb: 'pane-A', label: '2', doc: 'Machine pane' },
+  { keys: ['3'], verb: 'pane-M', label: '3', doc: 'Hardware pane' },
   { keys: ['['], verb: 'fold-rail', label: '[', doc: 'fold the element rail' },
   { keys: [']'], verb: 'fold-dock', label: ']', doc: 'fold the side panels' },
   { keys: ['\\'], verb: 'fold-both', label: '\\', doc: 'fold both' },
@@ -4468,7 +4468,7 @@ var GLOSSARY = [
   ['el:component', { type: 'cmp:spur_dock' }, {}]
 ];
 var STEPS = [
-  ['Build a device', 'Pick a card on the empty canvas for a ready-made one, or press Trapping site and click the canvas a few times, then shift-drag one site onto another to lay a rail between them.'],
+  ['Build a machine', 'Pick a card on the empty canvas for a ready-made one, or press Trapping site and click the canvas a few times, then shift-drag one site onto another to lay a rail between them.'],
   ['Run a programme on it', 'Press Test drive for a small valid programme, or write your own in the Write panel and press Evaluate. The ions move on the canvas; the counters in the head keep score.'],
   ['Read the verdict', 'The status line names the instruction, the price line says what it costs, and the Report panel lists every hardware rule the design passes or fails, with the reason.']
 ];
@@ -4615,20 +4615,20 @@ function hideHud() {
 // is this" and one source for "what does it cost".
 var HINTS = {
   // the three regions of the screen
-  'region:rail':  { t: '1 \u00b7 Elements', d: 'The standard parts: press a tile, then click the canvas to place it there; a zone chip places a site in that zone the same way. Drag the right edge to make this column wider. Everything else about the device is in the tools bar above.' },
+  'region:rail':  { t: '1 \u00b7 Elements', d: 'The standard parts: press a tile, then click the canvas to place it there; a zone chip places a site in that zone the same way. Drag the right edge to make this column wider. Everything else about the machine is in the tools bar above.' },
   'rail:grip':     { t: 'Column width', d: 'Drag to make the Elements column wider or narrower (180 to 560 px); the width is remembered. Double-click to put it back.' },
-  'region:tools': { t: '0 \u00b7 Tools', d: 'One button per thing that used to crowd the rail: Start a device, append a row, the machine settings, whole components. Each opens a panel under its button; Escape closes it. What you can do to one PART of the device is on the part itself — right-click it. The search box finds any feature on the page (Ctrl+K).' },
-  'tools:start': { t: 'Start', d: 'A new device: a blank canvas, a generator, or one of the shipped devices opened as itself.' },
-  'tools:rows': { t: 'Append a row', d: 'Add a row to the device as code: a curve point, a zone, a class, a wiring or budget setting.' },
+  'region:tools': { t: '0 \u00b7 Tools', d: 'One button per thing that used to crowd the rail: Start a machine, append a row, the machine settings, whole components. Each opens a panel under its button; Escape closes it. What you can do to one PART of the machine is on the part itself — right-click it. The search box finds any feature on the page (Ctrl+K).' },
+  'tools:start': { t: 'Start', d: 'A new machine: a blank canvas, a generator, or one of the shipped machines opened as itself.' },
+  'tools:rows': { t: 'Append a row', d: 'Add a row to the machine as code: a curve point, a zone, a class, a wiring or budget setting.' },
   'tools:machine': { t: 'Machine settings', d: 'The physics and the control plane: primitives, heating, species, budgets, wiring.' },
   'tools:components': { t: 'Components', d: 'Whole parts placed as one: a trap with its junction, a register, a dock spur. Press one, then click the canvas.' },
   // (no 'tools:selection': the button it described is gone.  The rail's own Selection
   //  section is inside `region:rail`, and per-element actions are `ctxmenu` below.)
   'search': { t: 'Search', d: 'Type any words: every control on the page, its hint, and every lesson is indexed. Choose a hit to open where it lives, scroll to it and flash it. Ctrl+K focuses this box.' },
-  'region:stage': { t: '2 \u00b7 Canvas', d: 'The device, drawn to scale. Drag a part to move it; drag empty space to pan; wheel to zoom; shift-drag one site onto another to join them with a rail.' },
-  'region:bar':   { t: 'Transport', d: 'Plays the hardware programme on this device: every step is one instruction that moves, gates or measures ions.' },
+  'region:stage': { t: '2 \u00b7 Canvas', d: 'The machine, drawn to scale. Drag a part to move it; drag empty space to pan; wheel to zoom; shift-drag one site onto another to join them with a rail.' },
+  'region:bar':   { t: 'Transport', d: 'Plays the hardware programme on this machine: every step is one instruction that moves, gates or measures ions.' },
   'el:spur': { t: 'Spur', d: 'A short rail from the loop to a side site, where an ion can be parked. A parked ion stays put while the loop turns; moving onto the spur and back off it are the dock and undock moves.' },
-  'region:dock':  { t: '4 \u00b7 Panel', d: 'One panel at a time, opened from the menu in the head: the course, the device as code, the machine settings, a place to write your own test programme, or the report. Press its menu item again to close it.' },
+  'region:dock':  { t: '4 \u00b7 Panel', d: 'One panel at a time, opened from the menu in the head: the course, the machine as code, the machine settings, a place to write your own test programme, or the report. Press its menu item again to close it.' },
   'region:prog':  { t: '3 \u00b7 Program', d: 'The hardware programme one instruction per row, and the circuit it was compiled from, beside the animation: the executing instruction is marked and the next ones are in view. Hardware, Gates or Both.' },
   'progview': { t: 'Hardware \u00b7 Gates \u00b7 Both', d: 'What the Program pane shows: the hardware instructions, the circuit statements they realise, or both side by side. Only a compiled page has a circuit.' },
   'progpin': { t: 'Beside the animation', d: 'Keep the programme in its own column next to the canvas, the whole height, or put it back among the panels to give the canvas the width.' },
@@ -4642,13 +4642,13 @@ var HINTS = {
   'zone:new':      { t: 'New zone type', d: 'Declare another kind of site \u2014 a different capacity, or different things allowed in it.' },
   'el:curve_point': { t: 'Curve point', d: 'One measured way of running an operation: its duration in microseconds and the heat it adds to the ion in quanta. Faster runs heat more, so each curve has several rows; the price of every move is read off these curves.', k: 'adds a row to a named curve' },
   'el:primitives': { t: 'Primitives', d: 'The physics of the machine: how long a shuttle, a split, a merge, a crossing or a gate takes, and how much each heats the ion. Every price on this page comes from here.', k: 'edit in place' },
-  'prim:field': { t: 'Primitive field', d: 'One value this device declares for an operation, as its file writes it: a duration, a fidelity, a heat budget. Change it and press apply, and the page writes set_primitive(name, field=value) and prices again. A field nothing reads (a source, a note) is listed as plain text instead.' },
+  'prim:field': { t: 'Primitive field', d: 'One value this machine declares for an operation, as its file writes it: a duration, a fidelity, a heat budget. Change it and press apply, and the page writes set_primitive(name, field=value) and prices again. A field nothing reads (a source, a note) is listed as plain text instead.' },
   'prim:curve': { t: 'Edit this curve', d: 'Opens the operation’s curve: every measured way of running it (its duration and the heat it adds), which one the model prices, and a row to add another.' },
   'el:control':    { t: 'Control plane', d: 'The wiring: how many voltage sources (DACs) drive how many electrodes, and how many different motions can happen in one step. This is what the DAC count measures.', k: 'edit in place' },
   'el:heating':    { t: 'Heating', d: 'How fast an ion warms up just by waiting, in quanta per millisecond. A hot ion makes a bad gate, so time itself has a price.', k: 'edit in place' },
   'el:species':    { t: 'Species', d: 'Which ion carries the qubit, which one is used for cooling, and how long the qubit stays coherent.', k: 'edit in place' },
   'el:budget':     { t: 'Budget', d: 'Hard ceilings for the design \u2014 at most this many DACs, junctions or square millimetres. The report says when a design goes over.', k: 'edit in place' },
-  'explode': { t: 'Convert parts to plain sites', d: 'Turns every placed component into ordinary sites and rails so they can be edited one by one. The device stays the same; only its description changes.' },
+  'explode': { t: 'Convert parts to plain sites', d: 'Turns every placed component into ordinary sites and rails so they can be edited one by one. The machine stays the same; only its description changes.' },
   'el:component':  { t: 'Component', d: 'A whole part made of several sites and rails \u2014 a dock, a tile, a register \u2014 placed as one piece and moved as one piece.', k: 'press the tile, then click the canvas' },
   // the toolbar
   'play':   { t: 'Play / Pause', d: 'Run the programme as an animation: ions move along the rails one instruction at a time.', k: 'space' },
@@ -4659,47 +4659,47 @@ var HINTS = {
   'glide':  { t: 'Glide', d: 'Animate just the next instruction, then stop.', k: 'enter' },
   'phase':  { t: 'Phase', d: 'Jump to the next batch of instructions that run together.' },
   'reset':  { t: 'Reset', d: 'Back to the first instruction.', k: 'home' },
-  'fit':    { t: 'Fit', d: 'Zoom so the whole device fills the canvas.', k: 'f' },
+  'fit':    { t: 'Fit', d: 'Zoom so the whole machine fills the canvas.', k: 'f' },
   'zoom:in':  { t: 'Zoom in', d: 'Closer, about the middle of the canvas. The wheel (with or without Ctrl) zooms at the pointer.' },
-  'zoom:out': { t: 'Zoom out', d: 'Further away, about the middle of the canvas, as far out as twelve devices wide.' },
+  'zoom:out': { t: 'Zoom out', d: 'Further away, about the middle of the canvas, as far out as twelve machines wide.' },
   'slider': { t: 'Position', d: 'Where you are in the programme. Drag to scrub.' },
   'speed':  { t: 'Speed', d: 'How fast the animation plays, relative to real time.' },
   'colour': { t: 'Colour by', d: '\u201crole\u201d colours an ion by what it is doing; \u201cheating\u201d colours it by how hot it has become \u2014 a hot ion gates badly.' },
   'snap':   { t: 'Snap', d: 'Off (the default): a part lands exactly where you drop it, at any coordinate. On: it lands on the lattice; hold alt to place it freely anyway, shift for quarter steps. Marks never overlap: a drag stops against the next mark and slides along it.' },
-  'hwlabels': { t: 'Hardware labels', d: 'The names a hardware program is written in, on the picture: every trapping site and junction (S0, J0) and every ion (d0, a0) carries its name beside it, so p.shuttle("d0", ["S0", "J0", "A0"]) reads straight off the canvas. On by default; this button hides them, and the choice is remembered. On a big device they step aside while too small to read, and come back as you zoom in.' },
-  'truescale': { t: 'True scale', d: 'On (the default): one screen pixel is the same distance across and down, so an angle you measure on the screen is the angle on the chip. Off: a long thin device is stretched to fill the canvas \u2014 easier to see, and wrong about every angle. The bar at the bottom left of the canvas always says what a length on screen is worth.' },
-  'scalebar': { t: 'Scale bar', d: 'The bracket is as long, on the chip, as the distance written beside it, at the zoom you are looking at, and it re-measures as you zoom. It sits under the picture so it never covers the device.' },
+  'hwlabels': { t: 'Hardware labels', d: 'The names a hardware program is written in, on the picture: every trapping site and junction (S0, J0) and every ion (d0, a0) carries its name beside it, so p.shuttle("d0", ["S0", "J0", "A0"]) reads straight off the canvas. On by default; this button hides them, and the choice is remembered. On a big machine they step aside while too small to read, and come back as you zoom in.' },
+  'truescale': { t: 'True scale', d: 'On (the default): one screen pixel is the same distance across and down, so an angle you measure on the screen is the angle on the chip. Off: a long thin machine is stretched to fill the canvas \u2014 easier to see, and wrong about every angle. The bar at the bottom left of the canvas always says what a length on screen is worth.' },
+  'scalebar': { t: 'Scale bar', d: 'The bracket is as long, on the chip, as the distance written beside it, at the zoom you are looking at, and it re-measures as you zoom. It sits under the picture so it never covers the machine.' },
   'mode': { t: 'Sketch \u00b7 Parts', d: 'Two ways to design. Sketch: draw the shape the ions travel on \u00b7 a rectangle, a circle, a line, a polyline \u00b7 and the release fills it with trapping sites one lattice unit apart, declares the orbit if the shape closed, and adds a junction where the new rail meets an existing one. Parts: place a site, a junction or a rail one at a time, which is what the course teaches and what detail work needs. Remembered between visits; a canvas with nothing on it opens on Sketch.', k: 'd' },
-  'mode:sketch': { t: 'Sketch', d: 'Draw the shape first and fill in the details after: arm a shape, drag it on the canvas, and the release lays the trapping sites along what you drew. The default on a canvas with no device on it.', k: 'd' },
+  'mode:sketch': { t: 'Sketch', d: 'Draw the shape first and fill in the details after: arm a shape, drag it on the canvas, and the release lays the trapping sites along what you drew. The default on a canvas with no machine on it.', k: 'd' },
   'mode:parts': { t: 'Parts', d: 'The element-at-a-time tool: press a tile, click the canvas, shift-drag one site onto another for a rail. Everything it could ever do, unchanged.', k: 'd' },
   'shape:rect': { t: 'Rectangle', d: 'Drag corner to corner. The release makes a closed rectangular rail with a trapping site every lattice unit and a site at each corner \u00b7 a corner is a BEND, which R18 prices as ordinary transport, not a junction.', k: 'r' },
-  'shape:ellipse': { t: 'Ellipse / circle', d: 'Drag a box; hold shift for a circle. The ring is polygonised at one side per lattice unit, and a circle too small for its rails to subtend the device\u2019s minimum angle is refused by R20 while you are still dragging.', k: 'e' },
+  'shape:ellipse': { t: 'Ellipse / circle', d: 'Drag a box; hold shift for a circle. The ring is polygonised at one side per lattice unit, and a circle too small for its rails to subtend the machine\u2019s minimum angle is refused by R20 while you are still dragging.', k: 'e' },
   'shape:line': { t: 'Line', d: 'Drag end to end for an open register: trapping sites one lattice unit apart and no orbit to rotate \u00b7 the shape the chain generator makes.', k: 'n' },
-  'shape:poly': { t: 'Polyline', d: 'Click point after point. Double-click or press enter to finish it open; click the first point again to close it into an orbit. A corner tighter than the device\u2019s minimum angle is refused by R20 with the angle it would have made.', k: 'p' },
+  'shape:poly': { t: 'Polyline', d: 'Click point after point. Double-click or press enter to finish it open; click the first point again to close it into an orbit. A corner tighter than the machine\u2019s minimum angle is refused by R20 with the angle it would have made.', k: 'p' },
   // The QEC-cycle panel is another session's (qccd/site/qec_cycle.py); it rides into the
   // page through the site build and adds its `data-hint` only once this entry resolves.
-  'qec:cycle': { t: 'QEC cycle', d: 'One syndrome-extraction round and the classical loop around it: the outcomes cross a wire to a decoder, and its answer either stays in the classical memory as a Pauli-frame update or comes back to gate an operation. The panel reads this device’s own round time and says whether the decoder keeps up with the rounds and what waiting for its answer costs.' },
+  'qec:cycle': { t: 'QEC cycle', d: 'One syndrome-extraction round and the classical loop around it: the outcomes cross a wire to a decoder, and its answer either stays in the classical memory as a Pauli-frame update or comes back to gate an operation. The panel reads this machine’s own round time and says whether the decoder keeps up with the rounds and what waiting for its answer costs.' },
   'measure': { t: 'Measure', d: 'A ruler. Click two points and it gives the distance in micrometres, in lattice units, and as a pair of offsets; click a third and it gives the angle at the middle one; click two different rails and it also gives the angle between those rails. Each click snaps to the nearest site or rail. Escape clears it, and pressing the button again leaves the tool.', k: 'm' },
   'undo':   { t: 'Undo', d: 'Take back the last gesture: a drag, a placement, a nudge.', k: 'ctrl+Z' },
   'redo':   { t: 'Redo', d: 'Put back what you just undid.', k: 'ctrl+Y' },
   'help':   { t: 'Guide', d: 'What everything on this screen is, how to use it in three steps, and every gesture and key.', k: '?' },
   'explain': { t: 'Explain', d: 'Label the parts of the screen. Hovering anything already tells you what it is.', k: 'h' },
   'status': { t: 'Now', d: 'Which instruction the animation is on, and what that instruction does.' },
-  'price':  { t: 'Price', d: 'What the programme costs on this device: heating (cost), instructions (steps), wall-clock time, and the voltage sources the wiring needs (DACs).' },
-  'edits':  { t: 'Edits', d: 'How many changes you have made to the device. Undo takes them back one gesture at a time.' },
-  'problems': { t: 'Problems', d: 'Things wrong with the device you have drawn: a geometry rule broken, a site with no zone, a segment with a missing end, a statement the applier refused. Click to list them. Observations about what has NOT been drawn yet are counted separately, as notes.' },
+  'price':  { t: 'Price', d: 'What the programme costs on this machine: heating (cost), instructions (steps), wall-clock time, and the voltage sources the wiring needs (DACs).' },
+  'edits':  { t: 'Edits', d: 'How many changes you have made to the machine. Undo takes them back one gesture at a time.' },
+  'problems': { t: 'Problems', d: 'Things wrong with the machine you have drawn: a geometry rule broken, a site with no zone, a segment with a missing end, a statement the applier refused. Click to list them. Observations about what has NOT been drawn yet are counted separately, as notes.' },
   'notes': { t: 'Notes', d: 'Observations about what is not there yet \u2014 a zone type no site uses, a movement class whose orbit matches no loop. Nothing is wrong; they are here so an empty canvas does not open on a pile of red. Click to read them.' },
   'ctxmenu': { t: 'Element menu', d: 'Everything the page can do to the part you right-clicked: change its capacity, position and zone, place another one, delete it, drop a trapping site into a rail, or take a whole placed component. An action that cannot run here is greyed with the reason rather than hidden.', k: 'right-click a part' },
-  'menu:item': { t: 'Menu action', d: 'One thing the page can do to the part under the pointer. Greyed means it cannot run on this device, and the line under it says why.' },
+  'menu:item': { t: 'Menu action', d: 'One thing the page can do to the part under the pointer. Greyed means it cannot run on this machine, and the line under it says why.' },
   'menu:modify': { t: 'Modify', d: 'Opens a small panel of this part\u2019s own fields \u2014 a site\u2019s capacity and position, a rail\u2019s length, a loop\u2019s kind \u2014 built from the file format itself, so it can never offer a field the format cannot hold. Enter applies, Escape cancels, and a refusal is shown in the panel beside the field.' },
-  'menu:zone': { t: 'Set zone', d: 'Give this trapping site one of the zone types the device declares: how many ions it holds, and whether a gate, a measurement or cooling may happen in it.' },
+  'menu:zone': { t: 'Set zone', d: 'Give this trapping site one of the zone types the machine declares: how many ions it holds, and whether a gate, a measurement or cooling may happen in it.' },
   'menu:place': { t: 'Place another one of these', d: 'Arms the same kind of element, so the next click on the canvas puts one where you click.' },
   'menu:delete': { t: 'Delete', d: 'Removes the selection. A site takes its rails with it, and one Undo brings the whole thing back.', k: 'del' },
   'menu:insert': { t: 'Insert a trapping site here', d: 'Splits this rail where you clicked and drops a trap into the gap. The two halves inherit the rail\u2019s loop, labels and capacity, its declared length is split at that point, and the new site is spliced into the orbit in the right place \u2014 the only add that can safely put a node on a transport loop.' },
   'menu:component': { t: 'The whole component', d: 'This part was placed as one piece \u2014 a dock, a tile, a register. Select or delete every site and rail it owns, in one step.' },
   'start:corners': { t: 'Corners', d: 'How the ring and dual_loop cards build their corners. Junction corners (the default): the four corners are bare junctions and the traps stand only on the sides, as a square trap is built; a turn of the loop carries an ion round a corner to the next trap and never stops it there. A trap in each corner: the drawing every design made before this choice keeps.' },
   'menu:close-loop': { t: 'Close loop', d: 'Declares the selected nodes as an orbit the machine can rotate by one step in a single instruction: in the order you selected them, or, when that order is not a walk, in the order the rails between them run. It needs at least three.' },
-  'testdrive': { t: 'Test drive', d: 'Writes a small valid programme for this device \u2014 a rotation if it has a loop, otherwise a shuttle out and back \u2014 and plays it.' },
+  'testdrive': { t: 'Test drive', d: 'Writes a small valid programme for this machine \u2014 a rotation if it has a loop, otherwise a shuttle out and back \u2014 and plays it.' },
   'gripRail': { t: 'Elements', d: 'Hide or show the elements rail.', k: '[' },
   'gripDock': { t: 'Panels', d: 'Hide or show the side panels.', k: ']' },
   // the head
@@ -4713,23 +4713,23 @@ var HINTS = {
   'm:peak n-bar': { t: 'Peak n\u0304', d: 'The hottest any single ion gets, in average motional quanta. A gate on an ion above the budget fails rule R7.' },
   'm:contacts': { t: 'Contacts', d: 'How many two-ion gates the programme performs.' },
   'm:cooling': { t: 'Cooling', d: 'Time spent cooling ions back down.' },
-  'm:DACs':   { t: 'DACs', d: 'Independent voltage sources the wiring needs. The headline hardware cost: a broadcast scheme keeps it flat as the device grows, a direct scheme pays one per electrode.' },
-  'm:junctions': { t: 'Junctions', d: 'Crossings in the device. Every ion that passes one is heated.' },
+  'm:DACs':   { t: 'DACs', d: 'Independent voltage sources the wiring needs. The headline hardware cost: a broadcast scheme keeps it flat as the machine grows, a direct scheme pays one per electrode.' },
+  'm:junctions': { t: 'Junctions', d: 'Crossings in the machine. Every ion that passes one is heated.' },
   'm:junction transits': { t: 'Junction transits', d: 'How many times an ion crosses a junction in the programme.' },
   'm:electrodes': { t: 'Electrodes', d: 'The metal pads that shape the field along every rail.' },
   'm:switches': { t: 'Switches', d: 'Per-site switches that let one voltage source serve many electrodes.' },
-  'm:ion capacity': { t: 'Ion capacity', d: 'How many ions the whole device can hold at once.' },
+  'm:ion capacity': { t: 'Ion capacity', d: 'How many ions the whole machine can hold at once.' },
   // the panels
   'tab:P': { t: 'Program', d: 'The hardware programme, one instruction per row. Click a row to jump the animation there.' },
   'tab:Q': { t: 'Circuit', d: 'The quantum circuit this programme was compiled from, stepping in lockstep with the animation.' },
-  'tab:A': { t: 'Device', d: 'The device as code: every site, rail and setting as the statements that rebuild it. Edit the source and the picture follows.' },
-  'tab:M': { t: 'Machine', d: 'Hardware totals, and which of the rules this page could check.' },
+  'tab:A': { t: 'Machine', d: 'The machine as code: every site, rail and setting as the statements that rebuild it. Edit the source and the picture follows.' },
+  'tab:M': { t: 'Hardware', d: 'Hardware totals, and which of the rules this page could check.' },
   'tab:W': { t: 'Write', d: 'Write your own test programme \u2014 place ions, shuttle them, rotate a loop \u2014 then press Evaluate to price it and play it.' },
   'menu': { t: 'Panels', d: 'One item per panel. Click to open it beside (or under) the canvas; click the lit item to close it and give the canvas the room back.' },
   'tab:L': { t: 'Learn', d: 'The course: what the machine is, how to build and program it by hand, every rule it must obey, and how to choose an architecture. Small lessons, each with an exercise the page checks.' },
   'learn:pick': { t: 'Lessons', d: 'Jump to any lesson. Stars show what you have passed.' },
   'learn:lean': { t: 'The tutorial in Lean', d: 'The tutorial goes on past this page: Parts E onward are lessons whose code is Lean, checked as you type, on the site’s Learn page. Opens in a new tab.' },
-  'learn:load': { t: 'Load', d: 'Put this lesson\u2019s device and programme on the canvas. Undo takes you back to what was there.' },
+  'learn:load': { t: 'Load', d: 'Put this lesson\u2019s machine and programme on the canvas. Undo takes you back to what was there.' },
   'learn:check': { t: 'Check', d: 'Test your answer against what the page measures: the frames, the verdicts, the price.' },
   'learn:hint': { t: 'Hint', d: 'Shows you the next step: the page dims, the one control to press lights up, and a pointer makes the gesture. Taking it costs nothing.' },
   'guide:do': { t: 'Show me', d: 'Do this one step for me, the way the pointer shows, and stay on the walk-through.' },
@@ -4738,7 +4738,7 @@ var HINTS = {
   'learn:solution': { t: 'Solution', d: 'Show one way to do it, applied to the canvas so you can read it back.' },
   'learn:next': { t: 'Next', d: 'On to the next lesson.' },
   'learn:verdict': { t: 'The checker\u2019s verdict', d: 'Some rules are not checked in the browser. For these lessons the page carries the verdict the checker computed on this exact programme when the page was built \u2014 the rule, its state, and the verifier\u2019s own sentences.' },
-  'p:init': { t: 'p.init', d: 'Puts named ions on named sites: p.init({"d0": "S0"}). The first line of every programme; a device starts empty.' },
+  'p:init': { t: 'p.init', d: 'Puts named ions on named sites: p.init({"d0": "S0"}). The first line of every programme; a machine starts empty.' },
   'p:shuttle': { t: 'p.shuttle', d: 'Pushes one ion along a path of site ids, one rail per step: p.shuttle("d0", ["S0", "S1", "S2"]). A third argument names the movement class (default: shuttle).' },
   'p:move': { t: 'p.move', d: 'One ion, one hop: p.move("d0", "S0", "S1"). The same thing p.shuttle does for one rail.' },
   'p:simd': { t: 'p.simd', d: 'Several ions in one step: p.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S2", "S3"]]). The class first, then a list of [ion, from, to]. One instruction, one step, judged as a whole by the rules.' },
@@ -4756,7 +4756,7 @@ var HINTS = {
   'evaluate': { t: 'Evaluate', d: 'Price the programme, check it against the rules, and play it.' },
   'evalall': { t: 'Evaluate everything', d: 'Evaluate the metrics priced on another clock and the noise model’s budget too. On a long programme each is another replay, so the page waits to be asked.' },
   'evalcheck': { t: 'Check the evaluation', d: 'Evaluate every metric, requirement and budget line again in the browser, from the same texts, and compare them with the values the grader computed for this page.' },
-  'archview': { t: 'View', d: 'Program: the statements that build the device \u00b7 Device: every node and rail \u00b7 Source: edit it as text.' },
+  'archview': { t: 'View', d: 'Program: the statements that build the machine \u00b7 Parts: every node and rail \u00b7 Source: edit it as text.' },
   // the legend
   'leg:segment': { t: 'Rail', d: 'A segment an ion can travel along.' },
   'leg:site':    { t: 'Trapping site', d: 'Where ions sit; the ticks are its capacity.' },
@@ -4782,7 +4782,7 @@ var RULE_HINTS = {
   R6: 'A gate, a measurement or cooling only happens in a zone that allows it.',
   R6b: 'Both ions of a gate are in the same site.',
   R7: 'An ion is cool enough (n\u0304 under budget) when it enters a gate.',
-  R7b: 'Per-zone duty-cycle budgets \u2014 no device declares one yet.',
+  R7b: 'Per-zone duty-cycle budgets \u2014 no machine declares one yet.',
   R7c: 'A programme with gates, under a heating model, schedules some cooling.',
   R8: 'Ions are neither created nor lost, and none moves twice in one step.',
   R9: 'The totals the programme claims match what the replay measures.',
@@ -4795,7 +4795,7 @@ var RULE_HINTS = {
   R16: 'Gate error is read off the ion\u2019s actual heating, not a constant.',
   R17: 'Ions heat up just by waiting.',
   R18: 'A junction is charged by how many rails meet there.',
-  R19: 'No more rails meet at one node than the device says a junction can join.',
+  R19: 'No more rails meet at one node than the machine says a junction can join.',
   R20: 'Two rails leaving the same node are far enough apart in angle to be built.',
   R21: 'The drawing is flat: a rail touches only the nodes it ends at, and two rails cross only where they share a node.',
   R22: 'Every ion that moves in one step moves the same way; a site may sit the step out, but it may not do something else.',
@@ -4843,8 +4843,8 @@ function zoneHint(z) {
     (Q.unbox(r.photoionization) ? 'Marked as a loading zone, where new ions are made ' +
       '(photoionization); no rule and no price reads that flag. ' : '') +
     (r.note ? 'Note: ' + String(Q.unbox(r.note)) + '. ' : '') +
-    (used ? used + ' site' + (used === 1 ? '' : 's') + ' on this device ' +
-            (used === 1 ? 'uses' : 'use') + ' it.' : 'No site on this device uses it yet.') +
+    (used ? used + ' site' + (used === 1 ? '' : 's') + ' on this machine ' +
+            (used === 1 ? 'uses' : 'use') + ' it.' : 'No site on this machine uses it yet.') +
     (postSeedZones()[z] ? ' Declared after the machine was sealed, so a site placed now cannot use it.' : '');
   return { t: 'Zone type · ' + z, d: d, k: base.k };
 }
@@ -5608,20 +5608,20 @@ function renderMeasured(kind) {
   var arches = Object.keys(kind === 'planes' ? (M.planes || {}) : (M.micro || {})), i, h;
   if (!arches.length) return '<div class="learn-note">no measured results shipped for ' + esc2(kind) + '</div>';
   if (kind === 'planes') {
-    h = '<table class="learn-table"><tr><th>device</th><th>wiring</th><th>electrodes</th><th>DACs</th><th>junctions</th></tr>';
+    h = '<table class="learn-table"><tr><th>machine</th><th>wiring</th><th>electrodes</th><th>DACs</th><th>junctions</th></tr>';
     for (i = 0; i < arches.length; i++) {
       var p = M.planes[arches[i]];
       h += '<tr><td>' + esc2(arches[i]) + '</td><td>' + esc2(p.scheme) + '</td><td>' + p.electrodes + '</td><td>' + p.dacs + '</td><td>' + p.junctions + '</td></tr>';
     }
     return h + '</table><div class="mut">hardware_report(arch) at page-build time</div>';
   }
-  h = '<table class="learn-table"><tr><th>device</th><th>instructions</th><th>cost</th><th>steps</th><th>runtime</th><th>DACs</th></tr>';
+  h = '<table class="learn-table"><tr><th>machine</th><th>instructions</th><th>cost</th><th>steps</th><th>runtime</th><th>DACs</th></tr>';
   for (i = 0; i < arches.length; i++) {
     var r = measuredRow('micro', arches[i]), pl = (M.planes || {})[arches[i]] || {};
     if (!r) continue;
     h += '<tr><td>' + esc2(arches[i]) + '</td><td>' + r.instructions + '</td><td>' + fmt(r.total_cost, 1) + '</td><td>' + r.total_steps + '</td><td>' + fmt(r.runtime_us / 1000, 2) + ' ms</td><td>' + (pl.dacs === undefined ? '' : pl.dacs) + '</td></tr>';
   }
-  return h + '</table><div class="mut">' + esc2(M.circuit) + ' compiled for each device, replayed under the ' + esc2(M.model) + ' model at page-build time (cooled artifacts)</div>';
+  return h + '</table><div class="mut">' + esc2(M.circuit) + ' compiled for each machine, replayed under the ' + esc2(M.model) + ' model at page-build time (cooled artifacts)</div>';
 }
 function plain(t) { return String(t || '').replace(/\[\[([^\]|]+)\|[^\]]+\]\]/g, '$1').replace(/\*\*/g, '').replace(/`/g, ''); }
 function starsMax(L) { return 1 + (L && L.boundary ? 1 : 0) + (L && L.challenge ? 1 : 0); }
@@ -5934,7 +5934,7 @@ function gdApplied() {
 // A step: { say, gesture, el() | pts() | box(), here(), act(), code, next }.  `here` says the
 // step's own state is already on the page (the tab is open, the tile is armed); the step
 // shown is the one after the last step that is `here`.
-var PANE_NAME = { L: 'Learn', P: 'Program', A: 'Device', M: 'Machine', W: 'Write', R: 'Report' };
+var PANE_NAME = { L: 'Learn', P: 'Program', A: 'Machine', M: 'Hardware', W: 'Write', R: 'Report' };
 function gsTab(k) {
   if (k === 'P' && gdCol()) return null;        // the programme sits beside the animation
   return { say: 'Open the ' + PANE_NAME[k] + ' tab.', gesture: 'click', nav: true,
@@ -5975,7 +5975,7 @@ function gsPick(sel, value, say) {
            act: function () { var e = gdQ(sel); if (e) { e.value = String(value); gdFire(e, 'change'); } } };
 }
 function gsView(v) {
-  var id = { prog: 'avB', dev: 'avD', src: 'avS' }[v], name = { prog: 'Program', dev: 'Device', src: 'Source' }[v];
+  var id = { prog: 'avB', dev: 'avD', src: 'avS' }[v], name = { prog: 'Program', dev: 'Parts', src: 'Source' }[v];
   return { say: 'Press ' + name + '.', gesture: 'click', nav: true, el: function () { return gdQ('#' + id); },
            here: function () { try { return ARCHVIEW === v; } catch (err) { return false; } },
            act: function () { setArchView(v); } };
@@ -6245,7 +6245,7 @@ function guideNow() {
       var pts = null; try { pts = st.pts(); } catch (err) { pts = null; }
       var stage = gdStage(), off = !pts;
       for (var p = 0; pts && p < pts.length; p++) if (!gdInside(pts[p], stage, 6)) off = true;
-      if (off) st = { say: 'Press Fit: the whole device comes into view.', gesture: 'click',
+      if (off) st = { say: 'Press Fit: the whole machine comes into view.', gesture: 'click',
                       el: function () { return gdQ('#fit'); }, act: function () { if (typeof fit === 'function') fit(); } };
     }
     return { g: g, step: st };
@@ -6805,7 +6805,7 @@ function checkId(kind, id) {
 function newCanvas(opts) {
   opts = opts || {};
   var name = opts.name === undefined ? 'design' : String(opts.name);
-  var bad = checkId('device name', name);
+  var bad = checkId('machine name', name);
   if (bad) return { ok: false, problems: [{ code: 'bad_id', message: bad }] };
   var tmpl = opts.template === undefined ? (Q.templateDefault() || null) : opts.template;
   var geom = [{ method: 'DeviceBuilder', args: [opts.generator || 'explicit'], kwargs: {} }];
@@ -6881,14 +6881,14 @@ function newCanvas(opts) {
 function newFromGenerator(gen, params, opts) {
   opts = opts || {};
   var name = opts.name === undefined ? 'design' : String(opts.name);
-  var bad = checkId('device name', name);
+  var bad = checkId('machine name', name);
   if (bad) return { ok: false, problems: [{ code: 'bad_id', message: bad }] };
   var kw = {};
   for (var k in params) if (has(params, k)) kw[k] = params[k];
   kw.name = name;
   kw.template = opts.template === undefined ? (Q.templateDefault() || null) : opts.template;
   var seed = { method: 'from_template', args: [String(gen)], kwargs: kw };
-  var r = transaction([{ canvas: { geom: [], seed: seed, post: [] } }], 'new device');
+  var r = transaction([{ canvas: { geom: [], seed: seed, post: [] } }], 'new machine');
   if (r.ok) { setProgram([]); }
   return r;
 }
@@ -7162,7 +7162,7 @@ function nameZone(zone, fields) {
 // `Device.reproducible_from_generator()` goes False forever and `to_json(expanded=False)`
 // writes the expanded form from then on.
 function explodeToExplicit() {
-  if (!STATE || !STATE.device) return { ok: false, problems: [{ message: 'no device' }] };
+  if (!STATE || !STATE.device) return { ok: false, problems: [{ message: 'no machine' }] };
   var tmpl = (SEED && SEED.kwargs && SEED.kwargs.template) || Q.templateDefault() || null;
   var stmts = Q.explicitStatements(STATE.device, { name: STATE.name, template: tmpl });
   var geom = [], seed = null;
@@ -7177,7 +7177,7 @@ function explodeToExplicit() {
   }
   var r = transaction([{ canvas: { geom: geom, seed: seed, post: post } }], 'explode');
   r.statements = stmts.length;
-  r.warning = 'this device no longer reproduces from its generator: saving now writes ' +
+  r.warning = 'this machine no longer reproduces from its generator: saving now writes ' +
               geom.length + ' explicit statements rather than the generator and its parameters.';
   return r;
 }
@@ -7327,7 +7327,7 @@ function humanMessage(e) {
   // a bare `'T9'` is Python's KeyError for a lookup that found nothing; a KeyError that
   // already carries a sentence ("no segment between ...") says where by itself
   if (e && e.code === 'KeyError' && /^'[^']*'$/.test(m)) {
-    return m + ' — no such node, segment or loop on ' + ((STATE && STATE.name) || 'this device');
+    return m + ' — no such node, segment or loop on ' + ((STATE && STATE.name) || 'this machine');
   }
   return m;
 }
@@ -7400,7 +7400,7 @@ function testDrivePlan(opts) {
   var dev = STATE && STATE.device;
   var refuse = function (code, message) {
     return { ok: false, problems: [{ code: code, message: message }] }; };
-  if (!dev) return refuse('no_device', 'no device to drive');
+  if (!dev) return refuse('no_device', 'no machine to drive');
   var lid;
   // `opts.noLoop`: the shuttle route even when a closed loop exists -- what `testDrive`
   // asks for after the device refused the rotation (a physics package with no rotate
@@ -8086,7 +8086,7 @@ function packageSelect(id) {
   var stems = Q.templates(), td = D.template_devices || {}, i;
   var on = PICKED_TEMPLATE || Q.templateDefault();
   var h = '<select id="' + id + '" data-start="tpl" title="the zones, curves and control ' +
-          'block a new device borrows">';
+          'block a new machine borrows">';
   for (i = 0; i < stems.length; i++) {
     h += '<option value="' + esc2(stems[i]) + '"' + (on === stems[i] ? ' selected' : '') + '>' +
          esc2(stems[i]) +
@@ -8100,7 +8100,7 @@ function packageSelect(id) {
 // lists the stems alone, for the 224 px rail
 function openPicker(id, short) {
   var stems = Q.templates(), td = D.template_devices || {}, i;
-  var h = '<select id="' + id + '" data-start="open" title="a device this page ships, ' +
+  var h = '<select id="' + id + '" data-start="open" title="a machine this page ships, ' +
           'opened as itself on its own physics">';
   for (i = 0; i < stems.length; i++) {
     if (!td[stems[i]]) continue;
@@ -8109,7 +8109,7 @@ function openPicker(id, short) {
                        esc2(paramsLabel(td[stems[i]].params))) +
          '</option>';
   }
-  return h + '</select><button data-open-pick="' + id + '" title="open the chosen device">' +
+  return h + '</select><button data-open-pick="' + id + '" title="open the chosen machine">' +
          'open</button>';
 }
 // THE SHAPE BUTTONS ON THE EMPTY CANVAS.  Same verb as the tools bar and the rail; the
@@ -8173,11 +8173,11 @@ function renderStart() {
     h += '<div class="fieldrow"><label>name</label>' +
          '<input id="palName" value="' + esc2(typedName() || '') +
          '" placeholder="named after the card you pick, unless you type one"></div>';
-    h += '<h5>Build a device</h5>' + startCards('rail');
+    h += '<h5>Build a machine</h5>' + startCards('rail');
     h += '<div class="fieldrow"><label>corners</label>' + cornersSelect('palCorners') + '</div>';
     h += '<div class="fieldrow"><label>open</label>' + openPicker('palOpen', true) + '</div>';
     h += '<div class="mut" style="margin-top:5px;font-size:11px">a blank canvas borrows the ' +
-         'selected package’s curves, zone types and control block, because a device with ' +
+         'selected package’s curves, zone types and control block, because a machine with ' +
          'no <code>shuttle_segment</code> curve cannot be priced at all.</div>';
     host.innerHTML = h;
     wireStartControls(host);
@@ -8199,14 +8199,14 @@ function renderStart() {
       'a corner is a <b>bend</b>, which R18 prices as ordinary transport, not a junction ' +
       '\u00b7 a junction is added by itself where the new rail meets or crosses one that is ' +
       'already there.</p>' +
-      '<h3>or start from a ready-made device</h3>' + startCards('stage') +
+      '<h3>or start from a ready-made machine</h3>' + startCards('stage') +
       '<div class="startrow"><label>ring and dual_loop corners ' + cornersSelect('stageCorners') + '</label></div>' +
       '<div class="startrow"><label>physics package ' + packageSelect('stageTpl') + '</label>' +
-      '<label>shipped device ' + openPicker('stageOpen') + '</label></div>' +
+      '<label>shipped machine ' + openPicker('stageOpen') + '</label></div>' +
       '<div class="startrow"><span class="mut">or build one by hand (Parts): press</span>' + armButtons() +
       '<span class="mut">then click the canvas — a double-click on empty canvas also ' +
       'places a site; shift-drag one site onto another joins them.</span></div>' +
-      '<p class="mut">a generator device comes with a <b>Test drive</b> programme and ' +
+      '<p class="mut">a generator machine comes with a <b>Test drive</b> programme and ' +
       'animates at once.</p>' +
       '<p class="mut">New here? Hover anything for what it is, press <b>Explain</b> (top right) to label ' +
       'the parts of the screen, or <b>?</b> for the guide.</p>';
@@ -8222,7 +8222,7 @@ function newFromTemplate(stem, opts) {
   var td = (D.template_devices || {})[String(stem)];
   if (!td) {
     return { ok: false, problems: [{ code: 'no_template_device',
-      message: 'this page carries no device for template ' + Q.pyRepr(String(stem)) +
+      message: 'this page carries no machine for template ' + Q.pyRepr(String(stem)) +
                '; have: ' + Object.keys(D.template_devices || {}).sort().join(', ') }] };
   }
   var params = {};
@@ -9144,7 +9144,7 @@ function componentItem(name) {
   if (blocked.length) {
     b.setAttribute('data-blocked', blocked.join(','));
     b.setAttribute('title', name + ' needs the zone type ' + blocked.join(', ') +
-                            ', which this device does not have');
+                            ', which this machine does not have');
   }
   var av = elh('span', 'avatar');
   var pic = cachedAvatar({ type: 'cmp:' + name }, {});
@@ -9591,7 +9591,7 @@ function clickStage(mx, my, mods) {
         // a component is builder statements, and a generator device has no builder: say
         // what to do rather than leak the interpreter's `no_builder`
         toast('bad', p0.code === 'no_builder'
-          ? 'this device came from a generator, so a part cannot be added to it as builder ' +
+          ? 'this machine came from a generator, so a part cannot be added to it as builder ' +
             'statements -- press "explode to explicit…" at the bottom of Elements first'
           : (p0.message || 'refused'));
       } else {
@@ -9673,7 +9673,7 @@ function placeStamp(type, x, y) {
   if (type === 'junction') return addNodeAt(x, y, { kind: 'junction' });
   if (z && postSeedZones()[z]) {
     return { ok: false, problems: [{ code: 'zone_after_seal', targets: [z],
-      message: "zone '" + z + "' was added after this device was sealed, so a new site " +
+      message: "zone '" + z + "' was added after this machine was sealed, so a new site " +
                'cannot use it — pick another zone chip.' }] };
   }
   return addNodeAt(x, y, { kind: 'site', zone: z || undefined });
@@ -9972,7 +9972,7 @@ function menuItem(id, label, enabled, why, hint) {
 // topology edit has a builder but no statement of its own to rewrite.
 function builderWhy(method, id) {
   if (!hasBuilder()) {
-    return 'this device came from a generator, so it has no builder statements to ' +
+    return 'this machine came from a generator, so it has no builder statements to ' +
            'rewrite -- explode it to explicit geometry first.';
   }
   if (!builderRecordFor(method, id)) {
@@ -10018,7 +10018,7 @@ function zoneMenuItem(sub) {
   var zt = (STATE && STATE.zone_types) || {};
   var names = Object.keys(zt).sort();
   var why = builderWhy('d.site', sub.id);
-  if (!why && !names.length) why = 'this device declares no zone types';
+  if (!why && !names.length) why = 'this machine declares no zone types';
   var post = postSeedZones();
   var kids = names.map(function (z) {
     var w = why || (post[z]
@@ -10128,7 +10128,7 @@ function insertSiteOn(segId, mx, my) {
   if (!sg) return { ok: false, problems: [{ code: 'no_segment', message: 'no rail ' + segId }] };
   var na = dev.nodes[sg.a], nb = dev.nodes[sg.b];
   if (!na || !nb) return { ok: false, problems: [{ code: 'no_endpoint',
-    message: segId + ' has an endpoint this device does not have' }] };
+    message: segId + ' has an endpoint this machine does not have' }] };
   var ax = +Q.unbox(na.pos[0]), ay = +Q.unbox(na.pos[1]);
   var bx = +Q.unbox(nb.pos[0]), by = +Q.unbox(nb.pos[1]);
   var p = latticeAt(mx, my);
@@ -10479,7 +10479,7 @@ function modifyExplode() {
   }
   if (!MDLG.confirm) {
     MDLG.confirm = true;
-    MDLG.why = 'this device will stop reproducing from its generator: it would be saved ' +
+    MDLG.why = 'this machine will stop reproducing from its generator: it would be saved ' +
                'as explicit statements instead. Press again to do it.';
     paintMenu();
     return { ok: false, confirm: true,
@@ -10958,10 +10958,10 @@ function primitivesForm(host, e) {
   var intro = elh('div', 'mut');
   intro.textContent = names.length
     ? names.length + ' primitive' + (names.length === 1 ? '' : 's') + ' declared by this ' +
-      'device. A curve is a list of measured operating points, and the policy picks the ' +
+      'machine. A curve is a list of measured operating points, and the policy picks the ' +
       'one a price is read from; a field is a single value.'
-    : 'This device declares no primitives, so nothing on it can be priced. A template or ' +
-      'a shipped device from Start carries a full set.';
+    : 'This machine declares no primitives, so nothing on it can be priced. A template or ' +
+      'a shipped machine from Start carries a full set.';
   host.append(intro);
   var list = elh('div', 'rowlist');
   // the Selection panel is sticky at the foot of the rail, so a list taller than the rail

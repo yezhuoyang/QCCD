@@ -95,7 +95,7 @@ def _show(x: Any) -> str:
 
 def _place(x: Any, fn: str) -> Any:
     """A word about a place given a quoted name that names nothing (`occupancy("C9", t)` on a
-    device without C9) refuses, rather than reading the empty place it would otherwise find."""
+    machine without C9) refuses, rather than reading the empty place it would otherwise find."""
     if isinstance(x, str):
         raise EvalError(f"{fn} needs a site, junction or rail, and nothing here is named {x!r}")
     return x
@@ -126,13 +126,13 @@ def _sites(ctx: Ctx):
 
 
 @term("junctions", "a set of nodes", "The nodes where three or more rails meet, whatever the "
-      "device calls them.  An ion crosses a junction; whether it may stop there is a rule.",
+      "machine calls them.  An ion crosses a junction; whether it may stop there is a rule.",
       "hardware", domain=True)
 def _junctions(ctx: Ctx):
     return ctx.hw.junctions
 
 
-@term("nodes", "a set of nodes", "Every node of the device: its sites and its junctions.",
+@term("nodes", "a set of nodes", "Every node of the machine: its sites and its junctions.",
       "hardware", domain=True)
 def _nodes(ctx: Ctx):
     return ctx.hw.nodes
@@ -145,12 +145,12 @@ def _rails(ctx: Ctx):
 
 
 @term("capacity(x)", "a number", "How many ions the site or rail x may hold at once, as the "
-      "device declares it.", "hardware")
+      "machine declares it.", "hardware")
 def _capacity(ctx: Ctx, x):
     try:
         return ctx.hw.capacity[x]
     except KeyError:
-        raise EvalError(f"the device declares no capacity for {_show(x)}") from None
+        raise EvalError(f"the machine declares no capacity for {_show(x)}") from None
 
 
 @term("degree(n)", "a number", "How many rails meet at node n.", "hardware")
@@ -166,7 +166,7 @@ def _zone(ctx: Ctx, s):
 
 @term("can(s, a)", "true or false", "Whether site s is equipped for ability a: \"gate\" (a laser "
       "gate), \"spam\" (preparation and measurement) or \"cool\" (cooling).", "hardware",
-      schedule="A paper's device that declares no abilities is taken to allow everything; its "
+      schedule="A paper's machine that declares no abilities is taken to allow everything; its "
                "own rules then say where each operation may run.")
 def _can(ctx: Ctx, s, a):
     ab = ctx.hw.abilities.get(s)
@@ -176,7 +176,7 @@ def _can(ctx: Ctx, s, a):
 
 
 @term("neighbours(s1, s2)", "true or false", "Whether sites s1 and s2 are neighbouring zones "
-      "that a two-ion gate may span (some devices gate across two zones of one rail).",
+      "that a two-ion gate may span (some machines gate across two zones of one rail).",
       "hardware")
 def _neighbours(ctx: Ctx, a, b):
     return b in ctx.hw.neighbours.get(a, ()) or a in ctx.hw.neighbours.get(b, ())
@@ -225,7 +225,7 @@ def _cross(ctx: Ctx, r1, r2):
     return _segments_cross(p(a1), p(b1), p(a2), p(b2))
 
 
-@term("max_junction_degree()", "a number", "The most rails a junction of this device may join, "
+@term("max_junction_degree()", "a number", "The most rails a junction of this machine may join, "
       "as its document declares (6 when it says nothing: a junction of a trap built in more "
       "than one layer joins up to six).", "hardware", kinds=("programme",))
 def _max_junction_degree(ctx: Ctx):
@@ -233,33 +233,33 @@ def _max_junction_degree(ctx: Ctx):
 
 
 @term("min_rail_angle()", "degrees", "The smallest angle two rails meeting at a node may make, as "
-      "the device's document declares (60 degrees when it says nothing).", "hardware",
+      "the machine's document declares (60 degrees when it says nothing).", "hardware",
       kinds=("programme",))
 def _min_rail_angle(ctx: Ctx):
     return ctx.hw.numbers.get("min_rail_angle_deg", 60.0)
 
 
-@term("max_classes()", "a number", "How many different motions the device's control system can "
+@term("max_classes()", "a number", "How many different motions the machine's control system can "
       "drive in one step.", "hardware", kinds=("programme",))
 def _max_classes(ctx: Ctx):
     return ctx.hw.numbers.get("max_simd_classes", 1)
 
 
-@term("control()", "a name", "How the device's electrodes are driven: \"direct\" (every "
+@term("control()", "a name", "How the machine's electrodes are driven: \"direct\" (every "
       "electrode its own signal) or a broadcast scheme where many share one waveform.",
       "hardware", kinds=("programme",))
 def _control(ctx: Ctx):
     return ctx.hw.numbers.get("control_model", "simd_classes")
 
 
-@term("priced(j)", "true or false", "Whether the device declares the time it takes to cross "
+@term("priced(j)", "true or false", "Whether the machine declares the time it takes to cross "
       "junction j, at j's number of rails.", "hardware", kinds=("programme",))
 def _priced(ctx: Ctx, j):
     return ctx.hw.degree.get(j, 0) in ctx.hw.numbers.get("priced_degrees", ())
 
 
 @term("heat_budget()", "quanta", "The hottest an ion may be when a two-ion gate starts (its "
-      "motional quanta n̄), as the device declares it; no limit when it declares none.",
+      "motional quanta n̄), as the machine declares it; no limit when it declares none.",
       "hardware", kinds=("programme",))
 def _heat_budget(ctx: Ctx):
     return ctx.exe.facts.get("heat_budget", math.inf)
@@ -276,33 +276,33 @@ def _rotated(ctx: Ctx, n):
 
 @term("legs", "a set of sites", "The legs of a C2LR lattice: the trap at the centre of every "
       "wire between two junctions, each holding one two-ion crystal (one ion of this model).  "
-      "Empty on any other device.", "hardware", domain=True, kinds=("programme",))
+      "Empty on any other machine.", "hardware", domain=True, kinds=("programme",))
 def _legs(ctx: Ctx):
     return ctx.hw.numbers.get("c2lr_legs", [])
 
 
-@term("c2lr_device()", "true or false", "Whether the device is a C2LR swap-or-stay lattice: it "
+@term("c2lr_device()", "true or false", "Whether the machine is a C2LR swap-or-stay lattice: it "
       "declares C2LR control, and its drawing is a lattice of junctions with one leg on every "
       "wire (arXiv:2403.00756).", "hardware", kinds=("programme",))
 def _c2lr_device(ctx: Ctx):
     return bool(ctx.hw.numbers.get("c2lr_device"))
 
 
-@term("c2lr_wiring()", "true or false", "Whether a device that declares C2LR control is driven "
+@term("c2lr_wiring()", "true or false", "Whether a machine that declares C2LR control is driven "
       "as C2LR is: a fixed number of shared analog signals, plus one digital input and one "
       "switch per leg, over a lattice of legs.", "hardware", kinds=("programme",))
 def _c2lr_wiring(ctx: Ctx):
     return not ctx.hw.numbers.get("c2lr_wiring_problems")
 
 
-@term("com_frequency_held()", "true or false", "Whether the device's swap-or-stay step records "
+@term("com_frequency_held()", "true or false", "Whether the machine's swap-or-stay step records "
       "the centre-of-mass frequency it holds a crystal at during a shift.  A property of the "
-      "waveform, recorded, not decided from a programme; a device that records none leaves the "
+      "waveform, recorded, not decided from a programme; a machine that records none leaves the "
       "rule unchecked.", "model", kinds=("programme",))
 def _com_held(ctx: Ctx):
     com = ctx.hw.numbers.get("c2lr_com_mhz")
     if com is None:
-        raise NotApplicable("the device's swap_or_stay primitive records no COM frequency")
+        raise NotApplicable("the machine's swap_or_stay primitive records no COM frequency")
     return True
 
 
@@ -373,7 +373,7 @@ def _transport(ctx: Ctx, k=None):
 
 @term("splits", "a set of operations", "Every operation that lifts an ion out of the chain it "
       "stood in.", "execution", domain=True,
-      programme="A move whose motion includes a split (the device's movement class says so).")
+      programme="A move whose motion includes a split (the machine's movement class says so).")
 def _splits(ctx: Ctx, k=None):
     if ctx.exe.kind == "programme":
         return [o for o in _ops(ctx, ("move",), k) if o.facts.get("split")]
@@ -438,7 +438,7 @@ def _end(ctx: Ctx, o):
 
 
 @term("duration(o)", "microseconds", "How long operation o lasts.", "execution",
-      programme="Its step's duration under the device's clock (the slowest operation of the "
+      programme="Its step's duration under the machine's clock (the slowest operation of the "
                 "step).")
 def _duration(ctx: Ctx, o):
     o = _op(o, "duration")
@@ -602,13 +602,13 @@ def _mode(ctx: Ctx, k):
 
 
 @term("class_declared(k)", "true or false", "Whether transport step k's movement class is one "
-      "the device declares (or the device declares none to check against).", "execution",
+      "the machine declares (or the machine declares none to check against).", "execution",
       kinds=("programme",))
 def _class_declared(ctx: Ctx, k):
     return bool(_stepfact(ctx, k, "class_declared", "class_declared"))
 
 
-@term("drivable(k)", "true or false", "Whether the device's control channels can drive step k: "
+@term("drivable(k)", "true or false", "Whether the machine's control channels can drive step k: "
       "one channel carries one waveform, so every ion a channel moves must move the same way, "
       "and a site may sit a step out only if it has its own switch.", "execution",
       kinds=("programme",))
@@ -618,7 +618,7 @@ def _drivable(ctx: Ctx, k):
 
 @term("exchange(x)", "true or false", "Whether x -- a step, an instant, an operation or a hop -- "
       "belongs to a C2LR swap-or-stay step, whose crystals exchange through the junctions by "
-      "the device's matching: the routes are derived from the device, never read from the "
+      "the machine's matching: the routes are derived from the machine, never read from the "
       "programme, so a programme cannot claim this for a move it wrote itself.", "execution",
       programme="An instant is the one during such a step; an operation or hop is one of its "
                 "moves.",
@@ -637,7 +637,7 @@ def _exchange(ctx: Ctx, x):
 
 
 @term("c2lr_step(k)", "true or false", "Whether step k is a C2LR template step: a swap-or-stay "
-      "or a reorder-or-not, played by the device's shared waveforms.", "execution",
+      "or a reorder-or-not, played by the machine's shared waveforms.", "execution",
       kinds=("programme",))
 def _c2lr_step(ctx: Ctx, k):
     return bool(_stepfact(ctx, k, "c2lr_template", "c2lr_step"))
@@ -650,9 +650,9 @@ def _form(ctx: Ctx, k):
     return _stepfact(ctx, k, "c2lr_form", "form")
 
 
-@term("matched(k)", "true or false", "Whether swap-or-stay step k is the device's matching: every "
+@term("matched(k)", "true or false", "Whether swap-or-stay step k is the machine's matching: every "
       "crystal it shifts toward a junction has a partner leg there under the step's variation, "
-      "and the device offers that variation.", "execution", kinds=("programme",))
+      "and the machine offers that variation.", "execution", kinds=("programme",))
 def _matched(ctx: Ctx, k):
     return not _stepfact(ctx, k, "c6", "matched")
 
@@ -666,7 +666,7 @@ def _exits_as_entered(ctx: Ctx, k):
 
 
 @term("bits_only(k)", "true or false", "Whether transport step k, if it is of a C2LR class, "
-      "chooses nothing per leg but the direction bit: it is the device's template, not routes "
+      "chooses nothing per leg but the direction bit: it is the machine's template, not routes "
       "the programme wrote.", "execution", kinds=("programme",))
 def _bits_only(ctx: Ctx, k):
     return not _stepfact(ctx, k, "c2", "bits_only")
@@ -688,7 +688,7 @@ def _one_waveform(ctx: Ctx, k):
 
 
 @term("heats_every_crystal(k)", "true or false", "Whether C2LR step k heats every crystal on the "
-      "device -- the ones that move and the ones that stay -- as every waveform plays on every "
+      "machine -- the ones that move and the ones that stay -- as every waveform plays on every "
       "leg.", "execution", kinds=("programme",))
 def _heats_every(ctx: Ctx, k):
     return not _stepfact(ctx, k, "c9", "heats_every_crystal")
@@ -760,7 +760,7 @@ def _position(ctx: Ctx, i, t):
 
 
 @term("heat(i, t)", "quanta", "Ion i's motional energy n̄ (in quanta) at instant t, under "
-      "the device's heating model.  Known at the start of every two-ion gate.", "time",
+      "the machine's heating model.  Known at the start of every two-ion gate.", "time",
       kinds=("programme",))
 def _heat(ctx: Ctx, i, t):
     ctx.need("programme", "heat figures")
@@ -847,7 +847,7 @@ def _replayed(ctx: Ctx, c):
 
 # ------------------------------------------------------------------- the model's own facts
 
-@term("models_heating()", "true or false", "Whether the device's clock tracks how hot each ion "
+@term("models_heating()", "true or false", "Whether the machine's clock tracks how hot each ion "
       "gets.", "model", kinds=("programme",))
 def _models_heating(ctx: Ctx):
     return bool(ctx.exe.facts.get("models_heating"))
@@ -873,7 +873,7 @@ def _heat_upper(ctx: Ctx):
     return True
 
 
-@term("declares_duty_budget()", "true or false", "Whether the device declares how much heat a "
+@term("declares_duty_budget()", "true or false", "Whether the machine declares how much heat a "
       "gate zone may absorb over time (a duty-cycle budget).", "model", kinds=("programme",))
 def _declares_duty(ctx: Ctx):
     return bool(ctx.hw.numbers.get("duty_budget"))

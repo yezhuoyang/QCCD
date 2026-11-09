@@ -9,7 +9,7 @@ things around it and touches neither file:
   share of exercises done as a ring, the stars, the level the reader has reached and what the
   next one takes, a Continue button to the next lesson, the seven badges), then each part with
   one card per lesson on its own line -- a small diagram of what the lesson is about (drawn
-  the way the studio draws a device), the title, the lesson's own first line, and its state
+  the way the studio draws a machine), the title, the lesson's own first line, and its state
   (done with its stars, next up, or not started).  The cards are
   written by the build; the page's script (`LEARN_JS`) only sets their state.
 
@@ -486,7 +486,7 @@ def _diagrams() -> dict[str, str]:
                + tinychain(66, ((0, -1.6, D1), (0, 1.6, D0), (1, 0, D2), (2, 0, CHK)), True, "swap_operands",
                            "the pulses refuse it"))
     layers = (("Lean kernel + propext", "proved", GOOD), ("parser Input.ofJson", "believed", "#c9971a"),
-              ("device facts (hops)", "believed", "#c9971a"), ("check_cert's semantics", "computed", MEAS))
+              ("machine facts (hops)", "believed", "#c9971a"), ("check_cert's semantics", "computed", MEAS))
     d["F6"] = "".join(f'<rect x="6" y="{6 + i * 18}" width="108" height="15" rx="3" fill="#fff" stroke="#d0d5dd" stroke-width="1.1"/>'
                       + text(11, 16 + i * 18, name, 6, "#182230", "start", 600)
                       + pill(96, 13.5 + i * 18, tag, colour, 34)
@@ -525,7 +525,7 @@ def _diagrams() -> dict[str, str]:
                + text(114, 60, "lean_certificate", 6.2, GATE, "end", 700, True) + text(114, 70, "semantics", 6.2, GATE, "end", 700, True)
                + text(10, 66, "R10 needs", 6, "#667085", "start") + text(10, 74, "these two", 6, "#667085", "start")
                + text(10, 15, "ten stages", 5.8, "#667085", "start"))
-    flow = ("circuit.qasm + device", "qccdc compile", "insert_cooling", "mk_qcheck_input", "check_cert --qcheck")
+    flow = ("circuit.qasm + machine", "qccdc compile", "insert_cooling", "mk_qcheck_input", "check_cert --qcheck")
     d["H4"] = ('<rect x="3" y="3" width="114" height="74" rx="5" fill="#1f2430"/>'
                + "".join(text(9, 15 + i * 12.2, ("$ " if i else "  ") + s, 6.2, "#e6edf3" if i else "#9fb3c8", "start", 600, True)
                          for i, s in enumerate(flow))
@@ -661,7 +661,7 @@ def _diagrams() -> dict[str, str]:
                + "".join(f'<rect x="7" y="{7 + i * 11.6}" width="48" height="9" rx="2" fill="#f2f4f7"/>'
                          + text(10, 13.4 + i * 11.6, s, 5.4, "#182230", "start", 600) for i, s in enumerate(slots))
                + '<path d="M63 6V74" stroke="#e4e7ec" stroke-width="1"/>'
-               + text(90, 9, "from the device", 5.4, "#667085", weight=700)
+               + text(90, 9, "from the machine", 5.4, "#667085", weight=700)
                + site(77, 24, n=2, gap=6) + beam(77, 13, 19) + text(117, 26, "gate sites", 5.2, "#475467", "end")
                + rail(67, 45, 89, 45) + jsq(79, 45) + site(68, 45) + arrow("M70 38Q79 32 88 38", ARROW, w=1)
                + text(117, 47, "a hop", 5.2, "#475467", "end")
@@ -676,7 +676,7 @@ def _diagrams() -> dict[str, str]:
                + text(6, 31, "speedup, geometric mean", 5.4, "#667085", "start")
                + '<rect x="6" y="34" width="70" height="6" rx="3" fill="#e4e7ec"/><rect x="6" y="34" width="49" height="6" rx="3" fill="#1f7fa8"/>'
                + text(80, 39.5, "1.4×", 6.6, "#1f7fa8", "start", 800)
-               + pairs + text(6, 76, "every circuit × device pair", 5.2, "#667085", "start")
+               + pairs + text(6, 76, "every circuit × machine pair", 5.2, "#667085", "start")
                + f'<rect x="90" y="47" width="18" height="18" rx="4" fill="{BAD}"/>'
                + '<path d="M94.5 51.5l9 9M103.5 51.5l-9 9" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>'
                + text(99, 74, "not eligible", 5, BAD, weight=700))
@@ -1022,7 +1022,7 @@ def course_section(parts: list[dict], less: list[dict], part_art: dict, part_col
               "levels": levels, "badges": [b["id"] for b in badges], "total": total, "stars": stars}
     hints = {"learn:signin": {"t": "Sign in to save your progress",
                               "d": "Opens the site's sign-in dialog. Signed in, the lessons and exercises you finish "
-                                   "are kept on your account and shown here on any device."}}
+                                   "are kept on your account and shown here on any machine."}}
     out.append("<script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, "
                + json.dumps(hints) + ");</script>")
     out.append(sync_script())
@@ -1365,9 +1365,9 @@ LEARN_JS = r"""
     if(st.user && st.status === 'synced'){
       acct.className = 'you-acct ok';
       acct.textContent = '✓ Saved to your account' + (st.updated ? ': last lesson finished ' + day(st.updated) + '.'
-                         : done ? '.' : '. Finish an exercise and it is kept here, on every device.');
+                         : done ? '.' : '. Finish an exercise and it is kept here, on every machine.');
     } else if(st.user){ acct.textContent = 'Your account could not be reached just now; your progress is kept in this browser and saved next time.'; }
-    else if(st.status === 'anon'){ acct.textContent = 'Kept in this browser only. Sign in and every exercise you finish is saved to your account, on any device.'; }
+    else if(st.status === 'anon'){ acct.textContent = 'Kept in this browser only. Sign in and every exercise you finish is saved to your account, on any machine.'; }
     else if(st.status === 'loading'){ acct.textContent = 'Checking your account…'; }
     else { acct.textContent = 'Your progress is kept in this browser.'; }
     sign.hidden = !(st.status === 'anon' && canSign);

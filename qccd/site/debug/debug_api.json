@@ -178,7 +178,7 @@
    "kind": "read",
    "does": "the review guide's row for a rule: what its failure usually means and what to change -- the words the panel shows the person beside the failure (opened in the Why tab)",
    "args": {
-    "rule": "a rule id (R7, C3, F4, ...), or 'budget' for the device stage's budget"
+    "rule": "a rule id (R7, C3, F4, ...), or 'budget' for the machine stage's budget"
    }
   },
   "note": {

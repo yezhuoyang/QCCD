@@ -44,7 +44,7 @@ from .features import SHOW_RUN, _enc, _run_program, _run_result  # noqa: F401  (
 
 log = logging.getLogger("qccd.mcp")
 
-INSTRUCTIONS = """QCCD workspace tools for co-designing a trapped-ion QCCD device and its hardware program.
+INSTRUCTIONS = """QCCD workspace tools for co-designing a trapped-ion QCCD machine and its hardware program.
 A request from Studio carries the current state in its own text (the design the Studio shows and its
 revision, the other designs, the boards) and says when its frozen context holds nothing more: act on it
 directly. qccd_get_context returns more when you need it -- the person's designs and the leaderboards
@@ -103,9 +103,9 @@ LOGICAL ERROR RATE AND THE TWO LEADERBOARDS. The Leaderboard has two sections. A
 designs, each compiled by the reference compiler; the memory boards among them ("... memory") rank by the
 logical error rate per round. qccd_estimate_ler(experiment, design) measures a design's logical error rate
 the way those boards do: a QEC memory experiment compiled onto the design, checked, and sampled under the
-noise model built from the device's physics; report its interval and its dominant error channels, never a
+noise model built from the machine's physics; report its interval and its dominant error channels, never a
 bare number. The COMPILER board ranks compilers, not designs: a compiler is a directory the person writes,
-graded over a suite of circuit x device pairs by `qccd bench run --compiler DIR` in a shell (it runs their
+graded over a suite of circuit x machine pairs by `qccd bench run --compiler DIR` in a shell (it runs their
 code, so never through these tools); read results with qccd_get_bench, the contract and the suite with
 qccd_read_reference(section='compiler'), the noise model with section='noise'. qccd_get_leaderboard shows
 local rankings, or the published ones with official=true.

@@ -8,7 +8,7 @@ as a diagram, on one of four circuits compiled for the purpose (`compile_example
 circuit 1 on the 2x3 lattice, circuit 2 on the four-site register, circuit 3 on the
 six-site ring by rotation, and a Toffoli for the lowering.
 
-Nothing in an example is typed in.  Every diagram is drawn here from the device document
+Nothing in an example is typed in.  Every diagram is drawn here from the machine document
 and the certificates (a Python trap graph, the ASAP rule, the meeting-trap argmin, the
 waveform signature, a replay with rotations), and the placement traces re-execute the
 placer's own tie rules and are ASSERTED against the layout the compiler chose, so a trace
@@ -31,7 +31,7 @@ from . import learn
 HEADINGS = [
     ("algorithm", "5. The algorithm, pass by pass"),
     ("algo-problem", "5.1 Setting and problem statement"),
-    ("notation", "The notation, on three devices"),
+    ("notation", "The notation, on three machines"),
     ("algo-lower", "5.2 Lowering"),
     ("algo-layout", "5.3 Placement"),
     ("algo-layers", "5.4 Layering and round emission"),
@@ -52,7 +52,7 @@ IDS = {
     ("Problem", "compilation"): "def-problem", ("Problem", "placement"): "def-placement",
     ("Definition 5", "ASAP layering"): "def-asap", ("Definition 6", "meeting trap"): "def-meeting-trap",
     ("Definition 7", "undocking with one-layer lookahead"): "def-undock", ("Problem", "layer routing"): "def-routing",
-    ("Definition 8", "conveyor device"): "def-conveyor", ("Definition 9", "Implements"): "def-implements",
+    ("Definition 8", "conveyor machine"): "def-conveyor", ("Definition 9", "Implements"): "def-implements",
     ("Theorem 1", "pulse identities, proved"): "thm-identities", ("Theorem 2", "soundness of the checker"): "thm-checker",
     ("Check 1", "legality"): "check-legality", ("Check 2", "semantics"): "check-semantics",
 }
@@ -104,7 +104,7 @@ def machine(dev: str):
 
 
 def trap_graph(m, max_transit: int = 3):
-    """The compiler's trap graph, rebuilt from the device document: sites in document
+    """The compiler's trap graph, rebuilt from the machine document: sites in document
     order, one hop per pair of traps joined through junctions only (shortest `via` kept),
     all-pairs hop distances, capacities and positions."""
     dev = m.arch.device
@@ -146,7 +146,7 @@ def trap_graph(m, max_transit: int = 3):
 
 
 def lab_signature(m, hop_via: list[str], src: str) -> str:
-    """The waveform signature of a hop on a device without loops or spurs (the lattice)."""
+    """The waveform signature of a hop on a machine without loops or spurs (the lattice)."""
     dev = m.arch.device
     at = src
     labels = []
@@ -378,7 +378,7 @@ def esc(s) -> str:
 
 
 def dev_fig(dev: str, caption: str, fit: tuple[int, int] | None = (300, 230), **kw) -> str:
-    """One device, drawn into a box of one size (`fit`), so the figures of a strip come out
+    """One machine, drawn into a box of one size (`fit`), so the figures of a strip come out
     the same height with their labels the same size (a reader's comment, 2026-11-07); `fit=None`
     draws it at its natural size."""
     from .build import device_svg
@@ -388,9 +388,9 @@ def dev_fig(dev: str, caption: str, fit: tuple[int, int] | None = (300, 230), **
 
 
 def notation_table(devices: list[tuple[str, str, object]]) -> str:
-    """Definition 1's tuple read off real devices: one column per device, one row per
-    symbol, the values taken from the device document itself (reader's comment, 2026-11-07:
-    "show how the device tuple concretizes in these examples")."""
+    """Definition 1's tuple read off real machines: one column per machine, one row per
+    symbol, the values taken from the machine document itself (reader's comment, 2026-11-07:
+    "show how the machine tuple concretizes in these examples")."""
     def names(xs: list[str], cap: int = 8) -> str:
         xs = list(xs)
         if not xs:
@@ -426,7 +426,7 @@ def notation_table(devices: list[tuple[str, str, object]]) -> str:
                    for sym, what, key in rows)
     return (f'<div class="tw" id="notation"><table class="sm notation"><thead><tr><th>symbol</th><th>meaning</th>{head}</tr></thead>'
             f'<tbody>{body}</tbody></table></div>'
-            '<p class="sub notecap">The notation of this part, read off the three devices the examples run on. Every '
+            '<p class="sub notecap">The notation of this part, read off the three machines the examples run on. Every '
             'later symbol is built from these: <var>d</var>(<var>t</var>, <var>t′</var>) counts hops between traps, '
             'π(<var>a</var>) is the trap qubit <var>a</var> starts in, pos<sub><var>t</var></sub>(<var>i</var>) is '
             'where ion <var>i</var> is at cycle <var>t</var>, and <var>μ</var>(<var>a</var>) is the ion that carries '
@@ -726,7 +726,7 @@ def section(by: dict, lowering_text: str = "") -> str:
           '(5.8), correctness (5.9), and what the compiler cannot do (5.10).',
           'Every formal statement is followed by a line <b>in words</b> and by a green <b>Example</b> drawn from a '
           'real compiled artefact, so no symbol is left without a picture.',
-          'One notation, introduced once in 5.1 and shown on the three devices the examples run on; every symbol '
+          'One notation, introduced once in 5.1 and shown on the three machines the examples run on; every symbol '
           'that appears later is in that table, and hovering a word anywhere on the page explains it.',
           'The four circuits of the examples can be played at the end (5.11).',
       ], title="In this part")
@@ -740,7 +740,7 @@ def section(by: dict, lowering_text: str = "") -> str:
       'pairs then a joining CNOT, on the 2×3 lattice; <b>circuit 2</b>, a GHZ chain, on the four-site '
       'register; <b>circuit 3</b>, a three-qubit parity check, on the six-site ring by rigid rotation; and '
       'a Toffoli, for the lowering. The Bell pair of §3 is used where two qubits '
-      'suffice. Every diagram is drawn from the device document and the compiler\'s own certificate, and the '
+      'suffice. Every diagram is drawn from the machine document and the compiler\'s own certificate, and the '
       'placement traces re-execute the placer\'s rules and are checked against the layout it chose. The '
       'four circuits can be played in §5.11.</div>')
 
@@ -752,7 +752,7 @@ def section(by: dict, lowering_text: str = "") -> str:
                   'qubits, in order). It must hand back a programme the machine can run and a certificate that says '
                   'where every gate happened. This section writes those four things down once, as symbols, and then '
                   'shows every symbol on the three machines the examples use.')
-      + learn.section('four definitions (device, trap graph, circuit, programme and certificate), the notation '
+      + learn.section('four definitions (machine, trap graph, circuit, programme and certificate), the notation '
                       'table that concretises them, and the problem statement: legal, realised, correct, and short.'))
     A(df("Definition 1", "device",
          'Let <var>M</var> be a machine, the text defined on the <a href="../machine/#def-machine">Machine</a> '
@@ -772,7 +772,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'prices in that text are read only by cooling insertion (5.8), and nothing else about the hardware is '
          'ever read by the compiler.'))
     A(notation_table([("chain4", "the register", mc), ("grid2x3", "the lattice", mg), ("ring6d", "the ring", mr)]))
-    A(eg('The same three devices drawn, in one size, with their traps (discs), junctions (squares) and rails; '
+    A(eg('The same three machines drawn, in one size, with their traps (discs), junctions (squares) and rails; '
          'the column of the table above each picture is the tuple <var>A</var> read off it. '
          'The <b>register</b> is four traps in a line: <var>T</var> = {C0, …, C3}, no junction, no loop, and '
          'every trap can gate and measure. The <b>lattice</b> has seven traps on its wires and six lattice '
@@ -920,7 +920,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'Give every qubit a starting trap so that qubits which will gate together start close together. '
          'The score of a layout adds up, over every pair of qubits, "how many gates they share" times "how '
          'many hops apart they start". Lower is better. Single-qubit gates do not count: where they happen '
-         'is decided later, and on a device where every trap gates they cost no transport at all.'))
+         'is decided later, and on a machine where every trap gates they cost no transport at all.'))
     phi1 = phi({int(k[1:]): v for k, v in init1.items()}, w1, g_dist)
     A(eg('Circuit 1 on the lattice, with the layout the compiler chose. Each of the three interacting pairs '
          'is one hop apart, so the score is 1 + 1 + 1 = 3. It cannot be lower: interacting qubits starting in '
@@ -942,11 +942,11 @@ def section(by: dict, lowering_text: str = "") -> str:
       '|<var>T</var><sub>u</sub>| ≥ <var>n</var>, otherwise <var>c</var>(<var>t</var>) = cap(<var>t</var>). '
       'In words: prefer traps that can gate and are not junctions (a junction holds one ion, and an ion '
       'parked on one blocks every route through it for a whole layer); start one ion per trap when there '
-      'are enough traps, and only pack two into a trap on a device that is tight, which the compiler then '
+      'are enough traps, and only pack two into a trap on a machine that is tight, which the compiler then '
       'reports.</p>')
     A(eg('On the lattice every trap qualifies: seven traps for four qubits, one ion each. On the ring only '
          'the two docks can gate, and together they hold four ions, exactly the four qubits, so the general '
-         'router would start two ions in each dock and report "device is tight". (Circuit 3 is compiled by '
+         'router would start two ions in each dock and report "machine is tight". (Circuit 3 is compiled by '
          'the conveyor pass of §5.7 instead, which lays out riders and docks by its own rule.)'
          + '<div class="strip">'
          + dev_fig("grid2x3", "the lattice: all 7 traps usable, one ion each", hi=set(g_sites))
@@ -964,7 +964,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'A trap is <i>free</i> while it holds fewer than <var>c</var>(<var>t</var>) placed qubits. Ties: the seed is '
          'the lowest such qubit, the next qubit the highest-index one among equals, the trap the first in '
          'document order. Running time <var>O</var>(<var>n</var> · |<var>T</var><sub>u</sub>| · <var>n</var>).',
-         'Start with the busiest qubit in the middle of the device. Then, again and again, take the '
+         'Start with the busiest qubit in the middle of the machine. Then, again and again, take the '
          'unplaced qubit with the most gates to qubits already placed, and put it in the free trap closest '
          'to its partners.'))
     g_steps, g_assign = greedy_trace(4, w1, g_dist, g_sites)
@@ -1002,7 +1002,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          '<var>c</var>(<var>t</var>) times; the two orders are zipped.',
          'Instead of placing qubits one at a time, spread all of them along a line at once, so that '
          'qubits sharing many gates land next to each other (the Fiedler vector is the best such line, in '
-         'the least-squares sense). Then walk the device outward from its centre, and hand the traps out '
+         'the least-squares sense). Then walk the machine outward from its centre, and hand the traps out '
          'along that walk, in order.'))
     s_assign, qorder, torder, fvec = spectral_assign(4, w1, c_hops, c_dist, c_sites)
     phi_c_spec = phi(s_assign, w1, c_dist)
@@ -1033,7 +1033,7 @@ def section(by: dict, lowering_text: str = "") -> str:
     A(eg(f'On the register the spectral layout (score 4) is chosen over greedy (5). The descent tries the six '
          f'pairs in order; swapping q{x0} and q{y0} is the first that helps, taking the score from {s0} to {s1}, and '
          f'no later swap improves on it, so the descent stops after {rounds} sweeps. That is the layout the '
-         f'compiler chose, the chain of the circuit laid along the chain of the device; its note reads '
+         f'compiler chose, the chain of the circuit laid along the chain of the machine; its note reads '
          f'"hill-climb 4 -> 3 in 2 rounds". On the lattice greedy already scored 3 and no swap improves it.'
          + '<div class="strip">'
          + dev_fig("chain4", f"before: the spectral layout, Φ = {s0}", ions=ions_of({f"q{q}": s for q, s in s_assign.items()}), hi_ions={f"q{x0}", f"q{y0}"})
@@ -1162,7 +1162,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'is routed back to init by the layer router of §5.6; an ion that cannot be routed home stays and '
          'is noted.',
          'When a layer is done, every ion that gated in it and is not needed by the very next layer is sent '
-         'back to where it started. That keeps the few gate-capable traps of a device free for the gates '
+         'back to where it started. That keeps the few gate-capable traps of a machine free for the gates '
          'still to come, and the one-layer lookahead stops the rule from sending an ion home only to fetch '
          'it straight back.'))
     sw = by.get("swap")
@@ -1203,7 +1203,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'stands still and is in the way. Find each mover a route, one hop per cycle with waiting allowed, '
          'so that no rule is broken at any cycle, and finish as early as possible. This is multi-agent path '
          'finding, with the twist that ions share traps up to a capacity and that, on a broadcast-wired '
-         'device, everything moving in one cycle must move the same way.'))
+         'machine, everything moving in one cycle must move the same way.'))
     A('<p>The solver is prioritised planning with a space-time reservation table (cooperative A*): '
       'movers are planned one at a time in a priority order; each plan is found by A* over states '
       '(<var>t</var>, <var>τ</var>) with actions <i>wait</i> and <i>hop</i>, cost 1 per cycle and the admissible '
@@ -1217,7 +1217,7 @@ def section(by: dict, lowering_text: str = "") -> str:
       '(<var>t′</var>, <var>t</var>, τ) not reserved                                   R5   no head-on exchange on a segment\n'
       'one action per ion per cycle                                 R8\n'
       'act(<var>h</var>) = (ℓ, δ) ⇒ act(ℓ, τ) ∈ {⊥, δ}                          R4d, R11   one signed direction per loop per cycle\n'
-      'wave(τ) ∈ {⊥, sig(<var>h</var>)}      (broadcast devices only)         R22  one waveform per cycle\n'
+      'wave(τ) ∈ {⊥, sig(<var>h</var>)}      (broadcast machines only)         R22  one waveform per cycle\n'
       '</pre>'
       '<p>The <i>waveform signature</i> sig(<var>h</var>) is the movement class followed by one label per '
       'segment crossed: along a named loop the signed unit step on that loop; across a spur, inward or '
@@ -1283,7 +1283,7 @@ def section(by: dict, lowering_text: str = "") -> str:
          'of §5.10 once found a layer where the single order then in use cost 43 cycles against 5.'
          + fig(loop_order_svg(), "the same two movers on an eight-slot loop, planned in the two orders"), "Example (a small loop)"))
     A('<p><b>Failure is a result.</b> When Algorithm 4 raises, or §5.5 leaves an operation unrealised, the '
-      'compiler tries again with the next placement of Algorithm 3; when all three fail on a device with a '
+      'compiler tries again with the next placement of Algorithm 3; when all three fail on a machine with a '
       'closed loop and docks, §5.7 is tried; otherwise the compiler declines with the reason. No branch '
       'emits a programme that violates a rule it knows about.</p>')
 
@@ -1293,10 +1293,10 @@ def section(by: dict, lowering_text: str = "") -> str:
                   'By turning the whole ring, like a conveyor belt with workstations beside it. It works exactly when '
                   'every gate pairs an ion riding the belt with one parked at a dock, which is the shape of a '
                   'syndrome-extraction round.')
-      + learn.section('the compiler\'s second router: the conveyor device (Definition 8), when rigid rotation '
+      + learn.section('the compiler\'s second router: the conveyor machine (Definition 8), when rigid rotation '
                       'suffices (Proposition 2), and the greedy sweep that schedules it (Algorithm 5), traced on '
                       'circuit 3.'))
-    A(df("Definition 8", "conveyor device",
+    A(df("Definition 8", "conveyor machine",
          'A closed loop ℓ ∈ <var>L</var> with rail slots <var>r</var><sub>0</sub>, …, <var>r</var><sub><var>N</var>−1</sub> '
          'and a set of <i>docks</i> <var>D</var>, each a gate-capable trap joined to one rail slot by one spur '
          'segment. A <i>rider</i> <var>i</var> has a fixed slot σ(<var>i</var>) ∈ ℤ<sub><var>N</var></sub> and the loop an '
@@ -1516,15 +1516,15 @@ def section(by: dict, lowering_text: str = "") -> str:
          'which moves no ion and names the same two ions, by Check 2.',
          'The checker is nothing but a decision procedure for Definition 9, and a machine-checked proof says '
          'that whenever it answers yes, the definition really holds. So the whole claim lives in the '
-         'definition, which a reader can judge. The facts about the device that the definition refers to '
+         'definition, which a reader can judge. The facts about the machine that the definition refers to '
          '(which traps gate, which pairs are one hop apart, how each loop is ordered) are read out of the '
-         'document by code the compiler never runs, so the compiler cannot make the device bigger by '
-         'saying so; that is what makes the guarantee hold for any device.'))
-    A(eg('What "any device" buys. Suppose a compiler, by a bug, believed the loop site S2 of the ring could '
+         'document by code the compiler never runs, so the compiler cannot make the machine bigger by '
+         'saying so; that is what makes the guarantee hold for any machine.'))
+    A(eg('What "any machine" buys. Suppose a compiler, by a bug, believed the loop site S2 of the ring could '
          'gate, and emitted a contact there; its witness would name S2, the checker\'s list of gate-capable '
          'traps is {A0, A3}, and conjunct (6) fails. Suppose instead it believed S0 and S3 were adjacent and '
          'moved an ion across in one cycle: that pair is not a hop of the ring, and (5) fails. The compiler '
-         'cannot argue with either, because nothing it writes is consulted for the device facts.'
+         'cannot argue with either, because nothing it writes is consulted for the machine facts.'
          + dev_fig("ring6d", "two things a wrong compiler might claim on the ring, both refused: a gate at S2 (not a gate trap), a hop S0→S3 (not adjacent)",
                    crossed={"S2"}, paths=[{"nodes": ["S0", "S3"], "color": RED, "label": "not a hop", "dashed": True}], hi={"A0", "A3"})))
     A(df("Check 2", "semantics",
@@ -1564,7 +1564,7 @@ def section(by: dict, lowering_text: str = "") -> str:
                       'measured against an exact solver.')
       + '<p><b>Optimality.</b> Nothing above certifies minimality. The router\'s layer instances were re-solved '
       'exactly by a SAT encoding of the same problem on the same trap graph; the heuristic was optimal '
-      'on every instance of the lattice and cyclone devices and lost on a racetrack, where a single '
+      'on every instance of the lattice and cyclone machines and lost on a racetrack, where a single '
       'priority order had cost 43 cycles against 5, which is the origin of the four orders in '
       'Algorithm 4. The placement relaxation of Algorithm 2 was predicted to dominate Algorithm 1 and '
       'did not; the 2-swap descent on Φ is what won, by up to 12 %.</p>'

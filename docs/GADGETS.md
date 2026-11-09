@@ -33,7 +33,7 @@ python -m qccd.gadget build PROGRAM.lq --design edited.gadget.json   # a design 
 
 | IC design | Here | What carries over |
 |---|---|---|
-| standard cell, hard macro | **leaf gadget**: a device fragment plus one TSIR per operation | the layout exists once per master; every instance shares it |
+| standard cell, hard macro | **leaf gadget**: a machine fragment plus one TSIR per operation | the layout exists once per master; every instance shares it |
 | cell abstract (LEF: size, pins) | footprint, ports (boundary node, side, direction, role, width) | a parent sees only the abstract |
 | timing library (Liberty arcs) | **op characterization**: duration, per-ion port crossing times, n̄ at the port, gate counts, rule report | a parent schedules against it |
 | characterization, SPICE → `.lib` | replay the op's TSIR under the cost model and run all 28 rules | numbers come from the verifier, never from a formula written beside it |
@@ -58,11 +58,11 @@ resting inventory of ions by role, a capacity, a footprint and ops.
 
 **Port.** Where ions cross the boundary. `dir` in / out / inout; `role` (`data`,
 `messenger`, `magic`, `any`); `width`, the ions one transfer carries; `order`, the order a
-bundle crosses in; and on a leaf the device `node` it sits on and the testbench `stub`
+bundle crosses in; and on a leaf the machine `node` it sits on and the testbench `stub`
 beyond it. A composite's port binds to one child port.
 
 **Op.** Something a master does. On a leaf, an op is one TSIR on the master's testbench
-device. Every op carries a characterization and a **status**, under the repository's
+machine. Every op carries a characterization and a **status**, under the repository's
 reporting contract (`docs/rules.md`: *passed* only if the check ran):
 
 | status | meaning | drill-down |
@@ -98,7 +98,7 @@ A transfer is one ion bundle crossing one port during one op, measured from the 
 `port`, `dir`, `count`, the local ion names in crossing order, each ion's crossing time
 from op start, and the largest n̄ among them (read with the replay's probe).
 
-- **Stubs.** A leaf's testbench device is its device plus one stub per port: a site in zone
+- **Stubs.** A leaf's testbench machine is its machine plus one stub per port: a site in zone
   `port` (capacity = width; no gate, no SPAM, no cooling) one segment beyond the port node.
   An outgoing ion ends its op parked on the stub; an incoming ion starts there. Handoffs use
   the classes `port_in` / `port_out` (no split or merge). A stub is never cooled by its
@@ -129,16 +129,16 @@ leaf replays the master's TSIR for the op running at the global time, at local t
 `t − t0` (modulo the op inside `cycle × N`, and through the warp). Every level reads the
 same event list.
 
-### 4.1 Roads are devices; heat crosses the town
+### 4.1 Roads are machines; heat crosses the town
 
 A road is modeled the way a shuttle inside a place is. It is the conveyor `chan<L>`: L
 sites one lattice unit apart along the road's path, a stub at each end on the doors it
-joins. Every carry on the road runs that device's one-ion `carry` program. Its timing is
+joins. Every carry on the road runs that machine's one-ion `carry` program. Its timing is
 that program's replay (`LeafLibrary.channel_timing`), and so is its heat. The page draws
 the road as its sites. An ion on the road is placed where that program has it at the ion's
 own local time (`LeafSim`, the replay that places ions inside a place), and it queues on
-the last sites until it is taken in. A junction is the device `junc9`: a centre, four arm
-traps and four stubs. Up close it is drawn as that device, with its ions inside while a
+the last sites until it is taken in. A junction is the machine `junc9`: a centre, four arm
+traps and four stubs. Up close it is drawn as that machine, with its ions inside while a
 pass runs.
 
 **A bundle crosses a junction one ion at a time** (user's decision, 2026-10-26). The rest
@@ -196,7 +196,7 @@ is driven by DACs and electrodes like what moves them inside one, and it obeys t
 basic rules (`docs/rules.md`). That is what the user asked for on 2026-10-26: *the rules
 apply to the hardware program when there are gadgets.*
 
-Each place's op is verified on its own device against R1-R23: a cycle is one waveform of
+Each place's op is verified on its own machine against R1-R23: a cycle is one waveform of
 its plane (R4, R22), one class a cycle, holds by the per-site switches (R4d), and so on.
 Every leaf declares a broadcast plane: 32 shared channels (6 + 6 + 4 electrode roles,
 each with a motion bank and a hold bank), compensation channels, and a switch per site.
@@ -207,8 +207,8 @@ run once per ion. That is not a program a road can play:
   in the same cycle, which R22 refuses;
 - an ion reaching the far end while the one ahead waits would stack on the end stub.
 
-**Every carry is one program on its road's own device** (`qccd/gadget/roads.py`):
-- the device is the road's conveyor `chan<L>`, its stubs as wide as the bundle;
+**Every carry is one program on its road's own machine** (`qccd/gadget/roads.py`):
+- the machine is the road's conveyor `chan<L>`, its stubs as wide as the bundle;
 - each cycle runs one class: a load off the near stub, a conveyor shift, or a delivery
   onto the far stub;
 - a shift is rigid, and an ion blocked by the one ahead holds by its switch.
@@ -250,13 +250,13 @@ draws a road's sites at its real nodes, corners included. It is the very program
 not the one-ion pretence.
 
 **The machine's wiring is counted** (`machine_census`): electrodes, switches and DACs for
-every device the floor holds, each driving its own plane as its master declares. On the
+every machine the floor holds, each driving its own plane as its master declares. On the
 town, the 60 roads and 32 junctions take 3,054 of the machine's 3,438 DACs. That is the
 price of every road having its own plane. §4.3 lets a design share planes instead.
 
 ### 4.3 Shared planes (H2)
 
-A floorplan may say that devices share one plane of DACs, or one laser:
+A floorplan may say that machines share one plane of DACs, or one laser:
 
 ```
 plane bus  dacs   roads                  # every road on one set of channels
@@ -265,12 +265,12 @@ plane beam lasers post bridge clinic     # three places under one beam
 ```
 
 Members are places, junctions and roads by name, `roads`, `junctions`, or a family word.
-A shared plane is one set of channels, so its rule is a single device's rule: one waveform
+A shared plane is one set of channels, so its rule is a single machine's rule: one waveform
 at a time. Two members may play a cycle at once only if it is the very same cycle: the same
 class (or gate), the same lab directions, the same start and end.
 
 **The scheduler makes members take turns.** Each group of planes (planes that share a
-device form one group) has an activity calendar beside the devices' own. Those still hold
+machine form one group) has an activity calendar beside the machines' own. Those still hold
 occupancy, such as a block resting in a zone, which plays no waveform.
 - An op at a member place and a junction's train each fit into the group's calendar.
 - A road on a plane loads only once the plane is free. Within one trip, an activity on a
@@ -316,7 +316,7 @@ Every row holds every check. On the town, a bus of every road saves 55% of the D
 
 ### 5.1 Leaves (all ops `verified`)
 
-| master | device | ops (duration) |
+| master | machine | ops (duration) |
 |---|---|---|
 | `mem_bb72` | `ring(36, 2, 24, dock_offset=1)`: 72 data ions, 24 ancillas in dock traps; corner port traps `P_bus` (data bundle) and `P_net` (messenger) | `cycle` 53.9 ms (432 CX contacts, then restore + cool) · `layer1q` 2.0 ms · `emit` 19.3 ms · `absorb` 26.5 ms · `visit.<B><i>` per logical operator, compiled on demand (12–29 ms for supports of 6–28 ions) |
 | `tcx72` | a comb: two 72-site conveyor rails over 72 gate traps | `cx` / `xc` 37.0 ms (72 CX in one batch; bundles in at n̄ ≈ 1, out at n̄ ≈ 221) |
@@ -480,7 +480,7 @@ landing page and the SVG renderer.
 | Decoder | control room | chip with pins | `dec_d3` | `decode` (§10) |
 | Classical Memory | archive | drum of cells | `arch1` | `record`, `update`, `resolve` (§10) |
 
-**The bay.** Every ring place is one device family (`leaves/bay.py`): a racetrack of `2W`
+**The bay.** Every ring place is one machine family (`leaves/bay.py`): a racetrack of `2W`
 storage slots, dock traps on outward spurs (so the two rows never share a trap position),
 and doors on the corner slots, each a spur to a port trap and a stub. Blocks enter at the
 left doors and leave at the right ones, so with the ring turning clockwise a place is FIFO.
@@ -628,7 +628,7 @@ dashed and dark, because a bit is not an ion. Code: `leaves/classical.py`,
 
 **Ports and wires.** A `Port` has a `kind`: `ion` or `classical`. A classical port carries
 a `signal` (`syndrome`, `outcome`, `frame`, `decision`) and a number of `bits`, has no
-device node and no stub, and cannot be joined to an ion port — G1 refuses it, and so does
+machine node and no stub, and cannot be joined to an ion port — G1 refuses it, and so does
 the signal type (`tests/test_gadget_classical.py`). A `Channel` has a `kind` too: a `wire`
 has one cost, `latency_us`, and never enters the road network the scheduler routes ions on.
 Every measuring place has a `syn` port, the two that produce a logical result have `res`,
@@ -701,7 +701,7 @@ whose two bits are *parity expressions* over logical outcomes — a constant and
   measuring gadget's own flow report already declares, which is what the sign-off allows.
 
 **The S̄ gadget** is the first gadget built by composing places rather than by building a
-device: a |Ȳ⟩ block from the pharmacy (`inject.Y`: the corner ion is reset, H and S here,
+machine: a |Ȳ⟩ block from the pharmacy (`inject.Y`: the corner ion is reset, H and S here,
 then encoded — verified complete, distance 1 like any injection), a Z̄Z̄ lattice surgery
 against the data block, an X̄ readout of the |Ȳ⟩ block, and a Z̄ frame in the archive
 conditioned on the parity of the two outcomes (Litinski 2019, *Game of Surface Codes*,
@@ -770,7 +770,7 @@ one table (`qccd/analysis/feedback.py`: `LINK`, `DECODERS`, `cycle_report`, and 
 analysis, which is sweepable — *how slow may my decoder be before the backlog grows*):
 
 * **the studio's Design tab** (`studio.html#design`) has a **QEC cycle** panel — the round
-  the device on the canvas actually runs (the studio's own priced runtime, via
+  the machine on the canvas actually runs (the studio's own priced runtime, via
   `EDITOR.price()`, and nothing shown at all when that price is blocked), the loop drawn
   stage by stage, a decoder to pick, and the two verdicts. It is *injected* by
   `qccd/site/build.py` (`qccd/site/qec_cycle.py::studio_block`), so the studio's own
@@ -795,7 +795,7 @@ Clifford frame rather than a Pauli one) is not implemented.
 
 ## 11 · The design tool
 
-`index.html` in the build directory, plus `leaf/<master>.js` (one master's device and
+`index.html` in the build directory, plus `leaf/<master>.js` (one master's machine and
 programs, loaded with a plain `<script>` so `file://` works), `hw/leaf/<master>.js` (each
 master the run uses, as TSIR text, for the Hardware column) and, with `--studio`,
 `studio/<master>.<op>.html`. Canvas throughout; no network.
@@ -810,7 +810,7 @@ a sharp white square of side `0.60g`; a rail is a butt-capped line coloured by i
 (`rail`, `highway`, `compute` thin); an ion is a white-outlined disc of radius `r_ion` when
 it is in play and `r_rest` otherwise, with the gold halo under a site in play and the
 potential-well ellipse under an ion in flight. `g` — the nearest-neighbour distance — is
-measured per device and multiplied by the camera's scale, which is what the studio's fit
+measured per machine and multiplied by the camera's scale, which is what the studio's fit
 does. Ion colour follows the studio's rule (*what the machine is doing to this ion now*,
 not what role a code gave it): a gate teal, a measurement or reset red, everything else
 slate. Change the palette in `theme.py` and both tools move together.
@@ -862,7 +862,7 @@ slate. Change the palette in `theme.py` and both tools move together.
   windows: which op measured them, where, how many bits, how long each waited in its buffer.
   Colours come from the `wire` entry of `categories.py` (`lit`, `glow`).
 - **Descend.** Double-click an instance, pick it in the hierarchy tree, or use the
-  breadcrumb; `Esc` goes up. A leaf level is the ion-by-ion view: its device, its ions by
+  breadcrumb; `Esc` goes up. A leaf level is the ion-by-ion view: its machine, its ions by
   role, the instruction running (`visit.X1 · instruction 30/35 · cool`), with the op's TSIR
   instruction ticks on the timeline. **Studio page** (with `--studio`) opens the full
   studio debugger for that op, with every listing and all 28 rules.
@@ -930,9 +930,9 @@ correction that must fail) — 120 tests, about four minutes cold.
   `{const, sources: [[event, flow]]}`: a constant and the logical outcomes it is the parity
   of, each named by the event that measured it and that gadget's own flow.
 - **Checks** `checks.json`: `{passed, failed, skipped, violations, metrics}`.
-- **Leaf data** `leaf/<master>.js`: `{master, device, arch, zones, home, roles, programs,
+- **Leaf data** `leaf/<master>.js`: `{master, machine, arch, zones, home, roles, programs,
   times}`, wrapped as `window.__gadgetLeaf(…)`. A classical place has no `arch` and no
-  `programs`: `classical: true`, a device to draw and nothing to replay.
+  `programs`: `classical: true`, a machine to draw and nothing to replay.
 
 ---
 
@@ -946,7 +946,7 @@ correction that must fail) — 120 tests, about four minutes cold.
 | **P3** | the page: run, descend, leaf replay, library, follow an ion | ✅ headless walk, JS/Python replay parity |
 | **P4** | edit: place, move, connect, group, ungroup, export, `--design` | ✅ an edited design round-trips and synthesizes |
 | **P5** | `fac_t15` and the magic path | ✅; PPM gadgets for single logicals, mixed-basis PPMs, OpenQASM input: open |
-| **P6** | flat sign-off on a small design | ✅ as logic (§9.3: every example algorithm); the flat 27-rule replay across instance devices: open |
+| **P6** | flat sign-off on a small design | ✅ as logic (§9.3: every example algorithm); the flat 27-rule replay across instance machines: open |
 | **P7** | verified place library: categories and silhouettes, logic checks, fault distance | ✅ §9.1–9.2, every op verified, distances cross-checked with stim |
 | **P8** | Logical Algorithm: the town, the scheduler, place-model G1–G9, end-to-end sign-off | ✅ §9.3, eight algorithms; a composer for new towns in the page: the editor, not yet the scheduler |
 | **P9** | the classical half: classical ports, wires, messages, the control floor, G10/G11 | ✅ §10; drawn dashed with packets, causality and backlog checked |

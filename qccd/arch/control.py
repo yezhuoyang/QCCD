@@ -1,7 +1,7 @@
 """The control plane: what can be driven, and what must be driven together.
 
 PLAN §2 puts electrode-level waveform synthesis out of scope, and that boundary is right:
-the voltages on a pad are a field solve over one device's geometry, they are not portable
+the voltages on a pad are a field solve over one machine's geometry, they are not portable
 between architectures, and the compiler has no use for them. What every QCCD *does* have,
 and what every architectural claim in the corpus actually rests on, is one level up:
 
@@ -188,7 +188,7 @@ class ControlPlane:
 
     @property
     def n_switches(self) -> int:
-        """Every electrode behind a two-way switch, when the device has them."""
+        """Every electrode behind a two-way switch, when the machine has them."""
         return self.n_electrodes * 2 if self.switch_per_site else 0
 
     # --------------------------------------------------------------- indexes
@@ -341,11 +341,11 @@ class ControlPlane:
 
 
 def build_control_plane(device, control: Mapping) -> ControlPlane:
-    """Expand a `control.channels` block against the device's sites.
+    """Expand a `control.channels` block against the machine's sites.
 
     An architecture that declares nothing gets an undeclared plane: counts still come out
     (from the aggregate wiring fields, as before) but drivability is not checked, because
-    a device that has not said how it is wired has not earned a verdict on what it can do.
+    a machine that has not said how it is wired has not earned a verdict on what it can do.
     """
     sites = [n.id for n in device.nodes.values() if n.kind == "site"]
     junctions = [n.id for n in device.nodes.values() if n.kind == "junction"]

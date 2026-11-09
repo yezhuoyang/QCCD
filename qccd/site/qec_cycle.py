@@ -226,7 +226,7 @@ def studio_payload() -> dict:
 
     `places` carries the decoder, the classical memory and the wire as the gadget library
     defines them -- title, silhouette and colours -- so the decoder drawn over the studio's
-    device is the same place, in the same shape and the same green, as the decoder in the
+    machine is the same place, in the same shape and the same green, as the decoder in the
     gadget tool.  Retyping those three colours here is how two pictures of one thing start.
     """
     from ..gadget.categories import CATEGORIES

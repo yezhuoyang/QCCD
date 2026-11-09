@@ -25,7 +25,7 @@ def guide_text() -> str:
 @lru_cache(maxsize=1)
 def guide() -> dict[str, dict[str, str]]:
     """{rule id: {"means": ..., "fix": ...}} from the guide's "Usually means | Fix" tables (the
-    device rules, the machine rules, and the device stage's budget as "budget")."""
+    machine rules, the machine rules, and the machine stage's budget as "budget")."""
     out: dict[str, dict[str, str]] = {}
     table = False
     for line in guide_text().splitlines():

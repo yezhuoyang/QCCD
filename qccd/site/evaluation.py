@@ -4,7 +4,7 @@ The page is written from the evaluation language itself (`qccd.evalset`): every 
 requirement and noise channel is printed as the text the interpreter evaluates, every word
 it uses is listed with its definition, and every example on the page is computed when the
 page is built -- the small programmes from the Language and Rules pages, the shipped
-devices, and two published Goal 1 entries recomputed from their bundles and set beside
+machines, and two published Goal 1 entries recomputed from their bundles and set beside
 their official reports.  Nothing on the page is typed in that the language could compute.
 """
 
@@ -216,7 +216,7 @@ def _short_line(line: str) -> str:
 # ============================================================================ computed examples
 
 def _small_programmes() -> list[dict]:
-    """The Language and Rules pages' small devices, each running a short programme."""
+    """The Language and Rules pages' small machines, each running a short programme."""
     from .examples import CHAIN, GRID, RACE, machine, rec, text_of
 
     specs = [
@@ -298,7 +298,7 @@ def _metric_table(examples: list[dict], names: list[str], ev) -> str:
 
 
 def _hardware_rows() -> list[dict]:
-    """The hardware metrics on the small devices and the shipped ones, by the language."""
+    """The hardware metrics on the small machines and the shipped ones, by the language."""
     from ..arch import Architecture
     from ..evalset.interp import Evaluator
     from ..ir.tsir import TSIR
@@ -503,7 +503,7 @@ def _pipeline_svg() -> str:
              'font-family="ui-sans-serif,system-ui,sans-serif">',
              '<defs><marker id="ev-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">'
              '<path d="M0 0L10 5L0 10z" fill="#8a8892"/></marker></defs>']
-    parts.append(box(10, 10, 180, 48, "the device", ".arch.json: graph, physics, wiring", "#eef3fb", "#9dbfe9"))
+    parts.append(box(10, 10, 180, 48, "the machine", ".arch.json: graph, physics, wiring", "#eef3fb", "#9dbfe9"))
     parts.append(box(210, 10, 180, 48, "the programme", ".tsir.json: one instruction a step", "#eef3fb", "#9dbfe9"))
     parts.append(box(600, 10, 250, 48, "the evaluation", ".eval: metrics, requirements, channels", "#f3f0fb", "#b9aee6"))
     parts.append(box(110, 104, 240, 48, "the replay", "the hardware language's semantics", "#fbfaf7", "#cfceca"))
@@ -522,7 +522,7 @@ def _pipeline_svg() -> str:
     parts.append(box(650, 252, 200, 48, "logical error rate", "estimated: a sample, ± 95 %", "#fbf6e9", "#e0c27a"))
     parts.append(arrow(600, 276, 650, 276))
     parts.append('</svg>')
-    return '<figure class="dg"><div class="figsvg">' + "".join(parts) + ('</div><figcaption>The device and the '
+    return '<figure class="dg"><div class="figsvg">' + "".join(parts) + ('</div><figcaption>The machine and the '
             'programme are replayed once; the evaluation is read over the run. Metrics and the circuit are '
             'functions of the three texts, the requirements formulas over them, and the logical error rate the '
             'one number that is sampled.</figcaption></figure>')
@@ -625,7 +625,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     w('<p class="sub">A design is judged by numbers: how long its programme runs, how hot it makes its ions, '
       'how much hardware it takes, and how often the logical qubit it stores is lost. On this website every '
       'one of those numbers is a term of a small language, printed on this page, evaluated on three texts: '
-      'the device, the programme, and the evaluation. Nothing else is read, so every number on the '
+      'the machine, the programme, and the evaluation. Nothing else is read, so every number on the '
       'leaderboard can be recomputed from the files it came from, and traced to the line of text that '
       'defines it.</p>')
     w('<p class="sub">The language is the <a href="../rules/">Rules</a> page&rsquo;s, extended. A rule is a '
@@ -684,15 +684,15 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '<p>where μ gives every metric a value, ρ gives every requirement a verdict, and <i>C</i> is the noisy '
       'circuit: a stim circuit with the experiment&rsquo;s detectors. The logical error rate is a statistic '
       'of <i>C</i>, LER(<i>C</i>) = Pr[the decoder&rsquo;s correction leaves a logical observable wrong].</p>'
-      '<p class="words">In words: the device and the programme are replayed once, which fixes where every ion '
+      '<p class="words">In words: the machine and the programme are replayed once, which fixes where every ion '
       'is, how hot it is and what the clock says at every instant; the evaluation is then read over that '
       'record.</p></div>')
     w(_pipeline_svg())
     w('<div class="df"><b>Proposition 1</b>(Determinism.) μ, ρ and <i>C</i> are functions of '
       '(<i>D</i>, <i>P</i>, <i>E</i>).'
       '<p><i>Proof sketch.</i> The replay is a deterministic transition system: each instruction&rsquo;s '
-      'duration and heat are read off the device&rsquo;s tables (<a href="#state">below</a>). Every word of '
-      'the vocabulary reads the device, the programme, the run the replay produced, or a parameter written '
+      'duration and heat are read off the machine&rsquo;s tables (<a href="#state">below</a>). Every word of '
+      'the vocabulary reads the machine, the programme, the run the replay produced, or a parameter written '
       'in <i>E</i>; the interpreter evaluates terms by structural recursion, with no clock, no random number '
       'and no file besides the three. &#8718;</p>'
       '<p class="words">So the grader is an interpreter of the text, not an authority: a second interpreter '
@@ -795,7 +795,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '<i>q</i><sub><i>e</i></sub> ) + Γ·duration(<i>k</i>)</div>'
       '<div class="eq">n̄(<i>i</i>, start(<i>k</i>+1)) = 0 if step <i>k</i> cools <i>i</i>, else n̄(<i>i</i>, end(<i>k</i>))</div>'
       '<p>A transport step lasts as long as its slowest ion; a rotation by δ slots is |δ| such cycles. A gate '
-      'step lasts τ<sub>MS</sub> or τ<sub>1q</sub> (a frame change VZ three one-ion pulses, unless the device '
+      'step lasts τ<sub>MS</sub> or τ<sub>1q</sub> (a frame change VZ three one-ion pulses, unless the machine '
       'declares a one-pulse Z gate); a measurement, reset or cooling its own τ; <code>init</code> and '
       '<code>barrier</code> no time at all. Splits and merges are what a move <a href="#w-entails">entails</a>: '
       'leaving a site where other ions stay, joining one where ions wait, or docking.</p>'
@@ -809,7 +809,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       f'heats a little with the clock; the cooling takes both back to zero at the end of its step, and the gate '
       f'meets them cold.</p><pre class="ev">{html.escape(junction["text"])}</pre>'
       f'{_state_table(junction)}</div>')
-    w('<p>Two clocks appear on this page. The small examples run on the website&rsquo;s default device '
+    w('<p>Two clocks appear on this page. The small examples run on the website&rsquo;s default machine '
       'document; Goal 1 runs on the cited Helios-class physics every one of its releases fixes '
       '(<code>clock "quantinuum"</code>), and a design may not change it.</p>')
     g1arch = entry["r"].run.arch if entry else None
@@ -832,9 +832,9 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         w(_metric_card(mets.metric(n), names))
     w(_define_block(mets, names, ["is_transport"]))
     w('<p><code>ions_per_instruction</code> is how much of the machine one waveform moves: on a broadcast-wired '
-      'device a rotation moves every ion on its loop for the price of one instruction, which is why the '
+      'machine a rotation moves every ion on its loop for the price of one instruction, which is why the '
       'rings run their rounds in few instructions.</p>')
-    w('<div class="eg"><b>Example</b><p>Four short programmes on the small devices of the Language and Rules '
+    w('<div class="eg"><b>Example</b><p>Four short programmes on the small machines of the Language and Rules '
       'pages, every value computed by the text above:</p>'
       + "".join(f'<p><b>{html.escape(x["key"])}</b> &mdash; {html.escape(x["what"])}, on '
                 f'{html.escape(x["device"])}:</p><pre class="ev">{html.escape(x["text"])}</pre>' for x in ex)
@@ -848,7 +848,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     w('<p>Every operation on a trapped-ion machine is paid for in motional quanta. A two-ion gate shares a '
       'motional mode between its ions, and a hot mode blurs the spin-dependent force that entangles them, so '
       'the gate&rsquo;s error grows with the heat it meets (rule R16), and rule R7 refuses a gate above the '
-      'device&rsquo;s budget. The device&rsquo;s law is part of the metrics file:</p>')
+      'machine&rsquo;s budget. The machine&rsquo;s law is part of the metrics file:</p>')
     w(_define_block(mets, names, ["eps0", "kappa", "Nref", "chain_factor", "chain_ratio", "ms_error",
                                   "gate_nbar", "gate_chain"]))
     w('<p class="words">ε(n̄, N) = ε₀ + κ·n̄ in a chain no longer than the reference; in a longer one, '
@@ -873,7 +873,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'wired directly, which is the first thing that does not scale. Broadcast wiring shares one DAC among '
       'every electrode that plays the same role, which holds the count near constant at the price that one '
       'cycle carries one motion (rule R22). The floors below are the deck&rsquo;s array (pp. 19&ndash;20) '
-      'and WISE (<a href="https://arxiv.org/abs/2305.12773">arXiv:2305.12773</a>): a device may declare more, '
+      'and WISE (<a href="https://arxiv.org/abs/2305.12773">arXiv:2305.12773</a>): a machine may declare more, '
       'never less.</p>')
     w('<pre class="ev">' + "\n".join(f'<span id="p-{p}"></span>' + hl(f"param {p} = {mets.param_text[p]}", names)
                                        for p in ("least_electrodes_per_trap", "least_compensation_per_trap",
@@ -893,8 +893,8 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'any site.</p></div>')
     board = load("board")
     w('<div class="df"><b>The budget, as requirements</b><p>Every task release fixes a hardware budget with '
-      'its physics, and every board judges a design&rsquo;s device by two requirements of the same language. '
-      'The grader&rsquo;s device stage evaluates them with the release&rsquo;s numbers; a design over budget '
+      'its physics, and every board judges a design&rsquo;s machine by two requirements of the same language. '
+      'The grader&rsquo;s machine stage evaluates them with the release&rsquo;s numbers; a design over budget '
       'keeps its numbers and is not ranked.</p>'
       f'<pre class="ev">{hl(board.text(), _names(board))}</pre></div>')
     rows = "".join(f'<tr><td><code>{html.escape(r["name"])}</code>'
@@ -906,10 +906,10 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
                    f'<td class="r"><b>{num(r["dacs"])}</b></td>'
                    f'<td>{"<span class=ok>holds</span>" if r["dacs"] <= 128 else "<span class=bad>fails</span>"}</td></tr>'
                    for r in hw)
-    w('<div class="eg"><b>Example</b><p>The small devices and the devices the repository ships, by the text '
+    w('<div class="eg"><b>Example</b><p>The small machines and the machines the repository ships, by the text '
       'above; the last column is requirement B1 of every board, <code>dacs &lt;= max_dacs</code>, with Goal '
-      '1&rsquo;s <code>max_dacs = 128</code>. The grader&rsquo;s device stage evaluates exactly these two '
-      'requirements, with the release&rsquo;s numbers.</p><div class="tw"><table class="t"><tr><th>device</th><th>wiring</th><th class="r">sites</th>'
+      '1&rsquo;s <code>max_dacs = 128</code>. The grader&rsquo;s machine stage evaluates exactly these two '
+      'requirements, with the release&rsquo;s numbers.</p><div class="tw"><table class="t"><tr><th>machine</th><th>wiring</th><th class="r">sites</th>'
       '<th class="r">junctions</th><th class="r">electrodes</th><th class="r">switches</th>'
       '<th class="r">shared + shim DACs</th><th class="r">DACs</th><th>B1</th></tr>' + rows + '</table></div>'
       + _hardware_caption(hw) + '</div>')
@@ -1173,13 +1173,13 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       + rrows + '</table></div></details>')
     w('<p>An entry is on the board only when it is <i>eligible</i> and places at most 200 ions. Five '
       'conditions are requirements of the evaluation, decided on this page&rsquo;s terms: the wiring fits 128 '
-      'DACs (B1) and the device 200 junctions (B2), the rules hold (G1), the programme places at most 200 ions '
+      'DACs (B1) and the machine 200 junctions (B2), the rules hold (G1), the programme places at most 200 ions '
       '(G2, the board&rsquo;s own filter rather than a stage of grading), and the noiseless check holds (G3). '
       'The other stages are about the submission itself, and the grader decides them before any number is '
       'computed:</p>'
       '<div class="tw"><table class="t"><tr><th>stage</th><th>decides</th><th>how</th></tr>'
       '<tr><td>bundle</td><td>the files are the ones the manifest names, for this release</td><td class="na">sha-256 of every file</td></tr>'
-      '<tr><td>physics lock</td><td>the device&rsquo;s gates, transport, heating and budget are the release&rsquo;s</td><td class="na">equality of four blocks</td></tr>'
+      '<tr><td>physics lock</td><td>the machine&rsquo;s gates, transport, heating and budget are the release&rsquo;s</td><td class="na">equality of four blocks</td></tr>'
       '<tr><td>correspondence</td><td>the graded programme is the certified one, with only coolings added</td><td class="na">instruction by instruction</td></tr>'
       '<tr><td>certificate binding</td><td>the certificate is about this circuit, operation by operation</td><td class="na">the compiler&rsquo;s witnesses</td></tr>'
       '<tr><td>R10, first half</td><td>every gate happens, once, in order, with its own ions together</td>'
@@ -1241,7 +1241,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         except Exception as exc:  # noqa: BLE001 -- the page says what went wrong rather than hiding the example
             w(f'<p class="note">The example could not be evaluated: {html.escape(str(exc))}</p>')
     w(learn.recap([
-        'A design is judged by a function of three texts: the device, the programme, and the evaluation. '
+        'A design is judged by a function of three texts: the machine, the programme, and the evaluation. '
         'Every number the leaderboard shows is a term of that text, and anyone can recompute it.',
         'The numbers come in four families: speed (the clock of the replay), heat (motional quanta, and the gate '
         'error they cause), hardware (electrodes, switches, DACs), and the logical error rate.',
@@ -1254,7 +1254,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         'interpreter computes it on every design.',
     ], "evaluation", more='This is the end of the story. From here: the <a href="../board/goal1/">Goal 1 board</a>, '
                           'where these numbers rank real designs, each one opening on its own page; or the '
-                          '<a href="../studio.html#design">Design page</a>, where your own device is scored by the '
+                          '<a href="../studio.html#design">Design page</a>, where your own machine is scored by the '
                           'same texts as you draw it.'))
     w('</div>')
     return PAGE.format(title="Evaluation - QCCD studio", style=STYLE, extra_css=CSS + learn.LAYOUT_CSS,

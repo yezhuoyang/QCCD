@@ -68,7 +68,7 @@ class Evaluation:
     # ------------------------------------------------------------------ running it
     def run(self, prog, arch, *, experiment=None, qasm: str | None = None, qubit_map=None,
             cert: Mapping | None = None, rules: bool = False, cost_model=None) -> Run:
-        """Replay the programme on the device under this evaluation's clock (with `rules`, the
+        """Replay the programme on the machine under this evaluation's clock (with `rules`, the
         verifier's rule verdicts from the same replay, in `run.facts["verification"]`).
         `cost_model` replaces the clock's own model -- a studio page priced by another model
         (`deck`) is evaluated on the replay it shows; the grader never passes one."""
@@ -148,7 +148,7 @@ class Evaluation:
         return out
 
     def with_clock(self, clock: str) -> "Evaluation":
-        """The same evaluation on another operating-point table; a name the device format does
+        """The same evaluation on another operating-point table; a name the machine format does
         not declare is refused (it would price every step on some other table, silently)."""
         import copy
         from ..arch.curves import TABLES

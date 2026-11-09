@@ -168,7 +168,7 @@
       }
       f.classList.remove('stale');
       var dev = data.devices[fig.arch];
-      if (!dev) { f.innerHTML = '<div class="figwait">No studio page for the device <code>' + esc(fig.arch) + '</code>.</div>'; return; }
+      if (!dev) { f.innerHTML = '<div class="figwait">No studio page for the machine <code>' + esc(fig.arch) + '</code>.</div>'; return; }
       var o = figObjs.get(f);
       if (!o) { o = studio ? BookFigure.programme(f, fig.arch) : BookFigure.live(f, fig.arch); figObjs.set(f, o); }
       o.update(fig, dev);

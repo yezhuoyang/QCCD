@@ -1634,10 +1634,10 @@ function renderStart() {
     (mine ? '<div class="q-card"><h3>Your design</h3><p>The design you last left on the Design page: <b>' + esc(mine.name) + '</b>' +
       (mine.calls ? ', with a program of ' + plural(mine.calls, 'statement') : ', with no program written yet') + '.</p>' +
       '<button type="button" class="q-p" id="sMine" data-hint="debug:start:design">Debug my design</button></div>' : '') +
-    '<div class="q-card"><h3>Design one here</h3><p>Open the Design page in this frame: build a device and write its program, then check it here. Your work stays in the frame.</p>' +
+    '<div class="q-card"><h3>Design one here</h3><p>Open the Design page in this frame: build a machine and write its program, then check it here. Your work stays in the frame.</p>' +
     '<button type="button" id="sStudio" data-hint="debug:start:studio">Open the Design page</button></div>' +
     '<div class="q-card"><h3>A file from your computer</h3><p>A Studio page saved from this site (.html), a saved design (.studio.json, .arch.json), ' +
-    'or a device and its program together: choose the .arch.json and the .tsir.json at once.</p>' +
+    'or a machine and its program together: choose the .arch.json and the .tsir.json at once.</p>' +
     '<input type="file" id="sFile" multiple accept=".html,.htm,.json" data-hint="debug:start:file" aria-label="open a file"></div>' +
     '<div class="q-card q-wide"><h3>A program from the website</h3><input id="sQ" type="search" placeholder="search ' + CFG.catalogue.length +
     ' programs: a board, a design, a paper…" data-hint="debug:start:search" aria-label="search the programs"><div id="sList" class="q-list"></div></div>' +
@@ -1710,7 +1710,7 @@ function openFiles(files) {
       say('drawing ' + tsir.name + ' on ' + arch.name + ' (the rule language draws it, as the site would)…');
       return pyJSON('render_page', [arch.text, tsir.text, 'null']).then(function (r) { return openHTML(r.html, tsir.name + ' on ' + arch.name); });
     }
-    // a saved design (.studio.json), a device (.arch.json) or an edit list: the Design page opens it
+    // a saved design (.studio.json), a machine (.arch.json) or an edit list: the Design page opens it
     var saved = docs[0], frame = $('dFrame');
     S.src = null; S.kind = 'file'; S.title = saved.name; S.fold = false;
     return load(function () { frame.removeAttribute('srcdoc'); frame.src = CFG.root + 'studio.html#design'; }, function (win) {
@@ -1996,8 +1996,8 @@ window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, {
   'debug:report:link': { t: 'Copy the link', d: 'copy the link that reopens the page exactly here' },
   'debug:report:json': { t: 'Download as data', d: 'the report and every verdict as a JSON file' },
   'debug:start:design': { t: 'Debug my design', d: 'open the design you last left on the Design page' },
-  'debug:start:studio': { t: 'Open the Design page', d: 'design a device and write its program in the frame, then check it' },
-  'debug:start:file': { t: 'Open a file', d: 'a Studio page, a saved design, or a device and its program together (the person\'s to choose)' },
+  'debug:start:studio': { t: 'Open the Design page', d: 'design a machine and write its program in the frame, then check it' },
+  'debug:start:file': { t: 'Open a file', d: 'a Studio page, a saved design, or a machine and its program together (the person\'s to choose)' },
   'debug:start:search': { t: 'Search programs', d: 'find a program of the website by its title or path' },
   'debug:start:program': { t: 'A program', d: 'open this program in the page' }
 });

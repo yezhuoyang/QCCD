@@ -69,7 +69,7 @@ the parking edge while another leaves it through the PZ node in the same step; t
 mutexes cannot exempt one node, so `ionshuttler_rules` checks every other node itself.
 
 Ours (`schedule_ours`): a schedule of our own for each of the heuristic's paper runs, under
-the heuristic's model only (its device, its placement, its rules above), written in its dump
+the heuristic's model only (its machine, its placement, its rules above), written in its dump
 format and judged by the same `check_ionshuttler`.  Every one meets `lower_bound`, so it is
 optimal in that model.  It is not compared with the SAT runs, whose model and count differ.
 
@@ -1036,7 +1036,7 @@ class _Planner:
 
 
 def schedule_ours(d: Mapping, *, tries: int = 512, seed: int = 0, H: int | None = None) -> tuple[dict | None, dict]:
-    """Our schedule for the heuristic dump ``d``'s device, placement and circuit (FRA: one
+    """Our schedule for the heuristic dump ``d``'s machine, placement and circuit (FRA: one
     one-qubit gate per chain): the best of up to ``tries`` seeded randomised runs of `_Planner`,
     stopping at the first that meets `lower_bound` (then it is optimal in this model).  Returns
     the dump (or None) and what the search did."""
@@ -1352,7 +1352,7 @@ def reproduce(out: str | Path, *, with_ours: bool = True, log=print) -> dict:
         "summary": summary, "configs": configs, "not_replayed": not_replayed, "runs": runs,
         "ours": {
             "how": "Prioritised planning in space and time under the cycle heuristic's model only: its "
-                   "device and its placement for each seed (read from its dump), one edge per chain per "
+                   "machine and its placement for each seed (read from its dump), one edge per chain per "
                    "iteration, one chain per node per iteration except the PZ node, following into "
                    "vacated edges, the one-way PZ, one gate per iteration counted when the chain stands "
                    "on the parking edge, chains may stay parked at the end. The next chain is the one "

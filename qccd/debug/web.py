@@ -89,7 +89,7 @@ def rulesets() -> str:
 
 
 def render_page(arch: str, program: str, model: str = "null") -> str:
-    """A Studio page for an uploaded device and programme, as the site would draw it."""
+    """A Studio page for an uploaded machine and programme, as the site would draw it."""
     def go():
         import tempfile
         from pathlib import Path

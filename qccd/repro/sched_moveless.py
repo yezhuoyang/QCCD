@@ -214,7 +214,7 @@ def plan(circ: Sequence[tuple[str, str]], device: PortGraph, law: QCCDSimParams,
 def build(circuit: Sequence[tuple[str, str]], device: PortGraph, *, law: QCCDSimParams,
           name: str = "moveless_ours", verify: bool = True, iters: int = 150_000,
           seed: int = 0) -> TimedSchedule:
-    """The schedule for ``circuit`` (every CNOT on one ancilla) on ``device``: `plan`'s
+    """The schedule for ``circuit`` (every CNOT on one ancilla) on ``machine``: `plan`'s
     placement, the brigade that realises it, then the ancilla's walk, CNOT by CNOT in the
     circuit's order; checked before it is returned (see the module docstring)."""
     circ = [(str(a), str(b)) for a, b in circuit]

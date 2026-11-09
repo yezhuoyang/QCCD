@@ -1834,7 +1834,7 @@
         div.innerHTML = `<span class="skip">∑</span><span>${hw.dacs.toLocaleString()} DACs, ${hw.electrodes.toLocaleString()} electrodes` +
           (hw.beams ? `, ${hw.beams} beams` : "") +
           ` <span class="muted">(${bus.toLocaleString()} DACs on the roads and junctions${shared})</span></span>` +
-          `<div class="t"><div>Every device drives its own plane, as its master declares: ` +
+          `<div class="t"><div>Every machine drives its own plane, as its master declares: ` +
           Object.entries(fam).map(([k, v]) => `${escapeHtml(k)} ${v.devices}× · ${v.dacs} DACs`).join(", ") + `.</div></div>`;
         div.onclick = () => div.classList.toggle("open");
         el.appendChild(div);

@@ -10,7 +10,7 @@ asks for every entry.
 The text comes from whoever made the bundle, so it is read here and nowhere else:
 
 * it is the rule language and nothing more (`syntax.parse`), at most `MAX_TEXT` bytes and
-  `MAX_RULES` rules, about one device (`level "device"`);
+  `MAX_RULES` rules, about one machine (`level "device"`);
 * `include` names a rule set this website ships -- never a path, which `load` would read
   from the grader's disk;
 * the core rules (R0 R1 R8 R24) hold in every set, as the catalogue writes them: a set that
@@ -59,7 +59,7 @@ def load_declared(text: str) -> RuleSet:
     try:
         src = parse(text)
         if src.level != "device":
-            raise DeclaredRulesError(f"a leaderboard entry's rules are about its device, not level {src.level!r}")
+            raise DeclaredRulesError(f"a leaderboard entry's rules are about its machine, not level {src.level!r}")
         _check_includes(text)
         rs = load(text)
     except RuleSyntaxError as exc:

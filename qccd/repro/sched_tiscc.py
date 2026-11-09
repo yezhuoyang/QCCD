@@ -7,7 +7,7 @@ one in the operation zone O, the other in an M zone next to it.  Every measure i
 home O zone for each of its four ZZs and comes back, and every layer of ZZs starts together;
 a junction conflict stalls every later instruction (`enforce_hw_master_validity`).
 
-What we keep exactly: the ions and where they start, the device, TISCC's gate table, and
+What we keep exactly: the ions and where they start, the machine, TISCC's gate table, and
 each ion's own sequence of native operations (preparation, rotations, ZZs with the same
 partners in the same order, measurement) -- so the round is the same circuit, operation for
 operation.  Single-qubit operations, preparation and measurement happen only in O zones (the

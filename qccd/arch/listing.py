@@ -14,12 +14,12 @@ resolves through `ArchListing.index`; a click on a line resolves through `call`.
 round-trips through text.
 
 **It round-trips.**  `round_trip_check()` emits the Python, `exec`s it, and structurally
-diffs the result against the original -- device, params, zone types, primitives, control,
+diffs the result against the original -- machine, params, zone types, primitives, control,
 heating, species, budget, description and provenance.  All nine shipped architectures
 come back identical.  A listing that could not rebuild its own subject would be a
 description, not a program.
 
-**It degrades honestly.**  A device that is still reproducible from its generator emits
+**It degrades honestly.**  A machine that is still reproducible from its generator emits
 one `Machine.blank("ring", width=72, ...)` line.  One that has been dragged emits the
 generator call *plus* `move_site` patches (`patch` mode).  One that has gained a node
 emits every node, segment and loop through a `DeviceBuilder` (`explicit` mode).  The
@@ -312,7 +312,7 @@ def _baseline(dev: Device) -> Device | None:
 
 
 def _patchable(dev: Device) -> bool:
-    """True when the device differs from its generator only in node positions,
+    """True when the machine differs from its generator only in node positions,
     per-site capacities and segment lengths -- things a patch call can restate."""
     ref = _baseline(dev)
     if ref is None:
@@ -397,7 +397,7 @@ def architecture_listing(
 ) -> ArchListing:
     """Render `arch` as the program that rebuilds it.
 
-    `mode`: "auto" picks generator / patch / explicit from the device and emits against
+    `mode`: "auto" picks generator / patch / explicit from the machine and emits against
     `template` (a base `.arch.json` whose zones, curves and control block are inherited);
     "full" is the self-contained form -- no template, every declaration stated -- and is
     the one that is actually a program you can hand to someone.
@@ -688,7 +688,7 @@ def _emit_classes(b, arch) -> None:
         # survives -- a wholesale `classes=` replacement afterwards would not
         b.call("classes", "set_control", f"classes={_lit(meta)}",
                target="classes.meta", kwargs={"classes": meta},
-               note="the class family this device is drawn from; `extra` is declared "
+               note="the class family this machine is drawn from; `extra` is declared "
                     "below, and this line must come first")
     for cid, spec in arch.simd_classes.items():
         fields = {k: v for k, v in spec.items() if k != "id"}
@@ -839,7 +839,7 @@ def _emit_policy(b, arch, policy) -> None:
         b.blank()
         return
     b.note("policy", f"policy table={policy.table!r} objective={policy.objective!r} "
-                     f"(set by the cost model, not by the device)", target="policy")
+                     f"(set by the cost model, not by the machine)", target="policy")
     cover = arch.primitives.table_coverage(policy.table) if policy.table else {}
     for pname, curve in arch.primitives.curves.items():
         try:
@@ -932,7 +932,7 @@ def architecture_diff(a: Architecture, b: Architecture) -> list[str]:
     out: list[str] = []
     if a.name != b.name:
         out.append(f"name {a.name!r} != {b.name!r}")
-    out += [f"device: {d}" for d in devices_equal(a.device, b.device)]
+    out += [f"machine: {d}" for d in devices_equal(a.device, b.device)]
     if dict(a.device.params) != dict(b.device.params):
         out.append(f"device.params {dict(a.device.params)} != {dict(b.device.params)}")
     for fld in ("zone_types", "control", "heating", "species", "budget"):

@@ -161,7 +161,7 @@ class EvaluationSource:
 
 
 def _table(s: str, line: int) -> str:
-    """A clock is an operating-point table the device format declares (`qccd.arch.curves.
+    """A clock is an operating-point table the machine format declares (`qccd.arch.curves.
     TABLES`): a misspelt one would price every step on some other table, silently."""
     from ..arch.curves import TABLES
     if s not in TABLES:

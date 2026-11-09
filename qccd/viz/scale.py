@@ -3,7 +3,7 @@
 A node position is a LATTICE UNIT.  It is not a length, and for as long as the only thing
 a page carried was lattice units there was no distance on the picture anybody could put a
 number to, and no angle either: the fit is free to stretch one axis by up to `K_ANISO`, so
-a right angle in the device is not a right angle on the screen.  A reviewer of the
+a right angle in the machine is not a right angle on the screen.  A reviewer of the
 hardware picture asked for both -- measure any two points in micrometres, measure the
 angle between any two rails -- and both need one thing the renderer did not have: the
 nanometres per lattice unit, which live in the technology sidecar (`qccd/phys/tech.py`).
@@ -11,7 +11,7 @@ nanometres per lattice unit, which live in the technology sidecar (`qccd/phys/te
 **WHY THIS IS ITS OWN MODULE.**  `tests/test_phys_view.py::
 test_viz_still_does_not_import_the_physics_package` asserts that `render.py`, `layout.py`
 and `theme.py` do not import `qccd.phys`, and it is right to: the METAL is a property of
-`(device, technology)`, a page is a property of a run, and wiring one to the other inside
+`(machine, technology)`, a page is a property of a run, and wiring one to the other inside
 the renderer would make every emitted page pay for a polygon build and a field solve it
 did not ask for.  Reading nine integers out of a JSON sidecar is not that build.  So the
 dependency is real, narrow and worth stating out loud rather than buried in a 4,000-line

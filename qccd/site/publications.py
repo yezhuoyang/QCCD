@@ -12,7 +12,7 @@ from __future__ import annotations
 GROUPS = (
     ("this", "From this project", "Papers about the tool and the studies run with it."),
     ("arch", "Architectures and cost tables",
-     "The QCCD architecture studies whose cost tables, devices and results the leaderboard's tasks are measured against."),
+     "The QCCD architecture studies whose cost tables, machines and results the leaderboard's tasks are measured against."),
     ("control", "Wiring and control",
      "Why the control plane is broadcast, and what a compiler for a broadcast-wired machine has to respect."),
     ("transport", "Transport, heating and junctions",

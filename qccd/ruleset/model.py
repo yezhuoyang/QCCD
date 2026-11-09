@@ -54,7 +54,7 @@ class Entity:
 
 
 class Site(Entity):
-    """A node of the device: a place an ion can be (a trap, a dock, a loop slot) or a
+    """A node of the machine: a place an ion can be (a trap, a dock, a loop slot) or a
     junction.  `sites` and `junctions` are both sets of these."""
     __slots__ = ()
     kind = "site"
@@ -184,7 +184,7 @@ class CircuitOpData:
 
 @dataclass
 class Hardware:
-    """The device as the rules see it."""
+    """The machine as the rules see it."""
 
     name: str
     sites: list[Site]                      # every place an ion may stand

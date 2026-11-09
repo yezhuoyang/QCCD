@@ -34,7 +34,7 @@ about them -- and this record says `not judged`, never `yes`.
 
 What it deliberately does not claim is enumerated per record in `undetermined`, and the
 first entry is always PLAN §2's scope boundary: voltages, waveform shape, ramp profile
-and DAC bit depth are a field solve over one device's geometry.
+and DAC bit depth are a field solve over one machine's geometry.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ __all__ = [
 # reads as a claim about everything it does not.
 
 NOTE_SCOPE = ("voltages, waveform shape, ramp profile, DAC bit depth: PLAN 2 puts them "
-              "out of scope -- they are a field solve over one device's geometry")
+              "out of scope -- they are a field solve over one machine's geometry")
 NOTE_ROLES = ("which role's channels carry a given movement: attribution is by name "
               "only -- a 'junction' channel is counted engaged when the cycle crosses a "
               "junction node, and no finer claim is made")
@@ -69,7 +69,7 @@ NOTE_OFFPATH = ("drivability of {n} of {m} move(s): they run on a segment that b
                 "to no named path, so there is no conveyor direction to compare and R4d "
                 "is silent -- which is not a pass")
 NOTE_CROSS = ("cross-path drivability: whether one waveform advances an ion on each of "
-              "two paths alike depends on this device's electrode layout")
+              "two paths alike depends on this machine's electrode layout")
 NOTE_OPTICAL = ("the pathway that drives this cycle: the control plane models DC "
                 "transport electrodes only, and R4b keeps the two pathways apart")
 NOTE_UNDECLARED = ("everything: {arch} declares no control.channels, so no claim is "

@@ -172,7 +172,7 @@ def _resolve_participants(
             # expanded from the device by `replay` itself (`qccd.verify.c2lr`), which needs the
             # two-crystal state of every leg as well as the positions
             raise ReplayError(f"instruction {instr.id}: a {kind} step is expanded by the replay "
-                              f"from the device's matching, not from positions alone")
+                              f"from the machine's matching, not from positions alone")
         if kind != "loop_shift":
             raise ReplayError(f"unknown movement template kind {kind!r}")
         loop_id = str(instr.template["loop"])
@@ -228,7 +228,7 @@ def move_entails(declared: Sequence[str], sub: Sequence[Participant], occ: Mappi
 
     The class's `entails` was the only source, so a move the class did not declare paid for
     nothing: the router's `shuttle` took an ion out of a chain and into another and charged
-    neither, and a device that deleted its `dock`/`undock` classes docked through `shuttle`
+    neither, and a machine that deleted its `dock`/`undock` classes docked through `shuttle`
     and dropped the split, the merge and the cooling they force.  Three sources now, and a
     move pays each primitive at most once:
 
@@ -310,7 +310,7 @@ def conveyed_paths(prog: TSIR, arch: Architecture) -> frozenset[str]:
     A conveyor carries every ion on it through every slot, so a slot where three rails meet
     is not a place a router chose to park an ion.  Two spellings of a conveyor step: the
     rotation template (`loop_shift`), and a transport cycle that moves EVERY ion standing on
-    one named path along it, with a shift class the device declares for a path (its
+    one named path along it, with a shift class the machine declares for a path (its
     `orbit` names a loop or "rail", not "any" or "spurs") -- the conveyor rails of a
     transversal-CNOT station, say, whose sites each have a rung to a gate trap and so meet
     three rails.  One ion shuttled along a loop past others is not a conveyor step, and
@@ -493,7 +493,7 @@ def replay(
             if kind in C2LR_TEMPLATES:
                 if c2lr is None:
                     raise ReplayError(f"instruction {instr.id}: a {kind} step needs a C2LR "
-                                      f"device; {_not_c2lr(arch)}")
+                                      f"machine; {_not_c2lr(arch)}")
                 try:
                     c2lr_step, _ = c2lr.expand(instr, pos)
                 except _C2LRError as exc:
@@ -501,7 +501,7 @@ def replay(
                 try:
                     mover_c, stayer_c = model.c2lr_step(arch, kind)
                 except KeyError as exc:
-                    raise ReplayError(f"instruction {instr.id}: {exc.args[0]}; the device "
+                    raise ReplayError(f"instruction {instr.id}: {exc.args[0]}; the machine "
                                       f"prices no {kind} step") from None
                 subs = [list(c2lr_step.participants)]
                 if c2lr_step.assumed:

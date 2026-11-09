@@ -6,7 +6,7 @@ produces (`{"method", "args", "kwargs"}`), so the text the page shows is exactly
 `Machine.render` writes the same page the studio opens on them.  Nothing here is a
 second implementation of a rule or a price; the verdicts are quoted from `qccd.verify`.
 
-The examples stand on several small devices, each chosen for what it shows best: a
+The examples stand on several small machines, each chosen for what it shows best: a
 four-site linear register (no junctions, no loop), an eight-site racetrack (one loop, no
 junctions), a 2x3 lattice (real T-junctions beside plain corners), two concentric loops
 joined at one coupling (a junction between a data loop and a trap loop), the six-site
@@ -80,9 +80,9 @@ RING_BIG = {"generator": "ring", "params": {"width": 3, "height": 2, "verticals"
 # -------------------------------------------------------- explicit devices (geometry)
 
 def _explicit(name: str, about: str, nodes: dict, segments: list[tuple[str, str, str]]) -> dict:
-    """A device drawn node by node: `nodes` maps id -> (x, y), every node a trap site;
+    """A machine drawn node by node: `nodes` maps id -> (x, y), every node a trap site;
     `segments` lists (id, a, b).  The geometry rules judge the drawing itself, so these
-    examples are devices, not programmes."""
+    examples are machines, not programmes."""
     return {"generator": "explicit", "name": name, "about": about,
             "nodes": dict(nodes), "segments": list(segments)}
 
@@ -124,7 +124,7 @@ _MACHINES: dict[str, Machine] = {}
 
 
 def machine(dev: dict) -> Machine:
-    """The device, built the way the studio builds one: the named generator with its
+    """The machine, built the way the studio builds one: the named generator with its
     parameters, borrowing the default template's physics and control plane."""
     if dev["name"] not in _MACHINES:
         template = None
@@ -198,7 +198,7 @@ literal    ::=  string | number | "True" | "False" | "None"
 #: state, what it costs, the rules that judge it, the IR it becomes, and one example.
 VERBS: list[dict] = [
     {"verb": "init", "sig": 'p.init({ion: site, ...}, quanta=None)',
-     "what": "Places the named ions on the named sites. The first statement of every programme: a device starts empty.",
+     "what": "Places the named ions on the named sites. The first statement of every programme: a machine starts empty.",
      "state": "position := placement; n̄(ion) := 0, or the quanta given. Nothing moves.",
      "cost": "0 hops, 0 µs.", "rules": ["R1", "R2"], "ir": "init",
      "device": CHAIN, "example": [rec("init", {"d0": "C1", "d1": "C0"})]},
@@ -214,7 +214,7 @@ VERBS: list[dict] = [
               'a cycle with one participant.',
      "what": "One ion, one hop, in its own cycle: the shortest form of a transport instruction.",
      "state": "position(ion) := dst; the segment between src and dst, or the segments in via, is crossed once; n̄ grows by the primitives crossed.",
-     "cost": "the segment's hop, plus a junction_cross priced by the degree of any junction transited; duration from the device's curves.",
+     "cost": "the segment's hop, plus a junction_cross priced by the degree of any junction transited; duration from the machine's curves.",
      "rules": ["R1", "R2", "R3", "R4", "R8"], "ir": "simd with one participant",
      "device": CHAIN, "example": [rec("init", {"d0": "C1"}), rec("move", "d0", "C1", "C2")]},
     {"verb": "shuttle", "sig": 'p.shuttle(ion, [site, site, ...], cls="shuttle")', "kind": "shorthand",
@@ -234,7 +234,7 @@ VERBS: list[dict] = [
     {"verb": "swap_or_stay", "sig": 'p.swap_or_stay(diagonal, [ion, ...], checkerboard=None)',
      "what": "One C2LR swap-or-stay step (arXiv:2403.00756): every junction plays the same shared waveform for one "
              "diagonal (W-S, W-N, E-S or E-N), and each crystal's only choice is its direction bit: shifted toward its "
-             "pair's junction (the listed ones) or away. The pairs are the device's; the programme names no route. "
+             "pair's junction (the listed ones) or away. The pairs are the machine's; the programme names no route. "
              "<code>checkerboard={\"parity\": 0, \"pairing\": \"P1\"}</code> pairs two diagonals at the junctions "
              "of one colour instead: not demonstrated in the paper, allowed by the rule set <code>c2lr</code> and marked "
              "<b>assumed</b> in every report.",
@@ -391,16 +391,16 @@ RULES: list[dict] = [
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_0v"}),
                           rec("shuttle", "d0", ["T0_1h", "J1_1", "T1_1h"]), rec("shuttle", "d1", ["T1_0v", "J1_1", "T1_1v"])],
               "why": "the same two crossings, one cycle after the other: one ion in J1_1 at a time."}},
-    {"id": "R3", "checks": "no segment carries more ions in one cycle than its capacity (1 on every shipped device).",
+    {"id": "R3", "checks": "no segment carries more ions in one cycle than its capacity (1 on every shipped machine).",
      "device": RACE,
      "fail": {"program": [rec("init", {"d0": "S1", "d1": "S1"}), rec("simd", "shuttle", [["d0", "S1", "S2"], ["d1", "S1", "S2"]])],
               "why": "two ions on the S1–S2 segment in the same cycle."},
      "pass": {"program": [rec("init", {"d0": "S1", "d1": "S1"}), rec("move", "d0", "S1", "S2"), rec("move", "d1", "S1", "S2")],
               "why": "the same two hops, one cycle each."}},
-    {"id": "R4", "checks": "every movement class a cycle uses is declared by the device, and a cycle uses no more classes than the control plane allows.",
+    {"id": "R4", "checks": "every movement class a cycle uses is declared by the machine, and a cycle uses no more classes than the control plane allows.",
      "device": CHAIN,
      "fail": {"program": [rec("init", {"d0": "C1"}), rec("move", "d0", "C1", "C2", cls="teleport")],
-              "why": "no class named teleport exists on this device."},
+              "why": "no class named teleport exists on this machine."},
      "pass": {"program": [rec("init", {"d0": "C1"}), rec("move", "d0", "C1", "C2", cls="shuttle")],
               "why": "shuttle is declared."}},
     {"id": "R4d", "checks": "a cycle is drivable by the declared channels: along a loop every ion on a shared channel moves the same signed hop, and the docks on a channel act the same way.",
@@ -467,7 +467,7 @@ RULES: list[dict] = [
      "device": CHAIN, "model": "corrected",
      "note": "The page's verifier skips R10: it needs the circuit and a symbolic permutation with Pauli-frame tracking. On the leaderboard R10 is judged in two halves: the proved Lean checker on the compiler's certificate (where and when each gate's ions meet, once and in order), and the emitted pulses composed and compared with the circuit (which gate fires; computed, not proved). An entry's badge says R10 passed only when both agree.",
      "pass": {"program": _chain_gate(), "why": "a gate with no circuit to check it against: skipped, with the reason.", "expect": "skipped"}},
-    {"id": "R11", "checks": "shuttling along a loop is unidirectional within a cycle, and every junction degree the device has can be priced.",
+    {"id": "R11", "checks": "shuttling along a loop is unidirectional within a cycle, and every junction degree the machine has can be priced.",
      "device": RACE,
      "fail": {"program": [rec("init", {"d0": "S1", "d1": "S5"}), rec("simd", "shuttle", [["d0", "S1", "S2"], ["d1", "S5", "S4"]])],
               "why": "d0 goes one way round the racetrack, d1 the other, in one cycle (R4's channel clause fires too)."},
@@ -517,11 +517,11 @@ RULES: list[dict] = [
               "why": "T0_0v → J0_0 → T0_0h transits the corner J0_0, where only two wires meet: a bend, priced as plain transport.", "tag": "bend"}},
     {"id": "R19", "checks": "no node joins more rails than budget.max_junction_degree (6 unless the document declares fewer; a surface trap declares 4).",
      "device": HEX6,
-     "note": "R19 is judged from the drawing, before any programme runs; the two examples are two devices, each shown with one resting ion.",
+     "note": "R19 is judged from the drawing, before any programme runs; the two examples are two machines, each shown with one resting ion.",
      "fail": {"device": STAR7, "program": [rec("init", {"d0": "P0"})],
               "why": "J joins seven rails, one more than the limit. (Seven rails cannot all be 60 degrees apart, so R20 fails too.)"},
      "pass": {"device": HEX6, "program": [rec("init", {"d0": "P0"})],
-              "why": "J joins six rails, 60 degrees apart: the most a junction may join. The device prices no "
+              "why": "J joins six rails, 60 degrees apart: the most a junction may join. The machine prices no "
                      "degree-6 crossing, so it crosses at the X-junction's price."}},
     {"id": "R20", "checks": "at every node with two or more rails, any two of them subtend at least budget.min_rail_angle_deg (60 degrees unless the document says otherwise), measured from the node positions.",
      "device": FORK90,
@@ -544,7 +544,7 @@ RULES: list[dict] = [
      "pass": {"program": [rec("init", {"d0": "T0_0v", "d1": "T1_0v"}), rec("simd", "shuttle", [["d0", "T0_0v", "T0_1v", ["T0_0v.b", "T0_1v.a"]], ["d1", "T1_0v", "T1_1v", ["T1_0v.b", "T1_1v.a"]]])],
               "why": "both walk north through their own T-junction: one motion, one waveform."}},
     {"id": "R23", "checks": "a junction is crossed, not rested on: no ion ends a cycle on a node where three or more rails meet while the traps off the junctions have room for every ion.",
-     "note": "R2 says how many ions a junction holds at an instant; R23 says none of them may stay. A site counts as a junction when three or more rails meet at it (R18), whatever it was declared as. Two cases are not a violation, and the verifier says which applies: a slot of a loop the programme rotates, because a conveyor carries its ions through every slot, and a device whose traps off the junctions cannot hold the programme's ions.",
+     "note": "R2 says how many ions a junction holds at an instant; R23 says none of them may stay. A site counts as a junction when three or more rails meet at it (R18), whatever it was declared as. Two cases are not a violation, and the verifier says which applies: a slot of a loop the programme rotates, because a conveyor carries its ions through every slot, and a machine whose traps off the junctions cannot hold the programme's ions.",
      "device": RING,
      "fail": {"program": [rec("init", {"d0": "S1"}), rec("move", "d0", "S1", "S0")],
               "why": "d0 stops on S0, where the loop and the spur to A0 meet, with five empty traps around it."},
@@ -566,7 +566,7 @@ RULES: list[dict] = [
                                                        ["d1", "T1_1v", "T0_1h", ["T1_1v.a", "T0_1h.b"]]])],
               "why": "the swap written as two routes under the class swap_or_stay: the routes are the programme's, so it is judged as plain moves, and breaks the junction and rail rules too."},
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
-              "why": "the same exchange as a swap-or-stay step: two direction bits, and the device's pairs."}},
+              "why": "the same exchange as a swap-or-stay step: two direction bits, and the machine's pairs."}},
     {"id": "C3", "checks": "in one step a crystal on a horizontal leg and one on a vertical leg set their direction bits independently: the step carries one bit per crystal and nothing per axis.",
      "device": C2LR3, "ruleset": "c2lr",
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_0v"}), rec("swap_or_stay", "WS", ["d0"])],
@@ -585,7 +585,7 @@ RULES: list[dict] = [
               "why": "d0 is carried into the junction J1_1 and left there."},
      "pass": {"program": [rec("init", {"d0": "T0_1h"}), rec("swap_or_stay", "WS", ["d0"])],
               "why": "d0 crosses J1_1 to the leg it pairs with, and rests there."}},
-    {"id": "C6", "checks": "a step pairs legs by the device's matching under a variation the device offers and the rule set allows: a crystal shifted toward a junction has a partner leg.",
+    {"id": "C6", "checks": "a step pairs legs by the machine's matching under a variation the machine offers and the rule set allows: a crystal shifted toward a junction has a partner leg.",
      "device": C2LR3, "ruleset": "c2lr",
      "fail": {"program": [rec("init", {"d0": "T0_0v"}), rec("swap_or_stay", "WS", ["d0"])],
               "why": "T0_0v is on the lattice's edge: under W-S its junction J0_0 has no W leg, so d0 has nowhere to go."},
@@ -609,12 +609,12 @@ RULES: list[dict] = [
      "device": C2LR3, "ruleset": "c2lr",
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v", "d2": "T0_0v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
               "why": "d0 and d1 swap and d2, on the edge, stays: all three are heated, d2 by the stay's 0.035 quanta."}},
-    {"id": "C10", "checks": "a C2LR device is driven by a fixed set of shared analog signals plus one digital input and one switch per leg: its document says so, and its drawing is the lattice of legs they drive.",
+    {"id": "C10", "checks": "a C2LR machine is driven by a fixed set of shared analog signals plus one digital input and one switch per leg: its document says so, and its drawing is the lattice of legs they drive.",
      "device": C2LR3, "ruleset": "c2lr",
      "fail": {"device": C2LR3_TWO_INPUTS,
               "program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
               "why": "the same swap on a lattice whose document gives each leg two digital inputs: C2LR's per-leg "
-                     "control is one bit, so the device is not driven as C2LR is, whatever the programme does."},
+                     "control is one bit, so the machine is not driven as C2LR is, whatever the programme does."},
      "pass": {"program": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0", "d1"])],
               "why": "the lattice as the paper wires it: 27 shared analog signals, one input and one switch per leg (p4)."}},
 ]

@@ -7,7 +7,7 @@ and exit 50 each, MS 40, rotation 5, measurement 400, reset 50).  Their router s
 ancilla to one data qubit and back for every CNOT and inserts a barrier after every routing
 pass; it keeps each ancilla's CNOTs in circuit order but not each data qubit's.
 
-Ours keeps the device, the qubit-to-trap mapping, the native decomposition (H -> RY RX;
+Ours keeps the machine, the qubit-to-trap mapping, the native decomposition (H -> RY RX;
 CX(c,t) -> RY(c) RX(c) RX(t) MS RY(c); MR -> M then R) and every qubit's sequence of
 operations exactly as the circuit writes it: each qubit meets its CNOT partners in the
 circuit's order, even where two of its CNOTs commute.  That order is the circuit author's
@@ -459,7 +459,7 @@ def build(dev: PortGraph, chains: Mapping[str, list[str]], qubits: Mapping[str, 
 
 def publish(out: str | Path | None = None, distances: Sequence[int] = (2, 3, 6, 12)) -> list[Path]:
     """Write our schedule for each grid run on the reproduction page, as it is published:
-    built on the artifact's own device, placement and qubit-to-ion map, saved as
+    built on the artifact's own machine, placement and qubit-to-ion map, saved as
     ``grid_rot_d<d>_c2_ours.schedule.json.gz`` in ``Reproduce/jones2025/ours`` (or ``out``),
     gzip'd with no timestamp so that a rebuild is identical byte for byte."""
     import gzip

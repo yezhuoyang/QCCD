@@ -1,6 +1,6 @@
 """The design, as the studio holds it, replayed by the Python toolchain.
 
-The browser studio's source of truth is not a device -- it is a LIST OF RECORDS
+The browser studio's source of truth is not a machine -- it is a LIST OF RECORDS
 (`qccd/viz/js/editor.js`, "THE KEYSTONE"): the shipped listing split into
 
     geom   the builder statements (`DeviceBuilder`, `d.site`, ...) before the seal
@@ -132,7 +132,7 @@ def clean_edit(rec: Mapping, where: str = "edit") -> dict:
 class DesignState:
     """The authoritative, revisioned design inputs.
 
-    `geom/seed/post/edits` describe the device exactly as the studio does; `program` is
+    `geom/seed/post/edits` describe the machine exactly as the studio does; `program` is
     the authored program as `{method,args,kwargs}` records (the studio's Write lane);
     `final_program` optionally names a compiled TSIR artifact by digest -- the hardware
     program a submission is graded on when it was produced by a compiler rather than

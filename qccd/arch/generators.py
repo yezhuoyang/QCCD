@@ -83,7 +83,7 @@ def ring(
     puts the first dock at slot 0, which is a corner, and on a loop of height >= 3 a
     corner dock's spur lies along the side rail and fails DRC (`Codesign/findings/q06`);
     an offset that keeps every dock on a top or bottom straight costs nothing in the
-    transport model and makes the device buildable.
+    transport model and makes the machine buildable.
 
     `corners="junction"` is the square trap as it is built (Ke Sun, reader report
     2026-10-03): the four corners are junctions, `J0`..`J3` clockwise from the top left,
@@ -767,7 +767,7 @@ GENERATORS = {
 def expand_generator(
     name: str, params: Mapping, zone_types: Mapping[str, Mapping] | None = None
 ) -> Device:
-    """Expand `geometry.generator` + `geometry.params` into a `Device`."""
+    """Expand `geometry.generator` + `geometry.params` into a `Machine`."""
     if name == "explicit":
         raise ExpansionError(
             "geometry.generator is 'explicit' but the document carries no `nodes`"

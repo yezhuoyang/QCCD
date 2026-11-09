@@ -6,7 +6,7 @@
   "digest": "sha256:6bfce4f2d0279fd2e7e6b5ca5968bd757e2832912dca44484ae8b20b5963afa9",
   "file": "circuit.qasm"
  },
- "description": "Three rounds of the distance-3 rotated surface code's syndrome extraction (eight ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the device's physics.",
+ "description": "Three rounds of the distance-3 rotated surface code's syndrome extraction (eight ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the machine's physics.",
  "design_variables": [
   "geometry",
   "zone_types",

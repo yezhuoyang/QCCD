@@ -264,7 +264,7 @@ class ResultsMixin:
         rel = self.board(params.get("board"))
         (work / "device.arch.json").write_text(json.dumps(board_device(r.arch_doc, rel)), encoding="utf-8")
         (work / "circuit.qasm").write_bytes(rel.circuit_path.read_bytes())
-        self._progress(jid, "export", "expanding the device for the compiler")
+        self._progress(jid, "export", "expanding the machine for the compiler")
         ex = run_limited([tc.python, tc.bridge / "export_arch.py", work / "device.arch.json", "-o",
                           work / "device.expanded.json"], cwd=work, timeout=300, cancel=cancel)
         if not ex.ok:
@@ -674,11 +674,11 @@ class ResultsMixin:
                 "board": rel.title, "design": out["design"]}
 
     def _run_to_adopt(self, branch: str, rel, arch_digest: str, revision: int) -> dict | None:
-        """A finished run that compiled this board's circuit for this very device: its program, its
+        """A finished run that compiled this board's circuit for this very machine: its program, its
         certified program and its certificate, as the change that adopts them.  Compiling again would
         repeat the same export, compiler and cooling on the same inputs (~25 s for BB); what is
         adopted is graded from the frozen bundle either way.  The circuit must be the board's, text for
-        text (line endings aside: a checkout may carry them either way), and the device the one the
+        text (line endings aside: a checkout may carry them either way), and the machine the one the
         design has now."""
         want = rel.circuit_text().replace("\r\n", "\n")
         from .compilation import has_stage_evidence
@@ -912,7 +912,7 @@ def _refuse_withdrawn_compiler(tc) -> None:
 def _compiler_fault(res, tc, *, design: str, program: str) -> dict | None:
     """A compiled program that breaks a rule is a fault in the COMPILER, not a result.
 
-    The compiler's contract is a legal program for the device or a refusal.  Its output used to
+    The compiler's contract is a legal program for the machine or a refusal.  Its output used to
     be replayed, animated and graded as it came, so an illegal program reached the person as
     "your design is not eligible: R22", with the animation showing ions moving in different
     directions in one cycle -- the compiler's error presented as theirs.  This is checked on the

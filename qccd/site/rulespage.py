@@ -54,7 +54,7 @@ PARAM_NOTES = {
                     "ion's state into its place (read by R14)"),
 }
 
-GROUPS = (("hardware", "The device"), ("execution", "The execution"),
+GROUPS = (("hardware", "The machine"), ("execution", "The execution"),
           ("time", "Instants and the state"), ("circuit", "The input circuit"),
           ("model", "The clock"))
 
@@ -254,7 +254,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
                           'name a rule may use and what it reads off the replay. Skim it now and come back to it '
                           'from any rule below; each word is a link.'))
     b.append('<h2 id="words">The words</h2>')
-    b.append(learn.section('the dictionary of the rule language, grouped by what the words are about: the device, '
+    b.append(learn.section('the dictionary of the rule language, grouped by what the words are about: the machine, '
                            'the execution, the instants, the circuit.'))
     b.append('<p class="sub">Every word a rule may use, with what it means. Two kinds of execution are '
              'judged by the same rules: a <b>programme</b>, run one step at a time with everything in a step '
@@ -324,7 +324,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
                           'keeps it and one that breaks it. Press Play on either to watch the cycle the verdict '
                           'names.'))
     b.append(f'<h2 id="all">Every rule</h2>'
-             + learn.section(f'all {n_rules} rules, grouped by what they are about (the device\'s geometry, '
+             + learn.section(f'all {n_rules} rules, grouped by what they are about (the machine\'s geometry, '
                              f'occupancy, transport, control, gates, heat, cost, correctness), in the reader\'s '
                              f'browser. The group headings are the map; the cards are the territory.')
              + f'<p class="sub">All {n_rules} rules the website knows, each with '
@@ -412,7 +412,7 @@ MACHINE_GROUPS = (("floorplan", "Words about a floorplan"),
 def _machine_section(all_params) -> list[str]:
     """F1-F9 and G1-G14: the same language, one level up."""
     b = ['<h2 id="machine">One level up: the machine</h2>',
-         '<p class="sub">A fault-tolerant machine is built from <b>places</b> -- each a small device '
+         '<p class="sub">A fault-tolerant machine is built from <b>places</b> -- each a small machine '
          'whose every op is checked by the rules above, then used as a box with doors -- joined by '
          '<b>roads</b> that carry bundles of ions and <b>wires</b> that carry bits. Where the places '
          'stand is its <b>floorplan</b>, and a logical program run on it is a schedule of ops at places '

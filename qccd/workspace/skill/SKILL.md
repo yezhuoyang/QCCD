@@ -1,6 +1,6 @@
 ---
 name: qccd
-description: Co-design a trapped-ion QCCD device and its hardware program with the user in QCCD Studio. Use for anything about the QCCD workspace, Studio, traps, junctions, segments, gate zones, the leaderboards (boards), compiling, running programs such as the BB code on a design, performance and bottlenecks, designs, side-by-side comparisons, grading, submitting a design to a leaderboard, questions about a page of the qccd.academy website (rules, lessons, the language, physics, the leaderboard), or messages the user sent from Studio or a website page (they arrive as chat turns, <channel source="qccd"> messages, or unread_prompts).
+description: Co-design a trapped-ion QCCD machine and its hardware program with the user in QCCD Studio. Use for anything about the QCCD workspace, Studio, traps, junctions, segments, gate zones, the leaderboards (boards), compiling, running programs such as the BB code on a design, performance and bottlenecks, designs, side-by-side comparisons, grading, submitting a design to a leaderboard, questions about a page of the qccd.academy website (rules, lessons, the language, physics, the leaderboard), or messages the user sent from Studio or a website page (they arrive as chat turns, <channel source="qccd"> messages, or unread_prompts).
 ---
 
 # QCCD co-design
@@ -71,7 +71,7 @@ so neither of you can silently overwrite the other.
 - **To save a design or a run as files, use `qccd_export`**: `what="design"` (the design by its
   name, optionally a revision) writes `<name>.studio.json` (Studio opens it again with `qccd import`),
   `<name>.arch.json` (the architecture file the compiler reads) and, when the design has a compiled
-  program, that program and its certificate; `what="run"` with the run's id writes its device,
+  program, that program and its certificate; `what="run"` with the run's id writes its machine,
   circuit, compiled program, certificate, step times and performance report. Each export is a NEW
   folder `exports/<name>/` in the workspace, with a README.txt; tell the person where it is.
 - Your own file tools and shell in Studio only READ, unless the person allowed more:
@@ -117,11 +117,11 @@ could not do. Never guess a path, a control or a verb.
 **Draw on the person's design where they watch.** On their own Studio the design verbs work
 (`qccd_page_act` action `studio`): `sketchDraw` draws any shape (`["poly", [[x, y], ...], null,
 {"closed": true}]` is a closed loop through those corners; `rect`, `ellipse`, `line` take two
-points), `closeLoop`, `addNodeAt`, `joinNodes`, `stampComponent`; a device made by a generator is
+points), `closeLoop`, `addNodeAt`, `joinNodes`, `stampComponent`; a machine made by a generator is
 `explodeToExplicit`-ed first, and a NEW design starts with `newCanvas` on a new draft. Each verb's
 drawing is committed as your change set. A refusal names the rule: R20 means a corner under 60
 degrees (a triangle's corners are; cut them, which keeps the shape), `no_builder` means explode
-the generated device first.
+the generated machine first.
 
 **The Design page is the person's own Studio.** From a website page, `qccd_page_act`
 `navigate` with `path: '/studio'` opens it (the site's `studio.html` does too; a lesson,
@@ -243,12 +243,12 @@ a visible step at a time.
 - `qccd_estimate_ler(experiment=<a memory board's title, or rep3|rep5|surface3|...>, design=<name>)`
   measures it on any design: the experiment is compiled by the reference compiler, checked (every
   detector deterministic with the circuit's parity), and sampled under `qccd-noise@1`, the noise
-  model built from the device's own physics. Report the interval and the dominant error channels
+  model built from the machine's own physics. Report the interval and the dominant error channels
   (`dominant_channels`: two-qubit error from heating, from chain length, idle, measurement...),
   which say what to change in the design. `qccd_read_reference(section="noise")` has every channel.
 - The **Compiler** board ranks compilers. A compiler is a directory with `qccd-compiler.json`
   (`qccd bench init-compiler DIR` writes a working one to start from). It is graded over every
-  circuit x device pair of the suite by `qccd bench run --compiler DIR` -- run that in a shell,
+  circuit x machine pair of the suite by `qccd bench run --compiler DIR` -- run that in a shell,
   never through the tools, because it executes the person's code. Read reports with
   `qccd_get_bench`; the contract (inputs, outputs, exit 4 = refuse) is
   `qccd_read_reference(section="compiler")`. Any `wrong` pair makes an entry ineligible; ranking is

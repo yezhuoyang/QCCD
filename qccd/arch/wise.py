@@ -4,13 +4,13 @@ Malinowski, Allcock and Ballance, arXiv:2305.12773, as the team's transport deck
 Architectures", part 2) writes it for QCCD Studio: sweep h, Cx and Cy, keep the rest at the
 paper's defaults.
 
-**The device.**  A unit cell is one junction zone and h gate zones along the row; the chip is Cx x
+**The machine.**  A unit cell is one junction zone and h gate zones along the row; the chip is Cx x
 Cy cells, and junction zones join the rows directly (deck, Hardware model).  So a row is a line of
 zones and every (h+1)-th zone of it is an X-junction.  Each gate zone is a site.  The deck says the
 idealised grid's "one qubit per junction" breaks R23, and that the realistic layout fits if
 junction zones are modelled as sites (S8).  This model takes the other way out of the same
 conflict, which needs no rule dropped: a junction zone is a real junction, every ion crosses it
-inside a step (R2, R23), and no ion rests there.  A device therefore holds at most `h` qubits per
+inside a step (R2, R23), and no ion rests there.  A machine therefore holds at most `h` qubits per
 cell where the deck's full occupancy is h + 1; its hardware census is the deck's all the same.
 
 **A swap is the deck's S5 and S6.**  It takes two steps of the replay, a merge then a split: one
@@ -72,7 +72,7 @@ def ctl_classes() -> list[dict]:
 
 
 def device_doc(h: int, cx: int, cy: int, *, name: str | None = None) -> dict:
-    """The chip as a device document, before any physics: `explicit` geometry, since the layout's
+    """The chip as a machine document, before any physics: `explicit` geometry, since the layout's
     rows join only through their junction zones and no generator draws that."""
     from ..arch.schema import SCHEMA_VERSION
     if h < 2 or cx < 1 or cy < 1:
@@ -161,7 +161,7 @@ def primitives(base: Mapping) -> dict:
 
 
 class NotWise(ValueError):
-    """The device is not a WISE chip, so a swap step has no pairs on it."""
+    """The machine is not a WISE chip, so a swap step has no pairs on it."""
 
 
 @dataclass(frozen=True)

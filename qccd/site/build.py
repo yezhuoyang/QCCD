@@ -56,8 +56,8 @@ DOC_NAMES = ("adl", "tsir", "rules", "phys")
 MARKER = ".qccd-site"
 
 PARTS = (("learn", "Tutorial", "learn/", "the course, the reference docs, and worked examples"),
-         ("design", "Design", "studio.html#design", "build a device and program it, in the browser"),
-         ("board", "Leaderboard", "board/", "devices and compilers, ranked: speed and logical error rate"),
+         ("design", "Design", "studio.html#design", "build a machine and program it, in the browser"),
+         ("board", "Leaderboard", "board/", "machines and compilers, ranked: speed and logical error rate"),
          ("discuss", "Discuss", "discuss/", "rules, bugs and features, on GitHub Discussions"))
 
 #: The running example on the landing: one seed entry, embedded as the page it is, in
@@ -94,11 +94,11 @@ PART_ART = {
           '<path d="M12 14l14-6 12 8 16-8" fill="none" stroke="#1c2a4a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'),
 }
 PART_COLOR = {"A": "#2a78d6", "B": "#eb6834", "R": "#1baf7a", "C": "#4a3aa7", "D": "#1c2a4a"}
-DOC_TAGS = {"adl": "device language", "tsir": "control IR", "rules": "the rules", "phys": "physics and metal"}
+DOC_TAGS = {"adl": "machine language", "tsir": "control IR", "rules": "the rules", "phys": "physics and metal"}
 DOC_BLURBS = {"adl": "One document describes a machine: its trap graph, zones, wiring and the curves of its primitives.",
               "tsir": "The eleven verbs a programme is written in, and what each one costs.",
               "rules": "All 27 rules, what each one checks, and what the verifier can honestly say about it.",
-              "phys": "From the graph to electrodes: the metal a device implies, and its design rules."}
+              "phys": "From the graph to electrodes: the metal a machine implies, and its design rules."}
 
 
 def _t(r: dict):
@@ -304,7 +304,7 @@ pre.ident{background:#f7f6f2;border:1px solid var(--line);border-radius:8px;padd
 .pub .use b{color:var(--ink3);font-weight:500;text-transform:uppercase;font-size:10.5px;letter-spacing:.07em;margin-right:6px}
 .cite pre{font-size:12px}
 
-/* physics: figures drawn from the device data, embeds, photographs */
+/* physics: figures drawn from the machine data, embeds, photographs */
 .fig{margin:16px 0 22px} .fig figcaption{font-size:12.5px;color:var(--ink2);margin-top:7px;line-height:1.45}
 .fig .credit{color:var(--ink3)} .fig img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
 .figsvg{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px} .figsvg svg{display:block;width:100%;height:auto}
@@ -894,7 +894,7 @@ def board_index(ts: list[dict]) -> str:
               '<span><i style="background:#0b7a4b"></i>fastest verified</span></div>')
     body = ("<h1>Leaderboard</h1>" + boards.goals_section() + leaderboard.goal_table() + boards.architecture_intro() +
             '<section class="lb-sec" id="architecture"><h2>Architecture</h2>'
-            "<p class=\"sub\">Devices, compiled by the reference compiler and judged by every "
+            "<p class=\"sub\">Machines, compiled by the reference compiler and judged by every "
             "<a href=\"../rules/#set-standard\">rule</a>. The three fastest verified designs per board; "
             "<a href=\"#memory\">memory boards</a> rank by logical error rate"
             + (", and the <a href=\"#c2lr\">C2LR boards</a> rank swap-or-stay lattices apart"
@@ -1084,7 +1084,7 @@ def _verdict(v: dict, focus: str | None, expect: str | None, tag: str | None) ->
 
 
 def poster(m, init: dict | None, fit: tuple[int, int] = (640, 280)) -> str:
-    """The still a runbox shows before it is pressed: the device, with its ions where the
+    """The still a runbox shows before it is pressed: the machine, with its ions where the
     programme starts, drawn into one box so every poster of a page is one size."""
     ions: dict[str, list[str]] = {}
     for ion, site in sorted((init or {}).items()):
@@ -1217,16 +1217,16 @@ def language_page(built: dict) -> str:
                 "<div class=\"tw\"><table><thead><tr><th>statement</th><th>instruction type</th><th>carries</th></tr></thead><tbody>"
                 + "".join(f"<tr><td><code>{a}</code></td><td><code>{b}</code></td><td>{c}</td></tr>" for a, b, c in IR_TABLE)
                 + "</tbody></table></div>"
-                "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">the control IR</a>; the device language "
+                "<p class=\"sub\">The IR reference is <a href=\"../docs/tsir/\">the control IR</a>; the machine language "
                 "the programmes run on is the machine of the <a href=\"../machine/\">Machine</a> page, whose file format is "
                 "<a href=\"../docs/adl/\">the architecture description</a>.</p>")
     body.append(learn.recap([
-        "A programme is a list of statements, one machine cycle each, over one device. The state it steps is "
+        "A programme is a list of statements, one machine cycle each, over one machine. The state it steps is "
         "three things: where every ion is, how hot it is, and the clock.",
         f"{n_core} core statements are the whole language; the {n_short} shorthands stand for lists of them and are "
         "judged exactly as those lists. <code>claim</code> only records what the author believes the totals are.",
-        "A programme never states a cost. Time and heat are read from the device's tables when it is replayed, "
-        "which is why one programme can be priced on many devices and many programmes compared on one.",
+        "A programme never states a cost. Time and heat are read from the machine's tables when it is replayed, "
+        "which is why one programme can be priced on many machines and many programmes compared on one.",
         "Every statement is one record of the control IR, so hand-written and compiled programmes are judged by "
         "one verifier. The next page is that verifier's rules: what a cycle may and may not do.",
     ], "language", more="To write one yourself, open the <a href=\"../studio.html#design\">Design page</a>: its Write "
@@ -1504,7 +1504,7 @@ def _gate_row(g: dict, page: str, head: str | None = None) -> str:
     dev = m.get("device", "ring6d")
     title = html.escape(head) if head else f'<code>{html.escape(body.splitlines()[0])}</code>'
     return (f'<section class="gaterow" id="{g["id"]}"><h3>{title} <span class="st">{m["note"]}</span></h3>'
-            f'<p class="src">device: <b>{dev}</b>, {html.escape(m.get("device_about", ""))}</p>'
+            f'<p class="src">machine: <b>{dev}</b>, {html.escape(m.get("device_about", ""))}</p>'
             f'<div class="gr"><div>'
             f'<div class="lab">the circuit</div>{circuit_svg(c.get("circuit_ops", []), c.get("n_qubits", 2))}'
             f'<div class="lab">input</div><pre><code>{html.escape(body)}</code></pre>'
@@ -1527,7 +1527,7 @@ def compilation_page(built: list[dict]) -> str:
     body = ["<h1>Compilation</h1>",
             "<p class=\"sub\">The compiler takes a quantum circuit and a machine (the text of the "
             "<a href=\"../machine/\">Machine</a> page), and writes the programme the "
-            "device runs: which ion holds each qubit, how ions are carried so that the two ions of every "
+            "machine runs: which ion holds each qubit, how ions are carried so that the two ions of every "
             "two-qubit gate stand in the same trap, and the laser operations, in order. Every example on "
             "this page can be played.</p>",
             learn.strip("compilation"),
@@ -1540,7 +1540,7 @@ def compilation_page(built: list[dict]) -> str:
                 "nine steps.",
                 "<b>A worked example</b> (&sect;3). The smallest circuit that needs transport, a Bell pair, through "
                 "every step, with the programme it became and its checks. Press Play on it.",
-                f"<b>Every basic gate</b> (&sect;4). {n_gates} gates compiled on four small devices, each with its "
+                f"<b>Every basic gate</b> (&sect;4). {n_gates} gates compiled on four small machines, each with its "
                 "programme, its ion map, its pulses and its verdicts.",
                 "<b>The algorithm</b> (&sect;5 onwards). What each pass computes, stated precisely, with a picture "
                 "after every definition; and what is proved, what is only computed, and what the compiler cannot do.",
@@ -1587,7 +1587,7 @@ def compilation_page(built: list[dict]) -> str:
                 "with pulses: Rx(&pi;/2)&middot;Ry(&lambda;)&middot;Rx(&minus;&pi;/2), three <code>R</code> pulses "
                 "(the rightmost first), equals <code>VZ(&lambda;)</code> up to a global phase. The programme still "
                 "writes it as one <code>VZ</code>, and the clock charges it the time of three pulses, unless the "
-                "device declares a gate that turns about Z in one pulse.</p>"
+                "machine declares a gate that turns about Z in one pulse.</p>"
                 "<p><b>The two identities every gate is rewritten by.</b> Each is proved, so the operations written "
                 "for a gate are that gate (the rightmost factor happens first):</p>"
                 "<pre class=\"ident\">u3(&theta;, &phi;, &lambda;) = VZ(&phi; + &lambda;) &middot; R(&theta;, &pi;/2 &minus; &lambda;)\n"
@@ -1667,7 +1667,7 @@ def compilation_page(built: list[dict]) -> str:
         ("Route and schedule", "the moves, in layers",
          "operations run in layers of the dependency graph, and each qubit's operations keep the circuit's "
          "order exactly, even where two of them would commute. Before a two-qubit gate, its two ions are "
-         "carried to one trap that can gate: one hop at a time on most devices, or, on a ring more than about "
+         "carried to one trap that can gate: one hop at a time on most machines, or, on a ring more than about "
          "half full, by turning the whole ring at once. This is this website's compiler. The papers on "
          "<a href=\"../reproduce/\">Reproduce</a> use their own compilers, with their own ways of routing "
          "ions; there, each paper's schedules are replayed as its own code wrote them, and ours are set "
@@ -1679,7 +1679,7 @@ def compilation_page(built: list[dict]) -> str:
          "about one gate of the circuit: <i>it happens at instruction k, in trap T, on ions a and b</i>. The "
          "checks below test every claim instead of trusting it."),
         ("Cool", "cooling where it is needed",
-         "the programme is replayed with the device's heating model, and a cooling operation is added "
+         "the programme is replayed with the machine's heating model, and a cooling operation is added "
          "wherever a gate would otherwise start on ions too hot to gate (R7)."),
         ("Check the rules", "every rule of the rule set",
          "the cooled programme is replayed and every rule of the rule set is evaluated on it, exactly as on "
@@ -1688,9 +1688,9 @@ def compilation_page(built: list[dict]) -> str:
         ("Check what it computes", "R10, in two halves",
          "<b>O1</b>, where every gate happens: the certificate's moves are replayed from the starting "
          "positions; every witness must name exactly the ions its gate's qubits are mapped to and find them "
-         "together in a trap that can gate, every move must be one the device allows, and every gate of the "
+         "together in a trap that can gate, every move must be one the machine allows, and every gate of the "
          "circuit must be witnessed once, in the circuit's order on each of its qubits. O1 is decided by a "
-         "checker whose correctness is proved, and which reads the device from its description, not from "
+         "checker whose correctness is proved, and which reads the machine from its description, not from "
          "the compiler. <b>O2</b>, what the gates compute: the pulses are read out of the programme, "
          "composed through the qubit-to-ion map, and compared with the circuit as written, each measurement "
          "and reset in its place. A circuit of Clifford gates (H, S, CNOT and the Pauli gates, with "
@@ -1751,7 +1751,7 @@ def compilation_page(built: list[dict]) -> str:
                                    "the Bell pair, on its page", cls="tall")
                     + f'<a class="open" href="ex/bell.html#step=1">open the page</a></div>')
     body.append(learn.bridge("One circuit is an anecdote. The next section puts every basic gate through the same "
-                             "nine steps, each on a different small device, so that transport is seen on a line, a "
+                             "nine steps, each on a different small machine, so that transport is seen on a line, a "
                              "loop, a lattice and a dock."))
     # ---------------------------------------------------------------- 4. every basic gate
     body.append("<h2 id=\"gates\">4. Every basic gate, compiled and verified</h2>"
@@ -1760,7 +1760,7 @@ def compilation_page(built: list[dict]) -> str:
                                 "computed half O2), the programme, and a Play button. The two-qubit gates are the ones "
                                 "with transport; the gates outside the Clifford set (t, and the rotations by an arbitrary "
                                 "angle) are checked as exact matrices.")
-                + "<p class=\"sub\">One circuit per gate, each on one of four small devices named on its card, through the "
+                + "<p class=\"sub\">One circuit per gate, each on one of four small machines named on its card, through the "
                 "same steps: the input, the programme it became, the ion mapping, the operations witnessed, and the "
                 "verdicts of the rules and of R10's two halves.</p>")
     body.append("".join(_gate_row(g, f'ex/{g["id"]}.html') for g in built
@@ -1923,7 +1923,7 @@ def device_svg(m, labels: bool | None = None, ions: dict[str, list[str]] | None 
                paths: list[dict] | None = None, marks: dict[str, tuple[str, str]] | None = None,
                hi: set[str] | None = None, crossed: set[str] | None = None,
                hi_ions: set[str] | None = None, fit: tuple[float, float] | None = None) -> str:
-    """The device as the system holds it: every node of the expanded graph at its position,
+    """The machine as the system holds it: every node of the expanded graph at its position,
     every segment as a line.  Sites are discs coloured by zone, lattice junctions small dark
     squares, and a site where three or more axes meet gets a dark ring.  Drawn straight from
     `m.arch.device`, so the picture cannot disagree with what the verifier walks.  `ions`
@@ -1931,7 +1931,7 @@ def device_svg(m, labels: bool | None = None, ions: dict[str, list[str]] | None 
     names the pills to draw in green.  `paths` ({nodes, color, label, dashed}) draws arrows
     through node positions, `marks` (site -> (text, colour)) writes a note under a site,
     `hi` rings a site in green and `crossed` strikes it out in red.  `fit` (width, height)
-    draws the device as large as it fits, centred, in a box of exactly that size, so the
+    draws the machine as large as it fits, centred, in a box of exactly that size, so the
     figures of a row come out the same height with their labels the same size."""
     dev = m.arch.device
     nodes, segs = dev.nodes, dev.segments
@@ -2014,7 +2014,7 @@ def device_svg(m, labels: bool | None = None, ions: dict[str, list[str]] | None 
     Y = lambda y: oy + (y1 - y) * scale        # y up on the device, down on the screen
     # a small device is drawn at its natural size, centred; a big one fills the column
     out = [f'<svg viewBox="0 0 {W:.0f} {H:.0f}" style="max-width:{W:.0f}px;margin:0 auto" xmlns="http://www.w3.org/2000/svg" '
-           f'font-family="ui-sans-serif,system-ui,sans-serif" role="img" aria-label="the device {html.escape(m.name)}">']
+           f'font-family="ui-sans-serif,system-ui,sans-serif" role="img" aria-label="the machine {html.escape(m.name)}">']
     sw = max(2.0, r * 0.55)
     bowed = bows(X, Y, scale)
     for sid, s in segs.items():
@@ -2096,7 +2096,7 @@ PHYS_DEVICES: dict[str, tuple[str, dict]] = {
 
 
 def _arch_machine(name: str):
-    """A device by name: one of the examples' small devices, or `arch:<file>` from `arch/`."""
+    """A machine by name: one of the examples' small machines, or `arch:<file>` from `arch/`."""
     from .examples import DEVICES as EX_DEVICES, machine as ex_machine
     from ..api import Machine
     if name.startswith("arch:"):
@@ -2106,7 +2106,7 @@ def _arch_machine(name: str):
         return getattr(Machine, gen)(**params, name=name)
     dev = next((d for d in EX_DEVICES if d["name"] == name), None)
     if dev is None:
-        raise KeyError(f"physics.md names an unknown device {name!r}")
+        raise KeyError(f"physics.md names an unknown machine {name!r}")
     return ex_machine(dev)
 
 
@@ -2161,8 +2161,8 @@ def build_phys_runs(out: Path, put) -> dict[str, dict]:
 def _figures(body: str, runs: dict[str, dict]) -> str:
     """Expand the markers physics.md carries, each on a line of its own:
          {{photo:file|alt|caption|credit}}      a photograph from static/
-         {{device:name|caption}}                one device, drawn from its data
-         {{gallery:name,name,...}}              several devices side by side, captioned from the examples
+         {{device:name|caption}}                one machine, drawn from its data
+         {{gallery:name,name,...}}              several machines side by side, captioned from the examples
          {{run:id|caption}}                     one of PHYS_RUNS, in embed mode
     """
     first_run = [True]

@@ -1,6 +1,6 @@
 """Their machines, written in our architecture language.
 
-A paper's device reaches us as a `PortGraph` (what its timing model sees: traps with ports,
+A paper's machine reaches us as a `PortGraph` (what its timing model sees: traps with ports,
 junctions, segments).  To draw it, open it in the studio, or hand it to our compiler it has
 to be an architecture document: nodes at positions, segments, zones, and the paper's own
 primitive times as a curve table named after the paper.  The positions are not in any of
@@ -211,7 +211,7 @@ def to_arch_doc(pg: PortGraph, positions: Mapping[str, tuple[float, float]], *, 
     nid = adl_id
     ids = list(pg.sites) + list(pg.nodes) + list(pg.segments)
     if len({adl_id(i) for i in ids}) != len(set(ids)):
-        raise ValueError("two ids of this device map to one id of the language")
+        raise ValueError("two ids of this machine map to one id of the language")
     nodes = []
     for s, a in pg.sites.items():
         nodes.append({"id": nid(s), "pos": list(positions[s]), "kind": "site",

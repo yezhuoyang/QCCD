@@ -1,6 +1,6 @@
-"""C2LR swap-or-stay devices: which legs a step pairs, read off the device.  docs/c2lr.md.
+"""C2LR swap-or-stay machines: which legs a step pairs, read off the machine.  docs/c2lr.md.
 
-A C2LR device (R. D. Delaney et al., arXiv:2403.00756) is a lattice of junctions whose every
+A C2LR machine (R. D. Delaney et al., arXiv:2403.00756) is a lattice of junctions whose every
 wire carries one **leg**: a trap site at the wire's centre holding one two-ion crystal, which
 this model counts as one ion.  The `grid(a, b)` generator draws exactly that.  Transport is
 not a route a programme chooses.  One shared waveform plays at every junction at once, and
@@ -53,7 +53,7 @@ _EPS = 1e-6
 
 
 class NotC2LR(ValueError):
-    """The device is not a C2LR lattice, so a swap-or-stay step has no matching on it."""
+    """The machine is not a C2LR lattice, so a swap-or-stay step has no matching on it."""
 
 
 @dataclass(frozen=True)
@@ -133,7 +133,7 @@ class C2LRGeometry:
 
     def pairs(self, var: Variation) -> dict[str, tuple[str, str]]:
         """leg -> (the junction it is paired at, its partner leg) under `var`.  A leg absent
-        here is unpaired in that step (the device's edge).  A matching by construction:
+        here is unpaired in that step (the machine's edge).  A matching by construction:
         under one diagonal a leg is the named arm of exactly one of its two junctions, and
         under a checkerboard it touches exactly one junction of the step's colour."""
         hit = self._pairs.get(var.key)
@@ -174,10 +174,10 @@ class C2LRGeometry:
 
 
 def _build(dev) -> C2LRGeometry:
-    """Read the lattice off the device, or say why it is not one."""
+    """Read the lattice off the machine, or say why it is not one."""
     legs = sorted(n for n, node in dev.nodes.items() if node.kind == "site")
     if not legs:
-        raise NotC2LR("the device has no legs: no site to hold a crystal")
+        raise NotC2LR("the machine has no legs: no site to hold a crystal")
     junctions = sorted(n for n, node in dev.nodes.items() if node.kind != "site")
     pos = {n: (float(node.pos[0]), float(node.pos[1]) if len(node.pos) > 1 else 0.0)
            for n, node in dev.nodes.items()}
@@ -236,15 +236,15 @@ _CACHE: dict[int, tuple] = {}
 
 
 def is_c2lr(arch) -> bool:
-    """Does the device declare C2LR control?  (Whether its geometry is one is `geometry`.)"""
+    """Does the machine declare C2LR control?  (Whether its geometry is one is `geometry`.)"""
     return str((arch.control or {}).get("model", "")) == "c2lr"
 
 
 def geometry(arch) -> C2LRGeometry:
-    """The device's C2LR lattice.  Raises `NotC2LR`, saying why, for a device that does not
+    """The machine's C2LR lattice.  Raises `NotC2LR`, saying why, for a machine that does not
     declare C2LR control or whose drawing is not a lattice of legs."""
     if not is_c2lr(arch):
-        raise NotC2LR(f"device {arch.name!r} does not declare C2LR control "
+        raise NotC2LR(f"machine {arch.name!r} does not declare C2LR control "
                       f"(control.model is {str((arch.control or {}).get('model', 'simd_classes'))!r}, "
                       f"not 'c2lr')")
     dev = arch.device
@@ -258,12 +258,12 @@ def geometry(arch) -> C2LRGeometry:
             _CACHE.clear()
         hit = _CACHE[id(dev)] = (dev, got)
     if isinstance(hit[1], NotC2LR):
-        raise NotC2LR(f"device {arch.name!r}: {hit[1]}")
+        raise NotC2LR(f"machine {arch.name!r}: {hit[1]}")
     return hit[1]
 
 
 def declared(arch) -> dict:
-    """What the device's `control.c2lr` block offers: the diagonals, the checkerboard
+    """What the machine's `control.c2lr` block offers: the diagonals, the checkerboard
     pairings, and which forms it marks assumed."""
     blk = dict((arch.control or {}).get("c2lr") or {})
     return {
@@ -331,7 +331,7 @@ C2LR_WIRING: Mapping = {
 
 
 def c2lr_control(*, checkerboard: bool = True, wiring: bool = False) -> dict:
-    """The control block of a C2LR device (docs/c2lr.md section 1).
+    """The control block of a C2LR machine (docs/c2lr.md section 1).
 
     The census C10 reads: 27 shared analog signals, plus one digital input and one switch
     per leg (and two site-dependent shims, p4).  The checkerboard pairings are offered and
@@ -350,7 +350,7 @@ def c2lr_control(*, checkerboard: bool = True, wiring: bool = False) -> dict:
         },
         "classes": {"extra": [
             {"id": "swap_or_stay", "type": "c2lr",
-             "note": "one swap-or-stay step: the template's direction bits, the device's "
+             "note": "one swap-or-stay step: the template's direction bits, the machine's "
                      "matching"},
             {"id": "reorder_or_not", "type": "c2lr",
              "note": "a 180-degree rotation of the listed crystals' wells; nothing moves"},
@@ -364,7 +364,7 @@ def c2lr_control(*, checkerboard: bool = True, wiring: bool = False) -> dict:
 
 
 def c2lr_primitives(species: str) -> dict:
-    """The primitives a C2LR device adds to (or replaces in) its template's: the step(s),
+    """The primitives a C2LR machine adds to (or replaces in) its template's: the step(s),
     and the merge/split a gate in one leg entails."""
     try:
         phys = C2LR_PHYSICS[species]
@@ -411,7 +411,7 @@ def deck_census(cx: int, cy: int) -> dict:
 
 
 def c2lr_species(species: str) -> dict:
-    """The species keys a C2LR device adds to its template's `species` block: the pair, its
+    """The species keys a C2LR machine adds to its template's `species` block: the pair, its
     qubit and coolant ions.  The paper is cited as `pair_source`, so the block's own `source`
     keeps citing the numbers that are the template's (T_coh_s, coolant_fraction), not this
     paper's."""

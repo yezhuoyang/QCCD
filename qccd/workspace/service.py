@@ -1095,7 +1095,7 @@ _CSP_COMPARE = _CSP + "; frame-src 'self'"
 
 
 def _run_page(state: ServiceState, run_id: str) -> str:
-    """A run's own Studio page: its device and its compiled program, view-only, cached."""
+    """A run's own Studio page: its machine and its compiled program, view-only, cached."""
     from .compare_page import RUNVIEW_BLOCK
     key = ("runview", run_id)
     with state.page_lock:
@@ -1256,7 +1256,7 @@ def _studio_page(state: ServiceState, snapshot_id: str | None) -> str:
 
     The design view renders ONCE per service (the page restores the head revision's
     records on load, so the base it was drawn from does not matter); a run view renders
-    the snapshot's own device and final program and is cached by snapshot."""
+    the snapshot's own machine and final program and is cached by snapshot."""
     ws = state.ws
     key = ("run", snapshot_id) if snapshot_id else ("design",)
     with state.page_lock:

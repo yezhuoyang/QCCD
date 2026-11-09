@@ -38,7 +38,7 @@ __all__ = ["ReachReport", "reach_report", "distance_matrix", "nearest"]
 
 @dataclass
 class ReachReport:
-    """Distances over the device, in the cost model's own units."""
+    """Distances over the machine, in the cost model's own units."""
 
     name: str
     model: str
@@ -70,7 +70,7 @@ class ReachReport:
 
 def _edges(arch: Architecture, model: CostModel, metric: str
            ) -> dict[str, list[tuple[str, float]]]:
-    """The device as a weighted graph, weighted by what a move actually costs.
+    """The machine as a weighted graph, weighted by what a move actually costs.
 
     `metric` is 'quanta', 'us' or 'cost'.  Distance in HOPS is available for free from any
     graph library and is the one unit no error budget is written in, so it is not offered.
@@ -211,7 +211,7 @@ def reach_report(arch: Architecture, model: CostModel, *,
         if unreachable:
             rep.notes.append(
                 f"{unreachable} ordered pairs of gate-capable traps cannot reach each "
-                f"other at all -- the device is not connected for transport")
+                f"other at all -- the machine is not connected for transport")
     else:
         rep.notes.append("fewer than two gate-capable traps; there is no pair to separate")
     return rep

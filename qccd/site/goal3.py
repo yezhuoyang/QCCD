@@ -111,7 +111,7 @@ def data() -> dict | None:
 
 #: what the page says for a rule that does not apply to a program, where the rule language's
 #: own reason is written for the rule's author
-_WHY = {"R7b": "no device declares a per-zone duty-cycle budget yet, so there is nothing to check",
+_WHY = {"R7b": "no machine declares a per-zone duty-cycle budget yet, so there is nothing to check",
         "R9": "a program's own figures are not checked; every number shown is the replay's",
         "R10": "the reference sweep skips the certificate and Lean step; an entry's grade runs it",
         "R29": "a paper's clock is checked on the paper's own timed schedules; a program's durations are "
@@ -538,9 +538,9 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "allows, compiled by its own baseline compiler, which keeps the circuit&rsquo;s gate order, and judged by "
         "its own rule set, without the Lean certificate step. The diamonds are entries submitted to the official "
         "server, which ran every check on the board&rsquo;s own physics. "
-        "Click any point to open its page: the ions moving on the device, the program against the circuit, the "
+        "Click any point to open its page: the ions moving on the machine, the program against the circuit, the "
         "rules, and the noise model&rsquo;s stim program block by block.</p>"
-        f"<div class=\"tw\"><table><tr><th>family</th><th>the device</th><th>swept</th></tr>{fams}</table></div></details>"
+        f"<div class=\"tw\"><table><tr><th>family</th><th>the machine</th><th>swept</th></tr>{fams}</table></div></details>"
         '<div class="g3" id="g3">'
         '<div class="g3-tabs" id="g3-tabs" role="tablist" aria-label="Code"></div>'
         '<p class="g3-code" id="g3-code"></p>'

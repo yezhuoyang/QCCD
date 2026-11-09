@@ -73,8 +73,8 @@ def _cmp(a: str, b: str) -> int:
 class Geometry:
     """The adapter: everything about the drawing that the occupancy law must not know.
 
-    `pos` returns None for a node the device does not have, which is how a programme that
-    outlived its device fails safe rather than drawing at NaN.
+    `pos` returns None for a node the machine does not have, which is how a programme that
+    outlived its machine fails safe rather than drawing at NaN.
     """
 
     pos: Callable[[str], tuple[float, float] | None]

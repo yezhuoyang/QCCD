@@ -745,7 +745,7 @@ def test_the_empty_canvas_leads_with_the_shape_and_keeps_every_start_card(blank,
 console.log(JSON.stringify({ html: document.getElementById('stageEmpty').innerHTML }));
 """)
     h = r["html"]
-    assert h.index("Draw the shape your ions travel on") < h.index("ready-made device"), (
+    assert h.index("Draw the shape your ions travel on") < h.index("ready-made machine"), (
         "the empty canvas must lead with the shape and keep the cards below it")
     for t in ["rect", "ellipse", "line", "poly"]:
         assert f'data-shape="{t}"' in h, f"no {t} button on the empty canvas"

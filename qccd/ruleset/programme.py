@@ -53,7 +53,7 @@ class Claim:
 
 
 def hardware_of(arch) -> Hardware:
-    """The device of an architecture document, in the rules' terms."""
+    """The machine of an architecture document, in the rules' terms."""
     dev = arch.device
     nodes = [Site(n) for n in dev.nodes]
     sites = [Site(n) for n, node in dev.nodes.items() if node.kind == "site"]

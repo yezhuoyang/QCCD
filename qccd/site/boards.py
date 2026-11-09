@@ -1,10 +1,10 @@
 """The Leaderboard's two sections, and the pages the Compiler section and the memory boards need.
 
-    Architecture   a person designs a device; the reference compiler compiles each board's circuit
+    Architecture   a person designs a machine; the reference compiler compiles each board's circuit
                    onto it; the grader checks and ranks it.  The syndrome-round boards (seed entries
                    and official submissions) and the MEMORY boards, which rank by the logical error
                    rate per round.
-    Compiler       a person submits a compiler; it is run over every (circuit, device) pair of a
+    Compiler       a person submits a compiler; it is run over every (circuit, machine) pair of a
                    benchmark suite and ranked by how much faster its programs run than the
                    reference compiler's, over the pairs both compile.
 
@@ -242,7 +242,7 @@ def c2lr_section(ts: list | None = None) -> str:
     (arXiv:2403.00756; docs/c2lr.md), each its own ranking by the logical error rate per round,
     judged by the C2LR rule set and compiled for reference by the baseline C2LR router.  Cards as
     the memory boards' are, apart from them: a lattice whose crystals move only by swap-or-stay
-    steps is not ranked against shuttling devices."""
+    steps is not ranked against shuttling machines."""
     boards = [b for b in memory_boards() if _c2lr(b)]
     if not boards:
         return ""
@@ -282,11 +282,11 @@ def compiler_section() -> str:
                       f'<td>{_e(m["about"])}</td></tr>' for m in s.manifest["metrics"])
     return (
         '<section class="lb-sec" id="compiler"><h2>Compiler</h2>'
-        f'<p class="sub">Submit a compiler: it runs on {summ["pairs"]} circuit&ndash;device pairs, plus '
+        f'<p class="sub">Submit a compiler: it runs on {summ["pairs"]} circuit&ndash;machine pairs, plus '
         f'{summ["hidden_pairs"]} hidden ones, ranked by speedup over the reference.</p>'
         f'<div class="lb-card"><h3>{_e(s.title)} <small>{_e(s.id)}</small></h3>'
         f'<p class="lb-meta">reference qccdc: {counts.get("valid", 0)} of {len(base)} pairs valid &middot; '
-        f'{len(summ["circuits"])} circuits &middot; {len(summ["devices"])} devices &middot; one wrong program makes an '
+        f'{len(summ["circuits"])} circuits &middot; {len(summ["devices"])} machines &middot; one wrong program makes an '
         'entry ineligible</p>'
         '<p><a href="compiler/">The suite, pair by pair, and how to submit &rarr;</a></p>'
         f'<details class="lb-more-d"><summary>The measures</summary><table class="lb-t"><thead><tr><th>metric</th>'
@@ -329,7 +329,7 @@ def compiler_page(PAGE: str, STYLE: str) -> str:
         '<a href="#submit">Submit</a><a href="../noise/">The noise model</a></nav>',
         '<h2 id="reference">The reference compiler, pair by pair</h2>',
         "<p>Each cell is one pair: the round time in milliseconds (T_jones) where qccdc's program is valid; "
-        "<i>wrong</i> where it breaks one of the device's rules (hover for which); <i>refused</i> where it cannot "
+        "<i>wrong</i> where it breaks one of the machine's rules (hover for which); <i>refused</i> where it cannot "
         "compile the pair. Every one of these is a place another compiler can do better.</p>",
         f'<div style="overflow-x:auto"><table class="lb-t lb-m"><thead><tr><th>circuit</th>{head}</tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table></div>',
@@ -433,9 +433,9 @@ def noise_page(PAGE: str, STYLE: str) -> str:
     body = [
         "<h1>The noise models</h1>",
         '<p class="sub">How a compiled QCCD program becomes a logical error rate. The program is replayed on the '
-        "device, which says where every ion is, how hot it is and how long everything takes. Each operation "
+        "machine, which says where every ion is, how hot it is and how long everything takes. Each operation "
         "becomes its gate in a stim circuit, and each clause of the model below puts its Pauli noise before or "
-        "after what it names, with the probability its term computes from the replay and the device's physics. "
+        "after what it names, with the probability its term computes from the replay and the machine's physics. "
         "The model IS this text: the grader reads it, and the <a href=\"../../evaluation/#noise\">Evaluation</a> "
         "page explains every word of it. The circuit's detectors come from the memory experiment's circuit, so an "
         "experiment means the same thing whichever compiler compiled it. A board names its model; changing the "
@@ -467,7 +467,7 @@ def noise_page(PAGE: str, STYLE: str) -> str:
                 "A Z-basis memory cannot see dephasing, so the boards under this model measure an X and a Z "
                 f"memory together.{on}</p>")
         else:
-            body.append("<p>Gates, readout, reset and a T₂ dephasing on every ion, priced from the device's own "
+            body.append("<p>Gates, readout, reset and a T₂ dephasing on every ion, priced from the machine's own "
                         f"physics block; the first preparation is noiseless, and no crosstalk is charged.{on}</p>")
         body.append(f'<p>The clauses, as the text writes them (<a href="../../evaluation/{_e(mid)}.eval">the whole '
                     f'text</a>; digest <code>{_e((n.get("digest") or "")[:19])}</code>):</p>'
@@ -493,7 +493,7 @@ def noise_page(PAGE: str, STYLE: str) -> str:
         '<h2 id="experiments">The memory experiments</h2>',
         '<table class="lb-t"><thead><tr><th>experiment</th><th>code</th><th>basis</th><th>distance</th><th>rounds</th>'
         f'<th>qubits (data + ancilla)</th></tr></thead><tbody>{erows}</tbody></table>',
-        "<p>The data readout after the last round is added by the grader, where the ions are, with the device's "
+        "<p>The data readout after the last round is added by the grader, where the ions are, with the machine's "
         "measurement error; an XZ experiment reads each patch in its own basis. The reference compiler's rotation "
         "cannot measure an ion that rides the loop. This is an approximation: the readout's own transport is not "
         "charged.</p>",
@@ -537,9 +537,9 @@ def index_entries() -> list:
             "u": "board/compiler/", "k": "page"},
            {"t": "The noise model", "d": "how a compiled program becomes a logical error rate, channel by channel",
             "u": "board/noise/", "k": "page"},
-           {"t": "Architecture leaderboard", "d": "devices ranked, each compiled by the reference compiler",
+           {"t": "Architecture leaderboard", "d": "machines ranked, each compiled by the reference compiler",
             "u": "board/#architecture", "k": "page"},
-           {"t": "Compiler leaderboard", "d": "compilers ranked over every circuit and device of the suite",
+           {"t": "Compiler leaderboard", "d": "compilers ranked over every circuit and machine of the suite",
             "u": "board/#compiler", "k": "page"}]
     for b in memory_boards():
         if _goal3(b):

@@ -130,7 +130,7 @@ promise an order it never recorded.
 
 The compact form is only emitted when re-running the generator on those params reproduces
 the graph exactly (`Device.reproducible_from_generator()`); otherwise the expanded form is
-written instead. Writing `generator + params` for a device that has since been edited
+written instead. Writing `generator + params` for a machine that has since been edited
 would throw the real graph away and hand back a file that loads as something else.
 
 The expanded form caches the derived `degree` and `corner` on each node and
@@ -259,7 +259,7 @@ across the die); `cylinder` is the planar drawing of the same torus.
 
 The studio (`python -m qccd studio`) has two design modes, remembered under
 `qccd.studio.mode`. **Parts** is the element-at-a-time tool: place a site, place a
-junction, shift-drag a rail. **Sketch** is the default on a canvas with no device on it,
+junction, shift-drag a rail. **Sketch** is the default on a canvas with no machine on it,
 and it is the one that speaks this language directly: arm a shape — rectangle, ellipse,
 line, polyline — drag it, and the release emits builder statements.
 
@@ -307,13 +307,13 @@ through a node it does not end at), and both are checked against R19 and R20 *be
 release commits: a crossing that would push a node past `budget.max_junction_degree`, or
 a corner tighter than `budget.min_rail_angle_deg`, is refused under the pointer with the
 rule and the number in the readout. The commit re-runs the geometry pass afterwards and
-takes the whole shape back if it added a finding, so a sketched device is clean of
+takes the whole shape back if it added a finding, so a sketched machine is clean of
 R19/R20/R21 by construction.
 
 Two limits are worth stating rather than discovering:
 
 * **A sketch needs a builder.** `d.site` is hoisted above the seal, and a generator
-  device (`from_template`, `blank`) has none — nor is there any post-seal verb that
+  machine (`from_template`, `blank`) has none — nor is there any post-seal verb that
   declares a loop (`qccd/arch/edit.py`'s op table is `add_site`, `add_junction`,
   `add_segment`, `remove_node`, `remove_segment`). Sketching on one is refused with the
   message that names the button which makes it explicit.

@@ -25,35 +25,35 @@ code (sections 3 and 4) say where a claim can be checked. If the code moved, tru
   single sharp corner can appear as two cases (`r1, r2` and `r2, r1`). Count each node, rail
   or instruction once.
 - **A failure under the board's physics is not always a design flaw.** The grader scores the
-  device with the board's `primitives`, `heating`, `species` and `budget`. Suppose a programme
+  machine with the board's `primitives`, `heating`, `species` and `budget`. Suppose a programme
   was cooled or timed under the
-  device's own physics, or the template's. Then it can fail R7 on the board while passing at
+  machine's own physics, or the template's. Then it can fail R7 on the board while passing at
   home. Say which physics produced the failure.
 
 ## 2. Causes and fixes, rule by rule
 
 One row per rule of every shipped set (a test keeps it so: a new rule fails CI until it has a row
-here). Device rules first, in the catalogue's groups; the machine rules (F, G, H) are in 2b.
+here). Machine rules first, in the catalogue's groups; the machine rules (F, G, H) are in 2b.
 
 | Rule | Usually means | Fix |
 |---|---|---|
-| R0 | an operation names an ion somewhere it isn't: a programme replayed on a different device than it was compiled for, or a hand-edited programme | recompile for this device. Check that the bundle's device is the one the programme was written for |
+| R0 | an operation names an ion somewhere it isn't: a programme replayed on a different machine than it was compiled for, or a hand-edited programme | recompile for this machine. Check that the bundle's machine is the one the programme was written for |
 | R1 | more ions in a site, or passing through it, than its capacity | raise the zone's capacity where the physics allows it (R13 caps a gate chain at 15), or route through a site with room |
 | R2 | two ions in one junction at once, resting or passing | serialise the crossings, and don't park ions on junctions (see R23) |
-| R3 | more ions on a rail than its capacity in one step | serialise, or give the rail more capacity only if the device really can hold it |
-| R4 | a transport step uses a movement class the device doesn't declare, or more classes in one cycle than `control.max_simd_classes_per_cycle` | declare the class in the device's `control.classes`, or split the cycle |
+| R3 | more ions on a rail than its capacity in one step | serialise, or give the rail more capacity only if the machine really can hold it |
+| R4 | a transport step uses a movement class the machine doesn't declare, or more classes in one cycle than `control.max_simd_classes_per_cycle` | declare the class in the machine's `control.classes`, or split the cycle |
 | R4b | one cycle mixes transport with gates, or intra- with inter-trap transport | split the cycle: one mode per cycle |
 | R4d | the control channels cannot drive the step. Either ions on one channel move differently, or a loaded site must hold still without a per-site switch | set `control.channels.switch_per_site: true` if the hardware has one; otherwise make every ion on the channel move the same way, or split the step. The grader's verifier reports this under **R4** |
 | R5 | two ions swap ends of one rail in one step | reroute one of them, or exchange them inside a trap (an ion swap) instead |
-| R6 | a gate, measurement/reset or cooling at a site whose zone type lacks that capability | give the site a zone type that has it (the device's `zone_types`: `gate`, `spam`, `cool`), or move the operation |
+| R6 | a gate, measurement/reset or cooling at a site whose zone type lacks that capability | give the site a zone type that has it (the machine's `zone_types`: `gate`, `spam`, `cool`), or move the operation |
 | R6b | the two ions of a 2-qubit gate are not in the same trap when it starts | transport them together first. A programme that names `sites` for a gate must name the one they are in |
 | R7 | an ion is hotter than the board's heat budget when a 2-qubit gate starts | **re-cool under the board's physics**: insert `cool` before the hot gate (in a workspace, submitting locally compiles, cools and grades in one step). Inserting `cool` is the one change a board allows between the certified and the final programme. Otherwise, fewer junction crossings or shorter transport before the gate |
-| R7b | a gate zone absorbs more heat over time than its duty budget. It does not apply today: no device declares a duty budget | nothing to fix yet. Once a device declares one, spread the gates over more zones or leave the zone idle between them |
+| R7b | a gate zone absorbs more heat over time than its duty budget. It does not apply today: no machine declares a duty budget | nothing to fix yet. Once a machine declares one, spread the gates over more zones or leave the zone idle between them |
 | R7c | a programme with 2-qubit gates and no cooling at all | insert cooling, as for R7 |
 | R8 | an ion takes part in two operations at once, appears, vanishes, or moves without an instruction moving it | a programme bug: recompile. If it is hand-written, find the instruction the diagnostic names |
 | R9 | a time, cost, step count or heat figure the programme states about itself is not what its replay computes. Advisory: the grader skips it, and the Debug page judges it | recompile, or drop the stale figures. A hand-edited programme often keeps its old totals |
 | R10 | the pulses, read through the certificate's qubit-to-ion map, do not compose to the circuit, or a gate is not performed once by its own ions in a trap that can gate. Only `certificate_binding`, `lean_certificate` and `semantics` decide it | compile the board's own circuit, and keep the certificate with the programme it was made for. If those three stages pass on another machine but not here, the toolchain is missing (section 5) |
-| R11 | ions on one loop move in different directions in one step, or a junction degree has no crossing cost (5- and 6-rail junctions cross at the X-junction's cost unless the device prices them) | one direction per loop per step. Price every junction degree the device uses (`junction_cross`), and note that a price the board lacks is listed as added physics |
+| R11 | ions on one loop move in different directions in one step, or a junction degree has no crossing cost (5- and 6-rail junctions cross at the X-junction's cost unless the machine prices them) | one direction per loop per step. Price every junction degree the machine uses (`junction_cross`), and note that a price the board lacks is listed as added physics |
 | R12 | two gates in one trap at once | serialise them |
 | R13 | a gate starts in a chain longer than `max_chain` (15) | split the chain first, or cap the zone's capacity |
 | R14 | an ion leaves a chain of more than 2 without an accounted `gate_swap` (the check charges every such split) | account the swap, or keep chains at 2 |
@@ -73,28 +73,28 @@ here). Device rules first, in the catalogue's groups; the machine rules (F, G, H
 | R29 | a paper's timed schedule gives an operation a duration other than its clock's law. It reads words only a schedule has, so it never applies to an entry's programme (`does not apply`) | nothing for a programme entry |
 | R30 | a paper's timed schedule runs two operations that hold one component at once. Only a schedule declares what an operation holds, so it never applies to a programme | nothing for a programme entry |
 | R31 | broadcast hops that overlap in time don't start and end together, or are of different classes, or a hop names no class | make every broadcast cycle one class with one start and one end (the compiler's uniform pass) |
-| R32 | a rotation, preparation or measurement runs in a zone outside the set's `single_ion_zones` | move the operation to an allowed zone, or give the device such zones |
+| R32 | a rotation, preparation or measurement runs in a zone outside the set's `single_ion_zones` | move the operation to an allowed zone, or give the machine such zones |
 | R33 | the two ions of a 2-qubit gate stand in zones that are neither the same nor neighbours when it starts | bring them into one zone, or neighbouring ones, before the gate |
 | C1 | a C2LR leg holds two crystals other than between an enter and its exit, or a crystal that entered a partner leg leaves by another step type than the one it came in by | keep one crystal per leg. A crystal that entered a partner leg leaves by the same step type. The site's C2LR router keeps both |
-| C2 | a transport step on a C2LR device writes its own routes, or chooses anything per leg beyond the direction bit | emit steps as direction bits on the device's matching, as the router does. Never hand-write the routes of a C2LR class |
+| C2 | a transport step on a C2LR machine writes its own routes, or chooses anything per leg beyond the direction bit | emit steps as direction bits on the machine's matching, as the router does. Never hand-write the routes of a C2LR class |
 | C3 | a step ties horizontal and vertical legs together (a bit per axis, not per crystal) | give every crystal its own direction bit |
-| C4 | an exchange step is not "C2LR, one shared junction waveform, C2LR back": two waveforms, or a shift that is not undone | use the device's `swap_or_stay` primitive as one step. Don't compose a step from separate moves |
+| C4 | an exchange step is not "C2LR, one shared junction waveform, C2LR back": two waveforms, or a shift that is not undone | use the machine's `swap_or_stay` primitive as one step. Don't compose a step from separate moves |
 | C5 | a crystal ends a step somewhere other than a leg centre | end every step with every crystal at a leg centre |
-| C6 | a step pairs legs other than by the device's matching, or uses a form the set doesn't allow (`c2lr_forms`) | use a demonstrated diagonal (W-S, W-N, E-S, E-N). Under `c2lr` the checkerboard is allowed but **assumed**: the review reports it. `c2lr-demonstrated` (Goal 3's C2LR family) refuses it |
+| C6 | a step pairs legs other than by the machine's matching, or uses a form the set doesn't allow (`c2lr_forms`) | use a demonstrated diagonal (W-S, W-N, E-S, E-N). Under `c2lr` the checkerboard is allowed but **assumed**: the review reports it. `c2lr-demonstrated` (Goal 3's C2LR family) refuses it |
 | C7 | a crystal rests on a junction when a step ends | a step carries crystals through junctions; never leave one there |
-| C8 | `allowed partial`: the COM frequency held during a shift is recorded with the step's primitive, not decided from the programme. Skipped (and blocking) when the primitive records none | nothing in the programme. Record the COM frequency on the device's `swap_or_stay` primitive (`Machine.c2lr_grid` does) |
-| C9 | a step heats only the crystals that move, as if one that sat it out stayed cold. The shared waveforms heat every crystal | give the device's `swap_or_stay` primitive its stay heat (`quanta_stay`, which `Machine.c2lr_grid` writes for Ba-Sr and Yb-Ba), then replay under the board's model |
-| C10 | a device with C2LR control whose document is not shared signals plus one input and one switch per leg | write the `control` block as `Machine.c2lr_grid` does, or don't declare C2LR control |
-| W1 | on a WISE device, two qubits share a zone for something other than a gate or the first half of a swap, or stay together after it | merge two qubits only to gate them or to begin a swap, and split them again before anything else happens in that zone |
+| C8 | `allowed partial`: the COM frequency held during a shift is recorded with the step's primitive, not decided from the programme. Skipped (and blocking) when the primitive records none | nothing in the programme. Record the COM frequency on the machine's `swap_or_stay` primitive (`Machine.c2lr_grid` does) |
+| C9 | a step heats only the crystals that move, as if one that sat it out stayed cold. The shared waveforms heat every crystal | give the machine's `swap_or_stay` primitive its stay heat (`quanta_stay`, which `Machine.c2lr_grid` writes for Ba-Sr and Yb-Ba), then replay under the board's model |
+| C10 | a machine with C2LR control whose document is not shared signals plus one input and one switch per leg | write the `control` block as `Machine.c2lr_grid` does, or don't declare C2LR control |
+| W1 | on a WISE machine, two qubits share a zone for something other than a gate or the first half of a swap, or stay together after it | merge two qubits only to gate them or to begin a swap, and split them again before anything else happens in that zone |
 | W2 | a swap step pairs zones of both parities, which the shared waveforms cannot drive at once | pair only odd zones, or only even ones, in one step, and the other parity in the next |
-| W4 | a transport step on a WISE device also carries gates, or moves ions other than between zones | run transport and gates in separate steps: one kind of operation across the chip at a time |
+| W4 | a transport step on a WISE machine also carries gates, or moves ions other than between zones | run transport and gates in separate steps: one kind of operation across the chip at a time |
 | W10 | a gate layer runs more than one gate, or one gate at more than one angle | split the layer by gate and by angle. Frame changes are not pulses and are free of this |
-| W11 | a layer does not pay for its shims first: a reconfiguration with no opening layer that charges them, or a gate, readout or reset priced without the charge | open every reconfiguration with a layer that charges the shims and plays no pulse, and use the device's WISE primitives, which price the charge into every gate, readout and reset |
-| Y1 | on a Cyclone device, the traps are not one closed ring with junctions only at its corners: an X or T junction, a spur, or a second loop | draw one closed ring, its corners L-shaped junctions, with no branches |
+| W11 | a layer does not pay for its shims first: a reconfiguration with no opening layer that charges them, or a gate, readout or reset priced without the charge | open every reconfiguration with a layer that charges the shims and plays no pulse, and use the machine's WISE primitives, which price the charge into every gate, readout and reset |
+| Y1 | on a Cyclone machine, the traps are not one closed ring with junctions only at its corners: an X or T junction, a spur, or a second loop | draw one closed ring, its corners L-shaped junctions, with no branches |
 | Y2 | a data qubit moves in a transport step | move only ancillas. Spread the data qubits evenly round the ring at the start and leave them there |
 | Y3 | the ancillas do not all move together, one trap the same way round, in a transport step | move every ancilla one trap per step in the same direction; never move only some of them |
 | Y4 | a trap holds more than 30 ions | give no trap a capacity above 30, or use more traps |
-| budget (device stage) | too many DACs (B1) or junctions (B2) for the board's budget | broadcast wiring instead of direct drive (a direct-wired grid needs thousands of DACs), or fewer junctions. Declaring fewer electrodes buys nothing, because counts are floored by the physics |
+| budget (machine stage) | too many DACs (B1) or junctions (B2) for the board's budget | broadcast wiring instead of direct drive (a direct-wired grid needs thousands of DACs), or fewer junctions. Declaring fewer electrodes buys nothing, because counts are floored by the physics |
 
 **Re-cooling under the board's physics**, for an agent working in a checkout (fixes R7 and R7c
 without recompiling, and keeps `correspondence` passing):
@@ -147,8 +147,8 @@ the floorplan is clean and a G rule still fails, suspect the scheduler, and repo
 | G12 | a carried bundle is not taken in at the far end exactly once, in order | usually a scheduler bug: report it with the inputs |
 | G13 | two bundles share a road at once | serialise them, or add a parallel road |
 | G14 | more of a bundle's ions are on a road's sites than the road has | lengthen the road, or split the bundle |
-| H1 | a carry, compiled onto its road's own device, breaks one of R1-R23, delivers an ion before the far side takes it, or shares a door's stub with the op there | a road's program is a device programme: read which device rule failed (section 2), then reshape or lengthen the road |
-| H2 | two devices that share a plane of DACs, or a laser, play different cycles at once | let them take turns, or give them planes of their own |
+| H1 | a carry, compiled onto its road's own machine, breaks one of R1-R23, delivers an ion before the far side takes it, or shares a door's stub with the op there | a road's program is a machine programme: read which machine rule failed (section 2), then reshape or lengthen the road |
+| H2 | two machines that share a plane of DACs, or a laser, play different cycles at once | let them take turns, or give them planes of their own |
 
 ## 3. Beyond the checkers: look at these in every review
 
@@ -156,13 +156,13 @@ The Debug page shows the facts behind items 5, 7 and 10 (each rule's closest cas
 rule judges at each step), and a grade report the facts behind 2, 3 and 9. Your job is the
 judgement: what each fact means for this design.
 
-1. **Board fit.** Does the device hold the circuit's qubits (total capacity), and does its shape
+1. **Board fit.** Does the machine hold the circuit's qubits (total capacity), and does its shape
    suit the compiler that will route it? The conveyor drives only the first closed loop plus
    docks one rail off it. The router needs a lattice with enough gate sites. Two separate loops
-   never meet. A design named after a shipped device (`arch/<name>.arch.json`) but wired
+   never meet. A design named after a shipped machine (`arch/<name>.arch.json`) but wired
    differently is worth a sentence. A reader citing "grid9x9" will assume the shipped wiring.
-2. **Physics the board overrides.** `physics_lock` lists `ignored` numbers (the device's, unused)
-   and `added` ones (the device's, used because the board has none). Ignored numbers mean the
+2. **Physics the board overrides.** `physics_lock` lists `ignored` numbers (the machine's, unused)
+   and `added` ones (the machine's, used because the board has none). Ignored numbers mean the
    design was tuned for physics it won't be scored with. Added numbers mean the entry is ranked
    with the "any rules" entries, not on the board's own ranking.
 3. **Budget headroom.** Look at DACs and junctions against the budget, and the wiring notes
@@ -182,12 +182,12 @@ judgement: what each fact means for this design.
    R1's occupancy, R13's chain, R20's angle), with its step and where it is. A site or road
    at exactly its capacity (slack 0) is legal; say so only when a small change would break it.
 6. **Control model.** `direct` wiring makes R22 vacuous and costs DACs. `switch_per_site: false`
-   is what the R4d hold clause bites on. A C2LR device is judged by C1-C10, and its checkerboard
+   is what the R4d hold clause bites on. A C2LR machine is judged by C1-C10, and its checkerboard
    steps are assumed.
 7. **The programme's own claims (R9, advisory).** If the programme states totals that the replay
    doesn't reproduce, the grader won't notice (it skips R9). A reader of the programme would.
 8. **Buildability beyond the rules (information only).** `qccd.phys` derives the electrodes a
-   device implies and runs a DRC (the CLI `python -m qccd phys` takes shipped devices). It is not
+   machine implies and runs a DRC (the CLI `python -m qccd phys` takes shipped machines). It is not
    part of grading. Many
    shipped designs are not DRC-clean under the ETH preset, so report it as an observation,
    never as a failure. Refused shapes (a diagonal rail the builder can't draw) are the useful
@@ -211,7 +211,7 @@ These hold as of the code this guide was written against. Each pointer says wher
   and R17 are marked checked whenever the cost model models heating and time. R18's
   `junctions` are, by definition, the nodes where three or more rails meet. None of them says
   anything about a design.
-- **A device alone decides only some rules.** Those whose words are all about the device and
+- **A machine alone decides only some rules.** Those whose words are all about the machine and
   the board's physics are judged the same at every step (the Debug page marks their cases
   "every step"). R11 is half and half: its "every junction is priced" half names no moment.
 - **R29 and R30 never apply to a programme.** They read words only a paper's timed schedule
@@ -235,7 +235,7 @@ These hold as of the code this guide was written against. Each pointer says wher
   figures are upper bounds.
 - **R23 has a precondition.** If the traps off the junctions cannot hold every ion, it does not
   apply.
-- **R7b cannot apply yet.** No device declares a per-zone duty-cycle budget.
+- **R7b cannot apply yet.** No machine declares a per-zone duty-cycle budget.
 - **What two moving ions do on one waveform across different paths is not judged** (R4d's
   off-path count is per class of sites, not a field solve). That is a layout question for a
   reviewer, not a checker verdict.
@@ -245,8 +245,8 @@ These hold as of the code this guide was written against. Each pointer says wher
 | Stage | Fails when | Typical fix |
 |---|---|---|
 | `bundle` | a file's digest is wrong, a member is unknown or missing, or the bundle is for another task release | rebuild the bundle for this board's release |
-| `device` | the device doesn't load, exceeds `max_nodes`, or is over the DAC/junction budget | fix the document; see budget above |
-| `physics_lock` | the device with the board's physics doesn't load | usually a C2LR or exotic primitive the board can't take |
+| `device` | the machine doesn't load, exceeds `max_nodes`, or is over the DAC/junction budget | fix the document; see budget above |
+| `physics_lock` | the machine with the board's physics doesn't load | usually a C2LR or exotic primitive the board can't take |
 | `program` | not a valid TSIR, or over `max_instructions` | regenerate the programme |
 | `correspondence` | the final programme isn't the certified one plus inserted `cool` instructions with fresh ids | only add cooling after certifying, never edit other instructions |
 | `certificate_binding` | the certificate's circuit isn't the board's circuit op for op, or a gate witness names the wrong instruction | compile the board's own circuit |
@@ -260,7 +260,7 @@ with ids of their own. **Goal 1's G1-G3 are not the machine rules G1-G3.**
 
 | Requirement | Where it is enforced | Fails when |
 |---|---|---|
-| B1, B2 (`board`) | the `device` stage (the grade report's budget line) | the wiring needs more DACs, or the device more junctions, than the board's budget |
+| B1, B2 (`board`) | the `device` stage (the grade report's budget line) | the wiring needs more DACs, or the machine more junctions, than the board's budget |
 | G1 (`goal1`) | the `rules` stage | any rule of the standard set fails |
 | G2 (`goal1`) | Goal 1's listing, not eligibility | the programme places more than 200 ions. The official listing filters by the board's experiment, which every Goal 1 board keeps under 200 |
 | G3 (`goal1`) | the `ler` stage's noiseless check (`QEC.CHECK_FAILED`) | with noise taken out, a detector or observable is not the fixed 0 the experiment's circuit gives it |

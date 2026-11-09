@@ -391,7 +391,7 @@ def published_cases() -> list[dict]:
 
 
 def devices() -> dict:
-    """The geometry of every device a figure may draw, from its own document: node positions
+    """The geometry of every machine a figure may draw, from its own document: node positions
     in model units, rails, loops, and which sites can gate."""
     out = {}
     for f in sorted(COMPILED.glob("*.arch.json")):
@@ -591,7 +591,7 @@ def studio_pages(dst: Path) -> list[Path]:
     """The studio pages the figures embed, made by the platform's own renderer -- the same
     engine, animation and transport as every studio page on the site -- in its embed mode:
 
-    * ex/dev-<arch>.html: the device, no programme; a chapter figure loads into it the programme
+    * ex/dev-<arch>.html: the machine, no programme; a chapter figure loads into it the programme
       Lean's replay of a certificate describes;
     * ex/<id>.html: a published example's REAL compiled programme with its circuit through the
       checked source map, exactly as the Compilation page renders it (build_compiled_pages)."""

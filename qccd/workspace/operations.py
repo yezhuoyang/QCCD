@@ -2,7 +2,7 @@
 
 Every operation COMPILES to the records the studio already speaks -- `{topology:{op,args}}`
 for graph edits (`qccd.arch.edit.OPS`), `{method,args,kwargs}` for retunes
-(`qccd.arch.edit.MUTATE`), a replaced base for a new device, and `{method,...}` program
+(`qccd.arch.edit.MUTATE`), a replaced base for a new machine, and `{method,...}` program
 records (`qccd.api.PROGRAM_METHODS`) -- and those records then go through the one
 applier in `design.replay`.  Nothing here moves a node or prices a design; an operation
 is a small, typed front end over the toolchain's own whitelists.
@@ -12,7 +12,7 @@ readable signatures an agent reads (`describe_operations()`) are derived from it
 than written a second time in the skill.
 
 Operations are checked for SHAPE here (types, required fields, id grammar).  Whether the
-result is a legal device is `design.replay`'s job, and whether it is a GOOD device is the
+result is a legal machine is `design.replay`'s job, and whether it is a GOOD machine is the
 evaluator's; a well-formed edit that produces a physically invalid draft is accepted with
 diagnostics.
 """
@@ -147,7 +147,7 @@ class _Ctx:
         self.replayed = None      # the next lookup replays
 
     def arch(self):
-        """The device as it stands now (replayed), for operations that compute from its geometry."""
+        """The machine as it stands now (replayed), for operations that compute from its geometry."""
         self.arch_doc()
         return self.replayed.arch
 
@@ -252,7 +252,7 @@ def _op_call(ctx: _Ctx, op: Mapping, where: str) -> None:
 
 
 def _op_construct(ctx: _Ctx, op: Mapping, where: str) -> None:
-    """Replace the device with a generated one (the studio's gallery pick)."""
+    """Replace the machine with a generated one (the studio's gallery pick)."""
     from ..api import Machine
 
     gen = op.get("generator")
@@ -322,7 +322,7 @@ def _op_add_docks(ctx: _Ctx, op: Mapping, where: str) -> None:
     """Batch: `count` gate sites around a closed loop, each one rail off it -- the conveyor's docks.
 
     An agent says how many; the geometry is computed here.  (A live agent spent 57 s of one model
-    call working out 24 dock coordinates by hand, 2026-09-24.)  The loop is `loop`, or the device's
+    call working out 24 dock coordinates by hand, 2026-09-24.)  The loop is `loop`, or the machine's
     first closed one.  Docks go at loop sites spread evenly by arc length -- never at a corner, where
     the spur would meet the loop's rails at under 90 degrees, and never beside another dock --
     `distance` units off the loop, perpendicular to it, on `side` ('inside' by default: the side
@@ -505,8 +505,8 @@ def _op_set_final_program(ctx: _Ctx, op: Mapping, where: str) -> None:
 
     `certified` and `certificate` name the compiler's own output and its certificate, so
     a submission can tie the graded program back to what was checked; `compiled_for` is
-    the architecture digest it was compiled against, so a later device edit shows the
-    program as stale instead of silently pairing it with a different device."""
+    the architecture digest it was compiled against, so a later machine edit shows the
+    program as stale instead of silently pairing it with a different machine."""
     ref = op.get("artifact")
     if ref is None:
         ctx.state.final_program = None
@@ -541,7 +541,7 @@ def _op_studio_sync(ctx: _Ctx, op: Mapping, where: str) -> None:
     """The browser's own edits, as the records `EDITOR` holds.
 
     `remove` lists records (by value) that were taken back -- the page's undo --, `append`
-    the records added since the base revision, `base` a new device (the gallery, a
+    the records added since the base revision, `base` a new machine (the gallery, a
     canvas op), `program` the Write lane's records.  Records are normalised to the three
     studio shapes by `design.clean_edit`, so a page cannot carry anything else in.
     """
@@ -598,7 +598,7 @@ OPERATIONS: dict = {s.name: s for s in [
            {"zone": "zone name", "fields": "object"}, _op_set_zone),
     OpSpec("call", "Any whitelisted retune verbatim (qccd.arch.edit.MUTATE).",
            {"method": "|".join(sorted(MUTATE)), "args": "list", "kwargs": "object"}, _op_call),
-    OpSpec("construct", "Replace the device with a generated one (a ring or dual loop gets junction "
+    OpSpec("construct", "Replace the machine with a generated one (a ring or dual loop gets junction "
            "corners unless params say \"corners\": \"site\").",
            {"generator": "|".join(GENERATORS), "params": "object", "name": "string?"},
            _op_construct),

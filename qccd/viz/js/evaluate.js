@@ -260,7 +260,7 @@ function inst_(x, fn) { if (x instanceof Instant) return x; throw new EvalErr(fn
 function scalarOf(state, p) {
   var prim = (state.primitives || {});
   var s = prim.scalars ? prim.scalars[p] : prim[p];
-  if (!s) throw new EvalErr('the device declares no primitive ' + JSON.stringify(p));
+  if (!s) throw new EvalErr('the machine declares no primitive ' + JSON.stringify(p));
   return s;
 }
 

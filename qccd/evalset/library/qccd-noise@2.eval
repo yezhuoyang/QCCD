@@ -55,7 +55,7 @@ channel readout_x "A wrong readout, in the X basis"
     Z_ERROR(min(1 / 2, scale * (1 - primitive("measure", "fidelity")))) on ions(m) counted as measure
 
 channel ms "The two-ion gate"
-  about "The device's gate error law at the heat the pair meets (the hotter ion, plus what ground-state cooling leaves behind) and at the length of the chain in its trap."
+  about "The machine's gate error law at the heat the pair meets (the hotter ion, plus what ground-state cooling leaves behind) and at the length of the chain in its trap."
   source "arXiv:2511.05465 Table II; arXiv:0810.0670 Sec. 5.2 (the slope per quantum); arXiv:2004.04706 Eq. 1 (the chain factor); arXiv:2206.11888 Fig. 3 (the cooling floor)"
   after g in two_qubit_gates:
     DEPOLARIZE2(min(15 / 16, scale * ms_error(gate_heat(g), gate_length(g)))) on ions(g)
@@ -64,13 +64,13 @@ channel ms "The two-ion gate"
                  ms_chain = ms_error(gate_heat(g), gate_length(g)) - ms_error(gate_heat(g), 2)
 
 channel gate_1q "A one-ion pulse"
-  about "Every pulse R, and every abstract one-qubit Clifford, fails with the device's one-qubit infidelity. A Z rotation VZ fails as three pulses do: the beams of a QCCD machine are shared, so a Z cannot be a frame update and is turned by three one-ion pulses, which is also the time the clock charges it."
+  about "Every pulse R, and every abstract one-qubit Clifford, fails with the machine's one-qubit infidelity. A Z rotation VZ fails as three pulses do: the beams of a QCCD machine are shared, so a Z cannot be a frame update and is turned by three one-ion pulses, which is also the time the clock charges it."
   source "arXiv:2511.05465 Table II"
   after g in single_qubit_gates where gate(g) != "I":
     DEPOLARIZE1(min(3 / 4, scale * (1 - pow(primitive("1q_gate", "fidelity"), if gate(g) = "VZ" then 3 else 1)))) on ions(g)
 
 channel reset "A wrong reset"
-  about "A reset leaves its ion in |1> instead of |0> with the device's reset error."
+  about "A reset leaves its ion in |1> instead of |0> with the machine's reset error."
   source "Quantinuum Helios-1E emulator parameters (p_init)"
   after r in resets:
     X_ERROR(min(1 / 2, scale * primitive("reset", "error"))) on ions(r)

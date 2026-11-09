@@ -258,7 +258,7 @@
    "status": "passed"
   },
   {
-   "coverage": "QCCDC.Cert.check (proved sound: check_sound) accepted the certificate against hop/gate-site facts re-derived from the submitted device",
+   "coverage": "QCCDC.Cert.check (proved sound: check_sound) accepted the certificate against hop/gate-site facts re-derived from the submitted machine",
    "detail": {},
    "diagnostics": [],
    "id": "lean_certificate",

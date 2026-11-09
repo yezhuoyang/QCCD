@@ -33,7 +33,7 @@ var QCCD_TUTORIAL = {
     { id: 'C', title: 'Circuits by hand',
       milestone: 'Part C done: a syndrome round and a plaquette, scheduled by hand under every rule, with the heat paid for. Part D lets the compiler do it and asks you to judge the machine.' },
     { id: 'D', title: 'Architecture decisions with the compiler',
-      milestone: 'The course is done. You can read the map, build a device, program it by hand, break and fix every rule, schedule a circuit, and judge an architecture from measured numbers. The rest is practice, and the compiler.' }
+      milestone: 'The course is done. You can read the map, build a machine, program it by hand, break and fix every rule, schedule a circuit, and judge an architecture from measured numbers. The rest is practice, and the compiler.' }
   ],
   // The tutorial goes on past this page: Parts E onward are lessons whose code is Lean, checked
   // in the page, on the site's Learn page (their titles are book/book.json's; tests/test_book.py
@@ -96,7 +96,7 @@ var QCCD_TUTORIAL = {
       teaches: ['el:zone_type', 'zone:new'],
       text: [
         'A [[zone type|el:zone_type]] is a label on a site. It says how many ions fit, and whether a gate, a measurement or cooling may happen there.',
-        'This device has three: `trap` (gate, measure, cool; 2 ions), `data` (stores ions, can cool; 2 ions) and `load` (where new ions arrive; 8 ions). Their chips are under **Zone type** on the left. Each chip shows the name and the size, for example `load · 8`.',
+        'This machine has three: `trap` (gate, measure, cool; 2 ions), `data` (stores ions, can cool; 2 ions) and `load` (where new ions arrive; 8 ions). Their chips are under **Zone type** on the left. Each chip shows the name and the size, for example `load · 8`.',
         '**Pick a zone:** press a chip, then click the canvas. The new site gets that zone.',
         '**A zone is shared:** change its capacity once, and every site with that zone changes.'
       ],
@@ -117,7 +117,7 @@ var QCCD_TUTORIAL = {
         { exercise: 'Press the **load** chip under **Zone type**. Then click an empty spot on the canvas. A new `load` site appears there.',
           check: ['all', ['sites', 5], ['anyNodeZone', 'load']],
           guide: [['site', 3, 1, { zone: 'load', chip: true }], ['check']] },
-        { exercise: 'Now change the `load` zone. Open the **Device** tab and press **Source**: the device as text. No line sets the `load` capacity yet, so type a new last line: `m.set_zone("load", capacity=4)`. The chip now reads `load · 4`, and your new site gets shorter. Go back to **Learn** and press **Check**.',
+        { exercise: 'Now change the `load` zone. Open the **Machine** tab and press **Source**: the machine as text. No line sets the `load` capacity yet, so type a new last line: `m.set_zone("load", capacity=4)`. The chip now reads `load · 4`, and your new site gets shorter. Go back to **Learn** and press **Check**.',
           check: ['zoneCapacity', 'load', 4],
           guide: [['tab', 'A'], ['view', 'src'], ['line', '#eSrc', 'm.set_zone("load", capacity=4)', 'Type this as a new last line.'],
                   ['goal', ['zoneCapacity', 'load', 4]], ['check']] }
@@ -125,7 +125,7 @@ var QCCD_TUTORIAL = {
       nudges: {
         sites: ['No new site yet. Press the load chip, then click an empty spot on the canvas.', 'The click must land on empty canvas, away from the other sites.'],
         anyNodeZone: ['A site was placed, but not in the load zone. Press the load chip first, then place another site.'],
-        zoneCapacity: ['The load zone still holds {have}. Open Device, press Source, and type the line m.set_zone("load", capacity=4) at the end.'],
+        zoneCapacity: ['The load zone still holds {have}. Open Machine, press Source, and type the line m.set_zone("load", capacity=4) at the end.'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
       praise: 'A load site that now holds {cap}. Capacity is the first rule of the machine, R1, and you just set it for a whole zone at once.',
@@ -203,7 +203,7 @@ var QCCD_TUTORIAL = {
       teaches: ['el:control', 'm:DACs', 'm:electrodes', 'm:switches'],
       text: [
         'Each [[electrode|m:electrodes]] along a rail needs a voltage. A [[DAC|m:DACs]] (digital-to-analog converter) makes that voltage. One DAC for every electrode does not scale to big chips.',
-        'This device uses **broadcast** wiring: many electrodes share one **channel**, and one DAC drives the whole channel. So the device counts DACs by channel, not by electrode.',
+        'This machine uses **broadcast** wiring: many electrodes share one **channel**, and one DAC drives the whole channel. So the machine counts DACs by channel, not by electrode.',
         'The price: **every site on a shared channel must move the same way in the same step.** You will meet this again as rule R4d, in Part B, and in Part D.'
       ],
       setup: [['newFromGenerator', 'ring', { width: 4, height: 3, verticals: 0, corners: 'junction' }, { name: 'ring6' }], ['testDrive'], ['fit']],
@@ -234,13 +234,13 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== A6
     { id: 'A6', part: 'A', title: 'The panels',
-      story: 'You have a device and a programme. Now read them.',
+      story: 'You have a machine and a programme. Now read them.',
       teaches: ['tab:P', 'tab:A', 'tab:M', 'tab:W', 'tab:R', 'follow'],
       text: [
         'The tabs at the top right open the panels. **Learn** is this course.',
         '[[Program|tab:P]]: the hardware programme, one instruction per row. Click a row and the animation jumps there.',
-        '[[Device|tab:A]]: the device as code. Press **Source** to see it as text you can edit.',
-        '[[Machine|tab:M]]: the rules and the hardware.',
+        '[[Machine|tab:A]]: the machine as code. Press **Source** to see it as text you can edit.',
+        '[[Hardware|tab:M]]: the rules and the hardware.',
         '[[Report|tab:R]]: the totals and the rules. Each rule is a badge: green passed, red failed, amber only partly checked, grey (dashed) not checked on this page.',
         '[[Write|tab:W]]: where you write programmes, from Part B on.',
         'A rotation row reads like `L0 × +1  1 hop`: the loop turns one site. Every ion on the loop pays for every hop, so the row with the most hops costs the most.'
@@ -257,7 +257,7 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== B1
     { id: 'B1', part: 'B', title: 'The programme language',
-      story: 'A device does nothing until you tell it what to do. Here is how.',
+      story: 'A machine does nothing until you tell it what to do. Here is how.',
       teaches: ['p:init', 'p:shuttle', 'evaluate', 'tab:W', 'tab:P'],
       text: [
         'A programme is a list of `p.` lines in the [[Write|tab:W]] tab. The lines run in order, one after another.',
@@ -371,7 +371,7 @@ var QCCD_TUTORIAL = {
         '**Where a failure shows:** open [[Report|tab:R]]. Each rule is a badge. A failed rule is red, with a count. A line under the badges says what broke and where.',
         '**What a rule says:** hover a badge to read the rule.',
         '**Where it happens:** the [[Program|tab:P]] tab lists every instruction. Click one, and the [[line under the canvas|status]] names the instruction the animation is on.',
-        'To fix a failure you change one of two things: the programme or the device. Here the device has a `data` site in the middle, `S1`, and the loaded programme makes the ions meet there.'
+        'To fix a failure you change one of two things: the programme or the machine. Here the machine has a `data` site in the middle, `S1`, and the loaded programme makes the ions meet there.'
       ],
       setup: [
         ['newCanvas', { name: 'line3' }],
@@ -385,7 +385,7 @@ var QCCD_TUTORIAL = {
       stages: [
         { exercise: 'The programme is loaded and has already run. Open **Report** and find the red badge. Then go back to **Learn**, choose that rule below, and press **Check**.',
           check: ['answer', 'R6'] },
-        { exercise: 'Now fix it without changing the device. `S1` is a `data` site and cannot hold a gate. In **Write**, make the ions meet in a site that can. Keep the CX. No rule may fail.',
+        { exercise: 'Now fix it without changing the machine. `S1` is a `data` site and cannot hold a gate. In **Write**, make the ions meet in a site that can. Keep the CX. No rule may fail.',
           check: ['all', ['rulesPass'], ['gateBetween', 'd0', 'd1', 'CX']] }
       ],
       choices: [
@@ -438,7 +438,7 @@ var QCCD_TUTORIAL = {
       teaches: ['p:simd', 'el:control', 'rule:R3', 'rule:R5'],
       text: [
         '[[p.simd|p:simd]] moves several ions in one instruction: `p.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S2", "S3"]])`.',
-        'The first argument is the [[movement class|el:control]]: the kind of motion. It must be one the device declares. This ring declares `shuttle`, `rotate_cw`, `rotate_ccw`, `dock`, `undock`, `sort_merge` and `sort_split`.',
+        'The first argument is the [[movement class|el:control]]: the kind of motion. It must be one the machine declares. This ring declares `shuttle`, `rotate_cw`, `rotate_ccw`, `dock`, `undock`, `sort_merge` and `sort_split`.',
         'The second argument is a list of moves. Each move is `[ion, from, to]`, from a site to the next one.',
         'One instruction is one **step**: all its moves happen at once. The **Program** tab shows the class in its own column. The rules judge the step as a whole: no two ions on one rail ([[R3|rule:R3]]), no two ions swapping places ([[R5|rule:R5]]), one direction per loop ([[R11|rule:R11]]).'
       ],
@@ -660,7 +660,7 @@ var QCCD_TUTORIAL = {
       story: 'One step is one setting of every voltage on the chip. So a step can do only one kind of thing.',
       teaches: ['rule:R4', 'rule:R4b', 'rule:R12', 'el:control'],
       text: [
-        '[[R4|rule:R4]]: a step moves ions by one declared [[movement class|el:control]]. A class fixes the kind and the direction of the motion, and the device lists the classes it can drive.',
+        '[[R4|rule:R4]]: a step moves ions by one declared [[movement class|el:control]]. A class fixes the kind and the direction of the motion, and the machine lists the classes it can drive.',
         '[[R4b|rule:R4b]]: a step has one mode, inter-trap (between traps) or intra-trap (inside a trap), and never mixes moving with gates.',
         '[[R12|rule:R12]]: inside one trap, one gate at a time.',
         'The page catches these in three ways. An undeclared class cannot be priced, so the top bar shows no price and the line under the canvas says why. A wrong mode is refused by the language itself. Only R12 gets as far as a red badge in **Report**.'
@@ -669,7 +669,7 @@ var QCCD_TUTORIAL = {
       stages: [
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("teleport", [["d0", "S0", "S1"]])\n']],
           breaks: [['priceBlocked']],
-          exercise: 'The loaded programme uses a class called `teleport`, which this device does not declare. So the top bar shows no price. **R4** wants a declared class: `shuttle`, `rotate_cw`, `rotate_ccw`, `dock`, `undock`, `sort_merge` or `sort_split`. In **Write**, replace `teleport` with one of them, so that `d0` still moves from `S0` to `S1`.',
+          exercise: 'The loaded programme uses a class called `teleport`, which this machine does not declare. So the top bar shows no price. **R4** wants a declared class: `shuttle`, `rotate_cw`, `rotate_ccw`, `dock`, `undock`, `sort_merge` or `sort_split`. In **Write**, replace `teleport` with one of them, so that `d0` still moves from `S0` to `S1`.',
           check: ['all', ['rulesPass'], ['ionAt', 'd0', 'S1']] },
         { setup: [['applyProgramSource', 'p.init({"d0": "S0", "d1": "S3"})\np.simd("shuttle", [["d0", "S0", "S1"]], "both")\n']],
           breaks: [['refused', 'R4b']],
@@ -776,10 +776,10 @@ var QCCD_TUTORIAL = {
       teaches: ['rule:R7', 'rule:R7c', 'rule:R17', 'rule:R15', 'rule:R16', 'rule:R7b', 'm:peak n̄', 'el:heating'],
       text: [
         'Moving an ion warms it, and a junction crossing warms it most.',
-        '[[R7|rule:R7]]: both ions of a two-qubit gate must be cool enough when the gate fires: under one quantum on this device.',
+        '[[R7|rule:R7]]: both ions of a two-qubit gate must be cool enough when the gate fires: under one quantum on this machine.',
         '[[R7c|rule:R7c]]: with broadcast wiring, cooling is required. A programme with gates and no cooling at all is refused.',
         '[[R17|rule:R17]]: ions also warm with time, even at rest. The model adds that heat per millisecond.',
-        'Three heat badges never turn green here. [[R15|rule:R15]] is amber: the page adds heats together, which only gives an upper bound. [[R16|rule:R16]] is grey: the checker checks it when the page is built, not the browser. The gate error depends on the heat at gate time, and the box below shows the number. [[R7b|rule:R7b]] is grey everywhere: no device declares a duty-cycle budget, so there is nothing to check, and the page says so.'
+        'Three heat badges never turn green here. [[R15|rule:R15]] is amber: the page adds heats together, which only gives an upper bound. [[R16|rule:R16]] is grey: the checker checks it when the page is built, not the browser. The gate error depends on the heat at gate time, and the box below shows the number. [[R7b|rule:R7b]] is grey everywhere: no machine declares a duty-cycle budget, so there is nothing to check, and the page says so.'
       ],
       setup: [['loadCase', 'R7'], ['fit']],
       verdict: { 'case': 'R7', which: 'loaded' },
@@ -794,7 +794,7 @@ var QCCD_TUTORIAL = {
       ],
       choices: [
         { id: 'stale', text: 'They have not been checked yet; reload the page.' },
-        { id: 'bound', text: 'R15: heats are added, which gives only an upper bound, so the verdict is partial. R7b: no device declares a duty-cycle budget, so there is nothing to check, and the page says so.' },
+        { id: 'bound', text: 'R15: heats are added, which gives only an upper bound, so the verdict is partial. R7b: no machine declares a duty-cycle budget, so there is nothing to check, and the page says so.' },
         { id: 'browser', text: 'The browser cannot check them, but the checker did, and both passed.' }
       ],
       nudges: {
@@ -1033,7 +1033,7 @@ var QCCD_TUTORIAL = {
       teaches: ['tab:Q', 'rule:R10', 'tab:P'],
       page: 'micro_grid9x9',
       text: [
-        'The compiler takes a circuit and a device. The circuit here is `micro.qasm`: four qubits, seven statements. The compiler writes the hardware programme: where the ions start, every shuttle, every gate (as the pulses that make it), every cooling.',
+        'The compiler takes a circuit and a machine. The circuit here is `micro.qasm`: four qubits, seven statements. The compiler writes the hardware programme: where the ions start, every shuttle, every gate (as the pulses that make it), every cooling.',
         'It also writes a **certificate**: for each instruction, which statement of the circuit it carries out. [[R10|rule:R10]] says the programme does what the circuit says. The certificate says where and when each statement is carried out; which gate the pulses make is checked separately, by composing them back into the circuit.',
         'On this page the [[Circuit|tab:Q]] tab shows the circuit next to the animation. The statement being carried out now is marked. Click a statement, and the animation jumps to the instruction that carries it out.'
       ],
@@ -1050,12 +1050,12 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== D2
     { id: 'D2', part: 'D', title: 'The same circuit on nine machines',
-      story: 'One circuit, compiled for every shipped device and replayed under the same model. The numbers are in the table below. The question is why.',
+      story: 'One circuit, compiled for every shipped machine and replayed under the same model. The numbers are in the table below. The question is why.',
       teaches: ['m:cost', 'm:runtime', 'm:junctiontransits', 'el:loop'],
       table: 'micro',
       text: [
-        'These numbers are measured, not estimated: the compiler output for `micro.qasm` on each shipped device, replayed when this page was built, with cooling added.',
-        'In the table: **cost** is the charge for moving ions, **steps** are machine steps, **runtime** is how long it takes, and **DACs** are the control channels of the device.',
+        'These numbers are measured, not estimated: the compiler output for `micro.qasm` on each shipped machine, replayed when this page was built, with cooling added.',
+        'In the table: **cost** is the charge for moving ions, **steps** are machine steps, **runtime** is how long it takes, and **DACs** are the control channels of the machine.',
         'Two families stand out. A ring pays for a **rotation** every time it moves anything, because all 144 ions turn together: its cost is high and its programme long. A grid pays for **junction crossings** and the cooling they force: its runtime is long even when its cost is small. A chain pays almost nothing on a four-qubit circuit, but could not hold a bigger one.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
@@ -1090,14 +1090,14 @@ var QCCD_TUTORIAL = {
       table: 'planes',
       text: [
         '`grid9x9` and `deck_unit_cell` have the same layout: 144 traps, 77 junctions, and the same 8496 electrodes. The grid is wired **direct**, with thousands of DACs. The deck is wired **broadcast** (the table calls its scheme `wise`): whole groups of electrodes share one signal.',
-        'The table below is the hardware report of every shipped device. Its DAC column is the whole case for broadcasting.',
+        'The table below is the hardware report of every shipped machine. Its DAC column is the whole case for broadcasting.',
         'The price of broadcasting, from R5: one signal per channel per step, so some programmes need more steps. The D2 table shows whether this one did.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
       stages: [
         { exercise: 'What did broadcasting cost `micro.qasm` on the deck, compared with the direct-wired grid? Compare their steps and runtime in the D2 table (the ◀ button above goes back to D2).',
           check: ['all', ['measuredSame', 'micro', 'total_steps', 'grid9x9', 'deck_unit_cell'], ['measuredSame', 'micro', 'runtime_us', 'grid9x9', 'deck_unit_cell'], ['answer', 'nothing']] },
-        { exercise: 'Now put the broadcast device on the canvas. Press **Start** in the tools bar. Next to **open**, choose `deck_unit_cell`, then press **open**. **DACS** in the top bar must stay under the budget of 128, with all 144 traps.',
+        { exercise: 'Now put the broadcast machine on the canvas. Press **Start** in the tools bar. Next to **open**, choose `deck_unit_cell`, then press **open**. **DACS** in the top bar must stay under the budget of 128, with all 144 traps.',
           check: ['all', ['dacsAtMost', 128], ['sites', 144]],
           guide: [['tool', 'start'], ['pick', '#palOpen', 'deck_unit_cell', 'Pick deck_unit_cell.'],
                   ['press', 'button[data-open-pick="palOpen"]', 'Press open.'],
@@ -1110,7 +1110,7 @@ var QCCD_TUTORIAL = {
       ],
       nudges: {
         measuredSame: ['The measured tables disagree with this lesson: {have}. Trust the table.'],
-        answer: ['Compare the two rows in the D2 table first: steps and runtime.', 'The two devices differ in the DAC column, not the runtime column.'],
+        answer: ['Compare the two rows in the D2 table first: steps and runtime.', 'The two machines differ in the DAC column, not the runtime column.'],
         dacsAtMost: ['The top bar reads {have} DACs. That is the direct-wired grid, or an empty canvas.'],
         sites: ['{have} sites: the deck has 144 traps. Press Start and open deck_unit_cell next to open.'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
@@ -1123,12 +1123,12 @@ var QCCD_TUTORIAL = {
       story: 'Everything on this page came from a command line. Here are the commands.',
       teaches: ['tab:W', 'tab:R'],
       text: [
-        '**Save your work:** press **Ctrl+S** to save it as `<name>.studio.json`. To copy the device or the programme, open **Device**, press **Source**, choose `as .arch.json` or `as .tsir.json` under the text, and press **Copy**.',
+        '**Save your work:** press **Ctrl+S** to save it as `<name>.studio.json`. To copy the machine or the programme, open **Machine**, press **Source**, choose `as .arch.json` or `as .tsir.json` under the text, and press **Copy**.',
         '**Check everything:** `python -m qccd open <name>.studio.json` runs the full checker on what you built, including the rules the [[Report|tab:R]] lists as not checked here.',
-        '**Open a device:** `python -m qccd studio --seed <name>.arch.json --program rotate -o x.html` opens a device with a built-in programme.',
+        '**Open a machine:** `python -m qccd studio --seed <name>.arch.json --program rotate -o x.html` opens a machine with a built-in programme.',
         '**Open a compiled programme:** `python -m qccd studio --tsir <compiled>.tsir.json --qasm <circuit>.qasm -o x.html` opens it with its circuit beside it. Lesson D1 uses such a page.',
         '**Build this course:** `python -m qccd tutorial -o tutorial` builds this page and its companion page.',
-        'The compiler takes a QASM file and a device, and writes the `.tsir.json` programme and the `.qcert.json` certificate that the **Circuit** tab checks. The D2 table was built with it. A programme of your own goes in the [[Write|tab:W]] tab.'
+        'The compiler takes a QASM file and a machine, and writes the `.tsir.json` programme and the `.qcert.json` certificate that the **Circuit** tab checks. The D2 table was built with it. A programme of your own goes in the [[Write|tab:W]] tab.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
       exercise: 'Last question. Which command opens a compiled programme with its circuit beside it?',

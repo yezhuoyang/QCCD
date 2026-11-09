@@ -6,7 +6,7 @@
   "digest": "sha256:4dff0bd0ea2122455d498aabeb3f7792cc3ea3129211e37d0e9d5c021b577026",
   "file": "circuit.qasm"
  },
- "description": "The shuttle memory board's experiment, unchanged: five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out. Here it runs on a C2LR swap-or-stay lattice of Ba-Sr crystals (arXiv:2403.00756): one crystal is one qubit, crystals move only by swap-or-stay steps (one shared junction waveform, one direction bit per leg), and a two-qubit gate runs on the two crystals of one leg, merged and split again. Judged by the C2LR rule set; ranked by the logical error rate per round under the noise model built from the device's physics: the shuttle board's, plus the paper's step (312.5 us; 0.14 quanta to a crystal that moves, 0.035 to one that stays) and the platform's own merge and split.",
+ "description": "The shuttle memory board's experiment, unchanged: five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out. Here it runs on a C2LR swap-or-stay lattice of Ba-Sr crystals (arXiv:2403.00756): one crystal is one qubit, crystals move only by swap-or-stay steps (one shared junction waveform, one direction bit per leg), and a two-qubit gate runs on the two crystals of one leg, merged and split again. Judged by the C2LR rule set; ranked by the logical error rate per round under the noise model built from the machine's physics: the shuttle board's, plus the paper's step (312.5 us; 0.14 quanta to a crystal that moves, 0.035 to one that stays) and the platform's own merge and split.",
  "design_variables": [
   "geometry",
   "zone_types",

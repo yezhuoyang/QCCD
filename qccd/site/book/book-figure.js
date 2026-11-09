@@ -172,7 +172,7 @@
     var f = this.fig, self = this, rows = [];
     f.moves.forEach(function (m, i) {
       rows.push({ t: m[0], key: 'm' + i, text: 'cycle ' + m[0] + ': ' + m[1] + ' moves ' + m[2] + ' → ' + m[3],
-        chips: [[m[4], m[4] ? 'a hop of the device' : 'NOT a hop of the device'], [m[5], m[5] ? 'starts where it is' : m[1] + ' is not in ' + m[2]]] });
+        chips: [[m[4], m[4] ? 'a hop of the machine' : 'NOT a hop of the machine'], [m[5], m[5] ? 'starts where it is' : m[1] + ' is not in ' + m[2]]] });
     });
     f.gates.forEach(function (g, i) {
       var together = g[4].every(function (s) { return s === g[2]; });

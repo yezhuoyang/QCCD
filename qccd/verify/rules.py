@@ -305,7 +305,7 @@ def r1_capacity(v: CycleView) -> list[Violation]:
 
 def device_exchange(v: CycleView) -> bool:
     """Is this cycle a C2LR swap-or-stay step, whose routes the replay derived from the
-    device's own matching?
+    machine's own matching?
 
     R2, R3, R5 and R22 do not judge its crossings: in a swap two crystals cross one junction
     and pass each other on its two rails BY DESIGN -- the shared junction waveform exchanges
@@ -482,7 +482,7 @@ def r4_drivable(v: CycleView) -> list[Violation]:
     a channel cannot be driven in opposite directions, however the electrodes are shaped.
     ACROSS paths there is no verdict, because whether one waveform advances a top-rail
     and a bottom-rail ion alike depends on whether their electrode layouts are mirrored
-    or translated -- a field solve over one device's geometry, which is exactly what
+    or translated -- a field solve over one machine's geometry, which is exactly what
     PLAN §2 puts out of scope. Silence there is the honest answer, not a pass.
 
     That argument is about two MOVING sites.  It does not cover a loaded site that does
@@ -494,7 +494,7 @@ def r4_drivable(v: CycleView) -> list[Violation]:
     rotates, a loop rider away from a dock while the riders beside docks dock.  A hold
     is a waveform of its own: the deck's two-way switch selects it from a second bank of
     DACs (p.19; WISE's N_set = 2, arXiv:2305.12773 Table I), and arXiv:2403.00756 does it
-    with one digital input per site.  A device with neither cannot hold a site still.
+    with one digital input per site.  A machine with neither cannot hold a site still.
 
     An architecture that has not declared its channel map is not judged at all.
     """
@@ -1008,7 +1008,7 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
         if deg > max_deg:
             out.append(Violation(
                 "R19", -1,
-                f"node {nid} has degree {deg}, but a junction on this device may join at "
+                f"node {nid} has degree {deg}, but a junction on this machine may join at "
                 f"most {max_deg} rails (budget.max_junction_degree)"))
         segs = list(dev.incidence[nid])
         for i in range(len(segs)):
@@ -1018,7 +1018,7 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
                     out.append(Violation(
                         "R20", -1,
                         f"rails {segs[i]} and {segs[j]} meet at {nid} at {ang:.1f} degrees, "
-                        f"less than the {min_ang:g} degrees the device requires "
+                        f"less than the {min_ang:g} degrees the machine requires "
                         f"(budget.min_rail_angle_deg)"))
     pos = {nid: _xy(n.pos) for nid, n in dev.nodes.items()}
     sids = sorted(dev.segments)
@@ -1386,7 +1386,7 @@ def c4_one_waveform(v: CycleView) -> list[Violation]:
 
 
 def c5_leg_centres(v: CycleView) -> list[Violation]:
-    """C5.  Every crystal at rest is at a leg centre: a C2LR device has nowhere else to hold
+    """C5.  Every crystal at rest is at a leg centre: a C2LR machine has nowhere else to hold
     one.  A template step ends there by construction; a plain move or a placement may not."""
     if v.c2lr is None:
         return []
@@ -1404,8 +1404,8 @@ def c5_leg_centres(v: CycleView) -> list[Violation]:
 
 
 def c6_matching(v: CycleView) -> list[Violation]:
-    """C6.  A swap-or-stay step's pairs are the device's matching under one variation: every
-    crystal it shifts toward a junction has a partner leg there, the device offers the
+    """C6.  A swap-or-stay step's pairs are the machine's matching under one variation: every
+    crystal it shifts toward a junction has a partner leg there, the machine offers the
     variation, and the rule set allows its form (`c2lr_forms`: `c2lr-demonstrated` allows
     the diagonals only)."""
     step = v.c2lr
@@ -1440,7 +1440,7 @@ def c7_no_junction_rest(v: CycleView) -> list[Violation]:
 
 
 def c9_every_crystal_heated(v: CycleView) -> list[Violation]:
-    """C9.  Every crystal plays every waveform: a C2LR step heats every crystal on the device,
+    """C9.  Every crystal plays every waveform: a C2LR step heats every crystal on the machine,
     the ones that stay included (the replay's charge)."""
     step = v.c2lr
     if step is None or not step.template:
@@ -1454,7 +1454,7 @@ def c9_every_crystal_heated(v: CycleView) -> list[Violation]:
 
 
 def c2lr_document_violations(arch: Architecture) -> list[Violation]:
-    """C10, once per programme: a C2LR device's control is a fixed set of shared signals plus
+    """C10, once per programme: a C2LR machine's control is a fixed set of shared signals plus
     one digital input and one switch per leg (arXiv:2403.00756, p4: 27 shared analog
     signals), so its document says so -- and its drawing is the lattice of legs those inputs
     drive."""
@@ -1462,17 +1462,17 @@ def c2lr_document_violations(arch: Architecture) -> list[Violation]:
     try:
         geometry(arch)
     except NotC2LR as exc:
-        return [Violation("C10", -1, f"the device declares C2LR control but is not a lattice of "
+        return [Violation("C10", -1, f"the machine declares C2LR control but is not a lattice of "
                                      f"legs: {exc}")]
     d = declared(arch)
     out = []
     sig = d.get("shared_signals")
     if isinstance(sig, bool) or not isinstance(sig, int) or sig < 1:
-        out.append(Violation("C10", -1, "the device's control.c2lr declares no number of shared "
+        out.append(Violation("C10", -1, "the machine's control.c2lr declares no number of shared "
                                         "analog signals (shared_signals)"))
     for key, what in (("inputs_per_leg", "digital input"), ("switches_per_leg", "switch")):
         if d.get(key) != 1:
-            out.append(Violation("C10", -1, f"the device's control.c2lr gives each leg "
+            out.append(Violation("C10", -1, f"the machine's control.c2lr gives each leg "
                                             f"{d.get(key)!r} {what}(s) ({key}); C2LR's per-leg "
                                             f"control is exactly one"))
     return out
@@ -1487,7 +1487,7 @@ C2LR_RULE_STATEMENTS: Mapping[str, str] = {
     "C3": "horizontal and vertical legs choose independently in one step",
     "C4": "a step is C2LR, one shared junction waveform, C2LR⁻¹",
     "C5": "every crystal ends a step at a leg centre",
-    "C6": "a step's pairs are the device's matching under one variation the rule set allows",
+    "C6": "a step's pairs are the machine's matching under one variation the rule set allows",
     "C7": "no crystal ends a step in a junction",
     "C8": "the COM frequency is held during a shift (recorded from the primitive, not decided)",
     "C9": "every crystal is heated by every waveform",

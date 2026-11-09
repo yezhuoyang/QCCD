@@ -57,7 +57,7 @@ def compile_under(qasm: str | Path, arch_path: str | Path, ruleset: RuleSet | st
                   out_dir: str | Path, *, qccdc: str | Path | None = None,
                   command: str = "compile", semantics: bool = True,
                   timeout: float = 1800) -> dict[str, Any]:
-    """Compile `qasm` onto the device under `ruleset`; cool; judge by every rule of it."""
+    """Compile `qasm` onto the machine under `ruleset`; cool; judge by every rule of it."""
     from ..arch import load as load_arch
     from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model
@@ -74,7 +74,7 @@ def compile_under(qasm: str | Path, arch_path: str | Path, ruleset: RuleSet | st
     r = subprocess.run([sys.executable, str(BRIDGE / "export_arch.py"), str(arch_path), "-o",
                         str(expanded)], capture_output=True, text=True)
     if r.returncode != 0:
-        raise RuntimeError(f"the device could not be exported: {r.stderr[-400:]}")
+        raise RuntimeError(f"the machine could not be exported: {r.stderr[-400:]}")
     exe_path = Path(qccdc) if qccdc else _qccdc()
     prefix = out / "prog"
     r = subprocess.run([str(exe_path), command, str(qasm), "--arch", str(expanded), "-o",

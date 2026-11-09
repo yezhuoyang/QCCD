@@ -1,8 +1,8 @@
-"""Benchmark suites: every (circuit, device) pair a submitted compiler is graded on.
+"""Benchmark suites: every (circuit, machine) pair a submitted compiler is graded on.
 
 A SUITE is an immutable directory, like a board's task release:
 
-    suites/<suite>@<release>/suite.json       the manifest: circuits, devices, pairs, limits, metrics
+    suites/<suite>@<release>/suite.json       the manifest: circuits, machines, pairs, limits, metrics
                              physics.json     the physics every pair is scored under
                              circuits/<c>.qasm, <c>.detectors.json (memory experiments)
                              devices/<d>.arch.json
@@ -16,7 +16,7 @@ HIDDEN pairs are generated from a seed only the official server holds (`QCCD_HID
 fresh random Clifford circuits and generated devices of fresh sizes, so a compiler tuned to
 the public pairs is still measured on ones it has never seen.  Without the seed there are none.
 
-Every pair is scored under the suite's physics (the devices' fixed blocks are replaced by
+Every pair is scored under the suite's physics (the machines' fixed blocks are replaced by
 `physics.json`), so a speedup is the compiler's and never a difference in the physics tables.
 """
 
@@ -175,10 +175,10 @@ class Suite:
 
 
 def with_physics(doc: Mapping, physics: Mapping) -> dict:
-    """The device under the suite's physics: its fixed blocks are the suite's.  A C2LR device
+    """The machine under the suite's physics: its fixed blocks are the suite's.  A C2LR machine
     keeps what makes it one, as a C2LR board's physics does (docs/c2lr.md): the primitives of
     its swap-or-stay steps and of a gate in one leg, and its species pair -- without them its
-    steps would not replay at all.  Every other device is exactly the suite's, as before."""
+    steps would not replay at all.  Every other machine is exactly the suite's, as before."""
     out = dict(doc)
     for b in FIXED_BLOCKS:
         if b in physics:
@@ -196,8 +196,8 @@ def with_physics(doc: Mapping, physics: Mapping) -> dict:
 
 
 def board_pairs(release, devices: list[Mapping] | None = None) -> tuple["Suite", list[Pair]]:
-    """A board as a one-circuit suite: its circuit (and memory experiment) on each of `devices`
-    -- device documents, the board's suggested start when none is given -- under the board's
+    """A board as a one-circuit suite: its circuit (and memory experiment) on each of `machines`
+    -- machine documents, the board's suggested start when none is given -- under the board's
     own physics, noise model and sampling budget, so a compiler can be graded on a board the
     suite has no pair for (the C2LR boards: `qccd bench run --compiler DIR --board X`).  The
     reference compiler has no result there, so nothing is compared: it grades, it does not rank."""
@@ -207,7 +207,7 @@ def board_pairs(release, devices: list[Mapping] | None = None) -> tuple["Suite",
     if not devices:
         st = m.get("starter") or {}
         if not st.get("generator"):
-            raise SuiteError(f"{release.id} suggests no device: name one with --device")
+            raise SuiteError(f"{release.id} suggests no machine: name one with --device")
         devices = [getattr(Machine, st["generator"])(**st.get("params", {}), name=st.get("name") or "starter")
                    .arch.to_json()]
     q = m.get("qec") or {}
@@ -275,7 +275,7 @@ def random_clifford(n: int, depth: int, rng: random.Random) -> str:
 
 def hidden_pairs(seed: str, physics: Mapping, *, count: int) -> list[Pair]:
     """`count` pairs no one has seen, determined by `seed`: fresh random Clifford circuits on
-    generated devices of fresh sizes.  The same seed always gives the same pairs (so a regrade is
+    generated machines of fresh sizes.  The same seed always gives the same pairs (so a regrade is
     comparable); a different seed gives a different split."""
     from ..api import Machine
     rng = random.Random(hashlib.sha256(f"qccd-hidden:{seed}".encode()).hexdigest())
@@ -309,7 +309,7 @@ def build_suite(name: str, release: str, *, out_dir: Path, circuits: list[dict],
                 physics: Mapping, title: str, description: str, limits: Mapping, ler: Mapping,
                 hidden_count: int, baseline: Mapping | None = None) -> Path:
     """Write a suite directory.  `circuits`: [{name, qasm, detectors (or None), source}];
-    `devices`: [{name, doc, source}].  Every pair is kept: a pair the reference compiler cannot
+    `machines`: [{name, doc, source}].  Every pair is kept: a pair the reference compiler cannot
     compile is exactly where another compiler can do better."""
     from ..workspace.jsonsafe import normalize_numbers
     d = Path(out_dir) / f"{name}@{release}"

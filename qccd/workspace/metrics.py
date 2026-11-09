@@ -92,7 +92,7 @@ def compute_metrics(arch: Architecture, prog: TSIR, physics: Mapping) -> tuple:
     by its interpreter: the execution time under each table (`T_jones`, `T_transport`,
     `T_quantinuum`, each with its own clock; any other table's as `T` on that clock),
     `instructions`, `transport_instructions`, `ions_per_instruction` and `dacs` (counted with
-    the physics' floors, as the device stage judges the budget)."""
+    the physics' floors, as the machine stage judges the budget)."""
     from ..evalset import load
 
     rank_table = physics.get("rank_table", "qccdsim_jones")

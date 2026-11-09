@@ -49,7 +49,7 @@ HOW_TO = [
             "evaluate), then play."},
     {"task": "change the person's design", "how": "draw on their Studio with its design verbs (qccd_page_act "
                                                   "action=studio: sketchDraw for any shape, closeLoop, addNodeAt, "
-                                                  "joinNodes, stampComponent; explodeToExplicit a generated device "
+                                                  "joinNodes, stampComponent; explodeToExplicit a generated machine "
                                                   "first; newCanvas for a new design, on a new draft) -- each verb is "
                                                   "committed as your change set where they watch -- or "
                                                   "qccd_apply_change_set (preview, then apply), in small steps."},
@@ -100,7 +100,7 @@ _HINT = re.compile(r"^\s*'((?:[^'\\]|\\.)+)'\s*:\s*\{\s*t:\s*'((?:[^'\\]|\\.)*)'
                    r"(?:\s*,\s*k:\s*'((?:[^'\\]|\\.)*)')?\s*\}", re.M)
 _GROUPS = (("screen", ("region:", "tools:", "search")),
            ("panels", ("tab:", "menu", "learn:", "follow", "filter", "evaluate", "archview", "progview", "progpin", "qec:")),
-           ("parts of a device", ("el:", "zone:", "explode", "ctxmenu", "menu:")),
+           ("parts of a machine", ("el:", "zone:", "explode", "ctxmenu", "menu:")),
            ("program verbs (the Write panel)", ("p:",)),
            ("numbers in the head", ("m:", "c:")),
            ("legend", ("leg:",)))

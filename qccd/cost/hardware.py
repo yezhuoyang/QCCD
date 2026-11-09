@@ -197,7 +197,7 @@ def hardware_report(arch: Architecture, *, floors: Mapping[str, int] | None = No
 
     def floor(what: str, declared: int, least: int) -> int:
         if declared < least:
-            notes.append(f"{what}: the device declares {declared}; counted at the physics' {least}")
+            notes.append(f"{what}: the machine declares {declared}; counted at the physics' {least}")
             return least
         return declared
 

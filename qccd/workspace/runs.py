@@ -11,7 +11,7 @@ or QASM the agent writes -- and a design (the working design `main`, or any draf
        cooling and the serialized program's source semantics;
     3. replays it under the release's cost model and under the transport table, with the
        rules checked, and builds the performance report (`perf.py`);
-    4. keeps the device, the program and each step's start time as artifacts, so the Studio
+    4. keeps the machine, the program and each step's start time as artifacts, so the Studio
        can animate the run and play two runs side by side on one clock.
 
 When the configured toolchain includes Lean, its certificate checker runs too.
@@ -207,7 +207,7 @@ class RunsMixin:
         device = board_device(r.arch_doc, self.release)
         (work / "device.arch.json").write_text(json.dumps(device), encoding="utf-8")
         (work / "circuit.qasm").write_text(qasm, encoding="utf-8")
-        self._progress(jid, "export", "expanding the device for the compiler")
+        self._progress(jid, "export", "expanding the machine for the compiler")
         ex = run_limited([tc.python, tc.bridge / "export_arch.py", work / "device.arch.json", "-o",
                           work / "device.expanded.json"], cwd=work, timeout=300, cancel=cancel)
         if not ex.ok:
@@ -309,7 +309,7 @@ class RunsMixin:
         except (OSError, ValueError, TypeError, KeyError) as exc:
             return {"_status": "failed", "summary": f"compiled artifacts changed before storage: {exc}",
                     "design": design, "program": {"name": name, "qubits": q}, "log": log[-2000:]}
-        d_dev = self.put_artifact(canonical_bytes(device), "application/json", f"run {jid}: device")
+        d_dev = self.put_artifact(canonical_bytes(device), "application/json", f"run {jid}: machine")
         d_prog = self.put_artifact(canonical_bytes(strict_loads(program_bytes, PROGRAM_LIMITS)),
                                    "application/json", f"run {jid}: program (cooled)")
         d_times = self.put_artifact(canonical_bytes({"times_us": _step_times(prog, res)}), "application/json",

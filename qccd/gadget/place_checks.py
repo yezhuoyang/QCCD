@@ -39,10 +39,10 @@ PLACE_RULES = {
            "decoded, no decoding job waits for another past the next syndrome, and nothing "
            "reads an outcome or a frame before the decoder has written it",
     "H1": "the hardware between gadgets obeys the basic rules too: every carry is one program "
-          "on its road's own device (a cycle one waveform, ions holding by their switches), it "
+          "on its road's own machine (a cycle one waveform, ions holding by their switches), it "
           "passes R1-R23, it delivers every ion before the far side takes it, and a door's stub "
           "is driven by one side at a time",
-    "H2": "devices that share a plane (of DACs, or a laser) never play two waveforms at once: "
+    "H2": "machines that share a plane (of DACs, or a laser) never play two waveforms at once: "
           "every cycle of every member -- each op's TSIR at its times, each road's compiled "
           "program -- either has the plane to itself or is the very same cycle",
 }

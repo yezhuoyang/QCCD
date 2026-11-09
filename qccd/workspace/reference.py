@@ -30,7 +30,7 @@ def read_reference(ws, section: str = "index", query: str | None = None) -> dict
     head = {"evaluator": {k: v for k, v in evaluator_identity().items()}, "section": section}
     if section == "index":
         return {**head, "sections": list(SECTIONS),
-                "hint": "read `design` before designing a device for the person or for a board; `workflow` "
+                "hint": "read `design` before designing a machine for the person or for a board; `workflow` "
                         "for the tools; `interface` for what you may do on a page (only what it "
                         "declares); `site` before working on the website's pages; `operations` before editing; "
                         "`evaluator` before citing results; `noise` for how a logical error rate is measured; "

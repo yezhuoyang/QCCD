@@ -295,7 +295,7 @@ def verify(
             except KeyError:
                 com = None
             if com is None:
-                rules.skipped["C8"] = "the device's swap_or_stay primitive records no COM frequency"
+                rules.skipped["C8"] = "the machine's swap_or_stay primitive records no COM frequency"
             else:
                 rules.partial["C8"] = (f"recorded, not decided: the primitive holds the COM mode "
                                        f"at {com} MHz during a shift")

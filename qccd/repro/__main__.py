@@ -195,7 +195,7 @@ def check_run(paper: dict, run: dict) -> dict:
 
 
 def check_ours(paper: dict, o: dict, by: dict) -> dict:
-    """One of our schedules, against the paper's run ``o["against"]``: the same device, that
+    """One of our schedules, against the paper's run ``o["against"]``: the same machine, that
     run's law and circuit, every profile in ``o["profiles"]``, strict durations."""
     base = ROOT / paper["key"]
     spec = next(r for r in paper["runs"] if r["id"] == o["against"])

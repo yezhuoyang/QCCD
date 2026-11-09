@@ -546,7 +546,7 @@ class Device:
     def reproducible_from_generator(self) -> bool:
         """Would re-running the generator on `params` give back exactly this graph?
 
-        False for an explicit geometry, for a hand-edited expansion, or for any device
+        False for an explicit geometry, for a hand-edited expansion, or for any machine
         whose params no longer describe it -- in which case only the expanded form is a
         faithful serialization.
         """
@@ -605,7 +605,7 @@ class Device:
 
     @staticmethod
     def from_json(d: Mapping) -> tuple["Device", dict]:
-        """Parse an explicit geometry block.  Returns `(device, declared_derived)`."""
+        """Parse an explicit geometry block.  Returns `(machine, declared_derived)`."""
         nodes: dict[str, Node] = {}
         declared_nodes: dict[str, dict] = {}
         # `nodes` when the writer recorded an order; otherwise the legacy split, which

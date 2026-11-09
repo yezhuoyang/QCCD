@@ -43,7 +43,7 @@ PAGE_ACTION_ABOUT = {
 #: every reference section an agent can read, in words
 SECTION_ABOUT = {
     "index": "the list of sections, and which to read first",
-    "design": "how a person's shape becomes a device that runs a board's circuit: mechanisms, measured sizes, run-and-fix",
+    "design": "how a person's shape becomes a machine that runs a board's circuit: mechanisms, measured sizes, run-and-fix",
     "boards": "the leaderboards: title, circuit, what is ranked",
     "interface": "everything an agent may do on a page: places, controls, Studio verbs (nothing else is allowed)",
     "site": "the website's pages, the course, and how to do the common things visibly",

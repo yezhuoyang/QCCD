@@ -9,12 +9,12 @@ writes what they produced under `qccd/site/compiled/<id>/`; `python -m qccd site
 that directory and never needs a toolchain.  Every artefact on the page is one of these
 files, unedited.
 
-    qccd/site/compiled/<device>.arch.json     the devices the gates are compiled onto
+    qccd/site/compiled/<device>.arch.json     the machines the gates are compiled onto
     qccd/site/compiled/<id>/circuit.qasm      the input
     qccd/site/compiled/<id>/prog.tsir.json    what the compiler emitted
     qccd/site/compiled/<id>/prog.qcert.json   its certificate
     qccd/site/compiled/<id>/prog.cooled.tsir.json   after the cooling pass
-    qccd/site/compiled/<id>/prog.qcheck.json  the checker's input (certificate + device facts)
+    qccd/site/compiled/<id>/prog.qcheck.json  the checker's input (certificate + machine facts)
     qccd/site/compiled/<id>/rules.json        check_tsir --json: the 22 rules
     qccd/site/compiled/<id>/verdict.json      check_cert --json: R10, both halves
     qccd/site/compiled/<id>/meta.json         title, note, the compiler's own summary line
@@ -203,7 +203,7 @@ def main(argv=None) -> int:
     todo = [(g, 2) for g in GATES] + [(g, 1 + max(int(x) for x in re.findall(r"q\[(\d+)\]", g[1]))) for g in ALGO]
     if only is not None:
         todo = [(g, n) for g, n in todo if g[0] in only]
-    print(f"{len(DEVICES)} devices; {len(todo)} circuits")
+    print(f"{len(DEVICES)} machines; {len(todo)} circuits")
     for (gid, body, title, note, dev), n in todo:
         compile_one(gid, body, title, note, *paths[dev], dev=dev, n_qubits=n)
     if only is None or "lowering" in only:

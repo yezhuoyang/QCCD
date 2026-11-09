@@ -741,9 +741,9 @@ def _landing(runs: dict, machines: dict, town_lib, algs: dict, beta: dict, rsa=N
         "scheduled one gate at a time, once per context in which it is called, and checked "
         "view by view and as a composition.</li>"
         "<li><b>The hardware program</b> (TSIR): every instruction belongs to one gadget, either "
-        "a place's verified op on its own device or a road's carry, compiled with its whole "
+        "a place's verified op on its own machine or a road's carry, compiled with its whole "
         "bundle onto its conveyor. Every one passes the same hardware "
-        '<a href="../rules/">rules</a>, R1&ndash;R23. Devices that share DACs or a laser take '
+        '<a href="../rules/">rules</a>, R1&ndash;R23. Machines that share DACs or a laser take '
         "turns.</li>"
         "<li><b>The ions</b>: the page draws each one where that program puts it, at the time on "
         "screen.</li></ol>")

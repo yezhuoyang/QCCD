@@ -8,7 +8,7 @@ many traps are stranded" but "how many are stranded as I move the coolers apart"
 Both knobs below are chosen so the sweep means something:
 
 * `ReachAnalysis.budget` overrides R7's `ms_gate.max_quanta`.  Sweeping it asks *how much
-  better would gates have to get before no position on this device is unusable* -- a
+  better would gates have to get before no position on this machine is unusable* -- a
   question about the machine that its own datasheet number cannot pose.
 * `BudgetAnalysis.scale` multiplies one heating channel.  Sweeping `scale.junction` from 1
   down to 0 draws the curve the whole project points at: junction transits are 76% of the
@@ -40,7 +40,7 @@ def _resolve_arch(device) -> Architecture:
     if isinstance(device, Architecture):
         return device
     if device is None:
-        raise ValueError("no device: set setup['device'] to an Architecture or a path")
+        raise ValueError("no machine: set setup['device'] to an Architecture or a path")
     return load(device if isinstance(device, Path) else str(device))
 
 
@@ -53,7 +53,7 @@ def _resolve_model(name):
 
 
 class ReachAnalysis(QCCDAnalysis):
-    """Distances over the device, and which positions are structurally unusable."""
+    """Distances over the machine, and which positions are structurally unusable."""
 
     summary = ("what the machine can do before anyone writes a programme: distances in "
                "the cost model's own units, and the traps that cannot reach a cooler "
@@ -131,7 +131,7 @@ class CycleAnalysis(QCCDAnalysis):
     """The QEC clock cycle of a design, with the classical feedback loop in it.
 
     The quantum round is measured -- either given as `round_us`, or replayed here from a
-    program on the device -- and the classical path is composed onto it
+    program on the machine -- and the classical path is composed onto it
     (`analysis.feedback`).  The knob worth sweeping is the decoder: *how slow may my
     decoder be before the undecoded backlog grows*, which for a QCCD round is a question
     with a very comfortable answer and for a microsecond round is not.

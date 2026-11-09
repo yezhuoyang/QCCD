@@ -27,10 +27,10 @@ verifier is worse than no viewer.
 Where the picture comes from
 ----------------------------
 Nothing on the stage is sized by a heuristic any more. `qccd.viz.layout.compute_layout`
-measures the device -- its lattice, its bounding box, and `g`, the minimum
+measures the machine -- its lattice, its bounding box, and `g`, the minimum
 nearest-neighbour distance *in drawn pixels* -- and every mark is a fixed fraction of `g`.
 `2*r_ion = 0.68*g < g` is a strict inequality in units of `g`, so ions cannot overlap at
-any scale, on any device. The layout travels in the JSON blob as ~40 scalars, which is
+any scale, on any machine. The layout travels in the JSON blob as ~40 scalars, which is
 what makes it testable from Python (`tests/test_viz_layout.py`) instead of only visible.
 """
 
@@ -148,7 +148,7 @@ def evaluation_view(arch: Architecture, prog: TSIR, model: CostModel) -> dict:
     The parse trees of what the page is judged by -- every board metric, the hardware budget
     (`board.eval`) and the noise model of its clock, `qccd.evalset.for_page` -- for the
     browser's interpreter (`js/evaluate.js`) to read after an edit, and the values the
-    grader's interpreter (`qccd.evalset`) gives them on the shipped device and programme, for
+    grader's interpreter (`qccd.evalset`) gives them on the shipped machine and programme, for
     the page to show until then and to check itself against.  A metric that cannot be computed
     on this page (no experiment, no sample, an empty programme) is in `missing` with why.
     """
@@ -823,8 +823,8 @@ def _template_devices(arch: Architecture, stems: "Sequence[str] | str | None" = 
     """`{stem: {"generator", "params"}}` -- the GEOMETRY a template's records drop.
 
     A template is a physics package: `template_records` keeps the zones, curves and
-    control block and drops the device, which is right for `Machine.ring(..., template=)`.
-    But the start gallery also wants to OPEN a shipped device -- `grid9x9` as the 9x9 grid
+    control block and drops the machine, which is right for `Machine.ring(..., template=)`.
+    But the start gallery also wants to OPEN a shipped machine -- `grid9x9` as the 9x9 grid
     it is, not as a package for some other shape -- and `from_template` needs the
     generator and its parameters for that.  Reflected off the same architectures, the same
     way `listing.py` prints them: the non-default parameters only.  An explicit-geometry
@@ -924,7 +924,7 @@ def _refuse_repository_paths(blob: str) -> None:
 
 
 def _escape_text(s: str) -> str:
-    """Text for an HTML text node (the page's <title>): the names a device or programme file gives."""
+    """Text for an HTML text node (the page's <title>): the names a machine or programme file gives."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
@@ -1688,8 +1688,8 @@ textarea.src.out{min-height:120px;opacity:.85}
         <button class="tab" id="tabL" data-hint="tab:L">Learn</button>
         <button class="tab" id="tabP" data-hint="tab:P">Program</button>
         <button class="tab off" id="tabQ" data-hint="tab:Q">Circuit</button>
-        <button class="tab" id="tabA" data-hint="tab:A">Device</button>
-        <button class="tab" id="tabM" data-hint="tab:M">Machine</button>
+        <button class="tab" id="tabA" data-hint="tab:A">Machine</button>
+        <button class="tab" id="tabM" data-hint="tab:M">Hardware</button>
         <button class="tab" id="tabW" data-hint="tab:W">Write</button>
         <button class="tab" id="tabR" data-hint="tab:R">Report</button>
       </nav>
@@ -1724,7 +1724,7 @@ textarea.src.out{min-height:120px;opacity:.85}
       <!-- THE START FOLD FIRST, compact, and closed until the user opens it: the stage's
            own empty state (#stageEmpty) is where a new device starts, so the element
            tiles below stay on screen at every laptop size.  `renderStart` fills it. -->
-      <details class="pal palfold" id="palStart"><summary>Start &mdash; new or template device</summary>
+      <details class="pal palfold" id="palStart"><summary>Start &mdash; new or template machine</summary>
         <div id="palStartBody"></div></details>
       <section class="pal" id="palElements"><h4>Elements</h4><div id="palBody"></div></section>
       <section class="pal" id="palInspect"><h4>Selection</h4><div id="palInsp"></div></section>
@@ -1909,9 +1909,9 @@ textarea.src.out{min-height:120px;opacity:.85}
         </section>
 
         <section class="pane card" id="paneA">
-          <header class="ph"><h3>Device</h3>
+          <header class="ph"><h3>Machine</h3>
             <span class="seg" data-hint="archview"><button class="on" id="avB">Program</button
-              ><button id="avD">Device</button><button id="avS"
+              ><button id="avD">Parts</button><button id="avS"
               title="edit the architecture as source">Source</button></span>
             <span class="grow"></span>
             <input class="filter" id="aFilter" type="text" spellcheck="false"
@@ -1951,7 +1951,7 @@ textarea.src.out{min-height:120px;opacity:.85}
           <header class="ph"><h3>Write a programme</h3>
             <span class="sub" id="pwCount"></span>
             <span class="grow"></span>
-            <button id="pwDrive" title="write and play a programme that fits this device">Test drive</button>
+            <button id="pwDrive" title="write and play a programme that fits this machine">Test drive</button>
             <button id="pwRun" class="p" data-hint="evaluate">Evaluate</button>
           </header>
           <!-- the lesson in one line, while one is open: the exercise and the two buttons
@@ -2246,7 +2246,7 @@ function noRail(aId, bId){
   if(NORAIL[k]) return;
   NORAIL[k] = 1;
   try { console.error('no rail between '+aId+' and '+bId+': this programme moves an ion '+
-                      'where the device has no segment, so nothing is drawn between them'); }
+                      'where the machine has no segment, so nothing is drawn between them'); }
   catch(e){ /* no console */ }
   const b = document.getElementById('norail');
   if(b){ b.textContent = 'no rail between '+aId+' and '+bId; b.style.display='block'; }
@@ -2994,7 +2994,7 @@ function drawInvalid(){
   document.getElementById('status').innerHTML =
     `<b>programme invalid</b> &mdash; ${esc(PROGRAM_STALE.why)}`;
   document.getElementById('why').textContent =
-    `These ${P.frames.length} frames were compiled against the device as it was before `
+    `These ${P.frames.length} frames were compiled against the machine as it was before `
     + `this edit; nothing on the stage would be where the programme says. Undo, or `
     + `recompile: python -m qccd run ${A.name} --program ${P.name}`;
 }
@@ -5068,7 +5068,7 @@ if(TOOLS){
 // THE SEARCH: every control on the page with its hint text, the course's lessons.  A hit
 // says where it lives; choosing it opens that pane or popover, scrolls to it, flashes it.
 const SRES = document.getElementById('sres'), SINP = document.getElementById('search');
-const PANE_NAMES = { L: 'Learn', P: 'Program', Q: 'Circuit', A: 'Device', M: 'Machine', W: 'Write', R: 'Report' };
+const PANE_NAMES = { L: 'Learn', P: 'Program', Q: 'Circuit', A: 'Machine', M: 'Hardware', W: 'Write', R: 'Report' };
 const POP_NAMES = { start: 'Start', row: 'Append a row', block: 'Machine settings', component: 'Components' };
 function sTextOf(el){
   if(el.classList && el.classList.contains('pal-item')){ const nb = el.querySelector('.pal-text b'); if(nb) return nb.textContent.trim(); const de = el.getAttribute('data-el'); if(de) return de.replace(/^cmp:/, '').replace(/_/g, ' '); }

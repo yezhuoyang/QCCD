@@ -45,7 +45,7 @@ def _source(ws, b: dict) -> tuple[str, str, str | None, str]:
         run = ws.run(rid)                        # refuses a run that is not finished
         art = run.get("artifacts") or {}
         if not art.get("device") or not art.get("program"):
-            raise WorkspaceError("not_found", f"run {rid} kept no device and programme to debug", status=404)
+            raise WorkspaceError("not_found", f"run {rid} kept no machine and programme to debug", status=404)
         cert = ws.get_artifact(art["certificate"]).decode("utf-8") if art.get("certificate") else None
         name = f"run {rid}: {(run.get('program') or {}).get('name', 'programme')} on {(run.get('design') or {}).get('name', 'the design')}"
         return (ws.get_artifact(art["device"]).decode("utf-8"), ws.get_artifact(art["program"]).decode("utf-8"),

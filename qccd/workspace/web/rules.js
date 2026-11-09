@@ -6,7 +6,7 @@
     {
       id: 'rules-static',
       title: 'Static & occupancy',
-      blurb: 'What may exist or be occupied at an instant: setup, capacities of sites, rails and junctions, and the device\u2019s topology and geometry.',
+      blurb: 'What may exist or be occupied at an instant: setup, capacities of sites, rails and junctions, and the machine\u2019s topology and geometry.',
       rules: ['R0', 'R1', 'R2', 'R3', 'R13', 'R18', 'R19', 'R20', 'R21', 'R23']
     },
     {
@@ -25,7 +25,7 @@
     {
       id: 'rules-c2lr',
       title: 'Swap-or-stay lattices (C2LR)',
-      blurb: 'What a C2LR step may do: one direction bit per leg, one shared waveform, crystals ending at leg centres, and the control it takes. They judge only a C2LR device.',
+      blurb: 'What a C2LR step may do: one direction bit per leg, one shared waveform, crystals ending at leg centres, and the control it takes. They judge only a C2LR machine.',
       rules: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10']
     },
     {

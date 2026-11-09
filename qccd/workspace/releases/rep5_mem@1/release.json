@@ -6,7 +6,7 @@
   "digest": "sha256:4dff0bd0ea2122455d498aabeb3f7792cc3ea3129211e37d0e9d5c021b577026",
   "file": "circuit.qasm"
  },
- "description": "Five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the device's physics.",
+ "description": "Five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the machine's physics.",
  "design_variables": [
   "geometry",
   "zone_types",

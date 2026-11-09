@@ -126,9 +126,9 @@ rule G14 "A road holds the ions on it"
 # ---------------------------------------------------------------- the hardware between gadgets
 
 rule H1 "The hardware between gadgets obeys the basic rules" core
-  about "A gadget is a box with doors, but the chip is one: what carries ions between the boxes is driven by DACs and electrodes like what moves them inside one. Every carry, compiled with its whole bundle onto its road's own device -- one class a cycle, a shift rigid, a blocked ion holding by its switch -- passes R1-R23; it delivers every ion before the far side takes it; and a door's stub is driven by one side at a time, the road never loading or delivering while the op there moves an ion on or off it."
+  about "A gadget is a box with doors, but the chip is one: what carries ions between the boxes is driven by DACs and electrodes like what moves them inside one. Every carry, compiled with its whole bundle onto its road's own machine -- one class a cycle, a shift rigid, a blocked ion holding by its switch -- passes R1-R23; it delivers every ion before the far side takes it; and a door's stub is driven by one side at a time, the road never loading or delivering while the op there moves an ion on or off it."
   for all c in carries: road_ok(c)
 
-rule H2 "Devices that share a plane play one waveform at a time" core
-  about "A floorplan may say that devices share one plane of DACs, or one laser, instead of driving their own. Then they are one set of channels: at no instant do two of them play different cycles -- each op's TSIR at its times, each road's compiled program -- unless it is the very same cycle (class, direction, start and end), played once for both. Members take turns; a trip over two roads of one plane waits between them."
+rule H2 "Machines that share a plane play one waveform at a time" core
+  about "A floorplan may say that machines share one plane of DACs, or one laser, instead of driving their own. Then they are one set of channels: at no instant do two of them play different cycles -- each op's TSIR at its times, each road's compiled program -- unless it is the very same cycle (class, direction, start and end), played once for both. Members take turns; a trip over two roads of one plane waits between them."
   plane_conflicts() = 0
