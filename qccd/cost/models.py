@@ -507,7 +507,7 @@ class CorrectedModel(CostModel):
                 Charge(cost=0.0, depth=1, us=us, quanta={C2LR_COMPONENT: stayed}))
 
     def wise_step(self, arch: Architecture, kind: str) -> Charge:
-        """How long a WISE swap step of `kind` (`h0` ... `vl1`) lasts: the device's `wise_swap`
+        """How long a WISE swap step of `kind` (`h0` ... `vl1`) lasts: the machine's `wise_swap`
         primitive, `us_by_kind` keyed by the kind's letter (`h`, `x`, `v`).  The step is its pairs'
         exchange, so its rails and any junction between them are inside that time, as a C2LR
         step's are.  Its heat is its routes', charged as any move's."""

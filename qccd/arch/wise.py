@@ -19,7 +19,7 @@ not one ion moving in and the other moving out.  The replay prices the step by i
 (`wise_swap`, `CorrectedModel.wise_step`): between neighbours t0; across a junction zone or between
 rows a junction step, which costs what a C2LR swap-or-stay step costs, 400 us, with its heat
 (feedback F1, "same time and cost as C2LR").  It names the step an exchange only where every move
-is one of the device's pairs of the step's kind, so R2, R3, R5 and R22 leave the pair's crossing
+is one of the machine's pairs of the step's kind, so R2, R3, R5 and R22 leave the pair's crossing
 alone exactly as they do a C2LR exchange.  A move into an empty zone is a step of the same kind.
 Heat comes from the noise model, since the paper gives none, charged by the step's routes as the
 page re-prices them: a split and a merge (the swap classes declare both), 2 + 0 quanta, 0.1 a

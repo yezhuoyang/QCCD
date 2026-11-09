@@ -218,7 +218,7 @@ def _segments_for(arch: Architecture, p: Participant) -> list:
 
 def wise_pairs_of(arch: Architecture) -> dict[str, set[frozenset]] | None:
     """On a WISE chip that prices its swap steps (`wise_swap`), each swap kind's pairs of zones
-    (`qccd.arch.wise.Zones`); None on any other device."""
+    (`qccd.arch.wise.Zones`); None on any other machine."""
     if (getattr(arch.device, "params", None) or {}).get("family") != "wise":
         return None
     if "wise_swap" not in arch.primitives.scalars:

@@ -225,7 +225,7 @@ def _run_step(em: Emitter, ops: Sequence[SourceOp], pl: Plan, t: int, ion: Mappi
 def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int, table: str = "helios",
                         name: str = "circuit") -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate).
-    The cooling pass runs as for any device: a rotation's splits heat the ancillas past the
+    The cooling pass runs as for any machine: a rotation's splits heat the ancillas past the
     budget, so a step's gates follow a cooling (the team's feedback Q2)."""
     from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model

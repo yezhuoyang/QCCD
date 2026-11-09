@@ -318,7 +318,7 @@ def device_exchange(v: CycleView) -> bool:
     exchange written as plain moves, even under the class `swap_or_stay`, is judged in full.
 
     A WISE swap step is the same exchange through a switched swap (arXiv:2305.12773 S5, S6):
-    `CycleView.wise_swap`, which the replay sets only where every move is one of the device's
+    `CycleView.wise_swap`, which the replay sets only where every move is one of the machine's
     pairs of the step's kind."""
     step = v.c2lr
     return (step is not None and bool(getattr(step, "exchange", False))) or bool(v.wise_swap)
