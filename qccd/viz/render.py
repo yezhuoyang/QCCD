@@ -5539,7 +5539,10 @@ relayout();
 fit();
 HWL_LIVE = true;
 draw();
-fromHash();
+// the deep links wait for the scripts after this one (editor.js, tutorial.js): #learn=B2
+// loads a lesson and #embed makes the page view-only through EDITOR, which is not defined yet
+if(document.readyState === 'loading' && document.addEventListener) document.addEventListener('DOMContentLoaded', fromHash);
+else fromHash();
 // the column's lists measure once the layout has settled, and the executing row comes into view
 setTimeout(() => { sizeLists(); if(PLIST && PLIST.follow && VIEWPOS[frame] >= 0) PLIST.scrollToRow(VIEWPOS[frame]); syncCursor(true); }, 50);
 </script>

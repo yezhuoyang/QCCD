@@ -131,3 +131,16 @@ def test_the_template_carries_what_the_overlay_added(page):
         assert needle in page, needle
     for gone in ('id="pNow"', 'id="qNow"', 'id="bbtools"'):
         assert gone not in page, gone
+
+
+def test_the_deep_links_wait_for_the_editor():
+    """#learn=B2 loads a lesson and #embed makes the page view-only, both through EDITOR, which
+    the scripts AFTER the template's own define (editor.js, tutorial.js).  Called at the end of
+    the template's script, the handler found no EDITOR: the site walk caught #learn=B2 opening no
+    lesson (2026-11-09).  The one call must wait for DOMContentLoaded."""
+    from qccd.viz.render import _TEMPLATE
+    main = _TEMPLATE[:_TEMPLATE.index("__EDITOR__")]
+    calls = [m.start() for m in re.finditer(r"(?<![\w.'])fromHash\(\)(?!\s*\{)", main)]
+    assert len(calls) == 1, calls
+    guard = main[calls[0] - 200:calls[0]]
+    assert "addEventListener('DOMContentLoaded', fromHash)" in guard, guard
