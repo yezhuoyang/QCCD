@@ -5,7 +5,7 @@
  "order": 7,
  "title": "Surface code memory, distance 3",
  "short": "surface-3 memory",
- "description": "Three rounds of the distance-3 rotated surface code's syndrome extraction (eight ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the device's physics.",
+ "description": "Three rounds of the distance-3 rotated surface code's syndrome extraction (eight ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the machine's physics.",
  "circuit": "circuit.qasm",
  "n_data": 9,
  "physics": {

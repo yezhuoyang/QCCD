@@ -5,7 +5,7 @@
  "order": 6,
  "title": "Repetition code memory, distance 5",
  "short": "rep-5 memory",
- "description": "Five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the device's physics.",
+ "description": "Five rounds of the distance-5 repetition code's syndrome extraction (four ancillas, reset and reused every round), then the data read out; ranked by the logical error rate per round under the noise model built from the machine's physics.",
  "circuit": "circuit.qasm",
  "n_data": 5,
  "physics": {
