@@ -1428,7 +1428,11 @@ conclusion: how long does it take to use d = 11 to factor RSA-2048 on a QCCD dev
   exp(iπZ/2^k), k = 1 .. 32 -- k = 1 is a frame, k = 2 a |Ȳ>, k = 3 a T, but k >= 4 needs a
   small-angle resource state no gadget makes yet; run once, a few seconds of a 21-year run.
 - **The program: 680,102,866 s = 21.55 years (7,872 days) on 111,930 tiles at d = 11** -- one
-  prime concrete x 21,640 (exact) plus the rest concrete, less those 29 rotations.
+  prime concrete x 21,640 (exact) plus the rest concrete, less those 32 rotations.
+- **With every program's exact time (rerun 2026-11-05): 680,292,200 s = 21.56 years (7,874 days)** --
+  one prime 31,433.62 s (8.73 h), the rest 68,699.73 s, the same schedule (282,302,296 gadgets a
+  prime), every check clean.  It touches 65,913 tiles, 18,982,944 ions (one prime alone: 64,350, 18.5
+  million).  Live at gadgets/rsa2048/ since 2026-11-05, with the map-to-ions viewer.
 - **Its distinct programs:** 128 merge shapes and 7 others (H̄, preparations in Z, X, Ȳ and T,
   readouts in Z and X); **every one passes at d = 11** (every rule, R10) -- 45 merges new in this
   run (`tools/lattice_check.py`: 1,031 to 5,524 ions, the longest an 18-tile corridor, 74 min),
@@ -1634,6 +1638,326 @@ Each entry shows which checks hold, layer by layer.
 Everything from QParam to QParamSys stays FormalRV's, unchanged. QCCD adds the last arrow, which FormalRV
 does not have today: its VM takes "all qubits are virtual" as a house rule (`compiler/lib/syntax/sys_ast.ml`),
 and `route` is "mechanism-free by construction" (`FormalRV/System/SysProg.lean`).
+
+### Slice S10 (user, 2026-11-05: "Please honestly use the same compilation as Gidney25"): FormalRV's paper-machine listing, on ions
+
+**Why.** S9's floorplan is ours: 116 distilling factories, the exponent in one row 1,280 tiles long,
+long corridors. One prime touches 64,350 tiles, 18.5 million ions, against the paper's 897,864
+qubits. A logical qubit is cheaper here (241 ions at d = 11, against 1,352 qubits hot at d = 25 or 430
+in yoked cold storage); the difference is the compilation. A comparison with Gidney must use his.
+
+**Decisions (user, 2026-11-05).**
+- The compilation is FormalRV's own, not a re-implementation of the paper: `Resource/Inputs/
+  PaperMachine_q1M` -- the exponent `[0, 1280)` in yoked cold storage, the 415 working blocks hot,
+  6 factories, `prepare_qec` then `qec_sys_staged` with that README's options -- rerun at our
+  parameters with FormalRV's own executables (input only, as always).
+- Hot patches at d = 11 (S9's distance study); the yoked cold code re-derived for our noise (the
+  paper point's `YokedSurface2D_d11_w16 [[30976,194,44]]` sits under d = 25 hot patches).
+- Magic states by cultivation (Gidney, Shutty and Jones 2024) feeding 8T -> CCZ, as in the paper,
+  built and checked as gadgets.
+- First, S9's exact-time rerun (below) and the live page; then this.
+
+**Steps, each with its exit test.**
+1. **Yoked cold storage at our noise.** Exit: an inner distance and a yoke whose failure per stored
+   logical qubit per round is at most a hot d = 11 patch's, measured under qccd-noise@2 at scale
+   1/2 the way Gidney, Newman, Brooks and Jones (2023; Nature Communications 2025; circuits and
+   statistics CC BY 4.0 at zenodo.org/records/10277397) measure it; the code written as our own
+   `codes:` input (the form of FormalRV's `yoked.qec`); its round and its outer checks compiled to
+   ions, every rule and R10. The outer checks are charged with their workspace (the paper point
+   measures them on one ancilla each; `Counterfactual_q1051k_ws` charges them).
+2. **The ion machine as FormalRV's compiler reads it.** Our `.machine` (one- and two-qubit gate,
+   measurement, reset and transport times from qccd-physics-best; decoders; the qubit budget
+   open) and `.layout` (cold: step 1's code; hot: surface d = 11). Exit: FormalRV's compiler makes
+   the listing with the paper's options, and FormalRV's VM validates it (its runtime and peak
+   qubits, as FormalRV counts them).
+3. **Nothing virtual.** Every virtual qubit an ion at a placed trap (the listing's layout laid on
+   tiles); `request_ancilla` an ion reset at a named trap; `route` transport on the grid;
+   `request_magic` step 4's output; `decode_syndrome` and `pauli_frame_update` the classical side,
+   timed; `maintenance` (the background rounds of every idle block) each tile's own round, as S9's
+   held patches. Exit: S1's devirtualizer on the listing's templates, each compiled once (S8),
+   every rule and R10; its dynamic count equal to the VM's (`vm_counts_agree`).
+4. **Cultivation and the CCZ factory.** Exit: Gidney, Shutty and Jones's cultivation circuits
+   (arXiv:2409.17595; circuits, code and statistics CC BY 4.0 at zenodo.org/records/13777072)
+   compiled to ions, every rule and R10 on the Clifford twin (their T an S, as others simulate
+   them); acceptance rate and output
+   error at our noise; 8T -> CCZ fed by it; the schedule reserves retries at a stated percentile.
+5. **The run.** Exit: time and ions for RSA-2048, concrete by S9's standard, beside S9's floorplan
+   and the paper's own figures.
+
+**Step 1 so far (2026-11-05).** `qccd/fullstack/scale/yoked.py`, `tools/yoked_study.py`.
+- The method is the paper's: each inner patch's signed complementary gap (the observable made a last
+  detector, the patch decoded twice), sampled over 10d-round memories; over N rounds the smallest of
+  N/10d draws; failure at a gap as observed, else likelihood 10^(-0.9 g/10); the outer round a
+  complete bipartite graph of row and column checks whose edges are the patches.  The estimate
+  (`rectangle_terms`) counts its leading failures exactly by convolving gap tables.
+- Checked on the paper's own data (Zenodo code.zip/assets, CC BY 4.0): its gap histograms through our
+  estimator meet its gap-sampled 2D points within 1.02-1.15 at W = 16 and 0.89-1.06 at W = 8
+  wherever it counted 80 failures or more (its points are "magic" memories, both bases).
+  `tools/yoked_study.py paper` reruns it.
+- The code: FormalRV's own generator, `make_yoked_code.py D 16 --workspace`: d = 5 is
+  [[7225,194,20]], d = 7 [[14161,194,28]], both passing FormalRV's catalog check.
+- The inner round on ions: `programs.IDLE` at d = 5, 7 (49, 97 ions), 5,822 µs like d = 11, every rule
+  and R10 clean.  With the workspace a stored logical qubit is 73 ions at d = 5, 145 at d = 7 (hot: 241).
+- **The inner distance: 5** (W = 16, the paper's 25dW + 4d = 2,020 rounds between outer checks).
+  Our patch's gaps (`tools/yoked_study.py`, out/yoked_study): per outer round, X and Z added,
+
+  | s | d = 3 | d = 5 | d = 7 |
+  |---|---|---|---|
+  | 1/2 | 1.1e-3 | 1.5e-11 (20 M shots a basis) | |
+  | 1 | 1.3e-2 | 1.3e-8 (20 M; 14 + 8 failed) | |
+  | 2 | 0.13 | 8.8e-6 | 2.1e-12 |
+  | 4 | 1.6 | 3.8e-3 | 1.3e-7 |
+
+  At the machine's noise (s = 1/2) a stored logical qubit fails 3.9e-17 a round (1.5e-11 over 194
+  qubits and 2,020 rounds); from s = 1 down by the s = 1 -> 2 slope (x654 a doubling, which only
+  steepens at lower noise) 5.4e-17.  A hot d = 11 patch: 3.3e-16.  So d = 5 holds with a 6x margin;
+  the code is FormalRV's `YokedSurface2D_d5_w16_ws` [[7225,194,20]], 73 ions a logical qubit.
+  (Gidney's ratio is the same: cold d = 11 under hot d = 25.)
+- Left in step 1: the outer checks on ions (the paper's Fig. 5: row and bi-row checks by lattice
+  surgery with patch rotations, 3w patches for 25d rounds).
+
+**Step 2 so far (2026-11-05).** `tools/gidney_machine.py` writes the ion machine, layout and loose
+system specification row by row as FormalRV's `make_paper_machine.py` writes the paper's; run in
+out/s10 from LF-exact inputs (`git -c core.autocrlf=false archive` of the pin: a CRLF checkout changes
+the program).
+- `prepare_qec` takes the paper's options at `--distance 11` with the cold family on
+  `YokedSurface2D_d5_w16_ws` (57 s).
+- The round: FormalRV's routed round is reset, one route, an H, five CX slots, the measurement; with
+  qccd-physics-best's gates and the route latency set to the rest of our compiled round (its
+  transport and cooling, 5,337 us), FormalRV's hot round is 5,822,000 ns, ours exactly.  FormalRV does
+  not route a round whose checks stay in one patch (`local-rounds`), so it times the yoked inner
+  round 485 us where our ions take 5,822 us: FormalRV's count is low there.  (Transport in the CX
+  slots instead, 1,137 us each, times every round right, but the scheduler then stretches a hot round
+  to 18 ms and the maintenance overruns.)
+- The board is the open budget: at the paper's 739 tile-equivalents the background maintenance needs
+  91,651 parallel gates of 88,680; at 770 it fits but leaves 749 for the program and an |AutoCCZ>
+  takes 2,160; at 800 (230,400 qubits) the compile proceeds.
+- Ancilla bandwidth as the VM counts it: ceil(1000 / reset_ns) qubits/us per measure ion (the paper's
+  4 x gates at 250 ns), gates at our 10 us -- FormalRV's maintenance reserve compares each block's
+  peak requests with it.
+- FormalRV's runtime bound in the loose specification, 10^18 ns, is below the primes at our round
+  (6.3e18 ns); 10^21 there.
+- **Result: the listing compiles (93 s; C2 194 merges 0 unverified, C5 9,410 separations proved, C6
+  62,427 trip pairs 0 not proved, 22 overlapping loops left to the VM) and FormalRV's VM validates it:
+  RESOURCE_VALIDATED, 6.27e18 ns = 198.6 years, peak 207,412 ions** (of 230,400; 4 factories at once,
+  559 decoders).  FormalRV's count, not yet concrete: the cold inner round counted 620 us (ours 5,822),
+  the magic states the paper's 150 rounds a CCZ at our round (step 4 replaces them), a decode one round.
+- Beside S9's own compilation (21.56 years, 19.0 million ions): Gidney's compilation uses 92x fewer
+  ions and runs 9.2x longer -- about 10x less ions x years.  In rounds: 1.08e12 here, 1.17e11 in S9
+  (whose merges keep 25 rounds); the paper's own machine, 1.39e12 rounds of 1.175 us.
+
+**Step 4, first look (2026-11-05).** Gidney, Shutty and Jones's record (zenodo.org/records/13777072,
+CC BY 4.0) holds 57 circuits: inject+cultivate on the d1 = 3 colour code (15 qubits; 42 at d1 = 5),
+and end to end with the escape to a d2 = 15 surface code (454 / 463 qubits).  Their gate set is
+reset (Z, X), CX, S, S_DAG, measure (Z, X) and one noiseless MPP that reads the Y observable --
+their T is already an S, the Clifford twin R10 needs.  The cultivation stage is decoded by
+postselection on every detector, so its acceptance and output error at our noise need stim only;
+the escape stage needs their gap decoder (code.zip).  Next: inject+cultivate compiled to ions
+(qccdc, every rule, R10), noise by `extract` with their detectors, acceptance and error at s = 1/2;
+then the escape to d2 = 11.
+
+**Step 3 result (2026-11-06): the listing on ions, timed; and it cannot succeed.** `tools/gidney_concrete.py`.
+- 154 cat programs at d = 11 (`qccd/fullstack/scale/catprog.py`, `qccd/compile/tiled_cat.py`), each compiled once, every rule
+  and R10, cover all 16,589,428,495 products; the dynamic count equals the VM's.
+- The reader compares every repetition, gate by gate, with what the writer will emit (`gidney._as_written`).  R10 proves a
+  program implements the writer's circuit and says nothing about whether that circuit is the listing's.  Two were not: the one
+  Ȳ had been compiled as X̄, and `prepMaskedP`'s 35-ion cat as a 6-ion product.  Both are fixed; the reader then read the whole
+  listing and refused nothing.
+- **One prime 90.31 h, the program 222.98 years, on a 1,700-tile floorplan** (FormalRV's VM: 198.6; S9's own compilation:
+  21.56 on 19.0 million ions).  Tests: `tests/test_gidney_concrete.py`.
+- Still not concrete in that number: the magic states' 150 and 23 rounds (step 4); cold fan access, a formula; the yoked outer
+  checks; a decode taken as one round; a wide cat's control offset, composed by a checked rule; regions assumed to be driven
+  independently, since each program is checked alone; and **a free ion between programs**.  A program's cat ions are at its
+  homes when it starts and nowhere after it ends, with no transport from the last program's homes.  That is virtual, and only
+  merges (below) remove it without a new transport layer.
+- **A cat product leaves its patches unchecked, and at these times that is fatal.**  No round runs on a patch during its 11
+  repetitions: 282 ms at the median, 1.28 s at the 90th percentile of products, 12.7 s at the longest.  An ion idle for T takes
+  Z with p(T) of qccd-noise@2 at s = 1/2, linear and coherent: 2.4e-3 at 282 ms, 3.2e-2 at 1.28 s, 0.2 at 3.6 s.  Sampled
+  (`tools/gidney_diagnose.py gaps`), one such gap fails a d = 11 patch at 4.7e-5 at p = 0.02, 4.6e-4 at 0.03, 6.9e-3 at 0.05,
+  0.13 at 0.1, 0.46 at 0.2: the threshold is near p = 0.1.  Over the program (`failures`), counting nothing but these gaps:
+
+  | Scheme | Longest gap | Expected logical failures a run (budget 0.067, all causes) |
+  |---|---|---|
+  | The listing: 11 repetitions, then 11 rounds | 12.7 s | 1.9e9 |
+  | The same, a perfect echo removing the coherent term | 12.7 s | 1.5e4 |
+  | Repetition, round, repetition, round ...: same gates, same time | 1.15 s | 103 |
+  | The same, a perfect echo | 1.15 s | 0.098 |
+  | A merge: a round every 5.5 ms | one round | the patch the distance study measured |
+
+  The top row is sampled, not extrapolated (wide 32's gap, p = 0.108, gives 75 % of it).  The lower rows lean on the p^6 tail
+  below p = 0.02.  So 222.98 years is the time of a program that does not factor.  FormalRV's VM cannot see this: it counts time
+  and qubits, and its `.qec` marks a merged code `distance=unclaimed`.
+
+**Design study (user, 2026-11-06: propose better architecture and traffic, larger gadgets, better abstractions).**
+`tools/gidney_diagnose.py`, `qccd/fullstack/scale/layer.py`, `tests/test_layer_merge.py`.
+- **What limits the cat machine.**
+  - Transport is 74-97 % of every hot program (84 % of Z̄Z̄ facing, 97 % of X̄X̄X̄); gates are 1-7 %.  1.7 ions ride a cycle on average.
+  - A wide cat spends 84 % of its time walking the lane (W = 32: tree 25 ms, out 91, columns 9, back 95, flag 1), because
+    its ions are packed at the row's middle to keep the tree short.
+  - One prime's critical path: X̄ products and wide cats 76 %, Z̄Z̄ 12 %, rounds 5 %, |AutoCCZ> 3 %.  Wide cats are on it for all
+    of their work.  X̄ is second class: both boundary-check columns half block the vertical seam, so a walk zigzags, two hops a
+    row (4.5 ms a tile against 2.26 along a row).
+  - The bounds (`bounds`, nothing built): no seam blocking 0.65 x; no seam or tile limit at all 0.50 x, so the listing's own
+    order allows 3.7 at once and no traffic design passes about 112 years at these program times; X̄ products at Z̄Z̄'s time
+    (assumed) 0.73 x; cat programs 25 % shorter 0.80 x.  Footprints at the grain of single traps give only 0.97 x: the programs
+    really do use the same traps, so better bookkeeping is not the answer.
+  - Not limits: a gadget placed whole loses nothing here (a flat schedule is 6 % slower, greedy against later work); compile-once
+    holds (154 programs for 1.66e10 uses).
+- **The larger gadget, built: one layer, one program.**  `experiments.layer_merge` puts disjoint merges and patches that only
+  hold on one lattice.  At d = 11, 11 rounds, every rule and R10:
+
+  | In the program | Ions | Time |
+  |---|---|---|
+  | One Z̄Z̄ merge | 505 | 61.03 ms |
+  | 4 merges | 2,020 | 61.03 ms |
+  | 8 merges | 4,040 | 61.03 ms |
+  | 4 merges, 8 patches holding | 3,948 | 61.03 ms |
+  | Z̄ product over 8 patches through a strip of tiles | 4,193 | 61.03 ms |
+  | Z̄ product over 16 patches through a strip of tiles | 8,409 | 61.03 ms |
+
+  The cat product it replaces takes 346 ms a pair (11 repetitions, then 11 rounds); a wide cat over 32 takes 2.52 s and then its
+  rounds.  **All of those programs are the same list of waveforms, cycle for cycle** (`layer.waveforms`): 419 cycles, 12 moves a
+  round, 8 motions in all.  What differs is which ions are there and which pulses fire.  So a whole machine can run one clock:
+  syndrome extraction and surgery are one activity, nothing travels, and regions need no drivers of their own, which removes
+  the independent-driving assumption instead of checking it.  A held patch runs its rounds in the same program.
+- **It is FormalRV's own statement.**  Its `.qec` writes each product as `merge P -> c`, then `extract rounds=11`, `decode`,
+  `split`.  The cat repetitions are how `qec_sys_staged` lowers a merge's high-weight check `P*X[a]`.  So a surgery leaf under that
+  statement keeps FormalRV's program, every product in its order, and replaces one lowering.  (Gidney's paper uses lattice surgery.)
+- **What it would give** (`bounds`: the same schedule with every product 61.03 ms and its rounds absorbed; floorplan NOT built):
+
+  | Scenario | One prime | Program |
+  |---|---|---|
+  | Corridors free | 15.73 h | 38.8 years |
+  | Corridors hold their bounding boxes | 17.32 h | 42.8 years |
+  | ... and magic at half the provisional time | 14.26 h | 35.2 years |
+  | ... and magic made ahead, no wait | 11.71 h | 28.9 years |
+  | ... the same with 25 rounds a merge | 18.18 h | 44.9 years |
+
+  Then |AutoCCZ> is 75 % of the critical path, so step 4 decides the rest; a flat schedule is 24 % better than whole placement
+  there (11.95 h against 15.73 h), so with merges a layer scheduler should not keep instances rigid.  The ions: about 290 a tile
+  with its seams, so 1,700 tiles are about 0.5 million hot, perhaps twice that with the room X̄ needs, against S9's 19.0 million.
+- **What is not solved.**  Mixed X̄Z̄ products (17 % of products): `corridor_merge` is one letter.  The candidates are a boundary
+  check with X on one side and Z on the other (the same motions, a new check to prove), or S9's made-ahead pairs and H̄.  A floorplan:
+  362 of 364 wires are met by both letters, 17 % of meetings on the minority letter, so a wire needs a free tile on a Z̄ side and on
+  an X̄ side; today's rows give the second no access.  The physical question whether one waveform can drive a whole chip.
+- **The abstraction.**  What the study found wrong with today's boundary, and what a gadget should declare instead:
+
+  | A gadget today | What went wrong | A gadget should declare |
+  |---|---|---|
+  | One implementation of a product: its cat, by shape | 5 x in time, 1.9e9 failures, no way to choose | The logical contract, `M(P)`: FormalRV's `merge`; implementations chosen by cost |
+  | Start: ions at homes of its own; end: back there | A free ion between programs is virtual | A rest state: which trap holds which ion at rest; gadgets compose when they agree |
+  | Footprint: cells held for its whole time | 35 % of the time lost, finer cells do not help | Footprint and clock: on the machine's clock, or a plane of its own |
+  | Checked alone | Running at once is an assumption | The waveforms it uses; a layer's are one list, compared by equality |
+  | Time and rules only | A gadget can pass every rule and be useless | A noise budget: the longest stretch any data ion goes unchecked, a rule |
+  | A wide cat is a special writer | Width is a parameter of nothing | Array gadgets: one program, a family by width, checked at small width with equal waveforms at every width |
+
+  The boundary stays where scale needs it: gadgets compiled once, composed only through contract, rest state, footprint and waveforms;
+  R10 under each, the logical sequence checked against FormalRV's above.
+
+**The user's call (2026-11-06): lattice surgery under FormalRV's `merge`.**  `qccd/fullstack/scale/gidney_surgery.py`, `tools/gidney_surgery.py`,
+`tests/test_gidney_surgery.py`.  FormalRV's program stays, every product in its order; only the lowering of a product changes.  S9's program was
+already this (`Gidney2025.qec` lowered to surgery: `autoccz` is 806,994,122 uses in both); what S10 adds is Gidney's layout, the exponent cold and
+the machine compact.
+- **What a product becomes.**  One merge of the listing's 11 rounds: the 11 rounds the listing writes after every product are exactly that merge's
+  (held by a test, product by product), and every other round it writes stays.  `M(P)` on a request's patch at the end of its life is that patch's
+  readout (19.7 % of products).  `M(P)` on a patch that lives on is a merge with one fresh tile.
+- **Which way round.**  A merge joins strings parallel to its seam, so a mixed X̄Z̄ product is a question of geometry, not of a new check: a patch may hold
+  its state H̄-turned, its listing Z̄ the column string and its X̄ the row string, every operation on it the listing's conjugated by H̄.  A request's patch
+  chooses at each product, a wire once.  No product is refused: the wires of one product can always agree.  A wire pair asked for both a CNOT and a CZ is
+  an odd cycle no labelling removes (620 million of 3.27 billion pairs through a request's patch); that patch takes H̄ in between, FormalRV's own: S̄, √X̄, S̄,
+  three |Ȳ> merges.  Ȳ on a wire is S̄ X̄ S̄† the same way.
+- **The floorplan.**  `Plan`'s rows, a free column between two bits, so every wire has a free tile beside it as well as above or below: 2,236 tiles, 1,689
+  of them ever used.  A patch goes on a tile only if every product due in its life can still route around it; it sits beside its largest product, so a
+  register-wide product has one shape whichever partner it also meets.  Nothing travels, so an ion is needed exactly where some program names it, and the
+  machine's other ions rest on their traps through any program (`layer.build(full=True)`, every rule and R10): no free ion is virtual any more.
+- **Result (schedule, on one clock, every merge starting on a round; no clash).**  Corrected 2026-11-07: the first figure, 15.45 h and 38.13 years,
+  let quantum work under `when source c[..]` start before the decode it waits for.  The reader had taken a `source` record for an outcome of long ago;
+  in the listing it is usually the product just above (`source c[qecParam1] <- c[251,253)` right after that product's `decode`).  Waiting for it:
+
+  | | One prime | Program | Ions | Programs |
+  |---|---|---|---|---|
+  | The listing's cats | 90.31 h | 222.98 years, and it cannot succeed | 1,700 tiles, cat ions not counted | 154 |
+  | FormalRV's program by surgery, in-place provisional factories | 17.11 h | 42.23 years | 469,522 hot + 93,440 cold = 562,962 | 514 |
+  | The same, cultivated factories in slots (step 4 below), every program compiled | 11.94 h | 29.48 years | 586,458 hot (+ at most 600) + 93,440 cold | 1,013 |
+  | S9: the same program, hot exponent, 116 real factories | 8.73 h | 21.56 years | 19.0 million | |
+
+  381 of that floorplan's 514 programs were compiled and checked, all clean (every rule, R10, logic at d = 3, the one clock's waveforms), before the
+  floorplan below replaced it.
+- **The scheduler, corrected twice (2026-11-07).**  (1) `Plan.flat`: below a prime every instance is written out and each item runs as soon as its
+  resources and outcomes allow, instead of each gadget instance placed whole with one internal timing.  It is sound for the same reason (a resource
+  is never used twice at once, nothing passes what it waits for: `tests/test_gidney_surgery.py`), and the machine does not need instances alike: a
+  program is compiled once and only its start differs.  (2) The critical-path walker (`tools/gidney_diagnose.py`) named a request's patch globally, so
+  two instances' same-named patches blocked each other; my earlier "rigid placement is not a limit" and "factory slots are no faster" rested on it.
+  **Slots do help:** on the old provisional factory, slots were 17.08 h placed whole against 12.44 h flat.  And the slot choice put 47 % of consecutive
+  factories in the same slot (a clamp at the band's end, and frames whose factories meet the same few wires); round-robin within a frame fixes it.
+- **The checker.**  At 8,400 ions a check took 460 s, now about 150 s: R22 (rescanning every move per ion, now `motion_signatures`' one pass) and `gate_sites` were quadratic in
+  ions, and R10 compared a whole machine's tableau per block; now the qubits a block touches, a block a round, and a block equal to one compared already takes its verdict.
+  It still catches a wrong pulse in a late round (`tests/test_layer_merge.py`).
+
+**Step 4 result (2026-11-07): cultivation on ions, a real factory, slots.**  `qccd/fullstack/scale/cultivation.py`, `factory.cultivated_autoccz`,
+`SurgeryPlan._factory_unit`, `tests/test_cultivation.py`; circuits in `qccd/qec/cultivation/` (Gidney, Shutty and Jones: circuits CC BY 4.0, code
+Apache 2.0; their generator rewrites their record's d2 = 15 circuit character for character).
+- **On the tiles, gate for gate.**  Their qubits stand on a square grid and every CX joins grid neighbours: turned 45 degrees that is our lattice, a
+  point of even x + y a data trap, odd a face trap, each CX a face ion stepping to its data ion.  One cycle is one waveform (R22), so `compile_tiled` now
+  gives each way out of a layer its own cycle (a colour code's layer has up to four; a surface round's programs are byte-identical, checked on ten).
+- **d1 = 3 injection and cultivation:** 15 ions, 45.26 ms, every rule and R10.  At the machine's noise 99.37 % of attempts are kept; the leading
+  error, counted exactly (`cultivation.undetected`), is 3.4e-12 on the Clifford twin.  The harness first reproduced the record: kept 0.8287 against
+  0.8286, leading error 3.98e-8 against 4.00e-8 at p = 5e-4.
+- **To d2 = 11 and a plain patch.**  Their end-to-end construction ends in a grafted code that is a plain patch but for one corner: 110 of its 120
+  checks are a plain patch's and its logicals run along the far sides.  `to_surface` reads out the five data on face points, prepares the four empty
+  data points, and runs two of our rounds.  The program: 246 ions, every rule and R10, noiseless detectors all deterministic.  With their gap decoder
+  (validated on their histogram: kept 0.7338 against 0.7336) at our noise:
+
+  | growing, final rounds | time | kept at gap >= 50 | error per kept T (twin) |
+  |---|---|---|---|
+  | 1, 1 | 117.4 ms | 0.954 | 1.3e-7 (12 in 95 M kept of 100 M; 95 % under 2.1e-7) |
+  | 2, 2 | 157.3 ms | about 0.94 | about 1e-6 |
+  | 3, 5 (the paper's) | 239.1 ms | about 0.91 | about 4e-6 |
+
+  Shorter is better at this noise: the errors are in the hybrid rounds, 18 ms each.  Their T-against-S rows put the true T's error about 2.5 times the
+  twin's, 3.2e-7, so 28 p^2 over 8.07e8 CCZ is about 0.002 failures a run (0.006 at the 95 % bound).
+- **The factory.**  FormalRV's |AutoCCZ> from eight cultivated T, with two changes that alter nothing it makes (state vector: fidelity 1 - 4e-15,
+  every single T fault caught): a rotation's correction moves to the T state, which is read in Ȳ instead of X̄ when its product took the wrong turn
+  (Gidney's |Ȳ> preparation run backwards, `experiments.y_read_qasm`: 251 ions, 48.4 ms, every rule and R10), so the rotated patches never wait for a
+  correction; and H̄ is FormalRV's, S̄ √X̄ S̄ by |Ȳ> merges, each product of one letter.  It sits in a slot ten tiles wide under its band's road:
+
+      x  .  y  .  z  .  k  .  T  T       outputs, the check, two T tiles; a gap beside each output
+      -  -  -  -  -  -  -  -  -  -       the rail, closed to every other corridor
+      s4 T  s3 T  s5 T  s6 T  s7 s8      four T tiles; the six spare sites between them
+
+  scheduled once per way its outputs must leave by the lattice scheduler, checked, and copied by translation: 1,230 ms when no output turns,
+  1,458 ms when one does (H̄ inside the factory, three merges).  Six T tiles take the eight T in turn: with 4.6 % of attempts discarded and each
+  rotation taking the first T ready (they commute), 0.44 % of factories end late, by 0.4 ms on average (four tiles: 18.6 %, 13 ms).  The spare sites
+  never sit on a T tile, so a slot's next factory never waits for the last consumer to read them.
+- **Result (`FLOOR`: bands of four rows, slots eleven tiles apart, a frame's factories taking four in turn; labels as solved):**
+  one prime 11.94 h, **the program 29.48 years, on 587,058 hot + 93,440 cold = 680,498 ions** (586,458 on 2,126 tiles, and at most 600 in
+  the 120 T tiles' extra column), 1,013 merge programs, 151 of them over 64 tiles (the longest corridor 110 tiles).
+  **Compiled (2026-11-08): every one of the 1,013 merge programs is built and checked** -- every rule, R10, logic at d = 3, the one clock's
+  waveforms -- and every one takes 61,032 us, the merge time the schedule charges (504 to 29,543 ions; the longest took 45 minutes to check, the
+  whole compile 43 hours of wall clock with memory stops).  The programs that are not merges (the cultivated T 117,369 us, Ȳ read 48,415 us,
+  |Ȳ> made in place 43,862 us) are checked by `tools/gidney_surgery.py gadgets`, and `run` refuses unless every program is clean and of the time
+  the plan charges.  On them: **one prime 42,982.18 s = 11.94 h, concrete in S9's sense** (every program the schedule places is a checked
+  program, but for two things that are not programs: a cold access, composed, 285 s of work a prime, and a transversal H, one 5 us pulse on a
+  patch's data ions, 1.1 s a prime; no clash); the program 930,305,961 s = 29.48 years.  The work in a prime: merges 52 %, cultivated T
+  18 %, |Ȳ> 16 %, reads 8 %, idle rounds 5 %; 4.65 programs run at once on average.  One prime is 5,143,041 gadgets of 963 distinct
+  (program, time) pairs.
+- **On the site (2026-11-09): gadgets/rsa2048/gidney/** (`qccd/gadget/rsa_gidney.py`), the S9 page's player (`web/rsa.js`) on this
+  floorplan: `Plan.flat(trace=)` hands out every item as the schedule places it (`tests/test_gidney_surgery.py` holds it to `out`), and
+  `tools/gidney_surgery.py page` cuts the prime into windows of 120 s, each with the gadgets still at work from the window before (its
+  `lead`).  Every program's ions (`tools/gidney_surgery.py ions`, replayed, no rules: `compile` checked them) are QIO2, each distinct cycle
+  stored once: a merge's 462 cycles are 31 bodies, about 430 MB for all, against about 4.6 GB written cycle by cycle.  Each prep and read
+  item now names its program (the listing's `basis=`, the factory gadget's shape).
+  Against S9 (21.56 years on 19.0 million ions): 1.37 x its time on 28 x fewer ions.
+  Factories that cost nothing would give 10.78 h a prime on the same floorplan; the cultivated ones add about 13 %.  Still composed in that figure:
+  a cold access (a merge counted at a hot round, the block held), the yoked outer checks, a decode taken as one round.  And one physical question:
+  a T tile runs a program of its own while the chip around it runs rounds, so the six T tiles of a slot need drive lines of their own.
+
+**Exact gadget times (2026-11-05).** Making the RSA page's ion view showed the schedule's times were
+the d = 11 check log's milliseconds, rounded: a merge 138,300 µs against its program's 138,340, H̄
+679,800 against 679,832, a |T> preparation's slot 330 against its program's 345, a held patch's round
+5,800 against 5,822. `lattice.Costs` now holds each program's own replayed time
+(`qccd/fullstack/scale/programs.py`, `tests/test_scale_programs.py`).  Rerun with them, the prime is
+31,433.62 s (+8.75 s) and the program 21.56 years (S9 above); the page is live with those.
 
 ---
 

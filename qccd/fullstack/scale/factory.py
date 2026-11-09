@@ -39,7 +39,7 @@ import re
 import numpy as np
 
 __all__ = ["distill_15to1", "run", "fault_census", "autoccz", "held", "ccz_census", "ccz_factory",
-           "TURNED"]
+           "TURNED", "hbar", "cultivated_autoccz"]
 
 
 def distill_15to1(tag: str = "f") -> tuple:
@@ -100,6 +100,50 @@ def autoccz(tag: str = "c", ts=None) -> tuple:
     lines += attach(6, [0], True, "p6") + attach(5, [6, 2], False, "p5")          # (s5, s6) on x, z
     lines += attach(7, [1], True, "p7") + [("ht", [l[7]], None, [])]              # (s7, s8) on x, y
     lines += attach(8, [7, 0], True, "p8")
+    return lines, [k] + l
+
+
+def _negated(g: str) -> str:
+    return g[1:] if g.startswith("!") else "!" + g
+
+
+def hbar(b: str, tag: str) -> list:
+    """FormalRV's H̄ on block `b`: S̄, √X̄, S̄, each a fresh |Ȳ>, a product of one letter with it (Z̄Z̄ for S̄, X̄X̄ for √X̄: |Ȳ> looks
+    the same from either side), its readout in the other letter, and a Pauli frame on `b` by both outcomes (√X̄'s also one fixed X̄).
+    Exactly e^{iπ/4} H (`run` holds it to H)."""
+    lines = []
+    for n, (letter, other, frame) in enumerate((("Z", "X", "z"), ("X", "Z", "x"), ("Z", "X", "z"))):
+        y, c, e = f"{tag}y{n}", f"{tag}c{n}", f"{tag}e{n}"
+        lines += [("prep", [y, "Y"], None, []), ("ppm", [letter, b, letter, y], c, []), ("read", [y, other], e, []),
+                  (frame, [b], None, [c]), (frame, [b], None, [e])]
+        if letter == "X":
+            lines.append((frame, [b], None, []))
+    return lines
+
+
+def cultivated_autoccz(tag: str = "c") -> tuple:
+    """(stream, blocks): `autoccz` on cultivated T states (Gidney, Shutty and Jones; `cultivation`), with two changes, neither in what it makes.
+    A rotation's correction is on the T state, not on the rotated patches: the product of its Z̄ with the rotation's, then the T state read in X̄ when
+    that product took the wanted turn and in Ȳ when it did not (`read m Y g`: Ȳ if guard `g` holds, else X̄), which turns the rotation the other
+    way; either leaves a Z̄ frame on the rotated patches by the readout.  So the rotations never wait for a correction, and each T is made, merged
+    and read on its own tile.  And H̄ is FormalRV's, S̄ √X̄ S̄ by |Ȳ> merges (`hbar`), where `autoccz` writes the H̄ gadget."""
+    k, l = f"{tag}k", [f"{tag}l{i}" for i in range(9)]
+    lines = [("prep", [b, "X"], None, []) for b in [k] + l[:3]]
+    for j, v in enumerate(itertools.product((0, 1), repeat=3)):
+        blocks = [k] + [l[i] for i in range(3) if v[i]]
+        prod = [x for blk in blocks for x in ("Z", blk)]
+        m, a, b = f"{tag}m{j}", f"{tag}a{j}", f"{tag}b{j}"
+        wrong = a if sum(v) % 2 == 0 else "!" + a       # T wants a = 0's turn, T† a = 1's
+        lines += [("prep", [m, "T"], None, []), ("ppm", prod + ["Z", m], a, []), ("read", [m, "Y", wrong], b, [])]
+        lines += [("z", [blk], None, [b]) for blk in blocks]
+    lines.append(("read", [k, "X"], f"{tag}r", []))
+    lines += [(p, [b], None, []) for p in "xz" for b in l[:3]]        # CZ_xy CZ_xz CZ_yz
+    lines += hbar(l[2], f"{tag}h2")
+    stream, _ = autoccz(tag)
+    at = next(i for i, x in enumerate(stream) if x[0] == "ht" and x[1] == [l[2]])
+    rest = stream[at + 1:]
+    seven = next(i for i, x in enumerate(rest) if x[0] == "ht" and x[1] == [l[7]])
+    lines += rest[:seven] + hbar(l[7], f"{tag}h7") + rest[seven + 1:]
     return lines, [k] + l
 
 
@@ -344,6 +388,7 @@ class Farm:
 _H = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
 _Z = np.diag([1, -1])
 _X = np.array([[0, 1], [1, 0]])
+_SDG = np.diag([1, -1j])
 _STATES = {"X": [1, 1], "Z": [1, 0], "Y": [1, 1j], "T": [1, np.exp(1j * np.pi / 4)]}
 
 
@@ -410,7 +455,13 @@ def run(stream, rng, faults=(), sv=None) -> tuple:
             for b in xs:
                 sv.gate(b, _H)
         elif w == "read":
-            if a[1] == "X":
+            basis = a[1]
+            if len(a) > 2:              # `read m Y g`: Ȳ if guard g holds, else X̄
+                g2 = a[2]
+                basis = "Y" if (out[g2[1:]] == 0 if g2[0] == "!" else out[g2]) else "X"
+            if basis == "Y":
+                sv.gate(a[0], _SDG)
+            if basis in ("X", "Y"):
                 sv.gate(a[0], _H)
             out[o] = sv.measure_z([a[0]], rng)
             sv.drop(a[0])
@@ -447,6 +498,24 @@ def _sites(sv: _SV, sites) -> np.ndarray:
         sv.gate(sites[i], _H)
     t = sv.psi.reshape([2] * len(sites))
     return np.transpose(t, [sv.names.index(b) for b in sites]).reshape(-1)
+
+
+def cultivated_census(trials: int = 50, seed: int = 1) -> dict:
+    """`cultivated_autoccz` by state vector: {"accepted", "fidelity" (the worst accepted output's with FormalRV's |AutoCCZ>), "caught" (single T
+    faults always rejected), "mags"}."""
+    from qccd.gadget.leaves.ccz import autoccz_vector
+    stream, blocks = cultivated_autoccz()
+    want = autoccz_vector()
+    rng = random.Random(seed)
+    acc, worst = 0, 1.0
+    for _ in range(trials):
+        sv, out = run(stream, rng)
+        if not out["cr"]:
+            acc += 1
+            worst = min(worst, abs(np.vdot(want, _sites(sv, blocks[-9:]))) ** 2)
+    mags = [k for k, (w, a, _, _) in enumerate(stream) if w == "prep" and a[1] == "T"]
+    caught = sum(all(run(stream, rng, (k,))[1]["cr"] for _ in range(10)) for k in mags)
+    return {"accepted": acc, "fidelity": worst, "caught": caught, "mags": len(mags)}
 
 
 def ccz_census(trials: int = 50, seed: int = 1, full: bool = False) -> dict:

@@ -3,6 +3,8 @@ programme built to break it (docs/rules.md: a check that cannot fail is not a ch
 
 from __future__ import annotations
 
+import random
+import time
 from collections import Counter
 
 import pytest
@@ -96,6 +98,59 @@ def test_r21_refuses_a_crossing_and_a_rail_through_a_node():
     planar = explicit({"A": (-1, 0), "B": (1, 0), "C": (0, -1), "D": (0, 1), "J": (0, 0)},
                       [("rA", "A", "J"), ("rB", "J", "B"), ("rC", "C", "J"), ("rD", "J", "D")])
     assert not geometry_violations(planar.arch)
+
+
+def _r21_by_scanning_everything(dev) -> list:
+    """R21 as the statement reads, every rail against every node and rail, in the verdict's order."""
+    from qccd.verify.rules import _point_on_segment, _segments_cross
+    pos = {n: tuple(float(v) for v in nd.pos[:2]) for n, nd in dev.nodes.items()}
+    sids = sorted(dev.segments)
+    out = []
+    for sid in sids:
+        a, b = dev.segments[sid].ends
+        out += [("on", sid, n) for n in sorted(dev.nodes)
+                if n not in (a, b) and _point_on_segment(pos[n], pos[a], pos[b])]
+    for i, s1 in enumerate(sids):
+        a, b = dev.segments[s1].ends
+        for s2 in sids[i + 1:]:
+            c, d = dev.segments[s2].ends
+            if not {a, b} & {c, d} and _segments_cross(pos[a], pos[b], pos[c], pos[d]):
+                out.append(("cross", s1, s2))
+    return out
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_r21_finds_exactly_what_scanning_everything_finds(seed):
+    """The index only skips pairs that cannot meet: tangles of short and very long rails, nodes on rails and off,
+    at scales from a thousandth of a unit to thousands, and negative coordinates."""
+    rng = random.Random(seed)
+    scale = [1e-3, 0.5, 1.0, 40.0, 3000.0, 1.0][seed]
+    nodes = {f"n{i}": (scale * rng.randint(-30, 30), scale * rng.randint(-30, 30)) for i in range(120)}
+    names = sorted(nodes)
+    rails, seen = [], set()
+    while len(rails) < 150:
+        a, b = rng.sample(names, 2)
+        if nodes[a] != nodes[b] and (a, b) not in seen and (b, a) not in seen:
+            seen.add((a, b))
+            rails.append((f"r{len(rails)}", a, b))
+    m = explicit(nodes, rails)
+    want = _r21_by_scanning_everything(m.arch.device)
+    got = [v for v in geometry_violations(m.arch) if v.rule == "R21"]
+    assert len(want) > 20                       # a test that finds nothing proves nothing
+    assert len(got) == len(want)
+    for v, (kind, x, y) in zip(got, want):
+        assert x in v.message and y in v.message and (" passes through " in v.message) == (kind == "on")
+
+
+def test_r21_on_a_large_device_is_not_quadratic():
+    """40,000 rails in a comb: the scan would take 8 * 10^8 pair tests."""
+    n = 200
+    nodes = {f"n{c}_{r}": (float(c), float(r)) for c in range(n) for r in range(n)}
+    rails = [(f"h{c}_{r}", f"n{c}_{r}", f"n{c + 1}_{r}") for c in range(n - 1) for r in range(n)]
+    rails += [(f"v{c}_{r}", f"n{c}_{r}", f"n{c}_{r + 1}") for c in range(n) for r in range(n - 1)]
+    t0 = time.perf_counter()
+    assert not [v for v in geometry_violations(explicit(nodes, rails).arch) if v.rule == "R21"]
+    assert time.perf_counter() - t0 < 60
 
 
 def test_every_shipped_generator_device_passes_the_geometry_rules():

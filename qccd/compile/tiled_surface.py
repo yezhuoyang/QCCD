@@ -163,7 +163,7 @@ def _face(touched: set, basis: str | None) -> tuple[int, int] | None:
 
 
 def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: str = "circuit",
-                  arch=None, coords=None, faces=None) -> tuple:
+                  arch=None, coords=None, faces=None, resting=()) -> tuple:
     """`(program, certificate, architecture)` for a circuit of surface-code checks on a lattice of
     rows x cols data points -- uncooled.  The data qubits come first: by default q0 ..
     q[rows*cols - 1] row-major, a rotated surface patch (`qccd.gadget.surface.patch`; cols =
@@ -176,7 +176,8 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
     `faces`, the face named for each measure ion in qubit order (`MemoryExperiment.faces`:
     needed when a face's checkerboard is the other one, after a transversal H, or its ion also
     carries data states, as H̄'s does).  Any set of faces plays: a face's junctions are its own,
-    whichever others are there."""
+    whichever others are there.  `resting`: traps that hold an ion the circuit does not name, there from start to end (what the rest
+    of the machine leaves on this program's device)."""
     cols = cols or rows
     arch = arch or device(rows, cols)
     n, ops, _ = _parse(qasm_text)
@@ -220,8 +221,12 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "patch": [rows, cols],
                       "qubit_map": {str(q): ion[q] for q in range(n)}})
-    b = _Build(prog, dict(place))
-    b.emit(type="init", placement=dict(place), quanta={i: 0.0 for i in place},
+    held = dict(place)
+    held.update({f"rest{k}": t for k, t in enumerate(resting)})
+    if len(set(held.values())) != len(held):
+        raise TiledError("an ion at rest on a trap another ion holds")
+    b = _Build(prog, dict(held))
+    b.emit(type="init", placement=dict(held), quanta={i: 0.0 for i in held},
            meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     b.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
     for layer in layers(ops):
@@ -237,24 +242,23 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
         two = [o for o in layer if o.name in GATES_2Q]
         if not two:
             continue
-        legs = {"north": [], "south": []}
+        # one cycle is one waveform (R22), so each way out takes a cycle of its own: a round's layer has one or two, a colour code's up to four
+        legs: dict = {}
         for o in two:
             m, q = (o.qubits[0], o.qubits[1]) if o.qubits[0] >= nd else (o.qubits[1], o.qubits[0])
             i, j = face[m]
             r, c = at[q]
             via = _route(i, j, r, c)
-            legs["north" if r == i else "south"].append(
+            legs.setdefault(("north" if r == i else "south", c == j), []).append(
                 Participant(ion[m], _face_trap(i, j), _data_trap(r, c), via))
-        for leg in ("north", "south"):
-            if legs[leg]:
-                b.emit(type="simd", cls="shuttle", mode="inter", participants=tuple(legs[leg]),
-                       meta={"kind": "route", "leg": leg, "op": [o.i for o in two]})
+        for way in sorted(legs, reverse=False):
+            b.emit(type="simd", cls="shuttle", mode="inter", participants=tuple(legs[way]),
+                   meta={"kind": "route", "leg": way[0], "op": [o.i for o in two]})
         b.play(two, ion)
-        for leg in ("north", "south"):
-            if legs[leg]:
-                back = tuple(Participant(p.ion, p.dst, p.src, tuple(reversed(p.via))) for p in legs[leg])
-                b.emit(type="simd", cls="shuttle", mode="inter", participants=back,
-                       meta={"kind": "undock", "leg": leg, "op": [o.i for o in two]})
+        for way in sorted(legs, reverse=False):
+            back = tuple(Participant(p.ion, p.dst, p.src, tuple(reversed(p.via))) for p in legs[way])
+            b.emit(type="simd", cls="shuttle", mode="inter", participants=back,
+                   meta={"kind": "undock", "leg": way[0], "op": [o.i for o in two]})
     cert = {
         "version": 1, "circuit": name, "arch": arch.name, "n_qubits": n,
         "circuit_ops": [o.to_json() for o in ops],

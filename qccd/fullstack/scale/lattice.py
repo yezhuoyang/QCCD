@@ -57,23 +57,29 @@ class LatticeError(ValueError):
 
 #: |Ȳ> made in place at the machine's distance: Gidney's preparation (`y_prep_qasm(11)`), tiled
 #: on qccd-physics-best, every rule and R10
-PREP_Y_US = 43_900.0
+PREP_Y_US = 43_862.0
 
 
 @dataclass(frozen=True)
 class Costs:
     """Machine times, µs.  The defaults are the Shor machine's (`machine`: d = 11, 25 rounds a
-    merge, qccd-physics-best), each measured on its compiled program: a syndrome round 5.8 ms, a
-    corridor merge 138.3 ms whatever its shape, H̄ 679.8 ms, a tile's preparation 0.33 ms and
-    readout 0.44 ms (the slower basis of each), |Ȳ> in place 43.9 ms; decoding is taken as one
-    round -- assumed."""
-    round_us: float = 5_800.0
-    merge_us: float = 138_300.0
-    hbar_us: float = 679_800.0
-    prep_us: float = 330.0
+    merge, qccd-physics-best), each its compiled program's own replayed time, to the microsecond
+    (`programs.machine_us`; `tests/test_scale_programs.py` holds them to it): a held patch's
+    syndrome round 5,822, a corridor merge 138,340 whatever its shape, H̄ 679,832, |Ȳ> in place
+    43,862; a tile's preparation is given the slowest one's time (|T>'s corner injection 345; Z 310,
+    X 330) and its readout the slower basis's (X 440; Z 420), the faster finishing early.
+    Decoding is taken as one round -- assumed."""
+    round_us: float = 5_822.0
+    merge_us: float = 138_340.0
+    hbar_us: float = 679_832.0
+    prep_us: float = 345.0
     read_us: float = 440.0
     prep_y_us: float = PREP_Y_US
-    decode_us: float = 5_800.0
+    decode_us: float = 5_822.0
+    #: a |T> made on its tile (`prep m T`) and Ȳ read in place (`read m Y`): the corner injection's and the X readout's unless a caller
+    #: says otherwise (S10's cultivated T and Gidney's readout, `gidney_surgery`)
+    prep_t_us: float = 345.0
+    read_y_us: float = 440.0
 
 
 @dataclass
@@ -398,13 +404,13 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
                 board.take(tile, t, INF, blk)
             elif blk not in homes:
                 if late:
-                    dur = costs.prep_y_us if a[1] == "Y" else costs.prep_us
+                    dur = costs.prep_y_us if a[1] == "Y" else costs.prep_t_us if a[1] == "T" else costs.prep_us
                     first = next((stream[j][1][1::2] for j in uses[blk] if j > k and stream[j][0] == "ppm"), ())
                     t = max([t] + [free_at[b] - dur for b in first if b != blk and b in free_at])
                 tile, t = place(blk, k, t)
                 where[blk] = tile
                 board.take(tile, t, INF, blk)
-            dur = costs.prep_y_us if a[1] == "Y" else costs.prep_us
+            dur = costs.prep_y_us if a[1] == "Y" else costs.prep_t_us if a[1] == "T" else costs.prep_us
             out.append(Gadget("prep", t, t + dur, frozenset([where[blk]]), ("prep", a[1]), k, (blk,)))
             free_at[blk] = t + dur
             pend.gadget("prep", w, a)
@@ -412,7 +418,10 @@ def schedule(stream, homes: dict, bounds: tuple, costs: Costs = Costs(), walls=(
             blk = a[0]
             if blk not in where:
                 raise LatticeError(f"line {k}: {blk} is read but lives nowhere")
-            tile, t1 = where[blk], t + costs.read_us
+            # `read m Y g`: Ȳ if guard g holds, else X̄: its basis waits for g, and its tile is held for the slower
+            if len(a) > 2:
+                t = max(t, guard_ready([a[2]]))
+            tile, t1 = where[blk], t + (costs.read_y_us if a[1] == "Y" else costs.read_us)
             out.append(Gadget("read", t, t1, frozenset([tile]), ("read", a[1]), k, (blk,)))
             ready[o] = max(t1 + costs.decode_us, pend.held(w, a))
             free_at[blk] = t1

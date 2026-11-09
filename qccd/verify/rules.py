@@ -177,15 +177,14 @@ class CycleView:
         where the ions are, so R6, R6b and R13 read it.  `sites`, when present, is a
         claim that R6b cross-checks.
         """
-        out: list[str] = []
+        out: dict[str, None] = {}       # a dict for its order: a large cycle has thousands of sites
         for operands in iter_operands(self.instr):
             for ion in operands:
                 site = self.pos_before.get(ion)
-                if site is not None and site not in out:
-                    out.append(site)
+                if site is not None:
+                    out[site] = None
         for site in self.instr.sites:
-            if site not in out:
-                out.append(site)
+            out[site] = None
         return tuple(out)
 
     def gate_budget(self) -> float:
@@ -1003,6 +1002,27 @@ def _segments_cross(a, b, c, d, eps: float = RAIL_EPS) -> bool:
            (o3 > eps and o4 < -eps or o3 < -eps and o4 > eps)
 
 
+class _Cells:
+    """Rail boxes and node points by cell of a uniform grid, about one rail long: only what shares a cell can touch.
+    A machine of 60,000 nodes has 3 * 10^9 pairs of rails and a few dozen that could meet."""
+
+    def __init__(self, boxes: Mapping[str, tuple]):
+        self.size = 1.0
+        if boxes:
+            span = max(max(b[2] for b in boxes.values()) - min(b[0] for b in boxes.values()),
+                       max(b[3] for b in boxes.values()) - min(b[1] for b in boxes.values()))
+            mean = sum(max(b[2] - b[0], b[3] - b[1]) for b in boxes.values()) / len(boxes)
+            self.size = max(mean, span / 1024, 1e-3)
+
+    def of_point(self, p) -> tuple:
+        return (math.floor(p[0] / self.size), math.floor(p[1] / self.size))
+
+    def of_box(self, box) -> list:
+        c0, r0 = self.of_point((box[0], box[1]))
+        c1, r1 = self.of_point((box[2], box[3]))
+        return [(c, r) for c in range(c0, c1 + 1) for r in range(r0, r1 + 1)]
+
+
 def geometry_violations(arch: Architecture) -> list[Violation]:
     """R19, R20 and R21: the shape of the rail graph, judged from the declared node
     positions alone.  These need no programme and no technology; they say whether the
@@ -1069,12 +1089,21 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
                     f"rail {sid} ({a}-{b}) joins layers {dev.layer_name(lay[a])} and "
                     f"{dev.layer_name(lay[b])}, which are not adjacent; a riser joins a layer "
                     f"to the next one"))
+    cells = _Cells(boxes)
+    nodes_in: dict = defaultdict(list)
+    for nid, p in pos.items():
+        nodes_in[cells.of_point(p)].append(nid)
+    rails_in: dict = defaultdict(list)
+    for j, sid in enumerate(sids):
+        for cell in cells.of_box(boxes[sid]):
+            rails_in[cell].append(j)
     for sid in sids:
         if riser[sid]:
             continue
         a, b = dev.segments[sid].ends
         x0, y0, x1, y1 = boxes[sid]
-        for nid in sorted(dev.nodes):
+        near = sorted(nid for cell in cells.of_box(boxes[sid]) for nid in nodes_in.get(cell, ()))
+        for nid in near:
             if nid == a or nid == b:
                 continue
             if layered and lay[nid] != lay[a]:
@@ -1093,7 +1122,8 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
             continue
         a, b = dev.segments[s1].ends
         bx0, by0, bx1, by1 = boxes[s1]
-        for j in range(i + 1, len(sids)):
+        near = sorted({j for cell in cells.of_box(boxes[s1]) for j in rails_in[cell] if j > i})
+        for j in near:
             s2 = sids[j]
             if riser[s2]:
                 continue
@@ -1342,16 +1372,13 @@ def r22_uniform_motion(v: CycleView) -> list[Violation]:
                     f"one cycle is one waveform a layer, so unlike motions in one layer "
                     f"need {len(sigs)} cycles"))
         return out
-    ions: list[str] = []
-    for m in v.moves:
-        if m.ion not in ions:
-            ions.append(m.ion)
-    sigs = sorted({motion_signature(v, ion) for ion in ions})
+    each = motion_signatures(v)
+    sigs = sorted(set(each.values()))
     if len(sigs) <= 1:
         return []
     return [Violation(
         "R22", v.instr.id,
-        f"{len(ions)} ions move in {len(sigs)} different ways in one cycle "
+        f"{len(each)} ions move in {len(sigs)} different ways in one cycle "
         f"({sigs[0]} and {sigs[1]}); one cycle is one waveform, so unlike motions need "
         f"{len(sigs)} cycles")]
 

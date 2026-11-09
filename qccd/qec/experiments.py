@@ -98,7 +98,9 @@ __all__ = [
     "surgery_cnot",
     "hadamard_bar",
     "corridor_merge",
+    "layer_merge",
     "y_memory",
+    "y_read_qasm",
     "y_prep_qasm",
     "injection",
     "EXPERIMENTS",
@@ -872,6 +874,31 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
         raise ValueError(f"letter must be 'X' or 'Z', not {letter!r}")
     r = d if rounds is None else rounds
     corridor = set(corridor)
+    pts, inside, far = _merge_region(d, letter, patches, corridor)
+    other = "X" if letter == "Z" else "Z"
+    coords = sorted(pts)
+    index = {q: k for k, q in enumerate(coords)}
+    checks = _merge_checks(letter, pts, far, index)
+    prep = {index[q]: letter if q in inside else other for q in coords}
+    name = f"corridor{d}_{letter.lower()}{len(patches)}_r{r}"
+    qasm, dets, bits, faces = _phased(
+        f"{name}: lattice surgery measuring the product of {letter}bar on {len(patches)} d = {d} "
+        f"patches through {len(corridor)} corridor tile(s), {r} round(s)",
+        len(coords), [_Phase(tuple(checks), r, prep=prep)], prep)
+    fresh = {index[q] for q in coords if q not in inside}
+    obs = [tuple(sorted(bits["check", 0, 0, f] for f, b, sup, _ in checks if b == letter and fresh & set(sup)))]
+    for lg in _merge_logicals(d, letter, patches):
+        obs.append(tuple(sorted(bits["final", index[q]] for q in lg)))
+    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_corridor", distance=d, rounds=r,
+                            basis=letter, n_data=len(coords), n_ancilla=len(faces), qasm=qasm,
+                            detectors=dets, observables=tuple(obs), readout="appended",
+                            readout_bits=tuple((q, bits["final", q]) for q in range(len(coords))),
+                            readout_basis=tuple(prep[q] for q in range(len(coords))),
+                            coords=tuple(coords), faces=faces)
+
+
+def _merge_region(d: int, letter: str, patches: Sequence[tuple], corridor: set) -> tuple:
+    """A merge's data points, the patches' among them, and the faces on each patch's far side."""
     ok = ("top", "bottom") if letter == "Z" else ("left", "right")
     pts: set = set()
     held: list = []
@@ -903,15 +930,18 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
             pts.add((cy * p + d, cx * p + d))
     inside = set().union(*held)
     pts = _cut_corners(pts, inside, letter)
-    other = "X" if letter == "Z" else "Z"
     far: set = set()                    # the faces on each patch's far side
     for (x, y), side in patches:
         f = _FAR[side]
         far |= ({(y * p - 1 if f == "top" else y * p + d - 1, x * p + j) for j in range(-1, d)}
                 if f in ("top", "bottom") else
                 {(y * p + i, x * p - 1 if f == "left" else x * p + d - 1) for i in range(-1, d)})
-    coords = sorted(pts)
-    index = {q: k for k, q in enumerate(coords)}
+    return pts, inside, far
+
+
+def _merge_checks(letter: str, pts: set, far: set, index: Mapping) -> list:
+    """The checks of a merge's region, `_placed`'s form, its data numbered by `index`."""
+    other = "X" if letter == "Z" else "Z"
     checks = []
     for i in range(min(a for a, _ in pts) - 1, max(a for a, _ in pts) + 1):
         for j in range(min(b for _, b in pts) - 1, max(b for _, b in pts) + 1):
@@ -924,21 +954,60 @@ def corridor_merge(d: int, letter: str, patches: Sequence[tuple], corridor,
             order, first = _TOMITA[basis]
             seq = [(index[corners[o]], first + t) for t, o in enumerate(order) if o in corners]
             checks.append(((i, j), basis, tuple(q for q, _ in seq), tuple(t for _, t in seq)))
-    prep = {index[q]: letter if q in inside else other for q in coords}
-    name = f"corridor{d}_{letter.lower()}{len(patches)}_r{r}"
-    qasm, dets, bits, faces = _phased(
-        f"{name}: lattice surgery measuring the product of {letter}bar on {len(patches)} d = {d} "
-        f"patches through {len(corridor)} corridor tile(s), {r} round(s)",
-        len(coords), [_Phase(tuple(checks), r, prep=prep)], prep)
-    fresh = {index[q] for q in coords if q not in inside}
-    obs = [tuple(sorted(bits["check", 0, 0, f] for f, b, sup, _ in checks if b == letter and fresh & set(sup)))]
+    return checks
+
+
+def _merge_logicals(d: int, letter: str, patches: Sequence[tuple]) -> list:
+    """Each patch's own Z̄ (X̄), on its far side, as lattice points."""
+    p, out = d + 1, []
     for (x, y), side in patches:
         f = _FAR[side]
-        lg = ([(y * p if f == "top" else y * p + d - 1, x * p + j) for j in range(d)] if letter == "Z"
-              else [(y * p + i, x * p if f == "left" else x * p + d - 1) for i in range(d)])
-        obs.append(tuple(sorted(bits["final", index[q]] for q in lg)))
-    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_corridor", distance=d, rounds=r,
-                            basis=letter, n_data=len(coords), n_ancilla=len(faces), qasm=qasm,
+        out.append([(y * p if f == "top" else y * p + d - 1, x * p + j) for j in range(d)] if letter == "Z"
+                   else [(y * p + i, x * p if f == "left" else x * p + d - 1) for i in range(d)])
+    return out
+
+
+def layer_merge(d: int, groups: Sequence[tuple], idle: Sequence[tuple] = (), rounds: int | None = None) -> MemoryExperiment:
+    """One layer of the machine: disjoint `corridor_merge`s (`groups`: (letter, patches, corridor) each) and patches that
+    only hold (`idle`: tiles), all on one lattice for `rounds` (default d) rounds.
+
+    Observables: per group its product, then each of its patches' own logical; then each idle patch's Z̄."""
+    r = d if rounds is None else rounds
+    regions = []
+    for letter, patches, corridor in groups:
+        if letter not in ("X", "Z"):
+            raise ValueError(f"letter must be 'X' or 'Z', not {letter!r}")
+        regions.append((letter, patches) + _merge_region(d, letter, patches, set(corridor)))
+    held = [_tile(d, tuple(t)) for t in idle]
+    every = [g[2] for g in regions] + held
+    coords = sorted(set().union(*every))
+    if len(coords) != sum(len(g) for g in every):
+        raise ValueError("two regions of a layer share a data point")
+    index = {q: k for k, q in enumerate(coords)}
+    checks, prep = [], {}
+    for letter, _patches, pts, inside, far in regions:
+        checks += _merge_checks(letter, pts, far, index)
+        prep.update({index[q]: letter if q in inside else ("X" if letter == "Z" else "Z") for q in pts})
+    edges = {"top": lambda k: "X", "bottom": lambda k: "X", "left": lambda k: "Z", "right": lambda k: "Z"}
+    for (x, y), pts in zip(idle, held):
+        checks += _region((y * (d + 1), x * (d + 1)), d, d, edges, index)
+        prep.update({index[q]: "Z" for q in pts})
+    if len({c[0] for c in checks}) != len(checks):
+        raise ValueError("two regions of a layer share a face")
+    name = f"layer{d}_{len(groups)}m{len(idle)}h_r{r}"
+    qasm, dets, bits, faces = _phased(
+        f"{name}: {len(groups)} lattice surgeries and {len(idle)} patches holding, one lattice, {r} round(s)",
+        len(coords), [_Phase(tuple(checks), r, prep=prep)], prep)
+    obs = []
+    for letter, patches, _pts, inside, _far in regions:
+        fresh = {index[q] for q in _pts if q not in inside}
+        obs.append(tuple(sorted(bits["check", 0, 0, f] for f, b, sup, _ in checks if b == letter and fresh & set(sup))))
+        for lg in _merge_logicals(d, letter, patches):
+            obs.append(tuple(sorted(bits["final", index[q]] for q in lg)))
+    for x, y in idle:
+        obs.append(tuple(sorted(bits["final", index[(y * (d + 1), x * (d + 1) + j)]] for j in range(d))))
+    return MemoryExperiment(name=name, code=f"rotated_surface_d{d}_layer", distance=d, rounds=r,
+                            basis=regions[0][0] if regions else "Z", n_data=len(coords), n_ancilla=len(faces), qasm=qasm,
                             detectors=dets, observables=tuple(obs), readout="appended",
                             readout_bits=tuple((q, bits["final", q]) for q in range(len(coords))),
                             readout_basis=tuple(prep[q] for q in range(len(coords))),
@@ -988,7 +1057,7 @@ _ONE = {"H": "h", "S": "s", "S_DAG": "sdg", "X": "x", "Y": "y", "Z": "z", "SQRT_
         "SQRT_X_DAG": "sxdg"}
 
 
-def _inplace_y(d: int, prep_only: bool):
+def _inplace_y(d: int, prep_only: bool, read_only: bool = False):
     import stim
     from pathlib import Path
     path = Path(__file__).with_name("inplace_y") / f"y_memory_d{d}.stim"
@@ -996,6 +1065,12 @@ def _inplace_y(d: int, prep_only: bool):
         raise ValueError(f"no Y-basis circuit for d = {d} (qccd/qec/inplace_y has 3, 5, 7, 9, 11)")
     c = stim.Circuit(path.read_text(encoding="utf-8")).without_noise()
     at = c.get_final_qubit_coordinates()
+    ops = list(c.flattened().decomposed())
+    if read_only:
+        # the readout is the preparation run backwards: from the last transition round (the last reset of more measure qubits than a standard
+        # round has) to the end
+        cut = max(k for k, inst in enumerate(ops) if inst.name == "R" and len(inst.targets_copy()) > d * d - 1 and k > len(ops) // 2)
+        ops = ops[cut:]
     # transposed: Gidney's (a, b) is our (row b, column a); data on integer points, measure
     # qubits on face centres
     key = (lambda q: (at[q][1], at[q][0]))
@@ -1003,14 +1078,16 @@ def _inplace_y(d: int, prep_only: bool):
     meas = sorted((q for q in at if q not in data), key=key)
     new = {q: k for k, q in enumerate(data + meas)}
     out, dets, obs, k = [], [], [], 0
-    for inst in c.flattened().decomposed():
+    for inst in ops:
         name, ts = inst.name, inst.targets_copy()
         if name == "OBSERVABLE_INCLUDE":
             if prep_only:
                 break
-            obs += [k + t.value for t in ts]
+            if not read_only:
+                obs += [k + t.value for t in ts]
         elif name == "DETECTOR":
-            dets.append(tuple(sorted(k + t.value for t in ts)))
+            if not read_only:
+                dets.append(tuple(sorted(k + t.value for t in ts)))
         elif name in _ONE:
             out += [f"{_ONE[name]} q[{new[t.value]}];" for t in ts]
         elif name in ("CX", "CZ"):
@@ -1025,7 +1102,7 @@ def _inplace_y(d: int, prep_only: bool):
             raise ValueError(f"{path.name}: {name} has no QASM here")
     head = ['OPENQASM 2.0;', 'include "qelib1.inc";',
             f"// Gidney's Y-basis memory at d = {d} ({path.name}: Quantum 8, 1310 (2024), CC BY 4.0), "
-            f"transposed onto the tiled lattice" + ("; its preparation only" if prep_only else ""),
+            f"transposed onto the tiled lattice" + ("; its preparation only" if prep_only else "; its readout only" if read_only else ""),
             f"qreg q[{len(new)}];", f"creg c[{k}];"]
     coords = tuple((int(at[q][1]), int(at[q][0])) for q in data)
     faces = tuple((int(at[q][1] - 0.5), int(at[q][0] - 0.5)) for q in meas)
@@ -1052,6 +1129,12 @@ def y_prep_qasm(d: int) -> str:
     time the observable is recorded (the transition round's measurements).  Its compiled time is
     the |Ȳ> gadget's."""
     return _inplace_y(d, True)[0]
+
+
+def y_read_qasm(d: int) -> str:
+    """The in-place readout of Ȳ alone, from `y_memory`'s circuit: the preparation run backwards, from its last transition round to the
+    data's measurement.  Its compiled time is the readout's."""
+    return _inplace_y(d, False, True)[0]
 
 
 def css_memory_xz(code: CSSCode, rounds: int, name: str | None = None, *,
