@@ -57,7 +57,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1734866,
+  "bytes": 1735015,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -121,7 +121,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1773295,
+  "bytes": 1773444,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -185,7 +185,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1844942,
+  "bytes": 1845091,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -249,7 +249,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1784991,
+  "bytes": 1785140,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
   ],
@@ -315,7 +315,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1924745,
+  "bytes": 1924894,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -379,7 +379,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1817624,
+  "bytes": 1817773,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -425,7 +425,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device / R21 fails on this device",
-    "note": "rails T0.a and T2.a meet at J0 at 56.9 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails T0.a (J0-T0) and T17.b (T17-J10) cross without a junction; rails may only cross at a node they share",
+    "note": "rails T0.a and T2.a meet at J0 at 56.9 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)  ALSO: rails T0.a (J0-T0) and T17.b (T17-J10) cross without a junction; rails may only cross at a node they share",
     "kind": "fail"
    },
    {
@@ -445,7 +445,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1844623,
+  "bytes": 1844773,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -502,7 +502,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device / R21 fails on this device",
-    "note": "rails T0_0h.a and T3_0h.b meet at J0_0 at 0.0 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rail T0_3v.b (T0_3v-J0_0) passes through node J0_1, which it does not end at; a rail may only meet a node it is joined to",
+    "note": "rails T0_0h.a and T3_0h.b meet at J0_0 at 0.0 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)  ALSO: rail T0_3v.b (T0_3v-J0_0) passes through node J0_1, which it does not end at; a rail may only meet a node it is joined to",
     "kind": "fail"
    },
    {
@@ -522,7 +522,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1800985,
+  "bytes": 1801135,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -588,7 +588,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1878268,
+  "bytes": 1878417,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -654,7 +654,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1883782,
+  "bytes": 1883931,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -718,7 +718,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1815007,
+  "bytes": 1815156,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -784,7 +784,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1822289,
+  "bytes": 1822438,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -848,7 +848,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1889431,
+  "bytes": 1889580,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -920,7 +920,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1795767,
+  "bytes": 1795916,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -974,7 +974,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device",
-    "note": "rails K10_1.a and K10_2.a meet at C10 at 52.4 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)",
+    "note": "rails K10_1.a and K10_2.a meet at C10 at 52.4 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)",
     "kind": "fail"
    },
    {
@@ -994,7 +994,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1853280,
+  "bytes": 1853430,
   "over_budget": [
    "dacs 1320 > max_dacs 128"
   ],

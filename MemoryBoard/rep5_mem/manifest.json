@@ -74,7 +74,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1818510,
+  "bytes": 1818659,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -189,7 +189,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1896018,
+  "bytes": 1896167,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -296,7 +296,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1853824,
+  "bytes": 1853973,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -403,7 +403,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1980644,
+  "bytes": 1980793,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -518,7 +518,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1936305,
+  "bytes": 1936454,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -635,7 +635,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1941842,
+  "bytes": 1941991,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -742,7 +742,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1828633,
+  "bytes": 1828782,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -849,7 +849,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1879751,
+  "bytes": 1879900,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -958,7 +958,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1891672,
+  "bytes": 1891821,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -1091,7 +1091,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1960810,
+  "bytes": 1960959,
   "over_budget": [],
   "sites": 24,
   "junctions": 8,
@@ -1222,7 +1222,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1968948,
+  "bytes": 1969097,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -1353,7 +1353,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2046059,
+  "bytes": 2046208,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -1460,7 +1460,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1833665,
+  "bytes": 1833814,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
   ],
@@ -1560,7 +1560,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device / R21 fails on this device",
-    "note": "rails T0_0h.a and T3_0h.b meet at J0_0 at 0.0 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rail T0_3v.b (T0_3v-J0_0) passes through node J0_1, which it does not end at; a rail may only meet a node it is joined to",
+    "note": "rails T0_0h.a and T3_0h.b meet at J0_0 at 0.0 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)  ALSO: rail T0_3v.b (T0_3v-J0_0) passes through node J0_1, which it does not end at; a rail may only meet a node it is joined to",
     "kind": "fail"
    },
    {
@@ -1580,7 +1580,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1863518,
+  "bytes": 1863668,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1669,7 +1669,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device / R21 fails on this device",
-    "note": "rails T0.a and T2.a meet at J0 at 56.9 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails T0.a (J0-T0) and T17.b (T17-J10) cross without a junction; rails may only cross at a node they share",
+    "note": "rails T0.a and T2.a meet at J0 at 56.9 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)  ALSO: rails T0.a (J0-T0) and T17.b (T17-J10) cross without a junction; rails may only cross at a node they share",
     "kind": "fail"
    },
    {
@@ -1689,7 +1689,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1909913,
+  "bytes": 1910063,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],

@@ -57,7 +57,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1751935,
+  "bytes": 1752084,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -121,7 +121,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1813529,
+  "bytes": 1813678,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -187,7 +187,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1877899,
+  "bytes": 1878048,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -253,7 +253,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1883409,
+  "bytes": 1883558,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -325,7 +325,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1816832,
+  "bytes": 1816981,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -382,7 +382,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device / R21 fails on this device",
-    "note": "rails T0_0h.a and T3_0h.b meet at J0_0 at 0.0 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rail T0_3v.b (T0_3v-J0_0) passes through node J0_1, which it does not end at; a rail may only meet a node it is joined to",
+    "note": "rails T0_0h.a and T3_0h.b meet at J0_0 at 0.0 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)  ALSO: rail T0_3v.b (T0_3v-J0_0) passes through node J0_1, which it does not end at; a rail may only meet a node it is joined to",
     "kind": "fail"
    },
    {
@@ -410,7 +410,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1801636,
+  "bytes": 1801786,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -467,7 +467,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device / R21 fails on this device",
-    "note": "rails K10_3.a and K10_4.a meet at C10 at 2.9 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails K10_3.a (C10-K10_3) and K11_0.a (C11-K11_0) cross without a junction; rails may only cross at a node they share",
+    "note": "rails K10_3.a and K10_4.a meet at C10 at 2.9 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)  ALSO: rails K10_3.a (C10-K10_3) and K11_0.a (C11-K11_0) cross without a junction; rails may only cross at a node they share",
     "kind": "fail"
    },
    {
@@ -487,7 +487,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1861666,
+  "bytes": 1861816,
   "over_budget": [
    "dacs 1640 > max_dacs 128"
   ],
@@ -561,7 +561,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1814960,
+  "bytes": 1815109,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -633,7 +633,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1941439,
+  "bytes": 1941589,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -677,7 +677,7 @@
     "step": 1,
     "id": 0,
     "label": "R20 fails on this device / R21 fails on this device",
-    "note": "rails T0.a and T2.a meet at J0 at 56.9 degrees, less than the 60 degrees the device requires (budget.min_rail_angle_deg)  ALSO: rails T0.a (J0-T0) and T17.b (T17-J10) cross without a junction; rails may only cross at a node they share",
+    "note": "rails T0.a and T2.a meet at J0 at 56.9 degrees, less than the 60 degrees the machine requires (budget.min_rail_angle_deg)  ALSO: rails T0.a (J0-T0) and T17.b (T17-J10) cross without a junction; rails may only cross at a node they share",
     "kind": "fail"
    },
    {
@@ -697,7 +697,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1845271,
+  "bytes": 1845421,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -763,7 +763,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1899665,
+  "bytes": 1899814,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -835,7 +835,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1815833,
+  "bytes": 1815982,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -899,7 +899,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1961700,
+  "bytes": 1961849,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -971,7 +971,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1805971,
+  "bytes": 1806120,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -997,7 +997,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1738606,
+  "bytes": 1738754,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
