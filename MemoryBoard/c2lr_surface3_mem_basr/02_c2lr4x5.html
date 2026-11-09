@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="qccd-page" content="3ff0ea994dee17bf">
+<meta name="qccd-page" content="5d0d2457e2ac0e05">
 <title>c2lr4x5_BaSr - circuit+cooling</title>
 <style>
 :root{
@@ -14223,7 +14223,10 @@ relayout();
 fit();
 HWL_LIVE = true;
 draw();
-fromHash();
+// the deep links wait for the scripts after this one (editor.js, tutorial.js): #learn=B2
+// loads a lesson and #embed makes the page view-only through EDITOR, which is not defined yet
+if(document.readyState === 'loading' && document.addEventListener) document.addEventListener('DOMContentLoaded', fromHash);
+else fromHash();
 // the column's lists measure once the layout has settled, and the executing row comes into view
 setTimeout(() => { sizeLists(); if(PLIST && PLIST.follow && VIEWPOS[frame] >= 0) PLIST.scrollToRow(VIEWPOS[frame]); syncCursor(true); }, 50);
 </script>
