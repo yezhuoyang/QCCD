@@ -181,7 +181,8 @@ def _signature(prog) -> list:
 def _like_reference(b):
     """A merge's ions without cooling or replaying it: every merge program has the same cycles on one clock (`compile` checks its waveforms
     against one merge's), so where the cooling pass puts its cooling and when each cycle runs are the reference merge's.  Its own instructions
-    in the reference's cooled order, at the reference's times; None unless its instructions are the reference's one for one (id, type, class).
+    in the reference's cooled order, at the reference's times, and that program's length; None unless its instructions are the reference's one
+    for one (id, type, class).
     `ions` checks it byte for byte against the full path before it relies on it."""
     from qccd.fullstack.scale import programs as PR
     from qccd.gadget.rsa import ion_bytes
@@ -196,17 +197,17 @@ def _like_reference(b):
 
     class Like:
         instructions = [mine.get(i.id, i) for i in _REF["cool"].instructions]
-    return ion_bytes(b.arch, Like, _REF["cycles"], distinct=True)
+    return ion_bytes(b.arch, Like, _REF["cycles"], distinct=True), len(Like.instructions)
 
 
-def _full(b) -> bytes:
-    """A program's ions the long way: cooled (a replay with R7) and replayed; the smaller of QIO1 and QIO2."""
+def _full(b) -> tuple:
+    """A program's ions the long way: cooled (a replay with R7) and replayed; the smaller of QIO1 and QIO2, and its cooled program's length."""
     from qccd.fullstack.scale import programs as PR
     from qccd.gadget.rsa import ion_bytes
     from qccd.verify.replay import replay
     prog = PR.cooled(b)
     res = replay(prog, b.arch, PR._model(), check_rules=False)
-    return min((ion_bytes(b.arch, prog, res.cycles, distinct=q) for q in (False, True)), key=len)
+    return min((ion_bytes(b.arch, prog, res.cycles, distinct=q) for q in (False, True)), key=len), len(prog.instructions)
 
 
 def _ions_one(args) -> str:
@@ -219,13 +220,13 @@ def _ions_one(args) -> str:
     t0 = time.time()
     try:
         b = _built(shape)
-        raw = _like_reference(b) if fast and shape[0] == "merge" else None
-        how = "like the reference" if raw is not None else "cooled and replayed"
-        raw = raw if raw is not None else _full(b)
+        got = _like_reference(b) if fast and shape[0] == "merge" else None
+        how = "like the reference" if got is not None else "cooled and replayed"
+        raw, n_instr = got if got is not None else _full(b)
         us = struct_us(raw)
         gz = gzip.compress(raw, 9, mtime=0)
         (Path(page) / "ions" / f"{key}.bin.gz").write_bytes(gz)
-        row = {"key": key, "shape": shape, "us": us, "ions": b.ions, "instructions": len(b.prog.instructions), "format": raw[:4].decode(),
+        row = {"key": key, "shape": shape, "us": us, "ions": b.ions, "instructions": n_instr, "format": raw[:4].decode(),
                "bytes": len(gz), "how": how, "s": round(time.time() - t0, 1)}
         (Path(page) / "programs" / f"{key}.json").write_text(json.dumps(row), encoding="utf-8")
         return f"{row['us']:>9.0f} us  {row['ions']:>6} ions  {row['format']} {row['bytes'] / 1e6:6.2f} MB  {row['s']:>5.0f} s  {how:>19}  {text}"

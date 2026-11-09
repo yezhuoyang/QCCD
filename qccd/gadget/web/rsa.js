@@ -697,7 +697,16 @@
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (let q = d.off[i]; q < d.off[i + 1]; q += 2) { x0 = Math.min(x0, d.tiles[q]); x1 = Math.max(x1, d.tiles[q]); y0 = Math.min(y0, d.tiles[q + 1]); y1 = Math.max(y1, d.tiles[q + 1]); }
     const c = $("rsa-canvas"), fitS = Math.min(c.width / (x1 - x0 + 1.4), c.height / (y1 - y0 + 1.4));
-    zoomTo((x0 + x1 + 1) / 2, (y0 + y1 + 1) / 2, Math.max(AUTO_AT.ions * 1.25, Math.min(fitS, AUTO_AT.ions * 3)));
+    let cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2;
+    if (fitS < AUTO_AT.ions * 1.25) {                 // too big to see whole with its ions: its own tile nearest the middle (a bent corridor's box is mostly bus)
+      let best = Infinity, bx = cx, by = cy;
+      for (let q = d.off[i]; q < d.off[i + 1]; q += 2) {
+        const dx = d.tiles[q] + 0.5 - cx, dy = d.tiles[q + 1] + 0.5 - cy;
+        if (dx * dx + dy * dy < best) { best = dx * dx + dy * dy; bx = d.tiles[q] + 0.5; by = d.tiles[q + 1] + 0.5; }
+      }
+      cx = bx; cy = by;
+    }
+    zoomTo(cx, cy, Math.max(AUTO_AT.ions * 1.25, Math.min(fitS, AUTO_AT.ions * 3)));
     if (detail !== "auto" && detail !== "ions") detail = "auto";
   }
 
