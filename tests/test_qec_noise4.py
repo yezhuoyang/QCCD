@@ -36,3 +36,24 @@ def test_config_contains_only_pr_a_switches():
     assert {f.name for f in fields(NoiseAt4Config)}=={'thermal_gate_error','idle_policy','meas_crosstalk_scope'}
     for field in ('thermal_gate_error','idle_policy','meas_crosstalk_scope'):
         with pytest.raises(ValueError):NoiseAt4Config(**{field:'unknown'})
+
+def test_reference_thermal_law_full_precision(frozen_case):
+    from qccd.evalset import load
+    from qccd.evalset.syntax import parse_term
+    _,prog,arch,exp,cert=frozen_case
+    ev=load('qccd-noise@4');e=ev.evaluator(ev.run(prog,arch,experiment=exp,cert=cert))
+    for row in json.loads((FIXTURE/'thermal_reference.json').read_text())['values']:
+        actual=e.term(parse_term(f"reference_thermal({row['excess']})"),{})
+        assert actual==pytest.approx(row['stim_excess'],abs=1e-12,rel=0)
+
+def test_thermal_switch_changes_only_ms_excess(frozen_case):
+    from dataclasses import replace
+    _,prog,arch,exp,cert=frozen_case
+    off=extract(prog,arch,exp,noise=NoiseModel4(config=OFF),cert=cert)
+    on=extract(prog,arch,exp,noise=NoiseModel4(config=replace(OFF,thermal_gate_error='reference')),cert=cert)
+    assert [(o,l) for o,l in zip(off.origin,off.lines) if o!='ms']==[(o,l) for o,l in zip(on.origin,on.lines) if o!='ms']
+    assert {k:v for k,v in off.budget.items() if k!='ms_heating'}=={k:v for k,v in on.budget.items() if k!='ms_heating'}
+    assert on.budget['ms_base']==off.budget['ms_base']
+    # Cold gates have zero excess; a hot schedule changes the MS probability.
+    if off.budget['ms_heating']:
+        assert on.budget['ms_heating']!=off.budget['ms_heating']

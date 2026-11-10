@@ -5,7 +5,8 @@ from .noise import NoiseModel3
 @dataclass(frozen=True, slots=True)
 class NoiseAt4Config:
     """Only PR A mechanisms. Defaults advance with their owning implementation commit."""
-    thermal_gate_error: str = "linear"
+    #: N:engine.py:164-170; gate_error_budget.py:58-105; profiles.py:244-264 (bca3de9).
+    thermal_gate_error: str = "reference"
     idle_policy: str = "per_interval"
     meas_crosstalk_scope: str = "chip"
 

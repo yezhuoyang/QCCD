@@ -4,7 +4,7 @@ about "What Goal 3's architectures are judged by: the team's Helios Nominal Nois
 include "metrics"
 clock "helios"
 
-param thermal_gate_error = "linear"
+param thermal_gate_error = "reference"
 param idle_policy = "per_interval"
 param meas_crosstalk_scope = "chip"
 
@@ -37,6 +37,26 @@ param leak_transport_per_s = 4.0e-4 / 55e-3
 
 # Section 4.  The excess above the cooled state, in Stim p.
 param slope = 9.5e-4
+
+# qccd-noise-model bca3de9: engine.py:64-72,164-170;
+# gate_error_budget.py:41-105; profiles.py:244-264. Helios engine parameters, NOT SCENARIOS.
+param ref_pi = 3.141592653589793
+param ref_eta_ld = 0.08
+param ref_nbar_cal = 0.05
+param ref_n_loops = 1
+param ref_lam2 = 1.6
+param ref_gate_us = 70
+param ref_tau_ms = 200
+param ref_delta_hz = 100
+define ref_omega = ref_pi * sqrt(ref_n_loops) / (2 * ref_gate_us * 1e-6)
+define ref_eta_d = 2 / (ref_tau_ms * 1e-3)
+define ref_delta = 2 * ref_pi * ref_delta_hz
+define ref_i_dw(n) = (pow(ref_pi, 2) / 5) * pow(ref_eta_ld, 4) * (pow(n, 2) + n + pow(n - ref_nbar_cal, 2))
+define ref_i_deph(n) = ref_pi * ref_eta_d * (2 * n + 1) * ref_lam2 / (16 * ref_omega * sqrt(ref_n_loops))
+define ref_i_delta(n) = pow(ref_pi, 2) * pow(ref_delta, 2) * (2 * n + 1) * ref_lam2 / (64 * pow(ref_omega, 2))
+define ref_i_thermal(n) = ref_i_dw(n) + ref_i_deph(n) + ref_i_delta(n)
+define reference_thermal(excess) = 5 / 4 * max(ref_i_thermal(ref_nbar_cal + max(excess, 0)) - ref_i_thermal(ref_nbar_cal), 0)
+define thermal_excess(g) = if thermal_gate_error = "reference" then reference_thermal(gate_nbar(g)) else slope * gate_nbar(g)
 
 define idle_s(i, o) = waited(i, o) * 1e-6
 
@@ -74,9 +94,9 @@ channel ms "The two-ion gate"
   about "The cooled gate's error, plus the excess above the cooled state: every quantum of heat the pair has gathered since its last cooling, background and transport alike, the hotter ion's. The excess goes inside the same depolarizing channel."
   source "Helios Nominal Noise Model Sec. 1 (2Q cooled, excluding cooling dephasing) and Sec. 4 (p_2Q = p_baseline + slope * max(n_gate - n_cal, 0))"
   after g in two_qubit_gates:
-    DEPOLARIZE2(min(15 / 16, scale * (5 / 4 * r_2q + (if heating then slope * gate_nbar(g) else 0)))) on ions(g)
+    DEPOLARIZE2(min(15 / 16, scale * (5 / 4 * r_2q + (if heating then thermal_excess(g) else 0)))) on ions(g)
       counted as ms_base = 5 / 4 * r_2q,
-                 ms_heating = if heating then slope * gate_nbar(g) else 0
+                 ms_heating = if heating then thermal_excess(g) else 0
 
 channel ms_leakage "Leakage from the two-ion gate"
   about "Applied apart from the gate's own depolarizing channel: the pair's leakage, halved, then folded, on each ion."
