@@ -140,6 +140,9 @@ class MemoryExperiment:
     #: part of the spec either
     faces: tuple[tuple[int, int], ...] = ()
 
+    #: PR A D1: source measurement-bit sidecar and explicit logical-round boundaries.
+    phase_metadata: dict | None = None
+
     def readout_plan(self) -> list[tuple[int, int, str]]:
         """(data qubit, classical bit, basis) for each appended readout, in order."""
         bases = self.readout_basis or (self.basis,) * len(self.readout_bits)
@@ -160,6 +163,7 @@ class MemoryExperiment:
             "detectors": [list(d) for d in self.detectors],
             "observables": [list(o) for o in self.observables],
             "readout": self.readout,
+            **({"phase_metadata": self.phase_metadata} if self.phase_metadata is not None else {}),
             **({"readout_bits": {str(q): b for q, b in self.readout_bits}}
                if self.readout == "appended" else {}),
             **({"readout_basis": {str(q): s for (q, _), s in zip(self.readout_bits,
@@ -203,6 +207,7 @@ class MemoryExperiment:
             readout=readout,
             readout_bits=tuple(rb),
             readout_basis=tuple(str(bases[str(q)]) for q, _ in rb) if bases else (),
+            phase_metadata=spec.get("phase_metadata"),
         )
 
     @property
@@ -368,8 +373,22 @@ def _memory(name: str, code: str, distance: int, n_data: int, checks: Sequence[_
         if c.basis == home[k]:
             dets.append((bit(rounds - 1, k),) + tuple(D + d for d in sorted(c.support)))
     obs = tuple(tuple(D + d for d in sorted(lg)) for lg in logicals)
+    phase_measurements = {}
+    for r in range(rounds):
+        for k, c in enumerate(checks):
+            phase_measurements[str(bit(r,k))] = dict(check_id=f"check_{k}", role="syndrome",
+                pauli_type=c.basis, data_support=list(c.support), round=r, qubit=anc[k])
+        for j,k in enumerate(flagged):
+            phase_measurements[str(fbit(r,j))] = dict(check_id=f"flag_{k}", role="flag",
+                pauli_type="X" if checks[k].basis=="Z" else "Z", data_support=[], round=r, qubit=flag_of[k])
+    for d in range(n_data):
+        phase_measurements[str(D+d)] = dict(check_id=f"data_{d}", role="data",
+            pauli_type=dbasis[d], data_support=[], round=rounds-1, qubit=d)
+    phase_metadata = {"measurements":phase_measurements,
+        "round_boundaries":[{"round":r,"after_bits":list(range(r*per_round,(r+1)*per_round))} for r in range(rounds)]}
     return MemoryExperiment(name=name, code=code, distance=distance, rounds=rounds,
                             basis=label, n_data=n_data, n_ancilla=m + nf,
+                            phase_metadata=phase_metadata,
                             qasm="\n".join(out) + "\n", detectors=tuple(dets),
                             observables=obs, readout=readout,
                             readout_bits=(tuple((d, D + d) for d in range(n_data))

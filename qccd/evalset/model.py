@@ -291,7 +291,7 @@ class _Cycles:
 
 
 def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm: str | None = None,
-              qubit_map=None, cert: Mapping | None = None, cost_model=None, rules: bool = False) -> Run:
+              qubit_map=None, cert: Mapping | None = None, cost_model=None, rules: bool = False, source_parser=None) -> Run:
     """Replay `prog` on `arch` under the clock (an operating-point table, at its fastest
     points) and build the run.  With an experiment, the run also carries its appended
     readout and the qubit -> ion map the circuit is read through."""
@@ -480,7 +480,7 @@ def build_run(prog, arch, clock: str = "qccdsim_jones", *, experiment=None, qasm
     if experiment is not None:
         from ..qec.qasm import parse_qasm
         text = qasm if qasm is not None else experiment.qasm
-        src = parse_qasm(text)
+        src = (source_parser or parse_qasm)(text)
         qmap, origin = resolve_qubit_map(prog, qubit_map, cert, src.n_qubits)
         run.qubit_map = {q: ion for q, ion in qmap.items() if q < src.n_qubits}
         run.facts["qubit_map_origin"] = origin

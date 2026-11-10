@@ -5,7 +5,7 @@ include "metrics"
 clock "helios"
 
 param thermal_gate_error = "reference"
-param idle_policy = "per_interval"
+param idle_policy = "since_reset"
 param meas_crosstalk_scope = "chip"
 
 # The knobs.  The official model is scale 1 with heating priced.
@@ -69,8 +69,13 @@ channel prepare "The first preparation"
 channel idle_dephasing "Mixed dephasing over an idle window"
   about "When an operation reaches an ion, the ion has waited since its last one, through transport, cooling and everything done to other ions. The whole window dephases once: the Gaussian term goes as the square of the total time, so taking the window's steps apart would understate it."
   source "Helios Nominal Noise Model Sec. 2 (Z_ERROR: pZ(t) = 0.5 [1 - exp(-t/T_lin - (t/T_g)^2)])"
-  before o in qubit_operations, i in ions(o):
+  before o in qubit_operations, i in ions(o) where idle_policy = "per_interval":
     Z_ERROR(min(1 / 2, scale * 0.5 * (1 - exp(0 - idle_s(i, o) / t_lin - pow(idle_s(i, o) / t_g, 2))))) on i
+
+# D1 full-precision increments are precomputed at chronological boundaries, never by mutable words.
+channel idle_dephasing_d1 "Cumulative source-operation idle clock"
+  before o in at4_idle_intervals:
+    Z_ERROR(min(1 / 2, scale * at4_idle_probability(o))) on ions(o) counted as idle_dephasing
 
 channel idle_leakage "Leakage over an idle window"
   about "The transport-layer leakage rate of the report the model is based on, 4.0e-4 per ion per 55 ms, folded by 0.75 and charged over the same window in proportion to its length."
