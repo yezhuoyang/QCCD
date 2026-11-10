@@ -198,3 +198,42 @@ def test_d1_cannot_silently_emit_from_an_unprepared_run(frozen_case):
         load("qccd-noise@4").circuit(old_run)
 
 
+def test_scope_switch_changes_only_crosstalk(frozen_case):
+    from dataclasses import replace
+    _,prog,arch,exp,cert=frozen_case
+    off=extract(prog,arch,exp,noise=NoiseModel4(config=OFF),cert=cert)
+    local=extract(prog,arch,exp,noise=NoiseModel4(config=replace(OFF,meas_crosstalk_scope='same_trap')),cert=cert)
+    def without_xtalk(ex):return [(o,l) for o,l in zip(ex.origin,ex.lines) if o not in ('crosstalk','crosstalk_same_trap')]
+    assert without_xtalk(local)==without_xtalk(off)
+    assert local.budget['crosstalk']<=off.budget['crosstalk']
+
+@pytest.mark.parametrize("same_site",[False,True])
+def test_same_trap_parallel_rule_and_event_coverage(same_site):
+    from dataclasses import replace
+    arch=Architecture.from_json(json.loads((FIXTURE/'device.json').read_text()))
+    sites=[s for s in arch.device.nodes if arch.device.nodes[s].is_site and arch.device.nodes[s].capacity>=2 and arch.can(s,'spam')][:3]
+    a,b,c=sites
+    placements={'q0':a,'q1':a,'q2':b,'q3':b,'q4':c}
+    if same_site:
+        arch.device.nodes[a]=replace(arch.device.nodes[a],capacity=3)
+        placements['q2']=a
+    prog=TSIR.from_json({'name':'local','arch_spec':'synthetic','instructions':[
+        {'type':'init','id':0,'placement':placements},
+        {'type':'measure','id':1,'ions':['q0','q2']},
+        {'type':'reset','id':2,'ions':['q0','q2']} ]})
+    qasm='OPENQASM 2.0; qreg q[5]; creg c[5]; measure q[0] -> c[0]; measure q[2] -> c[2]; reset q[0]; reset q[2];'
+    exp=MemoryExperiment('scope','synthetic',1,1,'Z',5,0,qasm,(),(),readout='appended',readout_bits=((1,1),(3,3),(4,4)))
+    local=extract(prog,arch,exp,noise=NoiseModel4(config=replace(OFF,meas_crosstalk_scope='same_trap')))
+    chip=extract(prog,arch,exp,noise=NoiseModel4(config=OFF))
+    def exposure(ex,origin):
+        out={}
+        for o,line in zip(ex.origin,ex.lines):
+            if o==origin:
+                inst=stim.Circuit(line)[0]
+                for t in inst.targets_copy():out[t.value]=inst.gate_args_copy()[0]
+        return out
+    assert exposure(local,'crosstalk_same_trap')==({1:1.44e-4} if same_site else {1:7.2e-5,3:7.2e-5})
+    assert exposure(chip,'crosstalk')=={1:1.44e-4,3:1.44e-4,4:1.44e-4}
+    # Reset and appended readout introduce no extra crosstalk events.
+    assert local.budget['crosstalk']==pytest.approx(2*7.2e-5)
+    assert arch.device.nodes[a].zone_type==arch.device.nodes[b].zone_type

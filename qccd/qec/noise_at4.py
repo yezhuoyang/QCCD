@@ -9,7 +9,8 @@ class NoiseAt4Config:
     thermal_gate_error: str = "reference"
     #: N:engine.py:108-121,379-430; DECISIONS.md:D1, plus approved source-gate policy.
     idle_policy: str = "since_reset"
-    meas_crosstalk_scope: str = "chip"
+    #: N:engine.py:195-203,375; trap=site is the approved PR A mapping.
+    meas_crosstalk_scope: str = "same_trap"
 
     def __post_init__(self):
         for name, allowed in (("thermal_gate_error", ("linear", "reference")),
