@@ -492,6 +492,10 @@ class NoiseModel3(NoiseModel2):
 MODELS: dict[str, NoiseModel] = {"qccd-noise@1": NoiseModel(), "qccd-noise@2": NoiseModel2(),
                                  "qccd-noise@3": NoiseModel3()}
 
+from .noise_at4 import NoiseModel4, NoiseAt4Config
+MODELS["qccd-noise@4"] = NoiseModel4()
+
+
 #: Which text a model's knobs set, knob by knob: (NoiseModel field, the text's parameter).
 _KNOBS = (("scale", "scale"), ("heating", "heating"), ("chain", "chain"), ("idle", "idle"),
           ("t2_s", "t2"), ("memory_rate_per_s", "memory_rate"),
@@ -519,6 +523,8 @@ def evaluation(model: "NoiseModel | str"):
         v = getattr(nm, field_)
         if v != getattr(default, field_):
             knobs[param] = v
+    if hasattr(nm, "eval_parameters"):
+        knobs.update(nm.eval_parameters())
     if knobs:
         ev = ev.with_params(knobs)
     if nm.table != (ev.clock or default.table):
