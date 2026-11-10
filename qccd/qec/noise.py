@@ -473,6 +473,17 @@ class NoiseModel3(NoiseModel2):
     id: str = "qccd-noise@3"
     table: str = "helios"
 
+    def to_json(self) -> dict:
+        # Reporting only: the evaluator continues to read its own text/architecture.
+        from .noise_reporting import text_settings
+        return text_settings(self)
+
+    def resolve(self, arch) -> dict[str, Any]:
+        # Keep the inherited operating-table validation exactly; discard stale @2 metadata.
+        super().resolve(arch)
+        from .noise_reporting import text_settings
+        return text_settings(self, arch)
+
     def channel_names(self) -> tuple[str, ...]:
         from ..evalset import load
         names: list[str] = []
@@ -491,6 +502,10 @@ class NoiseModel3(NoiseModel2):
 #: The published models.  `qccd-noise@1` is `NoiseModel()` with its defaults.
 MODELS: dict[str, NoiseModel] = {"qccd-noise@1": NoiseModel(), "qccd-noise@2": NoiseModel2(),
                                  "qccd-noise@3": NoiseModel3()}
+
+from .noise_at4 import NoiseModel4, NoiseAt4Config
+MODELS["qccd-noise@4"] = NoiseModel4()
+
 
 #: Which text a model's knobs set, knob by knob: (NoiseModel field, the text's parameter).
 _KNOBS = (("scale", "scale"), ("heating", "heating"), ("chain", "chain"), ("idle", "idle"),
@@ -519,6 +534,8 @@ def evaluation(model: "NoiseModel | str"):
         v = getattr(nm, field_)
         if v != getattr(default, field_):
             knobs[param] = v
+    if hasattr(nm, "eval_parameters"):
+        knobs.update(nm.eval_parameters())
     if knobs:
         ev = ev.with_params(knobs)
     if nm.table != (ev.clock or default.table):

@@ -1,0 +1,147 @@
+evaluation "qccd-noise@4"
+title "Helios PR A noise model"
+about "What Goal 3's architectures are judged by: the team's Helios Nominal Noise Model (QCCD simulation specification, 2026-11-05, based on Jaewon's noise model). Every gate, readout and preparation carries the model's Stim probability. A two-ion gate also pays for the heat it meets above the cooled state. An ion's idle window, however long, dephases once. Transport has no qubit error of its own: it costs time, which the idle channels charge, and heat, which the two-ion gate charges."
+include "metrics"
+clock "helios"
+
+param thermal_gate_error = "reference"
+param idle_policy = "since_reset"
+# same_trap (trap=site) is a sensitivity setting pending a physical scope decision.
+param meas_crosstalk_scope = "chip"
+
+# The knobs.  The official model is scale 1 with heating priced.
+param scale = 1                     # every probability is multiplied by this (0: noiseless)
+param heating = true                # price the heat a two-ion gate meets
+
+# Section 1.  r = 1 - F_avg, and Stim's p is 3r/2 on one ion, 5r/4 on a pair.
+param r_1q = 1.38e-5
+# 5.5e-4 less the 1.1e-5 cooling leaves in the idle channel, since pre-gate cooling is counted in
+# the idle window (Sec. 3): the model's "2Q cooled, excluding cooling dephasing", p ~ 6.74e-4.
+param r_2q = 5.5e-4 - 1.1e-5
+# Leakage is folded separately, as 0.75 of the per-ion probability; a pair's is halved first.
+param leak_fold = 0.75
+param leak_1q = 1.12e-5
+param leak_2q = 2.4e-4
+param p_reset = 5e-5
+param p_readout = 4.3e-4
+param p_crosstalk = 7.2e-5
+
+# Section 2.  Mixed dephasing over one idle window.
+param t_lin = 183.28657936          # seconds
+param t_g = 3.79487660              # seconds
+# "Idle leakage uses the transport-layer rate from Jaweon's report folded by a factor of 0.75" (Sec. 10b).
+# The model does not print the rate.  The report gives 1.45e-3 per ion at 200 ms before the Stim
+# conversion, which is 4.0e-4 per ion per 55 ms layer (4.0e-4 x 200/55, rounded), and folds it by 0.75
+# in DEPOLARIZE1, as below (confirmed by the model's author, 2026-11-07).  It is also Helios's rate
+# (arXiv:2511.05465 Sec. III B4, the leakage part of its linear memory term), and t_lin is the rest.
+param leak_transport_per_s = 4.0e-4 / 55e-3
+
+# Section 4.  The excess above the cooled state, in Stim p.
+param slope = 9.5e-4
+
+# qccd-noise-model bca3de9: engine.py:64-72,164-170;
+# gate_error_budget.py:41-105; profiles.py:244-264. Helios engine parameters, NOT SCENARIOS.
+param ref_pi = 3.141592653589793
+param ref_eta_ld = 0.08
+param ref_nbar_cal = 0.05
+param ref_n_loops = 1
+param ref_lam2 = 1.6
+param ref_gate_us = 70
+param ref_tau_ms = 200
+param ref_delta_hz = 100
+define ref_omega = ref_pi * sqrt(ref_n_loops) / (2 * ref_gate_us * 1e-6)
+define ref_eta_d = 2 / (ref_tau_ms * 1e-3)
+define ref_delta = 2 * ref_pi * ref_delta_hz
+define ref_i_dw(n) = (pow(ref_pi, 2) / 5) * pow(ref_eta_ld, 4) * (pow(n, 2) + n + pow(n - ref_nbar_cal, 2))
+define ref_i_deph(n) = ref_pi * ref_eta_d * (2 * n + 1) * ref_lam2 / (16 * ref_omega * sqrt(ref_n_loops))
+define ref_i_delta(n) = pow(ref_pi, 2) * pow(ref_delta, 2) * (2 * n + 1) * ref_lam2 / (64 * pow(ref_omega, 2))
+define ref_i_thermal(n) = ref_i_dw(n) + ref_i_deph(n) + ref_i_delta(n)
+define reference_thermal(excess) = 5 / 4 * max(ref_i_thermal(ref_nbar_cal + max(excess, 0)) - ref_i_thermal(ref_nbar_cal), 0)
+define thermal_excess(g) = if thermal_gate_error = "reference" then reference_thermal(gate_nbar(g)) else slope * gate_nbar(g)
+
+define idle_s(i, o) = waited(i, o) * 1e-6
+
+channel prepare "The first preparation"
+  about "Every ion starts in |0>, prepared as a reset is, with a reset's error."
+  source "Helios Nominal Noise Model Sec. 1 (physical prep / reset, 5e-5: R then X_ERROR)"
+  after p in preparations:
+    X_ERROR(min(1 / 2, scale * p_reset)) on ions(p) counted as reset
+
+channel idle_dephasing "Mixed dephasing over an idle window"
+  about "When an operation reaches an ion, the ion has waited since its last one, through transport, cooling and everything done to other ions. The whole window dephases once: the Gaussian term goes as the square of the total time, so taking the window's steps apart would understate it."
+  source "Helios Nominal Noise Model Sec. 2 (Z_ERROR: pZ(t) = 0.5 [1 - exp(-t/T_lin - (t/T_g)^2)])"
+  before o in qubit_operations, i in ions(o) where idle_policy = "per_interval":
+    Z_ERROR(min(1 / 2, scale * 0.5 * (1 - exp(0 - idle_s(i, o) / t_lin - pow(idle_s(i, o) / t_g, 2))))) on i
+
+# D1 full-precision increments are precomputed at chronological boundaries, never by mutable words.
+channel idle_dephasing_d1 "Cumulative source-operation idle clock"
+  before o in at4_idle_intervals:
+    Z_ERROR(min(1 / 2, scale * at4_idle_probability(o))) on ions(o) counted as idle_dephasing
+
+channel idle_leakage "Leakage over an idle window"
+  about "The transport-layer leakage rate of the report the model is based on, 4.0e-4 per ion per 55 ms, folded by 0.75 and charged over the same window in proportion to its length."
+  source "Helios Nominal Noise Model Sec. 2; the rate from the report it is based on (Sec. 10b): 1.45e-3 per ion at 200 ms, so 4.0e-4 per 55 ms, as in arXiv:2511.05465 Sec. III B4"
+  before o in qubit_operations, i in ions(o):
+    DEPOLARIZE1(min(3 / 4, scale * leak_fold * leak_transport_per_s * idle_s(i, o))) on i
+
+channel readout_z "A wrong readout"
+  about "Symmetric readout: the outcome is wrong with this probability."
+  source "Helios Nominal Noise Model Sec. 1 (symmetric readout, 4.3e-4)"
+  before m in measurements where basis(m) = "Z":
+    X_ERROR(min(1 / 2, scale * p_readout)) on ions(m) counted as measure
+
+channel readout_x "A wrong readout, in the X basis"
+  about "The same flip, for the experiment's own readout of an X memory."
+  source "Helios Nominal Noise Model Sec. 1 (symmetric readout, 4.3e-4)"
+  before m in measurements where basis(m) = "X":
+    Z_ERROR(min(1 / 2, scale * p_readout)) on ions(m) counted as measure
+
+channel ms "The two-ion gate"
+  about "The cooled gate's error, plus the excess above the cooled state: every quantum of heat the pair has gathered since its last cooling, background and transport alike, the hotter ion's. The excess goes inside the same depolarizing channel."
+  source "Helios Nominal Noise Model Sec. 1 (2Q cooled, excluding cooling dephasing) and Sec. 4 (p_2Q = p_baseline + slope * max(n_gate - n_cal, 0))"
+  after g in two_qubit_gates:
+    DEPOLARIZE2(min(15 / 16, scale * (5 / 4 * r_2q + (if heating then thermal_excess(g) else 0)))) on ions(g)
+      counted as ms_base = 5 / 4 * r_2q,
+                 ms_heating = if heating then thermal_excess(g) else 0
+
+channel ms_leakage "Leakage from the two-ion gate"
+  about "Applied apart from the gate's own depolarizing channel: the pair's leakage, halved, then folded, on each ion."
+  source "Helios Nominal Noise Model Sec. 1 (2Q leakage, folded: 9e-5 on each target)"
+  after g in two_qubit_gates:
+    DEPOLARIZE1(min(3 / 4, scale * leak_fold * leak_2q / 2)) on ions(g)
+
+channel gate_1q "A one-ion pulse"
+  about "Every physical pulse. A frame change is virtual here, so it fails no more than it takes time, and an identity is no pulse at all."
+  source "Helios Nominal Noise Model Sec. 1 (1Q computational, p = 3r/2 = 2.07e-5)"
+  after g in single_qubit_gates where gate(g) != "I" and gate(g) != "VZ":
+    DEPOLARIZE1(min(3 / 4, scale * 3 / 2 * r_1q)) on ions(g)
+
+channel gate_1q_leakage "Leakage from a one-ion pulse"
+  about "Folded, and applied apart from the pulse's own channel."
+  source "Helios Nominal Noise Model Sec. 1 (1Q leakage, folded: 8.4e-6)"
+  after g in single_qubit_gates where gate(g) != "I" and gate(g) != "VZ":
+    DEPOLARIZE1(min(3 / 4, scale * leak_fold * leak_1q)) on ions(g)
+
+channel residual_drive "Residual drive on inactive zones"
+  about "On a machine whose gates share one global drive, a layer of pulses reaches the qubits sitting it out, at a fraction of the strength. The machine's 1q_gate says how much that costs each of them; on any other machine it says 0. A layer that names one ion is the shim charge a reconfiguration opens with, or too small to count."
+  source "QCCD Transport Architectures deck, WISE T9 (arXiv:2305.12773 Sec. V B: below 1e-5 at epsilon ~ 0.1, the bound used as the value)"
+  after k in steps where kind(k) = "gate" and duration(k) = primitive("1q_gate", "us") and count(j in operated(k)) > 1:
+    DEPOLARIZE1(min(3 / 4, scale * primitive("1q_gate", "residual_inactive"))) on {i for i in ions where i not in operated(k)}
+
+channel reset "A wrong reset"
+  about "A reset leaves its ion in |1> instead of |0> with this probability."
+  source "Helios Nominal Noise Model Sec. 1 (physical prep / reset, 5e-5)"
+  after r in resets:
+    X_ERROR(min(1 / 2, scale * p_reset)) on ions(r)
+
+channel crosstalk "Measurement crosstalk"
+  about "Each measured ion disturbs every other ion on the chip, its spectators. A mid-circuit measurement and its reset share one crosstalk input, so a reset adds none. The model gives 7.2e-5 per spectator and does not say how ions measured in parallel combine. Here that is a simulation assumption: weak, independent scattering, so each measured ion adds the same 7.2e-5, to first order, wherever the spectator sits relative to the measurement light. Reading out in parallel therefore earns no discount."
+  source "Helios Nominal Noise Model Sec. 1 (measurement crosstalk and combined MR crosstalk, 7.2e-5 per spectator)"
+  after k in steps where kind(k) = "measure" and meas_crosstalk_scope = "chip":
+    DEPOLARIZE1(min(3 / 4, scale * p_crosstalk * count(j in operated(k)))) on {i for i in ions where i not in operated(k)}
+
+# qccd-noise-model bca3de9 engine.py:375: all other qubits in the trap.
+# Sensitivity setting only: trap=site; the physical trap scope is undecided.
+channel crosstalk_same_trap "Measurement crosstalk within a site"
+  after k in steps, s in sites where kind(k) = "measure" and meas_crosstalk_scope = "same_trap":
+    DEPOLARIZE1(min(3 / 4, scale * p_crosstalk * count(j in operated(k) where position(j, start(k)) = s))) on {i for i in ions where i not in operated(k) and position(i, start(k)) = s} counted as crosstalk
