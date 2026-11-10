@@ -130,6 +130,8 @@ def resolve_qubit_map(prog, qubit_map=None, cert: Mapping | None = None,
 def _explainer(nm: NoiseModel):
     """The `why` line for one written channel, in the words the Noise panels have always used."""
     rate = getattr(nm, "memory_rate_per_s", None)
+    from .noise import NoiseModel3
+    helios_text = isinstance(nm, NoiseModel3)
 
     def explain(ch, p: float, targets, env: dict, ev) -> str | None:
         name = ch.name
@@ -141,7 +143,7 @@ def _explainer(nm: NoiseModel):
             chain = int(g.step.occ0.get(g.site, 2) or 2)
             return f"MS {a},{b}: n-bar {nbar:.3g}, chain of {chain} -> p = {p:.3g}"
         if name == "gate_1q":
-            return f"one-qubit gate: p = {p:.3g} each (1 - fidelity)"
+            return f"one-qubit gate: p = {p:.3g} each" + (" (3r/2 computational channel)" if helios_text else " (1 - fidelity)")
         if name in ("readout_z", "readout_x"):
             return f"readout: flip with p = {p:.3g} before each measurement (1 - fidelity)"
         if name == "reset":
@@ -149,6 +151,8 @@ def _explainer(nm: NoiseModel):
         if name == "prepare":
             return f"every ion starts in |0>, prepared with the reset's error p = {p:.3g}"
         if name == "crosstalk":
+            if helios_text:
+                return f"measure: {n} spectator ion(s) across the chip disturbed with p = {p:.3g} each"
             return f"measure in a shared trap: {n} other ion(s) disturbed with p = {p:.3g} each"
         if name in ("crosstalk_global", "crosstalk_reset"):
             k = env.get("k")

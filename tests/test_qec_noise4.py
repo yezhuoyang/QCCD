@@ -237,3 +237,44 @@ def test_same_trap_parallel_rule_and_event_coverage(same_site):
     # Reset and appended readout introduce no extra crosstalk events.
     assert local.budget['crosstalk']==pytest.approx(2*7.2e-5)
     assert arch.device.nodes[a].zone_type==arch.device.nodes[b].zone_type
+
+def test_helios_report_uses_executable_model_fields(frozen_case):
+    from qccd.qec.noise import describe,NoiseModel2
+    from dataclasses import replace
+    _,prog,arch,exp,cert=frozen_case
+    settings=describe('qccd-noise@3')['settings']
+    assert settings['r_2q']==pytest.approx(5.39e-4)
+    assert settings['p_crosstalk']==7.2e-5
+    assert settings['t_lin']==183.28657936
+    for stale in ('memory_rate_per_s','coherent_dephasing_hz','nbar_floor','crosstalk_local','crosstalk_far','crosstalk_reset'):
+        assert stale not in settings
+        assert stale not in NoiseModel3().resolve(arch)
+    assert 'memory_rate_per_s' in NoiseModel2().to_json()
+    selected=NoiseModel4(config=OFF).resolve(arch)
+    assert selected['thermal_gate_error']=='linear'
+    assert selected['idle_policy']=='per_interval'
+    assert selected['meas_crosstalk_scope']=='chip'
+    assert 'legacy' in selected['r16_cost_estimate']
+    assert NoiseModel4().to_json()['thermal_gate_error']=='reference'
+    assert NoiseModel4().to_json()['idle_policy']=='since_reset'
+    assert NoiseModel4().to_json()['t_lin']==183.28657935856594
+    assert NoiseModel4().to_json()['t_g']==3.7948765959083626
+    assert NoiseModel4().to_json()['meas_crosstalk_scope']=='same_trap'
+
+def test_report_fix_retains_transport_validation(frozen_case):
+    from dataclasses import replace
+    _,_,arch,_,_=frozen_case
+    # The unsupported table is still refused before reporting.
+    with pytest.raises(ValueError,match='operating-point'):
+        replace(NoiseModel3(),table='unavailable').resolve(arch)
+
+def test_all_pr_a_defaults_work_and_do_not_change_timing(frozen_case):
+    name,prog,arch,old,cert=frozen_case
+    ex=extract(prog,arch,active_experiment(name),noise=NoiseModel4(),cert=cert)
+    legacy=extract(prog,arch,old,noise=NoiseModel3(),cert=cert)
+    assert ex.stats['t_us']==legacy.stats['t_us']
+    assert ex.stats['n_cool']==legacy.stats['n_cool']
+    assert ex.stats['rules_failed']==[]
+    assert ex.budget['idle_leakage']==legacy.budget['idle_leakage']
+    assert ex.budget['ms_base']==legacy.budget['ms_base']
+    assert str(ex.circuit)!=str(legacy.circuit)

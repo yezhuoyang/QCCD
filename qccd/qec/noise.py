@@ -473,6 +473,17 @@ class NoiseModel3(NoiseModel2):
     id: str = "qccd-noise@3"
     table: str = "helios"
 
+    def to_json(self) -> dict:
+        # Reporting only: the evaluator continues to read its own text/architecture.
+        from .noise_reporting import text_settings
+        return text_settings(self)
+
+    def resolve(self, arch) -> dict[str, Any]:
+        # Keep the inherited operating-table validation exactly; discard stale @2 metadata.
+        super().resolve(arch)
+        from .noise_reporting import text_settings
+        return text_settings(self, arch)
+
     def channel_names(self) -> tuple[str, ...]:
         from ..evalset import load
         names: list[str] = []
