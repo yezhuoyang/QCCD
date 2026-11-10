@@ -1179,7 +1179,7 @@ def _sources(src: str) -> str:
     return ", ".join(out)
 
 
-def rules_page(built: dict) -> str:
+def rules_page(built: dict, architecture_runs: list[dict] | None = None) -> str:
     """The Rules page, written from the rule language (`qccd/site/rulespage.py`)."""
     from . import rulespage
     from ..repro import catalog
@@ -1192,7 +1192,8 @@ def rules_page(built: dict) -> str:
                 papers[n].append((p["key"], p.get("short", p["key"])))
         for n in rulespage.MODEL_PAPER_SETS.get(p["key"], ()):
             papers.setdefault(n, []).append((p["key"], p.get("short", p["key"])))
-    return rulespage.page(built, {R["id"]: R for R in RULES}, PAGE, STYLE, papers)
+    return rulespage.page(built, {R["id"]: R for R in RULES}, PAGE, STYLE, papers,
+                          architecture_runs)
 
 
 def build_examples(out: Path, put) -> tuple[dict, dict]:
@@ -2473,14 +2474,16 @@ def build(out: Path) -> int:
     put("publications/index.html", publications_page(), 1, "publications")
     lang, rules = build_examples(out, put)
     put("language/index.html", language_page(lang), 1, "language")
-    put("rules/index.html", rules_page(rules), 1, "rules")
+    from . import architecture_compilation
+    architecture_runs = architecture_compilation.build_pages(out, put, device_svg)
+    put("rules/index.html", rules_page(rules, architecture_runs), 1, "rules")
     from . import rulespage
     for rel, blob in rulespage.downloads():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_bytes(blob)
     compiled = build_compiled_pages(out, put)
     put("compilation/index.html", compilation_page(compiled), 1, "compilation")
-    print(f"  compilation  {len(compiled)} compiled examples")
+    print(f"  compilation  {len(compiled)} compiled examples, {len(architecture_runs)} architecture runs")
     put("evaluation/index.html", evaluation.page(PAGE, STYLE, device_svg=device_svg), 1, "evaluation")
     for rel, blob in evaluation.files():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)

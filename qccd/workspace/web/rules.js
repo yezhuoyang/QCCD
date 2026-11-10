@@ -41,6 +41,7 @@
       rules: ['Y1', 'Y2', 'Y3', 'Y4']
     }
   ];
+  var ARCHITECTURES = window.QCCD_RULE_PROFILES || [];
 
   function linkFor(rule) {
     var a = document.createElement('a');
@@ -69,6 +70,171 @@
         cursor = link;
       });
     });
+    if (ARCHITECTURES.length) {
+      var architecture = document.createElement('a');
+      architecture.href = '#architecture-overlays';
+      architecture.textContent = 'Architecture rule profiles';
+      architecture.title = 'Architecture rule profiles';
+      architecture.className = 'tc-2 rule-category-toc';
+      cursor.after(architecture);
+      cursor = architecture;
+      ARCHITECTURES.forEach(function (profile) {
+        var link = document.createElement('a');
+        link.href = '#architecture-' + profile.id;
+        link.textContent = profile.title;
+        link.title = profile.title;
+        cursor.after(link);
+        cursor = link;
+      });
+    }
+  }
+
+  function ruleLinks(rules) {
+    var span = document.createElement('span');
+    (rules || []).forEach(function (rule, i) {
+      if (i) span.appendChild(document.createTextNode(', '));
+      span.appendChild(linkFor(rule));
+    });
+    return span;
+  }
+
+  function architectureFlow(profile) {
+    var visual = profile.visual;
+    if (!visual || !visual.steps || !visual.steps.length) return null;
+    var figure = document.createElement('figure');
+    figure.className = 'architecture-flow';
+    figure.setAttribute('aria-label', visual.title);
+    var caption = document.createElement('figcaption');
+    caption.textContent = visual.title;
+    figure.appendChild(caption);
+    var steps = document.createElement('ol');
+    visual.steps.forEach(function (step) {
+      var item = document.createElement('li');
+      var label = document.createElement('strong');
+      label.textContent = step.label;
+      var detail = document.createElement('span');
+      detail.textContent = step.detail;
+      item.appendChild(label);
+      item.appendChild(detail);
+      steps.appendChild(item);
+    });
+    figure.appendChild(steps);
+    return figure;
+  }
+
+  function architectureOverlays() {
+    if (!ARCHITECTURES.length) return null;
+    var section = document.createElement('section');
+    section.id = 'architecture-overlays';
+    section.className = 'architecture-overlays';
+    var head = document.createElement('header');
+    var h = document.createElement('h3');
+    h.textContent = 'Architecture rule profiles';
+    var intro = document.createElement('p');
+    intro.textContent = 'Each profile binds a real physical machine to the exact rule set the checker runs. The lists below separate architecture-only checks from general rules that stay, strengthen, or step aside in one narrowly defined phase.';
+    head.appendChild(h);
+    head.appendChild(intro);
+    section.appendChild(head);
+
+    var grid = document.createElement('div');
+    grid.className = 'architecture-profile-grid';
+    ARCHITECTURES.forEach(function (profile) {
+      var card = document.createElement('article');
+      card.id = 'architecture-' + profile.id;
+      card.className = 'architecture-profile';
+      card.dataset.architecture = profile.id;
+      var title = document.createElement('h4');
+      title.textContent = profile.title;
+      var scope = document.createElement('p');
+      scope.className = 'architecture-scope';
+      scope.textContent = profile.scope;
+      var source = document.createElement('a');
+      source.className = 'architecture-source';
+      source.href = profile.source_url;
+      source.textContent = profile.source;
+      card.appendChild(title);
+      card.appendChild(scope);
+      card.appendChild(source);
+
+      var machine = document.createElement('div');
+      machine.className = 'architecture-machine';
+      var machineTitle = document.createElement('strong');
+      machineTitle.textContent = 'Physical machine · ' + profile.architecture.label;
+      var facts = document.createElement('ul');
+      facts.className = 'architecture-facts';
+      profile.architecture.facts.forEach(function (fact) {
+        var factItem = document.createElement('li');
+        factItem.textContent = fact;
+        facts.appendChild(factItem);
+      });
+      var ruleSet = document.createElement('p');
+      ruleSet.className = 'architecture-rule-set';
+      ruleSet.appendChild(document.createTextNode('Checker profile '));
+      var ruleSetName = document.createElement('code');
+      ruleSetName.textContent = profile.ruleset;
+      ruleSet.appendChild(ruleSetName);
+      ruleSet.appendChild(document.createTextNode(' · ' + profile.ruleset_title));
+      machine.appendChild(machineTitle);
+      machine.appendChild(facts);
+      machine.appendChild(ruleSet);
+      card.appendChild(machine);
+      var flow = architectureFlow(profile);
+      if (flow) card.appendChild(flow);
+
+      var addTitle = document.createElement('h5');
+      addTitle.textContent = profile.rule_label;
+      card.appendChild(addTitle);
+      var additions = document.createElement('ol');
+      additions.className = 'architecture-additions';
+      profile.rules.forEach(function (addition) {
+        var item = document.createElement('li');
+        var label = document.createElement('strong');
+        label.appendChild(linkFor(addition.id));
+        label.appendChild(document.createTextNode(' · ' + addition.title));
+        var statement = document.createElement('span');
+        statement.textContent = addition.statement;
+        item.appendChild(label);
+        item.appendChild(statement);
+        additions.appendChild(item);
+      });
+      card.appendChild(additions);
+
+      var suppressTitle = document.createElement('h5');
+      suppressTitle.textContent = 'Rule changes and scoped exceptions';
+      card.appendChild(suppressTitle);
+      var suppressions = document.createElement('ul');
+      suppressions.className = 'architecture-suppressions';
+      profile.changes.forEach(function (suppression) {
+        var item = document.createElement('li');
+        var label = document.createElement('strong');
+        label.appendChild(document.createTextNode(suppression.kind + ' · '));
+        label.appendChild(ruleLinks(suppression.rules));
+        label.appendChild(document.createTextNode(' — ' + suppression.when));
+        var reason = document.createElement('span');
+        reason.textContent = suppression.reason;
+        item.appendChild(label);
+        item.appendChild(reason);
+        suppressions.appendChild(item);
+      });
+      card.appendChild(suppressions);
+
+      var verification = document.createElement('div');
+      verification.className = 'architecture-verification';
+      var verificationTitle = document.createElement('strong');
+      verificationTitle.textContent = 'Tested behaviour';
+      var verificationList = document.createElement('ul');
+      profile.verification.forEach(function (check) {
+        var checkItem = document.createElement('li');
+        checkItem.textContent = check;
+        verificationList.appendChild(checkItem);
+      });
+      verification.appendChild(verificationTitle);
+      verification.appendChild(verificationList);
+      card.appendChild(verification);
+      grid.appendChild(card);
+    });
+    section.appendChild(grid);
+    return section;
   }
 
   function organise() {
@@ -98,7 +264,9 @@
     });
     all.parentNode.insertBefore(nav, oldToc ? oldToc.nextSibling : all.nextSibling);
 
-    var cursor = nav;
+    var overlays = architectureOverlays();
+    if (overlays) nav.parentNode.insertBefore(overlays, nav.nextSibling);
+    var cursor = overlays || nav;
     GROUPS.forEach(function (group) {
       var section = document.createElement('section');
       section.className = 'rule-category';

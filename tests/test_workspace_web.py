@@ -250,6 +250,40 @@ def test_inject_adds_rule_categories_only_when_requested():
     assert "Transport & control" in grouped
     assert "Operations & timing" in grouped
     assert "['R0', 'R1', 'R2', 'R3', 'R13'" in grouped
+    assert "window.QCCD_RULE_PROFILES=" in grouped
+    assert "Architecture rule profiles" in grouped
+    for title in ("C2LR swap-or-stay lattice", "WISE switched grid",
+                  "Cyclone ring codesign", "General conveyor loop"):
+        assert title in grouped
+    assert "A leg holds one crystal, or two between an enter and its exit" in grouped
+    assert "Tested behaviour" in grouped
+
+
+def test_architecture_rule_profiles_are_complete_scoped_and_unique():
+    from qccd.ruleset import catalogue, load
+
+    profiles = json.loads((REPO / "qccd/workspace/web/rules-profiles.json").read_text())
+    assert [p["id"] for p in profiles] == ["c2lr", "wise", "cyclone", "conveyor"]
+    assert [p["ruleset"] for p in profiles] == ["c2lr", "wise", "cyclone-deck", "conveyor"]
+    assert set(profiles[0]["rule_ids"]) == {f"C{i}" for i in range(1, 11)}
+    assert set(profiles[1]["rule_ids"]) == {"W1", "W2", "W4", "W10", "W11"}
+    assert set(profiles[2]["rule_ids"]) == {"Y1", "Y2", "Y3", "Y4"}
+    assert {"R4d", "R11", "R22"} <= set(profiles[3]["rule_ids"])
+    catalogue_ids = {r.id for r in catalogue().rules}
+    assert all(set(p["rule_ids"]) <= catalogue_ids & set(load(p["ruleset"]).ids)
+               for p in profiles)
+    assert all(p["rule_ids"] and p["changes"] and p["verification"] for p in profiles)
+    assert all(p["visual"]["title"] and len(p["visual"]["steps"]) >= 3 for p in profiles)
+    assert all(step["label"] and step["detail"]
+               for p in profiles for step in p["visual"]["steps"])
+    assert all(s["kind"] and s["when"] and s["reason"] and s["rules"]
+               for p in profiles for s in p["changes"])
+    assert all(p["architecture"]["label"] and p["architecture"]["reference"]
+               and len(p["architecture"]["facts"]) >= 3 for p in profiles)
+    for profile in profiles:
+        ref = profile["architecture"]["reference"]
+        if ref.endswith(".json"):
+            assert (REPO / ref).exists(), ref
 
 
 def test_every_rule_on_the_rules_page_has_a_category_and_the_site_groups_them():
