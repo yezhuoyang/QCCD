@@ -9,8 +9,9 @@ class NoiseAt4Config:
     thermal_gate_error: str = "reference"
     #: N:engine.py:108-121,379-430; DECISIONS.md:D1, plus approved source-gate policy.
     idle_policy: str = "since_reset"
-    #: N:engine.py:195-203,375; trap=site is the approved PR A mapping.
-    meas_crosstalk_scope: str = "same_trap"
+    #: N:engine.py:195-203,375; same_trap (trap=site) is a sensitivity setting
+    #: pending a physical trap-scope decision; chip preserves the existing default.
+    meas_crosstalk_scope: str = "chip"
 
     def __post_init__(self):
         for name, allowed in (("thermal_gate_error", ("linear", "reference")),
@@ -40,5 +41,5 @@ class NoiseModel4(NoiseModel3):
         out = super().resolve(arch)
         out.update(self.to_json())
         out["r16_cost_estimate"] = "legacy linear replay estimate; use emitted channel budget for reference thermal error"
-        out["trap_mapping"] = "trap = site; requires confirmation from John" if self.config.meas_crosstalk_scope == "same_trap" else "chip-wide spectators"
+        out["trap_mapping"] = "sensitivity setting: trap = site; physical trap scope is pending" if self.config.meas_crosstalk_scope == "same_trap" else "chip-wide spectators"
         return out

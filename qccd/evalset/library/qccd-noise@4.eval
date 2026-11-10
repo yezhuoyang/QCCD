@@ -6,7 +6,8 @@ clock "helios"
 
 param thermal_gate_error = "reference"
 param idle_policy = "since_reset"
-param meas_crosstalk_scope = "same_trap"
+# same_trap (trap=site) is a sensitivity setting pending a physical scope decision.
+param meas_crosstalk_scope = "chip"
 
 # The knobs.  The official model is scale 1 with heating priced.
 param scale = 1                     # every probability is multiplied by this (0: noiseless)
@@ -140,7 +141,7 @@ channel crosstalk "Measurement crosstalk"
     DEPOLARIZE1(min(3 / 4, scale * p_crosstalk * count(j in operated(k)))) on {i for i in ions where i not in operated(k)}
 
 # qccd-noise-model bca3de9 engine.py:375: all other qubits in the trap.
-# PR A maps a physical trap to a site; John must confirm that device interpretation.
+# Sensitivity setting only: trap=site; the physical trap scope is undecided.
 channel crosstalk_same_trap "Measurement crosstalk within a site"
   after k in steps, s in sites where kind(k) = "measure" and meas_crosstalk_scope = "same_trap":
     DEPOLARIZE1(min(3 / 4, scale * p_crosstalk * count(j in operated(k) where position(j, start(k)) = s))) on {i for i in ions where i not in operated(k) and position(i, start(k)) = s} counted as crosstalk

@@ -259,7 +259,7 @@ def test_helios_report_uses_executable_model_fields(frozen_case):
     assert NoiseModel4().to_json()['idle_policy']=='since_reset'
     assert NoiseModel4().to_json()['t_lin']==183.28657935856594
     assert NoiseModel4().to_json()['t_g']==3.7948765959083626
-    assert NoiseModel4().to_json()['meas_crosstalk_scope']=='same_trap'
+    assert NoiseModel4().to_json()['meas_crosstalk_scope']=='chip'
 
 def test_report_fix_retains_transport_validation(frozen_case):
     from dataclasses import replace
@@ -278,3 +278,15 @@ def test_all_pr_a_defaults_work_and_do_not_change_timing(frozen_case):
     assert ex.budget['idle_leakage']==legacy.budget['idle_leakage']
     assert ex.budget['ms_base']==legacy.budget['ms_base']
     assert str(ex.circuit)!=str(legacy.circuit)
+
+
+def test_chip_is_default_and_local_scope_is_explicit_sensitivity():
+    from dataclasses import replace
+    from qccd.evalset import load
+    assert NoiseAt4Config().meas_crosstalk_scope == 'chip'
+    assert load('qccd-noise@4').params['meas_crosstalk_scope'].value == 'chip'
+    arch=Architecture.from_json(json.loads((FIXTURE/'device.json').read_text()))
+    assert NoiseModel4().resolve(arch)['trap_mapping'] == 'chip-wide spectators'
+    local=NoiseModel4(config=replace(NoiseAt4Config(),meas_crosstalk_scope='same_trap'))
+    assert 'sensitivity' in local.resolve(arch)['trap_mapping']
+    assert 'pending' in local.resolve(arch)['trap_mapping']
