@@ -648,3 +648,45 @@ def test_the_command_line_lists_who_is_learning(srv, capsys):
     out = capsys.readouterr().out.splitlines()
     assert out[0].startswith("A1") and "**" in out[1]
     assert capi.main(["progress", "--db", db, "nobody@example.org"]) == 1
+
+
+def test_a_visitor_a_member_and_a_granted_member_are_three_readers(srv, capsys):
+    """`/api/authz` is what the web server asks before it serves a page that is not for every
+    visitor.  A visitor is refused with 401; a member passes `member` and is refused a
+    permission with 403; a member granted the permission passes it.  Being the admin grants
+    nothing: who sees unpublished results is a list of people."""
+    db = srv[2].store.path
+    visitor = Client(srv[0], srv[1])
+    assert visitor.get("/api/authz?need=member")[0] == 401
+    assert visitor.get("/api/authz?need=layers")[0] == 401
+    ada = reader(srv)
+    assert ada.get("/api/authz?need=member")[0] == 200
+    assert ada.get("/api/authz?need=layers")[0] == 403
+    assert ada.get("/api/me")[1]["user"]["perms"] == []
+    boss = admin_client(srv)
+    assert boss.get("/api/authz?need=layers")[0] == 403, "an admin is not granted by being one"
+    # granted from the command line, one account at a time; it takes effect on the next request
+    assert capi.main(["grant", "--db", db, "ADA@example.org", "layers"]) == 0
+    assert "layers" in capsys.readouterr().out
+    assert ada.get("/api/authz?need=layers")[0] == 200
+    assert ada.get("/api/me")[1]["user"]["perms"] == ["layers"]
+    assert capi.main(["grants", "--db", db]) == 0
+    listed = capsys.readouterr().out
+    assert "ada@example.org" in listed and ADMIN not in listed
+    # and taken back
+    assert capi.main(["grant", "--db", db, "ada@example.org", "layers", "--revoke"]) == 0
+    assert ada.get("/api/authz?need=layers")[0] == 403
+    assert capi.main(["grant", "--db", db, "nobody@example.org", "layers"]) == 1
+
+
+def test_authz_refuses_a_word_it_does_not_know_and_a_closed_account(srv):
+    ada = reader(srv)
+    assert ada.get("/api/authz")[0] == 400
+    assert ada.get("/api/authz?need=everything")[0] == 400
+    capi.main(["grant", "--db", srv[2].store.path, "ada@example.org", "layers"])
+    assert ada.get("/api/authz?need=layers")[0] == 200
+    # a closed account is signed out at once, so it passes nothing, whatever it was granted
+    capi.main(["access", "--db", srv[2].store.path, "ada@example.org", "--revoke"])
+    assert ada.get("/api/authz?need=member")[0] == 401
+    assert ada.get("/api/authz?need=layers")[0] == 401
+

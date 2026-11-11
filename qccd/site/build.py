@@ -66,8 +66,7 @@ EXAMPLE = {"task": "five_qubit", "device": "ring24_8_j",
            "what": "The five-qubit code's syndrome round on a 24-site ring with 8 docks and junction corners"}
 
 #: The ranking pages' family colours (bb_studio.py's FAMHEX); everything else is grey.
-FAMHEX = {"ring + docks": "#2a78d6", "lattice": "#eb6834", "torus": "#1baf7a", "random graph": "#4a3aa7",
-          "conveyor sandwich": "#b5357f"}
+FAMHEX = {"ring + docks": "#2a78d6", "lattice": "#eb6834", "torus": "#1baf7a", "random graph": "#4a3aa7"}
 GREY = "#8a8985"
 
 #: One pictogram and one sentence per part of the course, keyed by the part id.
@@ -538,6 +537,11 @@ def tasks() -> list[dict]:
         # 2026-10-20 -- before, it was not published at all)
         # a device over the task's hardware budget is disqualified the same way: the board
         # scripts record the official grader's own verdict (DEVICE.OVER_BUDGET, #15)
+        # an entry marked `restricted` is unpublished work: it is on no page a visitor can
+        # fetch.  The board with it is built under the area its permission guards (below).
+        t["restricted"] = sorted({r["restricted"] for r in rows if r.get("restricted")})
+        t["all_rows"] = rows
+        rows = [r for r in rows if not r.get("restricted")]
         t["disqualified"] = [r for r in rows if r.get("rules_failed") or r.get("over_budget")]
         t["rows"] = [r for r in rows if not (r.get("rules_failed") or r.get("over_budget"))]
         t["seed_dir"] = seed
@@ -674,7 +678,8 @@ def render_docs() -> dict[str, dict]:
         r = Renderer(table, _doc_link)
         # the reference pages are the project's own engineering documents; `prose.strip`
         # takes the repository out of them, since a reader here has no such files
-        body = r.render(prose.strip((DOCS / f"{name}.md").read_text(encoding="utf-8"), name))
+        from .access import without_unpublished
+        body = r.render(prose.strip(without_unpublished((DOCS / f"{name}.md").read_text(encoding="utf-8")), name))
         title = re.sub(r"<[^>]+>", "", r.headings[0][2]) if r.headings else name
         toc = "".join(f'<li><a href="#{sid}">{text}</a></li>' for lvl, sid, text in r.headings if lvl == 2)
         out[name] = {"title": html.unescape(title), "body": body, "toc": toc, "headings": r.headings}
@@ -756,7 +761,7 @@ def learn_page(parts: list[dict], less: list[dict], docs: dict, ts: list[dict]) 
     return PAGE.format(title="Tutorial - QCCD studio", style=STYLE, extra_css=progress.LEARN_CSS, body="\n".join(body))
 
 
-def board_index(ts: list[dict]) -> str:
+def board_index(ts: list[dict], goals: bool = True) -> str:
     """One row per task: the ranked designs as bars coloured by family, the fastest verified
     one in green, refused and rule-failing ones called out, and the numbers that matter.
 
@@ -816,7 +821,8 @@ def board_index(ts: list[dict]) -> str:
               "".join(f'<span><i style="background:{c}"></i>{f}</span>' for f, c in FAMHEX.items()) +
               f'<span><i style="background:{GREY}"></i>a loop without docks, a line, rails, or two loops</span>'
               '<span><i style="background:#0b7a4b"></i>fastest verified</span></div>')
-    body = ("<h1>Leaderboard</h1>" + boards.goals_section() + leaderboard.goal_table() + boards.architecture_intro() +
+    body = ("<h1>Leaderboard</h1>" + (boards.goals_section() + leaderboard.goal_table() if goals else "")
+            + boards.architecture_intro() +
             '<section class="lb-sec" id="architecture"><h2>Architecture</h2>'
             "<p class=\"sub\">Machines, compiled by the reference compiler and judged by every "
             "<a href=\"../rules/#set-standard\">rule</a>. The three fastest verified designs per board; "
@@ -2359,8 +2365,6 @@ def build(out: Path) -> int:
     index += [{"t": html.unescape(re.sub(r"<[^>]+>", "", text)), "d": "Physics background",
                "u": f"physics/#{sid}", "k": "physics"} for lvl, sid, text in phys["headings"] if lvl == 2]
     index += machinepage.index_entries()
-    from . import layers as _layers
-    index += _layers.index_entries()
     index.append({"t": "People", "d": "who takes part in the project", "u": "people/", "k": "page"})
     index += [{"t": p["name"], "d": " \u00b7 ".join(x for x in (p.get("role"), p.get("affiliation")) if x),
                "u": f"people/#{slug(p['name'])}", "k": "person"} for p in PEOPLE]
@@ -2389,6 +2393,10 @@ def build(out: Path) -> int:
     # the Debug page: any Studio page above, step by step, checked by rules (qccd/site/debugpage.py)
     from . import debugpage
     index += debugpage.index_entries()
+    # the search box is on every page, a visitor's too: it does not list what a visitor may not open
+    from . import access
+    guarded = access.MEMBERS + tuple(p for ps in access.GRANTED.values() for p in ps)
+    index = [e for e in index if not str(e.get("u", "")).startswith(guarded)]
     idx = json.dumps(index, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")
 
     app_pages: list[tuple[str, str]] = []      # every Studio page written: what the Debug page can open
@@ -2475,6 +2483,10 @@ def build(out: Path) -> int:
         shown.append(facts)
     shutil.rmtree(out / ".layers_tmp", ignore_errors=True)
     put("layers/index.html", layers.page(PAGE, STYLE, shown), 1, "layers")
+    # what the web server answers instead of a page that is not for this reader
+    from . import access
+    put("restricted/index.html", access.sign_in_page(PAGE, STYLE), 1, None)
+    put("restricted/no/index.html", access.not_shared_page(PAGE, STYLE), 2, None)
     print(f"  layers       {len(shown)} machines built in layers, each with a programme played on it")
     from . import agentic
     put("agentic/index.html", agentic.page(PAGE, STYLE), 1, "agentic")
@@ -2513,7 +2525,11 @@ def build(out: Path) -> int:
     build_gadget_section(out, put)
     print(f"  language     {len(lang)} statements, rules {len(rules)} with {sum(len([w for w in ('pass', 'fail') if w in e]) for e in rules.values())} example pages")
 
+    # THE GOAL PAGES ARE FOR SIGNED-IN READERS (the user, 2026-11-10: unpublished).  The web
+    # server guards board/goal1/ and board/goal3/ and serves this index to a member; a
+    # visitor gets the same page without the two Goal sections (qccd/site/deploy/nginx-access.conf).
     put("board/index.html", board_index(ts), 1, "board")
+    put("board/index.public.html", board_index(ts, goals=False), 1, "board")
     from . import boards as lb
     put("board/compiler/index.html", lb.compiler_page(PAGE, STYLE), 2, "board")
     put("board/noise/index.html", lb.noise_page(PAGE, STYLE), 2, "board")
@@ -2526,11 +2542,25 @@ def build(out: Path) -> int:
             continue
         dst = out / "board" / t["id"]
         dst.mkdir(parents=True, exist_ok=True)
+        # a board with unpublished entries has a second index without them, and that is the
+        # one a visitor reads; the whole board goes under the area its permission guards
+        public_index = src / "index.public.html" if t["restricted"] else src / "index.html"
+        for perm in t["restricted"]:
+            full = f"{perm}/{t['id']}"
+            put(f"{full}/index.html",
+                lb.declare_board_controls((src / "index.html").read_text(encoding="utf-8")),
+                2, perm, extra=FOOTER_BLOCK + BOARD_SKIN)
+            (out / full / "manifest.json").write_text(
+                json.dumps(public_paths(t["all_rows"]), indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
+            for r in t["all_rows"]:
+                if r.get("status") == "ok" and r.get("page"):
+                    put(f"{full}/{r['page']}", (src / r["page"]).read_text(encoding="utf-8"), 2, perm,
+                        app=True, extra=qec_cycle.studio_block())
         # the chart's controls are declared as the page is copied (qccd/site/boards.py), and the
         # official leaderboard's entries join its chart, live (qccd/site/leaderboard.py)
         put(f"board/{t['id']}/index.html",
             lb.declare_board_controls(leaderboard.with_submissions(
-                (src / "index.html").read_text(encoding="utf-8"), t["id"], t["title"])),
+                public_index.read_text(encoding="utf-8"), t["id"], t["title"])),
             2, "board", extra=FOOTER_BLOCK + BOARD_SKIN)
         # the published manifest carries only the listed designs; the seed directory keeps
         # the full record, disqualified rows included.  Where a row names a file on the

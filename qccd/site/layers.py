@@ -1,4 +1,5 @@
-"""Machines built in layers, on the website (`layers/`).
+"""Machines built in layers, on the website (`layers/`): for the readers granted `layers`
+(`qccd/site/access.py`), and on no page a visitor can fetch.
 
 Three Studio pages and the page that introduces them.  Each Studio page is `render_html`
 over a board's circuit, compiled onto the conveyor sandwich (`qccd.arch.sandwich`) by its
@@ -141,13 +142,13 @@ trap. A layer of gates is a turn of a loop and a hop, whatever the number of anc
 <table class="lay"><thead><tr><th>page</th><th>layers</th><th>ions</th><th>DACs</th>
 <th>transport cycles</th><th>time</th></tr></thead><tbody>{rows}</tbody></table>
 {worth}
-<p class="note">These programmes come from a router written for this machine, not from the
-compiler the Leaderboard's entries use, and they are not entries on a board. Each page's
-programme passes the standard rule set, and its time is on its board's clock.</p>
+<h2 id="board">On the BB board</h2>
+<p>The BB [[144,12,12]] board with these three builds beside the designs our compiler serves
+is <a href="bb144/">here</a>: the same chart as the Leaderboard's, with the sandwich as a
+family of its own. The board every visitor reads does not list them.</p>
+<p class="note">This section, and everything under it, is shown to the readers it was shared
+with by name. The programmes come from a router written for this machine, not from the
+compiler the Leaderboard's other entries use. Each passes the standard rule set, and its time
+is on its board's clock.</p>
 """
     return PAGE.format(title="Machines built in layers - QCCD studio", style=STYLE, extra_css=CSS, body=body)
-
-
-def index_entries() -> list[dict]:
-    return [{"t": "Machines built in layers", "d": "three designs to turn in 3D: layers of traps joined by risers",
-             "u": "layers/", "k": "page"}]

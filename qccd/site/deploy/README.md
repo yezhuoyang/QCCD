@@ -62,6 +62,40 @@ Gmail (an app password) or a transactional relay.  Without it the invitation is 
 made and the panel shows the link to send by hand -- it is the mail that is optional, not
 the invitation.  Check the relay end to end by inviting yourself at another address.
 
+## Who reads what
+
+Three readers: a visitor (nobody signed in), a member (any signed-in account), and a member
+granted a named permission. `../access.py` says what each is refused; this is how it is held.
+
+| file | goes to | does |
+|---|---|---|
+| `nginx-access.conf` | `/etc/nginx/snippets/qccd-access.conf` | `include snippets/qccd-access.conf;` FIRST among the includes of the HTTPS server block. nginx asks `/api/authz` before it serves a guarded path (`auth_request`) |
+
+- **For members:** the 3-D stage's two files (`/static/3d/`), so a visitor's page shows no 3D
+  switch; the Goal pages (`/board/goal1/`, `/board/goal3/`); and the Leaderboard's index with
+  its Goal sections (a visitor gets `board/index.public.html`).
+- **For the permission `layers`:** `/layers/`, which holds everything compiled onto a machine
+  built in layers: the pages, and the BB board with its unpublished entries. A board entry
+  marked `"restricted": "layers"` in its catalogue is on no public page.
+
+A permission is given to one account at a time, by hand, and being an admin gives none:
+
+```sh
+sudo -u qccd python3 /home/qccd/comments_api.py grant  --db /var/lib/qccd/comments.db someone@university.edu layers
+sudo -u qccd python3 /home/qccd/comments_api.py grant  --db /var/lib/qccd/comments.db someone@university.edu layers --revoke
+sudo -u qccd python3 /home/qccd/comments_api.py grants --db /var/lib/qccd/comments.db
+```
+
+It takes effect on the reader's next request. A guarded page fails closed: if the accounts
+service is down, nginx answers 500 and sends nothing.
+
+**The file nginx loads is `/etc/nginx/sites-enabled/qccd.academy`**, a file of its own on the
+droplet, not a link to `sites-available`: an include added to the other one does nothing.
+
+What this does not hide: the code of a public page. Every Studio page carries the engine, which
+reads a machine built in layers, and the hidden 3D switch; only the files that draw in 3-D, and
+the pages above, are kept back. And the repository is public.
+
 Every later deploy is `.github/workflows/site.yml`: it rsyncs the site and
 `comments_api.py` as `qccd` and restarts the unit through that one sudo rule.  The
 database is never touched by a deploy; back it up with

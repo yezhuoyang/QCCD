@@ -113,7 +113,7 @@ var METRICS = [
 ];
 // the control measures (opt) are offered only on a board whose rows carry them
 METRICS = METRICS.filter(function(m){ return !m.opt || DATA.some(function(d){ return d.numbers && typeof d.numbers[m.k] === 'number'; }); });
-var FAMHEX = {'ring + docks':'#2a78d6','lattice':'#eb6834','torus':'#1baf7a','random graph':'#4a3aa7','conveyor sandwich':'#b5357f','two loops':'#8a8985'};
+var FAMHEX = {'ring + docks':'#2a78d6','lattice':'#eb6834','torus':'#1baf7a','random graph':'#4a3aa7','two loops':'#8a8985'};
 var $ = function(id){ return document.getElementById(id); };
 var ysel = $('ysel'), xsel = $('xsel'), logbox = $('log');
 METRICS.forEach(function(m){ var o = document.createElement('option'); o.value = m.k; o.textContent = m.name; ysel.appendChild(o);

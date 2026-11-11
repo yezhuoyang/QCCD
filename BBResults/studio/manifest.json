@@ -1060,6 +1060,7 @@
  {
   "key": "sandwich72_L1",
   "family": "conveyor sandwich",
+  "restricted": "layers",
   "title": "conveyor sandwich in one plane: a loop inside the ring of 72 data traps and one outside",
   "arch": "Compiler/build/bb2/sandwich72_L1.arch.json",
   "prefix": "Compiler/build/bb2/sandwich72_L1",
@@ -1158,6 +1159,7 @@
  {
   "key": "sandwich72_L2",
   "family": "conveyor sandwich",
+  "restricted": "layers",
   "title": "conveyor sandwich on two layers: one loop in the data traps' plane, one above",
   "arch": "Compiler/build/bb2/sandwich72_L2.arch.json",
   "prefix": "Compiler/build/bb2/sandwich72_L2",
@@ -1246,6 +1248,7 @@
  {
   "key": "sandwich72_L3",
   "family": "conveyor sandwich",
+  "restricted": "layers",
   "title": "conveyor sandwich on three layers: 72 data traps between a loop below and a loop above",
   "arch": "Compiler/build/bb2/sandwich72_L3.arch.json",
   "prefix": "Compiler/build/bb2/sandwich72_L3",

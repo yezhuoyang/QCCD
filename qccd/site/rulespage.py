@@ -15,6 +15,7 @@ from pathlib import Path
 from ..ruleset import RuleSet, catalogue, load, names, rule_order
 from ..ruleset.syntax import KEYWORDS
 from ..ruleset.vocabulary import TERMS
+from .access import UNPUBLISHED_WORDS, planar_about, planar_formula
 from . import learn
 
 #: The order and the plain names of the shipped rule sets.
@@ -262,7 +263,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
              'schedule</b>, whose operations each have a start and an end and overlap whenever the machine '
              'allows. Where a word is read differently from the two, both readings are given.</p>')
     for g, title in GROUPS:
-        terms = [t for t in TERMS.values() if t.group == g]
+        terms = [t for t in TERMS.values() if t.group == g and t.name not in UNPUBLISHED_WORDS]
         if not terms:
             continue
         b.append(f'<h3>{title}</h3>')
@@ -334,7 +335,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     b.append('<ul class="toc2">' + "".join(f'<li><a href="#{r.id}">{r.id}</a></li>'
                                           for r in sorted(cat.rules, key=lambda r: rule_order(r.id))) + '</ul>')
     for r in sorted(cat.rules, key=lambda r: rule_order(r.id)):
-        text = (f"when {r.when_text}:\n" if r.when is not None else "") + r.text
+        text = planar_formula((f"when {r.when_text}:\n" if r.when is not None else "") + r.text)
         sets_of = in_sets.get(r.id, [])
         chips = "".join(f'<a href="#set-{n}">{n}</a>' for n in sets_of) or "none of the shipped sets"
         cards = ""
@@ -349,7 +350,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
         b.append(f'<section class="rule" id="{r.id}"><h3>{r.id} <span class="st">{html.escape(r.title)}</span>'
                  f'{"<span class=core>core</span>" if r.core else ""}</h3>'
                  f'<pre class="assert">{highlight(text, all_params)}</pre>'
-                 f'<p class="checks">{html.escape(r.about)}</p>'
+                 f'<p class="checks">{html.escape(planar_about(r.about))}</p>'
                  + (f'<p class="src">sources: {_sources(r.source)}</p>' if r.source else "")
                  + f'<p class="src chips">in the rule sets: {chips}</p>{dev}{cards}</section>')
 
@@ -423,7 +424,7 @@ def _machine_section(all_params) -> list[str]:
          'The gadget design pages show every one of these rules, decided, beside the machine they '
          'judge.</p>']
     for g, title in MACHINE_GROUPS:
-        terms = [t for t in TERMS.values() if t.group == g]
+        terms = [t for t in TERMS.values() if t.group == g and t.name not in UNPUBLISHED_WORDS]
         if not terms:
             continue
         b.append(f'<h3>{title}</h3><table class="vocab">')
@@ -439,11 +440,11 @@ def _machine_section(all_params) -> list[str]:
                  f'<span class="st"><a href="sets/{n}.rules" download>{n}.rules</a></span></h3>'
                  f'<p class="sub">{html.escape(rs.about)}</p>')
         for r in sorted(rs.rules, key=lambda r: rule_order(r.id)):
-            text = (f"when {r.when_text}:\n" if r.when is not None else "") + r.text
+            text = planar_formula((f"when {r.when_text}:\n" if r.when is not None else "") + r.text)
             b.append(f'<section class="rule" id="{r.id}"><h3>{r.id} <span class="st">'
                      f'{html.escape(r.title)}</span>{"<span class=core>core</span>" if r.core else ""}</h3>'
                      f'<pre class="assert">{highlight(text, all_params | set(rs.params))}</pre>'
-                     f'<p class="checks">{html.escape(r.about)}</p>'
+                     f'<p class="checks">{html.escape(planar_about(r.about))}</p>'
                      + (f'<p class="src">sources: {_sources(r.source)}</p>' if r.source else "")
                      + '</section>')
     return b
@@ -452,6 +453,11 @@ def _machine_section(all_params) -> list[str]:
 def downloads() -> list[tuple[str, bytes]]:
     """Each shipped rule set, resolved into the one file the compiler is given -- and the
     machine level's two."""
-    out = [(f"rules/sets/{n}.rules", rs.text().encode("utf-8")) for n, _, rs in _sets()]
-    out += [(f"rules/sets/{n}.rules", load(n).text().encode("utf-8")) for n, _ in MACHINE_SETS]
+    # the files a reader downloads are the planar reading too: on a machine drawn in a plane it
+    # is the same rule set
+    def planar(text: str) -> str:
+        return re.sub(r'about "([^"]*)"', lambda m: 'about "' + planar_about(m.group(1)) + '"',
+                      planar_formula(text))
+    out = [(f"rules/sets/{n}.rules", planar(rs.text()).encode("utf-8")) for n, _, rs in _sets()]
+    out += [(f"rules/sets/{n}.rules", planar(load(n).text()).encode("utf-8")) for n, _ in MACHINE_SETS]
     return out

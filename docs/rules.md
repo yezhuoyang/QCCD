@@ -70,6 +70,7 @@ the rail: R20 and R21 both fire); it now runs a corner spur outward, so every sh
 ring passes. A periodic grid (`grid(..., periodic=True)`) cannot pass R21 on a plane and
 is not meant to: `cylinder` is the planar drawing of the same torus.
 
+<!-- unpublished:start -->
 **The same rules on a machine built in layers (2026-11).** A node may have a third
 coordinate, its layer (`docs/adl.md`), and no rule was added for it. R19 is unchanged: its
 default of six rails was written for exactly this. R20 gives a riser, the rail between two
@@ -84,6 +85,7 @@ electrodes and arrives on the other's, so its hop is in both layers' cycles. Its
 its clauses are already layer by layer. Before this a two-layer design was drawn flat under a
 rule set that dropped R20 and R21 (`docs/rule-language.md`); that still works, and judges
 less.
+<!-- unpublished:end -->
 
 **R22, one waveform (2026-09).** Broadcast control means one waveform per cycle, and the
 general router batched every hop that departed at the same time slot into one cycle

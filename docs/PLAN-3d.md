@@ -538,20 +538,33 @@ ion exactly where the SVG mark is within its panel, at every frame and five phas
   headless Chrome by hand; nothing in the suite drives it there.
 - Per-layer wiring parameters, a `nm_per_unit_z`, and electrodes for more than one plane.
 
-**On the website since 2026-11-10** (built from this branch).
-- Every Studio page of the sections rebuilt here has the 3-D switch, linked: the Design page,
-  the Leaderboard's entry pages, the examples of the Machine, Language, Rules, Compilation
-  and Physics pages, and the lesson companion.
-- `layers/` is new: a page about machines built in layers and three Studio pages
-  (`qccd/site/layers.py`); the Learn menu of the bar links to it.
-- The BB board lists the conveyor sandwich on three layers, on two and in a plane
-  (`Codesign/scripts/bb_studio.py`), in a family of their own, compiled by their own router.
-- The live site is 6.9 GB and this machine builds it without its gadget and Reproduce
-  sections, so those two, the Debug page, the book and the Goal 3 point pages were left as
-  they were: the bar and the template they had, and no 3-D switch.
-- What was replaced is in `/root/qccd-site-backups/` on the server (`site-before-3d-*`).
-- Not done: the official grading service. Its image predates layered machines, so it would
-  refuse a layered entry, and the pages it draws have the template it was built with.
+**On the website since 2026-11-11** (built from this branch), **and who may see it.** The 3-D
+stage and everything compiled onto a layered machine are unpublished, so the site has three
+readers (the user, 2026-11-11; `qccd/site/access.py`, `qccd/site/deploy/README.md`):
+
+- **A visitor** sees none of it. The stage's two files are refused to anyone not signed in,
+  so no visitor's page shows the 3D switch; the Goal pages are refused the same way, and the
+  Leaderboard's index is served without its Goal sections. The bar, the search index, the
+  documents and the Rules page say nothing of layers: the documents drop the passages marked
+  unpublished, and the Rules page prints each rule in its planar reading.
+- **A member** (any signed-in account) has the 3D switch on every Studio page of the sections
+  rebuilt here (the Design page, the Leaderboard's entries, the examples, Reproduce) and
+  reads the Goal pages.
+- **A member granted `layers`** (two accounts) also reads `layers/`: the page on machines
+  built in layers, three Studio pages, and the BB board with the conveyor sandwich's three
+  entries (`layers/bb144/`). Those entries are marked `"restricted": "layers"` in
+  `Codesign/scripts/bb_studio.py`; the public board is built without them.
+
+The web server asks the accounts service before it serves a guarded path, so a guarded page
+is never sent to a reader it is not for. What this does not hide: the code inside a public
+Studio page (the engine reads a layered machine; the template has the hidden switch), and
+this repository, which is public.
+
+Not on the new template, so without the 3D switch for anyone: the gadget pages (5.2 GB; the
+machine this was built on has 2 GB free and not their cache), the Debug page (it lists every
+Studio page, the gadgets included), Goal 3's point pages (drawn from compile outputs that are
+not in the repository), and the pages the official grading service draws (its image predates
+the template). What was replaced on the server is in `/root/qccd-site-backups/`.
 
 **Before a merge.**
 1. ~~Rebuild the committed pages.~~ Done 2026-11-10, at page stamp f65fc153934e7d9e. The

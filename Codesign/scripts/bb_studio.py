@@ -74,6 +74,8 @@ ENGINE_WORDS = {"rotate": "rigid rotation (qccdc rotate)",
                 "racetrack": "the race track (qccdc compile's fallback)",
                 "conveyor": "the conveyor router (the data stand still; the ancillas of a loop "
                             "turn and hop together)"}
+#: the colours of the families that are not on every board (`write_index`)
+FAMHEX_MORE = {"conveyor sandwich": "#b5357f"}
 #: the release every entry of this board is compiled from
 BB_RELEASE = "bb144@2"
 
@@ -170,7 +172,11 @@ CATALOG: tuple[dict, ...] = (
     # and in a plane (`qccd.arch.sandwich`), each compiled by the machine's own router
     # (`qccd.compile.conveyor_router`), NOT by qccdc.  Their files are made here, from the
     # release (`make`, `_make_sandwich`), so these three rebuild on any checkout.
-    {"key": "sandwich72_L3", "family": "conveyor sandwich",
+    # UNPUBLISHED (the user, 2026-11-10): `"restricted": "layers"` keeps an entry off the board
+    # every visitor reads.  The folder holds two boards: `index.html` and `manifest.json` with
+    # every entry, which the website serves only to readers granted `layers` (under /layers/),
+    # and `index.public.html` and `manifest.public.json` without the restricted ones.
+    {"key": "sandwich72_L3", "family": "conveyor sandwich", "restricted": "layers",
      "title": "conveyor sandwich on three layers: 72 data traps between a loop below and a loop above",
      "arch": BB2 / "sandwich72_L3.arch.json", "prefix": BB2 / "sandwich72_L3",
      "make": {"positions": 72, "layers": 3},
@@ -181,7 +187,7 @@ CATALOG: tuple[dict, ...] = (
                "of checks, and each layer has a broadcast of its own, so the two loops turn in the same "
                "cycle: 118 transport cycles and 19 cools. Compiled by a router written for this machine, "
                "in under a second. Press 3D on its page to turn it.")},
-    {"key": "sandwich72_L2", "family": "conveyor sandwich",
+    {"key": "sandwich72_L2", "family": "conveyor sandwich", "restricted": "layers",
      "title": "conveyor sandwich on two layers: one loop in the data traps' plane, one above",
      "arch": BB2 / "sandwich72_L2.arch.json", "prefix": BB2 / "sandwich72_L2",
      "make": {"positions": 72, "layers": 2},
@@ -189,7 +195,7 @@ CATALOG: tuple[dict, ...] = (
      "claim": ("The same machine with the X checks' loop in the data traps' own plane, inside their "
                "ring, and the Z checks' loop a layer above. The loops still turn together; the hops of "
                "the loop in the plane are a planar machine's: 151 transport cycles and 19 cools.")},
-    {"key": "sandwich72_L1", "family": "conveyor sandwich",
+    {"key": "sandwich72_L1", "family": "conveyor sandwich", "restricted": "layers",
      "title": "conveyor sandwich in one plane: a loop inside the ring of 72 data traps and one outside",
      "arch": BB2 / "sandwich72_L1.arch.json", "prefix": BB2 / "sandwich72_L1",
      "make": {"positions": 72, "layers": 1},
@@ -880,7 +886,8 @@ def _fmt(v, nd=1):
 
 
 def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
-                subtitle: str | None = None, intro: str | None = None) -> Path:
+                subtitle: str | None = None, intro: str | None = None,
+                name: str = "index.html") -> Path:
     """One white page, one plot: every design is a dot, ranked by whatever the reader picks.
 
     The chart is the page.  A `Rank by` control chooses the measure (running time on
@@ -920,6 +927,10 @@ def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
         })
     data = json.dumps(records, separators=(",", ":")).replace("</", "<\\/")
     page = _INDEX_TEMPLATE.replace("__DATA__", data)
+    # a family that is on this page only: its colour is written here and nowhere else, so a
+    # board without it does not name it
+    more = "".join(f"'{f}':'{c}'," for f, c in FAMHEX_MORE.items() if any(r.get("family") == f for r in rows))
+    page = page.replace("__FAMHEX_MORE__", more)
     dq = [r for r in rows if r.get("status") == "ok" and (r.get("rules_failed") or r.get("over_budget"))]
     page = page.replace("\n</main>", _disqualified_html(dq) + "\n</main>", 1)
     if title:
@@ -929,7 +940,7 @@ def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
     if intro:
         # the board's own account of itself, under the subtitle and above the controls (HTML)
         page = page.replace('\n<div class="controls">', f'\n<div class="intro">{intro}</div>\n<div class="controls">', 1)
-    p = out_dir / "index.html"
+    p = out_dir / name
     p.write_text(page, encoding="utf-8")
     return p
 
@@ -1073,7 +1084,7 @@ var METRICS = [
 ];
 // the control measures (opt) are offered only on a board whose rows carry them
 METRICS = METRICS.filter(function(m){ return !m.opt || DATA.some(function(d){ return d.numbers && typeof d.numbers[m.k] === 'number'; }); });
-var FAMHEX = {'ring + docks':'#2a78d6','lattice':'#eb6834','torus':'#1baf7a','random graph':'#4a3aa7','conveyor sandwich':'#b5357f','two loops':'#8a8985'};
+var FAMHEX = {'ring + docks':'#2a78d6','lattice':'#eb6834','torus':'#1baf7a','random graph':'#4a3aa7',__FAMHEX_MORE__'two loops':'#8a8985'};
 var $ = function(id){ return document.getElementById(id); };
 var ysel = $('ysel'), xsel = $('xsel'), logbox = $('log');
 METRICS.forEach(function(m){ var o = document.createElement('option'); o.value = m.k; o.textContent = m.name; ysel.appendChild(o);
@@ -1221,6 +1232,8 @@ var ans = DATA.filter(function(d){ return d.key===Q.sel; })[0] || DATA.filter(fu
 
 
 BB_TITLE = "BB [[144,12,12]] on QCCD — Bravyi's syndrome round, every design ranked"
+BB_SUBTITLE_PUBLIC = ("One syndrome round of the [[144,12,12]] bivariate-bicycle code in Bravyi et al.'s "
+                      "schedule (release bb144@2), on every design our compiler serves today.")
 BB_SUBTITLE = ("One syndrome round of the [[144,12,12]] bivariate-bicycle code in Bravyi et al.'s "
                "schedule (release bb144@2), on every design our compiler serves today, and on one "
                "machine that has a router of its own.")
@@ -1300,7 +1313,14 @@ def _fastest(ranked: list[dict]) -> str:
 
 
 def write_board_index(rows: list[dict], out_dir: Path) -> Path:
-    """The BB board's index: `write_index` with the board's own title, subtitle and intro."""
+    """The BB board's two indexes (`write_index` with the board's title, subtitle and intro):
+    `index.html` with every entry, and `index.public.html` with the entries any visitor may
+    see, each with the manifest it is drawn from.  Returns the first."""
+    public = [r for r in rows if not r.get("restricted")]
+    (out_dir / "manifest.public.json").write_text(json.dumps(to_repo(public), indent=1, default=str),
+                                                  encoding="utf-8")
+    write_index(public, out_dir, title=BB_TITLE, subtitle=BB_SUBTITLE_PUBLIC, intro=board_intro(public),
+                name="index.public.html")
     return write_index(rows, out_dir, title=BB_TITLE, subtitle=BB_SUBTITLE, intro=board_intro(rows))
 
 

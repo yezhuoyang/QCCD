@@ -34,7 +34,10 @@ Copy this file anywhere on the server and run it under systemd as an unprivilege
 it imports nothing outside the standard library and needs no install.
 
     GET    /api/health
-    GET    /api/me                          -> {"user": {...} | null}
+    GET    /api/me                          -> {"user": {...} | null}   (a user says its `perms`)
+    GET    /api/authz?need=member|<perm>    -> 200, 401 (nobody signed in) or 403 (signed in, not
+                                               granted): what nginx asks before it serves a page
+                                               that is not for every visitor (`auth_request`)
     GET    /api/invite?token=...            -> {"invite": {email, name, expires}}  (public)
     POST   /api/register  {token, password, name}
     POST   /api/login     {email, password}
@@ -122,6 +125,17 @@ COURSE_RE = re.compile(r"^[A-Z][0-9]{1,2}$")
 MAX_LESSONS = 100
 MAX_STARS = 3                                    # done, the boundary, the challenge
 
+#: the permissions an account can be granted, and what each opens (the website's nginx
+#: snippet, qccd/site/deploy/nginx-access.conf, names the same words)
+PERMS = {
+    "layers": "the programmes compiled onto machines built in layers, and their numbers: /layers/",
+}
+#: where a permission leads.  The bar of every page is public text, so it does not name a
+#: guarded page: a granted reader's bar is told its links here, with who they are (`/api/me`).
+PERM_LINKS = {
+    "layers": {"title": "Layers", "href": "/layers/", "note": "machines built in layers, to turn in 3D"},
+}
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users(
   id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, pw TEXT NOT NULL,
@@ -149,6 +163,9 @@ CREATE TABLE IF NOT EXISTS progress(
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, lesson TEXT NOT NULL,
   stars INTEGER NOT NULL, first_done REAL NOT NULL, updated REAL NOT NULL,
   PRIMARY KEY(user_id, lesson));
+CREATE TABLE IF NOT EXISTS grants(
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, perm TEXT NOT NULL,
+  created REAL NOT NULL, PRIMARY KEY(user_id, perm));
 CREATE INDEX IF NOT EXISTS threads_page ON threads(page);
 CREATE INDEX IF NOT EXISTS credits_user ON credits(user_id);
 CREATE INDEX IF NOT EXISTS comments_thread ON comments(thread_id);
@@ -247,7 +264,40 @@ class Store:
             d["email"] = row["email"]
             d["admin"] = row["email"].lower() in self.admins
             d["access"] = self.may_sign_in(row)
+            d["perms"] = self.perms_of(row["id"])
+            d["links"] = [PERM_LINKS[p] for p in d["perms"] if p in PERM_LINKS]
         return d
+
+    # -- what an account may see beyond what every signed-in reader may
+    #
+    # Three kinds of reader: a VISITOR (nobody signed in), a MEMBER (any open account: the
+    # site is by invitation), and a member who was GRANTED a named permission.  A permission
+    # is a word (`PERMS`); it is given to an account by hand, one account at a time, and being
+    # an admin gives none: who sees unpublished results is a list of people, not a role.
+    def perms_of(self, user_id: int) -> list[str]:
+        with self.connect() as c:
+            return [r["perm"] for r in c.execute("SELECT perm FROM grants WHERE user_id=? ORDER BY perm",
+                                                 (user_id,))]
+
+    def set_grant(self, email: str, perm: str, allow: bool) -> dict:
+        if perm not in PERMS:
+            raise HttpError(400, f"no such permission: {perm} (there is: {', '.join(sorted(PERMS))})")
+        with self.lock, self.connect() as c:
+            row = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+            if row is None:
+                raise HttpError(404, f"no account for {email}")
+            if allow:
+                c.execute("INSERT OR IGNORE INTO grants(user_id,perm,created) VALUES(?,?,?)",
+                          (row["id"], perm, time.time()))
+            else:
+                c.execute("DELETE FROM grants WHERE user_id=? AND perm=?", (row["id"], perm))
+        return {"email": row["email"], "name": row["name"], "perms": self.perms_of(row["id"])}
+
+    def grants(self) -> list[dict]:
+        with self.connect() as c:
+            return [dict(r) for r in c.execute(
+                "SELECT g.perm, u.email, u.name FROM grants g JOIN users u ON u.id=g.user_id "
+                "ORDER BY g.perm, u.id")]
 
     def may_sign_in(self, row) -> bool:
         """An account is let in while it is open; an admin always is."""
@@ -747,6 +797,7 @@ class App:
         self.routes = [
             ("GET", re.compile(r"^/api/health$"), self.health),
             ("GET", re.compile(r"^/api/me$"), self.me),
+            ("GET", re.compile(r"^/api/authz$"), self.authz),
             ("GET", re.compile(r"^/api/invite$"), self.invite_show),
             ("POST", re.compile(r"^/api/register$"), self.register),
             ("POST", re.compile(r"^/api/login$"), self.login),
@@ -775,6 +826,19 @@ class App:
 
     def me(self, req):
         return 200, {"user": self.store.user_json(req.user, me=True) if req.user else None}, []
+
+    def authz(self, req):
+        """May the reader this request's cookie names see what `need` guards?  nginx asks, as a
+        subrequest, before it serves a page that is not for every visitor; it reads the status
+        and nothing else.  `member` is any signed-in account; any other word is a permission
+        that account must have been granted."""
+        need = (req.query.get("need") or [""])[0]
+        if need != "member" and need not in PERMS:
+            raise HttpError(400, "need must be member or a permission")
+        u = req.require_user()                                  # 401: nobody is signed in
+        if need != "member" and need not in self.store.perms_of(u["id"]):
+            raise HttpError(403, "this account has not been given that")
+        return 200, {"ok": True}, []
 
     def invite_show(self, req):
         """What the link is worth, before anybody has an account: the address it is for."""
@@ -1137,6 +1201,13 @@ def main(argv=None) -> int:
     g = x.add_mutually_exclusive_group(required=True)
     g.add_argument("--allow", dest="allow", action="store_true")
     g.add_argument("--revoke", dest="allow", action="store_false")
+    gr = sub.add_parser("grant", help="give one account a permission, or take it back")
+    gr.add_argument("--db", required=True)
+    gr.add_argument("email")
+    gr.add_argument("perm", choices=sorted(PERMS))
+    gr.add_argument("--revoke", dest="allow", action="store_false")
+    gs = sub.add_parser("grants", help="who has been given which permission")
+    gs.add_argument("--db", required=True)
     u = sub.add_parser("users", help="list the accounts")
     u.add_argument("--db", required=True)
     v = sub.add_parser("invites", help="list the invitations")
@@ -1188,6 +1259,18 @@ def dispatch(a) -> int:
             return 1
         user = store.set_access(row["id"], a.allow)
         print(f"{user['email']} is now {'open' if user['access'] else 'closed'}")
+        return 0
+    if a.cmd == "grant":
+        try:
+            g = store.set_grant(norm_email(a.email), a.perm, a.allow)
+        except HttpError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"{g['email']} ({g['name']}) now has: {', '.join(g['perms']) or 'no permission'}")
+        return 0
+    if a.cmd == "grants":
+        for g in store.grants():
+            print(f"{g['perm']:12s} {g['email']:40s} {g['name']}")
         return 0
     if a.cmd == "users":
         for x in store.users():

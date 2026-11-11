@@ -255,6 +255,7 @@ were drawn on the end-cap rail until 2026-09 and failed R20 and R21 on every rin
 now run outward. A periodic grid cannot pass R21 on a plane (its wrap wires are chords
 across the die); `cylinder` is the planar drawing of the same torus.
 
+<!-- unpublished:start -->
 ## Machines built in layers
 
 A node's `pos` is `(x, y)`, or `(x, y, z)` on a machine built in layers: planar traps one
@@ -285,6 +286,8 @@ Three things hold wherever a layered machine is read (`docs/PLAN-3d.md`):
   waveform a layer (R22).
 
 On a page a layered machine is drawn one panel a layer, and the `3D` switch shows the stack.
+
+<!-- unpublished:end -->
 
 ## Sketching a shape (the studio's Sketch mode)
 
