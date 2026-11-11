@@ -255,6 +255,37 @@ were drawn on the end-cap rail until 2026-09 and failed R20 and R21 on every rin
 now run outward. A periodic grid cannot pass R21 on a plane (its wrap wires are chords
 across the die); `cylinder` is the planar drawing of the same torus.
 
+## Machines built in layers
+
+A node's `pos` is `(x, y)`, or `(x, y, z)` on a machine built in layers: planar traps one
+above another, joined by vertical rails. Nothing else is declared. A **layer** is a distinct
+`z`, and a **riser** is a rail whose two ends are in different layers; both are derived, like
+degree (`Device.layers`, `Device.layer_of`, `Device.is_riser`). A machine is planar or
+layered, never both, and a loop stays in one layer.
+
+```python
+a = Machine.grid(3, 3)                               # layer A, the lowest
+b = Machine.ring(8, 2, site_zone="trap")             # layer B: a different shape
+m = Machine.layered([a, b], risers=[("A.J1_1", "B.S3")])
+m.arch.device.layers            # (0.0, 1.0)
+m.arch.device.degree("A.J1_1")  # 5: four rails of its lattice, and the riser
+```
+
+Every id of a layer is prefixed with its name (`A.J1_1`, `B.L0`). A layer above the first is
+shifted so that its first riser stands vertical; `offsets=` places the layers by hand.
+
+Three things hold wherever a layered machine is read (`docs/PLAN-3d.md`):
+
+- **A riser is an ordinary shuttle.** It is a segment like any other: a hop along it is charged
+  `shuttle_segment`, and a node it ends at is priced by its degree.
+- **A riser is vertical**, between adjacent layers (R21). That is what keeps R20 meaningful: a
+  vertical rail is at 90 degrees to every rail of its layer whatever the lattice's scale.
+- **Each layer has a broadcast of its own.** The `control.channels` declaration is
+  instantiated once a layer, so no channel drives sites of two layers, and one cycle is one
+  waveform a layer (R22).
+
+On a page a layered machine is drawn one panel a layer, and the `3D` switch shows the stack.
+
 ## Sketching a shape (the studio's Sketch mode)
 
 The studio (`python -m qccd studio`) has two design modes, remembered under

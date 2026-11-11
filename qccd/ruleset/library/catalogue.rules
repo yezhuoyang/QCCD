@@ -88,10 +88,10 @@ rule R14 "A split takes the ion at the end of its chain, or pays to reorder"
   for all m in splits: at_chain_end(m) or swap_paid(m)
 
 rule R22 "A transport step is one waveform"
-  about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else. A swap-or-stay step on a C2LR machine is one shared waveform by construction -- each crystal's only choice is its direction bit -- so the different routes its crystals take are not judged here (C2, C4 are its rules)."
+  about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else. On a machine built in layers each layer has a broadcast of its own, so the rule holds layer by layer: ions moving in different layers may do different things in one step. A swap-or-stay step on a C2LR machine is one shared waveform by construction -- each crystal's only choice is its direction bit -- so the different routes its crystals take are not judged here (C2, C4 are its rules)."
   source "collaborator review 2026-09; arXiv:2510.23519; arXiv:2305.12773"
   when control() != "direct":
-  for all a, b in transport where simultaneous(a, b) and not exchange(a):
+  for all a, b in transport where simultaneous(a, b) and same_broadcast(a, b) and not exchange(a):
     motion(a) = motion(b)
 
 rule R23 "A junction is crossed, not rested on"
@@ -335,9 +335,10 @@ rule R20 "Rails meet at a wide enough angle"
     angle(n, r1, r2) >= min_rail_angle()
 
 rule R21 "Rails lie in a plane"
-  about "A rail meets only the nodes it ends at, and two rails cross only at a node they share: the drawing must be a surface trap."
+  about "A rail meets only the nodes it ends at, and two rails cross only at a node they share: the drawing must be a surface trap. On a machine built in layers every layer is such a plane, and a rail between two layers stands vertical between adjacent ones."
   source "collaborator review 2026-09; quant-ph/0702175"
-  (for all r in rails, n in nodes: not lies_on(n, r))
+  (for all r in rails: upright(r))
+  and (for all r in rails, n in nodes: not lies_on(n, r))
   and (for all r1, r2 in rails where r1 < r2: not cross(r1, r2))
 
 # ---------------------------------------------------------------- the programme's own claims

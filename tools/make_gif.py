@@ -148,6 +148,13 @@ class Clip:
 
     def __init__(self, arch, prog, res, model, max_frames=4000, width=560,
                  layout=None, source=None, rows=9, stage_h=None):
+        if arch.device.dim == 3:
+            # the page draws a machine built in layers one panel a layer, with each riser
+            # a port in two panels (`render.py`); this renderer has not learned that yet,
+            # and would draw every riser as a rail across the page
+            raise NotImplementedError(
+                f"{arch.name} is built in layers; tools/make_gif.py draws planar machines "
+                f"only (docs/PLAN-3d.md, phase P2)")
         vm = build_view_model(arch, prog, res, model, max_frames=max_frames,
                               include_listing=False, include_control=False)
 

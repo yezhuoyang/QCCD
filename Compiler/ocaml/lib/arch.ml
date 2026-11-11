@@ -51,6 +51,10 @@ let strings key j =
 type node = {
   id : string;
   pos : float * float;
+  (* the node's layer on a machine built in layers (its third coordinate); 0 on a planar
+     machine.  A rail whose two ends have different [z] is a riser, and a hop along it is
+     labelled [+z] or [-z] ([Route.direction_label], as [rules.py] labels it). *)
+  z : float;
   kind : string;
   capacity : int;
   zone_type : string;
@@ -102,16 +106,20 @@ type t = {
 let node_of_json caps j =
   let id = str_or "id" "?" j in
   let cap = match mem id caps with Some c -> c | None -> `Assoc [] in
-  let pos =
+  let f = function `Float v -> v | `Int v -> float_of_int v | _ -> 0.0 in
+  (* (x, y), or (x, y, z) on a machine built in layers.  Three coordinates used to fall
+     through to (0, 0), which labelled every hop of such a machine "0" and let the router
+     put unlike hops in one cycle. *)
+  let pos, z =
     match mem "pos" j with
-    | Some (`List [ x; y ]) ->
-      let f = function `Float v -> v | `Int v -> float_of_int v | _ -> 0.0 in
-      (f x, f y)
-    | _ -> (0.0, 0.0)
+    | Some (`List [ x; y ]) -> ((f x, f y), 0.0)
+    | Some (`List [ x; y; z ]) -> ((f x, f y), f z)
+    | _ -> ((0.0, 0.0), 0.0)
   in
   {
     id;
     pos;
+    z;
     kind = str_or "kind" "site" j;
     (* capacity is resolved during expansion (a node may inherit its zone type's), so
        the per-node capability block is authoritative over the raw node record. *)

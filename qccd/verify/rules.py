@@ -951,7 +951,21 @@ def _xy(pos) -> tuple[float, float]:
 
 def rail_angle_deg(dev, node_id: str, seg_a: str, seg_b: str) -> float:
     """The angle, in degrees, between two rails leaving `node_id`: each rail's direction
-    is the straight line from the node to the rail's other end."""
+    is the straight line from the node to the rail's other end.
+
+    A riser is vertical (R21), so it stands at 90 degrees to every rail of its layer and
+    at 180 to a riser going the other way.  Those are stated, not computed from `z`:
+    lattice to lab is a diagonal map with a scale of its own on every axis, which keeps a
+    right angle between an axis and the plane across it and no other angle out of the
+    plane, so a computed one would measure the drawing."""
+    ra, rb = dev.is_riser(seg_a), dev.is_riser(seg_b)
+    if ra or rb:
+        if not (ra and rb):
+            return 90.0
+        here = dev.layer_of(node_id)
+        up_a = dev.layer_of(dev.segments[seg_a].other(node_id)) > here
+        up_b = dev.layer_of(dev.segments[seg_b].other(node_id)) > here
+        return 180.0 if up_a != up_b else 0.0
     o = _xy(dev.nodes[node_id].pos)
     a = _xy(dev.nodes[dev.segments[seg_a].other(node_id)].pos)
     b = _xy(dev.nodes[dev.segments[seg_b].other(node_id)].pos)
@@ -999,10 +1013,17 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
          `budget.min_rail_angle_deg` (default 60)
     R21  rails are planar: no rail passes through a node it does not end at, and no
          two rails cross except at a node they share
+
+    On a machine built in layers (`Device.dim == 3`) R21 reads "rails lie in layers": a
+    rail stays in one layer or is a riser, which stands vertical between two adjacent
+    layers; and the two planar tests are made layer by layer, since a rail of one layer
+    is nowhere near a node or a rail of another.  A planar machine is one layer, and gets
+    the verdicts and the words it always did.
     """
     out: list[Violation] = []
     dev = arch.device
     max_deg, min_ang = geometry_limits(arch)
+    layered = dev.dim == 3
     for nid in sorted(dev.nodes):
         deg = dev.degree(nid)
         if deg > max_deg:
@@ -1028,11 +1049,35 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
         pa, pb = pos[a], pos[b]
         boxes[sid] = (min(pa[0], pb[0]) - RAIL_EPS, min(pa[1], pb[1]) - RAIL_EPS,
                       max(pa[0], pb[0]) + RAIL_EPS, max(pa[1], pb[1]) + RAIL_EPS)
+    riser: dict[str, bool] = {sid: layered and dev.is_riser(sid) for sid in sids}
+    lay: dict[str, int] = {nid: dev.layer_of(nid) for nid in dev.nodes} if layered else {}
+    if layered:
+        for sid in sids:
+            if not riser[sid]:
+                continue
+            a, b = dev.segments[sid].ends
+            pa, pb = pos[a], pos[b]
+            if abs(pa[0] - pb[0]) > RAIL_EPS or abs(pa[1] - pb[1]) > RAIL_EPS:
+                out.append(Violation(
+                    "R21", -1,
+                    f"rail {sid} ({a}-{b}) joins layers {dev.layer_name(lay[a])} and "
+                    f"{dev.layer_name(lay[b])} but is not vertical; a rail lies in one layer "
+                    f"or rises straight up to the next"))
+            elif abs(lay[a] - lay[b]) != 1:
+                out.append(Violation(
+                    "R21", -1,
+                    f"rail {sid} ({a}-{b}) joins layers {dev.layer_name(lay[a])} and "
+                    f"{dev.layer_name(lay[b])}, which are not adjacent; a riser joins a layer "
+                    f"to the next one"))
     for sid in sids:
+        if riser[sid]:
+            continue
         a, b = dev.segments[sid].ends
         x0, y0, x1, y1 = boxes[sid]
         for nid in sorted(dev.nodes):
             if nid == a or nid == b:
+                continue
+            if layered and lay[nid] != lay[a]:
                 continue
             p = pos[nid]
             if p[0] < x0 or p[0] > x1 or p[1] < y0 or p[1] > y1:
@@ -1044,12 +1089,18 @@ def geometry_violations(arch: Architecture) -> list[Violation]:
                     f"end at; a rail may only meet a node it is joined to"))
     for i in range(len(sids)):
         s1 = sids[i]
+        if riser[s1]:
+            continue
         a, b = dev.segments[s1].ends
         bx0, by0, bx1, by1 = boxes[s1]
         for j in range(i + 1, len(sids)):
             s2 = sids[j]
+            if riser[s2]:
+                continue
             c, d = dev.segments[s2].ends
             if a == c or a == d or b == c or b == d:
+                continue
+            if layered and lay[a] != lay[c]:
                 continue
             cx0, cy0, cx1, cy1 = boxes[s2]
             if cx0 > bx1 or cx1 < bx0 or cy0 > by1 or cy1 < by0:
@@ -1168,10 +1219,14 @@ def rails_to_loop(dev, on_loop, node: str) -> int:
 HOP_ANGLE_TIE = 1e-9
 
 
-def direction_label(dx: float, dy: float) -> str:
+def direction_label(dx: float, dy: float, dz: float = 0.0) -> str:
     """A hop's lab-frame direction, as R22 labels a hop that has no path or spur to be
     labelled by: `+x`, `-y` (or `0`) along an axis, and off an axis the signs AND the
     angle, `+x+y@30` -- whole degrees counter-clockwise from +x, in [0, 360).
+
+    A hop up or down a riser is `+z` or `-z`.  (A rail that changes layer without being
+    vertical breaks R21; its label is the `z` sign in front of the planar one, so that it
+    is at least never mistaken for a hop inside a layer.)
 
     The signs alone were the label until 2026-10 (issue #19), and they are too coarse:
     rails at 30 and 60 degrees both read `+x+y`, so R22 let one broadcast waveform drive
@@ -1183,6 +1238,9 @@ def direction_label(dx: float, dy: float) -> str:
     ring -- keeps its old label byte for byte; and a hop at 45 degrees is `+x+y@45` like
     any other.
     """
+    if dz > RAIL_EPS or dz < -RAIL_EPS:
+        flat = direction_label(dx, dy)
+        return ("+z" if dz > 0.0 else "-z") + ("" if flat == "0" else flat)
     sx = "+x" if dx > RAIL_EPS else "-x" if dx < -RAIL_EPS else ""
     sy = "+y" if dy > RAIL_EPS else "-y" if dy < -RAIL_EPS else ""
     if not (sx and sy):
@@ -1197,6 +1255,13 @@ def hop_label(dev, on_loop, src: str, dst: str, seg) -> str:
     """One hop's motion label, the unit R22's signature is made of: `L0:+1` along a
     named path, `spur:inward` / `spur:outward` on a spur, else the lab-frame direction
     (`direction_label`)."""
+    # A riser first: a hop between two layers is `+z` or `-z` whatever stands at its ends.
+    # It is never a dock -- a spur's label says which way a mirrored pair of electrodes is
+    # taken, and up is not the mirror image of down.
+    if dev.dim == 3 and dev.layer_of(src) != dev.layer_of(dst):
+        a, b = dev.nodes[src].pos, dev.nodes[dst].pos
+        return direction_label(float(b[0]) - float(a[0]), float(b[1]) - float(a[1]),
+                               float(b[2]) - float(a[2]))
     loop = seg.loop
     # CLOSED loops only.  A rotation is one waveform whose ions move in different lab-frame
     # directions, so the loop-relative step is the honest label there.  An open path's `+1`
@@ -1252,6 +1317,31 @@ def r22_uniform_motion(v: CycleView) -> list[Violation]:
         return []
     if device_exchange(v):
         return []                # one waveform by construction; see `device_exchange`
+    dev = v.arch.device
+    if dev.dim == 3 and len(dev.layers) > 1:
+        # EACH LAYER HAS A BROADCAST OF ITS OWN.  Two layers are two sets of electrodes on
+        # two sets of DACs, so one cycle is one waveform PER LAYER: the ions that move in
+        # layer A do one thing, and those in layer B may do another.  An ion on a riser
+        # leaves one layer's electrodes and arrives on the other's, so its motion is in
+        # both layers' cycles.
+        movers: dict[int, list[str]] = {}
+        for m in v.moves:
+            for k in sorted({dev.layer_of(m.src), dev.layer_of(m.dst)}):
+                mine = movers.setdefault(k, [])
+                if m.ion not in mine:
+                    mine.append(m.ion)
+        all_sigs = motion_signatures(v)
+        out: list[Violation] = []
+        for k in sorted(movers):
+            sigs = sorted({all_sigs[ion] for ion in movers[k]})
+            if len(sigs) > 1:
+                out.append(Violation(
+                    "R22", v.instr.id,
+                    f"in layer {dev.layer_name(k)}, {len(movers[k])} ions move in "
+                    f"{len(sigs)} different ways in one cycle ({sigs[0]} and {sigs[1]}); "
+                    f"one cycle is one waveform a layer, so unlike motions in one layer "
+                    f"need {len(sigs)} cycles"))
+        return out
     ions: list[str] = []
     for m in v.moves:
         if m.ion not in ions:

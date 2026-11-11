@@ -65,7 +65,8 @@ from ..verify.replay import ReplayResult
 from ..verify.rules import rule_statements
 from . import course as _course
 from .layout import (H_MAX, H_MIN, ISO_ASPECT, K_ANISO, K_ION, K_REST, PAD_A, PAD_B,
-                     PITCH_CAP, R_ION_MAX, R_ION_MIN, W_MAX, W_MIN, compute_layout)
+                     PITCH_CAP, R_ION_MAX, R_ION_MIN, W_MAX, W_MIN, compute_layout,
+                     panel_offsets)
 # THE SCALE, and the only thing in this module that knows a technology exists.  Node
 # positions are lattice units, which are not lengths; `qccd/viz/scale.py` is the one
 # narrow seam that turns them into nanometres, and it says in full why it is a separate
@@ -190,6 +191,13 @@ def evaluation_view(arch: Architecture, prog: TSIR, model: CostModel) -> dict:
     return block
 
 
+def _with_panels(layout: dict, panels) -> dict:
+    """The layout, with each layer's panel offset added when the machine has layers."""
+    if panels is not None:
+        layout["panels"] = [list(p) for p in panels]
+    return layout
+
+
 def build_view_model(
     arch: Architecture,
     prog: TSIR,
@@ -235,13 +243,27 @@ def build_view_model(
     dev = arch.device
     corners = dev.all_corners
 
+    # A MACHINE BUILT IN LAYERS IS DRAWN ONE PANEL A LAYER.  `x`, `y` below are where a
+    # node is DRAWN: its own (x, y) plus its layer's panel offset (`layout.panel_offsets`),
+    # and `z` is its layer.  Everything the flat stage does -- the fit, the marks, the
+    # position law, hit-testing -- then works on a layered machine as on a planar one, and
+    # the 3-D stage undoes the offsets to stack the panels (`js/stage3d.js`).  A planar
+    # machine has no offsets and no `z`, and its page is what it always was.
+    layered = dev.dim == 3
+    panels = (panel_offsets([float(n.pos[0]) for n in dev.nodes.values()],
+                            [float(n.pos[1]) for n in dev.nodes.values()],
+                            len(dev.layers)) if layered else None)
+
     nodes = []
     for nid, node in dev.nodes.items():
+        shift = panels[dev.layer_of(nid)] if layered else (0.0, 0.0)
         nodes.append(
             {
                 "id": nid,
-                "x": float(node.pos[0]),
-                "y": float(node.pos[1]) if len(node.pos) > 1 else 0.0,
+                "x": float(node.pos[0]) + shift[0] if layered else float(node.pos[0]),
+                "y": ((float(node.pos[1]) + shift[1] if layered else float(node.pos[1]))
+                      if len(node.pos) > 1 else 0.0),
+                **({"z": dev.layer_of(nid)} if layered else {}),
                 "kind": node.kind,
                 "zone": node.zone_type,
                 "cap": node.capacity,
@@ -268,9 +290,15 @@ def build_view_model(
             # changed disagrees with the number the model is charging.
             "len": float(s.length),
             "corner_endpoints": dev.corner_endpoints[s.id],
+            # a rail between two layers: drawn as a port in each of its two panels, never
+            # as a line across the page from one panel to the other
+            **({"riser": True} if layered and dev.is_riser(s.id) else {}),
         }
         for s in dev.segments.values()
     ]
+    #: what the fit is computed from: a riser has no drawn length, so it is not a segment
+    #: to the layout (it would be a line from one panel into another)
+    flat_segments = [s for s in segments if not s.get("riser")]
     loops = {lid: list(loop.nodes) for lid, loop in dev.loops.items()}
 
     # what each instruction actually cost, so the page's counters tick with the replay
@@ -469,10 +497,10 @@ def build_view_model(
         # Both are computed HERE rather than one of them in the browser, because
         # `compute_layout` is the tested implementation and `engine.js` is its mirror;
         # shipping the pair costs under 2 KB and keeps the first paint server-decided.
-        "layout": compute_layout(nodes, segments),
-        "layout_true": compute_layout(
-            nodes, segments, true_scale=True,
-            unit_nm=(tech_block["nm_per_unit_x"], tech_block["nm_per_unit_y"])),
+        "layout": _with_panels(compute_layout(nodes, flat_segments), panels),
+        "layout_true": _with_panels(compute_layout(
+            nodes, flat_segments, true_scale=True,
+            unit_nm=(tech_block["nm_per_unit_x"], tech_block["nm_per_unit_y"])), panels),
         # THE SCALE ITSELF.  Node positions are lattice units; every physical length on
         # the page is this block times one of them.
         "tech": tech_block,
@@ -693,6 +721,12 @@ ENGINE_JS = ("js/transit.js", "js/edit.js", "engine.js", "js/evaluate.js")
 #: `tutorial.js` is data -- the course's lessons -- and it registers itself with the editor
 #: at its last line, so it must come after `editor.js` and needs nothing else.
 EDITOR_JS = ("js/editor.js", "js/tutorial.js")
+#: THE 3-D STAGE, inlined only into a page that shows one (`render_html(stage3d=...)`):
+#: the vendored part of three.js (`tools/vendor_three.mjs`; 568 KB, which is why it is not
+#: in every page) and the stage itself, which reads the page's own globals and so comes
+#: last.  These two have a stamp of their own, `stage3d_stamp()`: changing them rebuilds
+#: the pages that carry a 3-D stage and no others.
+STAGE3D_JS = ("vendor/three.qccd.min.js", "js/stage3d.js")
 
 
 def page_stamp() -> str:
@@ -718,6 +752,35 @@ def page_stamp() -> str:
     for name in ENGINE_JS + EDITOR_JS:
         h.update((_JS_DIR / name).read_bytes().replace(b"\r\n", b"\n"))
     return h.hexdigest()[:16]
+
+
+def stage3d_stamp() -> str:
+    """`page_stamp`, for the two files of the 3-D stage.  A page that carries the stage
+    writes it into `<meta name="qccd-page-3d">`; a page that does not has no such tag."""
+    h = hashlib.sha256()
+    for name in STAGE3D_JS:
+        h.update((_JS_DIR / name).read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()[:16]
+
+
+def wants_stage3d(arch: Architecture, stage3d: "str | bool") -> bool:
+    """Does this page carry the 3-D stage?  `"auto"` (the default): a machine built in
+    layers does and a planar one does not.  `"always"` / `True` and `"never"` / `False`
+    say so outright."""
+    if stage3d in (True, "always"):
+        return True
+    if stage3d in (False, "never", None):
+        return False
+    if stage3d != "auto":
+        raise ValueError(f"stage3d must be 'auto', 'always' or 'never', not {stage3d!r}")
+    return arch.device.dim == 3 and len(arch.device.layers) > 1
+
+
+def _stage3d_block() -> str:
+    """The 3-D stage's two scripts, and the line that shows its switch."""
+    return (f'<meta name="qccd-page-3d" content="{stage3d_stamp()}">\n'
+            + _js_block(STAGE3D_JS)
+            + "\n<script>document.body.setAttribute('data-3d-ready','1'); STAGE3D.wire();</script>")
 
 
 def _js_block(names) -> str:
@@ -1685,6 +1748,29 @@ body:not([data-noprog="1"]) .lede{display:none}
 .hud.warn{background:var(--warn_ink)}
 .hud.bad{background:var(--z)}
 .canvas{position:relative;flex:1 1 auto;min-height:0;display:flex}
+/* THE 3-D STAGE (js/stage3d.js) lies over the SVG in the same box.  The SVG keeps being
+   drawn underneath it -- the labels and the harnesses read ion positions off its marks --
+   and is only made invisible, so it takes no pointer either. */
+#stage3d{position:absolute;inset:0;display:none;overflow:hidden}
+#stage3d[data-on="1"]{display:block}
+.canvas[data-3d="1"] #svg{visibility:hidden}
+#stage3d .s3canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#stage3d .s3canvas:active{cursor:grabbing}
+#stage3d .s3bar{position:absolute;right:10px;bottom:32px;display:flex;gap:6px;align-items:center;
+ flex-wrap:wrap;justify-content:flex-end;padding:6px 8px;border:1px solid var(--line);
+ border-radius:8px;background:rgba(255,255,255,.92);font-size:12px;color:var(--muted)}
+#stage3d .s3bar button,#stage3d .s3bar select{font:inherit;padding:3px 8px;border:1px solid var(--line);
+ border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
+#stage3d .s3bar label{display:flex;gap:5px;align-items:center}
+#stage3d .s3bar input[type=range]{width:86px}
+#stage3d .s3note{position:absolute;left:10px;bottom:8px;font-size:11px;color:var(--muted);
+ background:rgba(255,255,255,.85);padding:2px 6px;border-radius:5px;pointer-events:none}
+#stage3d .s3label{position:absolute;transform:translate(-100%,-50%);font-size:12px;font-weight:700;
+ color:var(--navy);white-space:nowrap;pointer-events:none;padding-right:6px}
+#s3tip{position:absolute;display:none;pointer-events:none;z-index:3;font-size:12px;padding:3px 7px;
+ border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);white-space:nowrap}
+#t3d{display:none}
+body[data-3d-ready="1"] #t3d{display:inline-block}
 .toasts{position:absolute;left:12px;bottom:12px;z-index:4;display:flex;
  flex-direction:column;gap:6px;max-width:min(560px,86%);pointer-events:none}
 .toast{background:var(--panel);border:1px solid var(--line);pointer-events:auto;
@@ -1808,6 +1894,23 @@ textarea.src.out{min-height:120px;opacity:.85}
            refusal is drawn over the picture it refers to and not below the legend. -->
       <div class="canvas" id="canvas">
         <svg id="svg" preserveAspectRatio="xMidYMid meet"></svg>
+        <!-- THE 3-D STAGE.  Empty, and its switch (#t3d) hidden, on a page built without
+             it (`render_html(stage3d=...)`); `js/stage3d.js` puts its canvas here when 3D
+             is shown and takes it away when it is hidden. -->
+        <div id="stage3d" aria-label="the machine in three dimensions">
+          <div class="s3bar">
+            <button id="s3corner" data-hint="s3view" title="look at the stack from a corner">Corner</button>
+            <button id="s3top" data-hint="s3view" title="look straight down">Top</button>
+            <button id="s3front" data-hint="s3view" title="look from the front">Front</button>
+            <label title="how far apart the layers are drawn">Layer spacing
+              <input type="range" id="s3gap" min="0.3" max="3" step="0.05" value="1" data-hint="s3gap"></label>
+            <label id="s3layers" title="show one layer at full strength">Show
+              <select id="s3only" data-hint="s3only"><option value="-1">all layers</option></select></label>
+            <button id="s3png" data-hint="s3png" title="save this picture as a PNG">PNG</button>
+          </div>
+          <div class="s3note" id="s3note">Drag to turn, wheel to zoom, right-drag to move.</div>
+          <div id="s3tip"></div>
+        </div>
         <!-- THE EXECUTING INSTRUCTION, filled by `syncCursor()`: #snHw the hardware line,
              #snQ the circuit statement (empty without a circuit). -->
         <div id="stageNow" data-hint="stagenow"></div>
@@ -1879,6 +1982,10 @@ textarea.src.out{min-height:120px;opacity:.85}
         <select id="mode" title="colour the marks by role or by heating" data-hint="colour">
         <option value="role" selected>role</option>
         <option value="heat">heating</option></select>
+        <!-- 3D: the same machine and programme as a stack of layers you can turn
+             (`js/stage3d.js`).  Shown only on a page that carries the 3-D stage. -->
+        <button class="tgl" id="t3d" aria-pressed="false" data-hint="stage3d"
+                title="show the machine in 3D: drag to turn it, wheel to zoom">3D</button>
         <!-- HARDWARE LABELS: the names a hardware programme is written in, on the picture.
              On by default and on every page (here, not in #etools, which the view-only
              embeds hide); the choice is remembered (`qccd.studio.hwlabels`). -->
@@ -2223,6 +2330,9 @@ const AXIS = {};
 {
   const arms = {};
   for (const sg of A.segments){
+    // a riser leaves the layer: on the flat stage its two ends are in two panels, and the
+    // line between them is no direction a trap of either layer lies along
+    if(sg.riser) continue;
     const a=nodeById[sg.a], b=nodeById[sg.b]; if(!a||!b) continue;
     const dx=px(b)-px(a), dy=py(b)-py(a), h=Math.hypot(dx,dy); if(h<1e-9) continue;
     let ux=dx/h, uy=dy/h; if(ux<-1e-12 || (Math.abs(ux)<1e-12 && uy<0)){ux=-ux;uy=-uy;}
@@ -2242,6 +2352,8 @@ const AXIS = {};
 // ---------- the static picture: built once, never rebuilt per frame ----------
 const SEGEL={}, SEGINFO={}, PAD_BY_SEG={}, PAD_BY_SITE={}, SITE_SPAN={},
       SEG_BY_PAIR={}, NODEEL={}, CAPTXT={};
+// what a layer of a machine built in layers is called: A, B, C, ... from the lowest
+const layerName = k => (k>=0 && k<26) ? String.fromCharCode(65+k) : 'L'+k;
 // A SEGMENT'S ROLE COLOUR IS DERIVED FROM ITS LABELS, here as in Python.  `D.roles`
 // is a snapshot keyed by segment id, taken when the page was emitted, and it has no
 // answer for a segment the user creates -- every one of those drew as 'rail' whatever it
@@ -2346,6 +2458,12 @@ function edgePoint(aId, bId, t){
     return a ? {x:px(a), y:py(a), norail:true} : null;
   }
   const I=SEGINFO[sid];
+  // A RISER joins two layers, which the flat stage draws as two panels.  The ion does not
+  // cross the page between them: it is at its port in the first panel for the first half
+  // of the hop and at the matching port in the second for the rest (`draw()` closes the
+  // mark into the one and opens it out of the other).
+  if(I && I.riser){ const n=nodeById[t<0.5 ? aId : bId];
+    return n ? {x:px(n), y:py(n)} : null; }
   if(I && I.cp){ const q=bezPoint(I, segById[sid].a===aId ? t : 1-t);
     return {x:q.x, y:q.y}; }
   const a=nodeById[aId], b=nodeById[bId]; if(!a||!b) return null;
@@ -2388,6 +2506,22 @@ function buildStatic(S){
   // --- segments: the RF null the ions ride, in the deck's role colours -------------
   // butt caps, not round: 144 collinear round caps overlap by half a stroke each and
   // fuse the whole rail into one slab.
+  // --- layers: a machine built in layers is one panel a layer (`L.panels`), each framed
+  // and named, so the reader sees at once that these are separate planes ---------------
+  if(L.panels && L.panels.length>1){
+    const box={};
+    for(const n of A.nodes){ const k=n.z||0, x=px(n), y=py(n);
+      const q=box[k]||(box[k]={x0:x,y0:y,x1:x,y1:y});
+      if(x<q.x0)q.x0=x; if(x>q.x1)q.x1=x; if(y<q.y0)q.y0=y; if(y>q.y1)q.y1=y; }
+    const m=0.62*L.g, fs=Math.max(10, L.g*0.26);
+    for(const k in box){ const q=box[k];
+      gLoop.append(el('rect',{x:q.x0-m, y:q.y0-m, width:(q.x1-q.x0)+2*m, height:(q.y1-q.y0)+2*m,
+        rx:0.18*L.g, fill:C.navy, 'fill-opacity':0.025, stroke:C.grid_faint,
+        'stroke-width':Math.max(1, L.sw_node), 'pointer-events':'none'}));
+      const t=el('text',{x:q.x0-m+0.35*fs, y:q.y0-m+0.95*fs, fill:C.navy, 'fill-opacity':0.7,
+        'font-size':fs, 'font-weight':700, 'pointer-events':'none'});
+      t.textContent='layer '+layerName(+k); gLoop.append(t); }
+  }
   let pads=0;
   const BOW=L.bows||{};
   for (const sg of A.segments){
@@ -2395,6 +2529,32 @@ function buildStatic(S){
     const ax=px(a), ay=py(a), bx=px(b), by=py(b);
     const dx=bx-ax, dy=by-ay, len=Math.hypot(dx,dy);
     const I={ax,ay,dx,dy,len,cp:null};
+    if(sg.riser){
+      // A RISER HAS NO LENGTH ON THE FLAT STAGE.  Its two ends are in two panels, and a line
+      // between them would be a rail the machine does not have.  It is drawn as a PORT at
+      // each end -- a ring in the rail's colour, labelled with the layer it leads to -- and
+      // is as long, for the timing of a hop, as one lattice step (`edgeLen`).
+      I.riser=true; I.dx=0; I.dy=0; I.len=0; I.alen=L.g;
+      SEGINFO[sg.id]=I;
+      SEG_BY_PAIR[sg.a+'>'+sg.b]=sg.id; SEG_BY_PAIR[sg.b+'>'+sg.a]=sg.id;
+      for(const [here,there,x,y] of [[a,b,ax,ay],[b,a,bx,by]]){
+        const up=(there.z||0)>(here.z||0), r=1.5*L.r_junc, fs=Math.max(7, L.g*0.2);
+        const ring=el('circle',{cx:x, cy:y, r:r, fill:'none', stroke:C.rail,
+          'stroke-width':L.sw_rail, opacity:0.95});
+        const tip=el('title',{});
+        tip.textContent = sg.id+' · riser · '+here.id+' ↔ '+there.id+' · '+(up?'up':'down')+
+                          ' to layer '+layerName(there.z||0)+
+                          ' · declared length '+(+(sg.len===undefined?1:sg.len).toFixed(3))+
+                          ' · cap '+(sg.cap===undefined?1:sg.cap);
+        ring.append(tip); gSeg.append(ring);
+        const t=el('text',{x:x+0.78*r, y:y-0.95*r, fill:C.accent, 'font-size':fs, 'font-weight':700,
+          'pointer-events':'none', stroke:'#ffffff', 'stroke-width':fs*0.26,
+          'stroke-linejoin':'round', 'paint-order':'stroke'});
+        t.textContent=(up?'↑':'↓')+layerName(there.z||0); gSeg.append(t);
+        if(here===a) SEGEL[sg.id]=ring;
+      }
+      continue;
+    }
     const bw=BOW[sg.id];
     if(bw && len>1e-6) I.cp={x:(ax+bx)/2 - (dy/len)*2*bw, y:(ay+by)/2 + (dx/len)*2*bw};
     I.alen = bezLen(I);          // the DRAWN length, arc included: pointOnPath needs it
@@ -2664,6 +2824,9 @@ function buildStatic(S){
       if(HWL_SHOWN === false) t.setAttribute('display','none');
       gNode.append(t); HWT_[n.id]=t; HWLG_[n.id]=g;
     }
+    // the stage's own scene (the only one with hardware labels) has just been redrawn:
+    // the 3-D stage, while it is the one shown, rebuilds its machine from the same data
+    if(globalThis.STAGE3D) STAGE3D.rebuild();
   }
 }
 
@@ -3282,6 +3445,15 @@ function draw(){
       r0 = r;
       if(pt.room) r = Math.min(r, pt.room);
     }
+    // what the 3-D stage draws this ion with: the same radius and the same beam
+    p.r3 = r; p.b3 = beam;
+    // ON A RISER the ion leaves one panel and arrives in the other: the mark closes into
+    // its port over the first half of the hop and opens out of the matching port over the
+    // second.  (In 3D it simply rides the riser.)
+    if(pt.fly){ const q=flying[ion];
+      if(q && q.a && q.b){ const rs=SEG_BY_PAIR[q.a+'>'+q.b];
+        if(rs!==undefined && SEGINFO[rs] && SEGINFO[rs].riser){
+          const k=Math.max(0.1, Math.abs(1-2*q.u)); r*=k; r0*=k; } } }
     if(pt.fly && wells){
       p.w.setAttribute('cx',pt.x); p.w.setAttribute('cy',pt.y); show(p.w);
     } else hide(p.w);
@@ -3390,6 +3562,9 @@ function draw(){
   slider.value=String(frame);
   syncCursor();
   paintQLabels();
+  // THE SAME FRAME, to the 3-D stage: where `TRANSIT.place` put every ion, as drawn above.
+  // It computes no position of its own (`js/stage3d.js`).
+  if(globalThis.STAGE3D) STAGE3D.frame(live, flying, f, stt);
 }
 
 // ---------- drop a design onto the page ----------
@@ -5547,6 +5722,7 @@ else fromHash();
 setTimeout(() => { sizeLists(); if(PLIST && PLIST.follow && VIEWPOS[frame] >= 0) PLIST.scrollToRow(VIEWPOS[frame]); syncCursor(true); }, 50);
 </script>
 __EDITOR__
+__STAGE3D__
 </body></html>
 '''
 
@@ -5571,6 +5747,7 @@ def render_html(
     tech=None,
     ruleset: dict | None = None,
     notes: dict | None = None,
+    stage3d: "str | bool" = "auto",
 ) -> Path:
     """Write the self-contained page.  Returns the path written.
 
@@ -5584,7 +5761,10 @@ def render_html(
     and `source=None` only for a programme no circuit stands behind.  `notes` is a page's
     study notes: {title, index (a link back), facts: [str], claim, marks: [{frame, id,
     label, note, kind}]}.  `open_pane` names the dock pane the page opens on (`"L"` for the
-    course); the default is none -- the page opens on the canvas."""
+    course); the default is none -- the page opens on the canvas.  `stage3d` says whether
+    the page carries the 3-D stage (`js/stage3d.js` and the vendored three.js, 0.6 MB):
+    `"auto"` gives it to a machine built in layers and to no other, `"always"` and
+    `"never"` say so outright."""
     view = build_view_model(arch, prog, res, model, max_frames=max_frames,
                             kicker=kicker, headline=headline, lede=lede,
                             control=control, provenance=provenance,
@@ -5605,6 +5785,7 @@ def render_html(
     html = html.replace("__DATA__", _escape_blob(blob))
     html = html.replace("__ENGINE__", _js_block(ENGINE_JS))
     html = html.replace("__EDITOR__", _js_block(EDITOR_JS))
+    html = html.replace("__STAGE3D__", _stage3d_block() if wants_stage3d(arch, stage3d) else "")
     for bad in FORBIDDEN:
         if bad in html:
             at = html.index(bad)

@@ -202,7 +202,8 @@ def cmd_run(args) -> int:
     if args.html:
         # a programme file on its own: no certificate names the circuit behind it
         path = render_html(arch, prog, res, model, args.html, source=None,
-                           max_frames=args.max_frames)
+                           max_frames=args.max_frames,
+                           stage3d=getattr(args, "stage3d", "auto"))
         print(f"  wrote          {path}")
     if args.json:
         Path(args.json).parent.mkdir(parents=True, exist_ok=True)
@@ -350,6 +351,7 @@ def cmd_studio(args) -> int:
     report = verify(prog, arch, model)
     path = render_html(arch, prog, report.result, model, args.out,
                        tech=tech,
+                       stage3d=getattr(args, "stage3d", "auto"),
                        kicker="QCCD STUDIO",
                        open_pane=getattr(args, "open_pane", None),
                        headline=(f"{arch.name} - {prog.name}" if args.tsir
@@ -914,6 +916,9 @@ def build_parser() -> argparse.ArgumentParser:
                        help="primitive table (PLAN 3.2)")
     p_run.add_argument("--cool", action="store_true", help="insert cooling for R7/R7c")
     p_run.add_argument("--html", default=None, help="write a self-contained page here")
+    p_run.add_argument("--stage3d", default="auto", choices=["auto", "always", "never"],
+                       help="whether the page carries the 3D stage (0.6 MB): auto gives "
+                            "it to a machine built in layers only (docs/PLAN-3d.md)")
     p_run.add_argument("--json", default=None, help="write the report here")
     p_run.add_argument("--max-frames", type=int, default=20000)
 
@@ -1008,6 +1013,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_studio.add_argument("--cert", default=None,
                           help="with --qasm, the compiler certificate "
                                "(default: alongside --tsir)")
+    p_studio.add_argument("--stage3d", default="auto", choices=["auto", "always", "never"],
+                          help="whether the page carries the 3D stage (0.6 MB): auto gives "
+                               "it to a machine built in layers only")
     p_studio.add_argument("--k", default="")
     p_studio.add_argument("--model", default="corrected", choices=["deck", "corrected"])
     p_studio.add_argument("--table", default="qccdsim_jones")

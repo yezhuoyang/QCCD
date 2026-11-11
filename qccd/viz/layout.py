@@ -40,6 +40,7 @@ __all__ = [
     "compute_layout",
     "COORD_MAX",
     "min_nearest_neighbour",
+    "panel_offsets",
     "pad_tiling",
     "site_length",
     "W_MAX",
@@ -209,6 +210,65 @@ def _sample(pts: Sequence[tuple[float, float]], cap: int = 6000):
         return pts
     stride = len(pts) / cap
     return [pts[int(i * stride)] for i in range(cap)]
+
+
+# --------------------------------------------------------------- panels
+#
+# A machine built in layers is drawn on the flat stage as ONE PANEL A LAYER.  Every layer
+# keeps its own (x, y); the panels are set apart by a whole number of pitches along one
+# axis, so that no layer is drawn over another and a node keeps its place within its panel.
+# `compute_layout` then lays the shifted nodes out like any planar machine -- it never
+# learns that there are layers, which is why its 39 scalars and their parity are untouched.
+#
+# The 3-D stage slides the panels back over one another (`js/stage3d.js`), so the offsets
+# here are the whole difference between the two pictures.
+
+#: The stage a page is fitted into is about this wide for its height (`W_MAX : H_MAX`).
+PANEL_ASPECT = 16.0 / 9.0
+#: The gap between two panels: at least this many lattice steps ...
+PANEL_GAP_STEPS = 2.0
+#: ... and at least this fraction of the machine's extent along the way the panels run.
+PANEL_GAP_FRAC = 0.15
+
+
+def panel_offsets(xs: Sequence[float], ys: Sequence[float], n_layers: int) -> list:
+    """`[[dx, dy], ...]`, one a layer, in lattice units: where each layer's panel stands.
+
+    `xs`, `ys` are the true coordinates of every node of the machine, all layers together:
+    the panels share ONE frame, so two nodes joined by a riser stand at the same place in
+    their two panels.  Layer 0 is not moved.
+
+    The panels run down the page or across it, whichever leaves the whole picture nearer
+    the stage's own shape (`PANEL_ASPECT`).  Mirrored in `engine.js::panelOffsets` with the
+    same operations in the same order; the parity suite compares the two exactly.
+    """
+    n = int(n_layers)
+    if n < 2:
+        return [[0.0, 0.0]]
+    if not xs:
+        return [[0.0, 0.0] for _ in range(n)]
+    w = max(xs) - min(xs)
+    h = max(ys) - min(ys)
+    ux = _lattice_step(xs)
+    uy = _lattice_step(ys)
+    step = ux if ux > _EPS else (uy if uy > _EPS else 1.0)
+    gap_x = max(PANEL_GAP_STEPS * (ux if ux > _EPS else step), PANEL_GAP_FRAC * w)
+    gap_y = max(PANEL_GAP_STEPS * (uy if uy > _EPS else step), PANEL_GAP_FRAC * h)
+    # the whole picture, panels across the page and panels down it
+    across_w = n * w + (n - 1) * gap_x
+    across_h = h if h > _EPS else step
+    down_w = w if w > _EPS else step
+    down_h = n * h + (n - 1) * gap_y
+    ra = across_w / across_h
+    rd = down_w / down_h
+    # how far each is from the stage's shape, as a ratio that is 1 for a perfect fit
+    fa = ra / PANEL_ASPECT if ra > PANEL_ASPECT else PANEL_ASPECT / ra
+    fd = rd / PANEL_ASPECT if rd > PANEL_ASPECT else PANEL_ASPECT / rd
+    if fa <= fd:
+        pitch = w + gap_x
+        return [[k * pitch, 0.0] for k in range(n)]
+    pitch = h + gap_y
+    return [[0.0, k * pitch] for k in range(n)]
 
 
 # --------------------------------------------------------------- the fit

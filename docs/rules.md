@@ -70,6 +70,21 @@ the rail: R20 and R21 both fire); it now runs a corner spur outward, so every sh
 ring passes. A periodic grid (`grid(..., periodic=True)`) cannot pass R21 on a plane and
 is not meant to: `cylinder` is the planar drawing of the same torus.
 
+**The same rules on a machine built in layers (2026-11).** A node may have a third
+coordinate, its layer (`docs/adl.md`), and no rule was added for it. R19 is unchanged: its
+default of six rails was written for exactly this. R20 gives a riser, the rail between two
+layers, its angles by statement: 90 degrees to every rail of its layer and 180 to a riser
+going the other way, because the lattice has a scale of its own on every axis and no other
+angle out of the plane survives the map to the lab. R21 reads "rails lie in layers": a riser
+stands vertical between adjacent layers, and the two planar tests are made layer by layer,
+since a rail of one layer is nowhere near a node or a rail of another. R22 is one waveform a
+LAYER, because each layer has a broadcast of its own; an ion on a riser leaves one layer's
+electrodes and arrives on the other's, so its hop is in both layers' cycles. Its label is
+`+z` or `-z`. R4d needs no change: the control plane's channel groups are split by layer, so
+its clauses are already layer by layer. Before this a two-layer design was drawn flat under a
+rule set that dropped R20 and R21 (`docs/rule-language.md`); that still works, and judges
+less.
+
 **R22, one waveform (2026-09).** Broadcast control means one waveform per cycle, and the
 general router batched every hop that departed at the same time slot into one cycle
 whatever its direction, which R4d only counted against the number of channels. R22 asks

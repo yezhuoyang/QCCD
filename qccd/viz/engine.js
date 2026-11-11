@@ -606,16 +606,75 @@ function _scale(pts, sx, sy) {
 // [{id,a,b}] arrays `compute_layout` takes.  Order is preserved because order is what
 // `_bows` and `_sample` depend on.
 function layoutOf(dev, opts) {
-  var nodes = [], segments = [];
-  for (var nid in dev.nodes) if (own(dev.nodes, nid)) {
-    var n = dev.nodes[nid];
-    nodes.push({ id: nid, x: Number(unbox(n.pos[0])), y: Number(unbox(n.pos[1])) });
+  var d = drawnOf(dev), lay = computeLayout(d.nodes, d.segments, opts);
+  if (d.panels) lay.panels = d.panels;       // `render.py::_with_panels`
+  return lay;
+}
+
+// PANELS -- `layout.py::panel_offsets`, the same operations in the same order.
+//
+// A machine built in layers is drawn on the flat stage as one panel a layer.  Every layer
+// keeps its own (x, y); the panels are set apart along one axis so that no layer is drawn
+// over another, and `computeLayout` then lays the shifted nodes out like any planar
+// machine.  The 3-D stage slides the panels back over one another (`js/stage3d.js`).
+var PANEL_ASPECT = 16.0 / 9.0, PANEL_GAP_STEPS = 2.0, PANEL_GAP_FRAC = 0.15;
+function panelOffsets(xs, ys, nLayers) {
+  var n = Math.trunc(nLayers), out = [], k;
+  if (n < 2) return [[0.0, 0.0]];
+  if (!xs.length) { for (k = 0; k < n; k++) out.push([0.0, 0.0]); return out; }
+  var x0 = xs[0], x1 = xs[0], y0 = ys[0], y1 = ys[0], i;
+  for (i = 1; i < xs.length; i++) {
+    if (xs[i] < x0) x0 = xs[i]; if (xs[i] > x1) x1 = xs[i];
+    if (ys[i] < y0) y0 = ys[i]; if (ys[i] > y1) y1 = ys[i];
   }
-  for (var sid in dev.segments) if (own(dev.segments, sid)) {
+  var w = x1 - x0, h = y1 - y0;
+  var ux = _latticeStep(xs), uy = _latticeStep(ys);
+  var step = ux > _EPS ? ux : (uy > _EPS ? uy : 1.0);
+  var gapX = Math.max(PANEL_GAP_STEPS * (ux > _EPS ? ux : step), PANEL_GAP_FRAC * w);
+  var gapY = Math.max(PANEL_GAP_STEPS * (uy > _EPS ? uy : step), PANEL_GAP_FRAC * h);
+  // the whole picture, panels across the page and panels down it
+  var acrossW = n * w + (n - 1) * gapX, acrossH = h > _EPS ? h : step;
+  var downW = w > _EPS ? w : step, downH = n * h + (n - 1) * gapY;
+  var ra = acrossW / acrossH, rd = downW / downH;
+  var fa = ra > PANEL_ASPECT ? ra / PANEL_ASPECT : PANEL_ASPECT / ra;
+  var fd = rd > PANEL_ASPECT ? rd / PANEL_ASPECT : PANEL_ASPECT / rd;
+  var pitch;
+  if (fa <= fd) { pitch = w + gapX; for (k = 0; k < n; k++) out.push([k * pitch, 0.0]); }
+  else { pitch = h + gapY; for (k = 0; k < n; k++) out.push([0.0, k * pitch]); }
+  return out;
+}
+
+// WHERE A MACHINE IS DRAWN, as the flat stage draws it: `render.py::build_view_model`'s
+// node and segment lists.  On a planar machine that is its own (x, y).  On one built in
+// layers each node is at its (x, y) plus its layer's panel offset and carries its layer
+// as `z`, and a riser is left out of the segments the fit is computed from -- its two ends
+// are in two panels, and it has no drawn length.
+//   { nodes: [{id, x, y[, z]}], segments: [{id, a, b}], panels: [[dx, dy], ...] | null,
+//     riser: {segment id: true}, layers: layersOf(dev) }
+function drawnOf(dev) {
+  var lay = layersOf(dev), nodes = [], segments = [], riser = {}, panels = null, nid, sid, p;
+  if (lay) {
+    var xs = [], ys = [];
+    for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+      p = dev.nodes[nid].pos;
+      xs.push(Number(unbox(p[0]))); ys.push(Number(unbox(p[1])));
+    }
+    panels = panelOffsets(xs, ys, lay.n);
+  }
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    p = dev.nodes[nid].pos;
+    var x = Number(unbox(p[0])), y = Number(unbox(p[1]));
+    if (lay) {
+      var k = lay.of[nid];
+      nodes.push({ id: nid, x: x + panels[k][0], y: y + panels[k][1], z: k });
+    } else nodes.push({ id: nid, x: x, y: y });
+  }
+  for (sid in dev.segments) if (own(dev.segments, sid)) {
     var s = dev.segments[sid];
+    if (lay && lay.of[s.a] !== lay.of[s.b]) { riser[sid] = true; continue; }
     segments.push({ id: sid, a: s.a, b: s.b });
   }
-  return computeLayout(nodes, segments, opts);
+  return { nodes: nodes, segments: segments, panels: panels, riser: riser, layers: lay };
 }
 function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -636,11 +695,13 @@ function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 // Errors carry Python's exact message text, so the editor's error strip says what
 // `python -m qccd` would say.
 
-function _node(id, x, y, kind, zone, cap, labels) {
+function _node(id, x, y, kind, zone, cap, labels, z) {
   // plain numbers, not PyFloat boxes: `pos` is `tuple(float)` in Python and `length` is a
   // float, so there is no ambiguity to carry, and a box here would travel into edit.js's
   // reports and serialize as {"v": ...}.  The tag lives only where the ambiguity is real.
-  return { id: id, pos: [Number(x), Number(y)], kind: kind || 'site',
+  // A node of a machine built in layers has a third coordinate, its layer's z.
+  return { id: id, pos: z === undefined ? [Number(x), Number(y)] : [Number(x), Number(y), Number(z)],
+           kind: kind || 'site',
            cap: cap || 0, zone: zone === undefined ? null : zone,
            labels: labels || [], capacity_explicit: false };
 }
@@ -1390,6 +1451,37 @@ function _channelGroups(dev, control) {
   return { grouping: grouping, groups: groups, n_sites: sites.length };
 }
 
+// EACH LAYER HAS A BROADCAST OF ITS OWN (`build_control_plane`): on a machine built in
+// layers every channel group is split by layer, so the count is, group by group, the
+// number of layers its members stand in.  The planar count above is what one layer gets;
+// this re-runs it on each layer's own sites and adds.
+function _channelGroupsLayered(dev, control) {
+  var lay = layersOf(dev);
+  if (!lay || lay.n < 2) return _channelGroups(dev, control);
+  var spec = (control && control.channels) || {};
+  if (!_nonEmpty(spec)) return null;
+  var total = null, k, nid;
+  for (k = 0; k < lay.n; k++) {
+    var sub = { nodes: {}, segments: {}, loops: {} }, some = false;
+    for (nid in dev.nodes) if (own(dev.nodes, nid) && lay.of[nid] === k) { sub.nodes[nid] = dev.nodes[nid]; some = true; }
+    if (!some) continue;
+    var ctl = control;
+    if (String(spec.grouping === undefined ? 'direct' : spec.grouping) === 'explicit') {
+      // an explicit map lists its members: a channel counts once for every layer it reaches
+      var ex = (spec.explicit || []).filter(function (e) {
+        return (e.drives || []).some(function (d) { return own(sub.nodes, d); });
+      });
+      ctl = Object.assign({}, control, { channels: Object.assign({}, spec, { explicit: ex }) });
+    }
+    var one = _channelGroups(sub, ctl);
+    if (!one) continue;
+    if (!total) total = { grouping: one.grouping, groups: 0, n_sites: 0 };
+    total.groups += one.groups;
+    total.n_sites += one.n_sites;
+  }
+  return total;
+}
+
 function _nonEmpty(o) {
   if (!o) return false;
   for (var k in o) if (own(o, k)) return true;
@@ -1424,7 +1516,7 @@ function hardwareReport(dev, control, budget, name) {
   var electrodes = eTrap + eJunction;
   var switches = electrodes * 2;
 
-  var plane = _channelGroups(dev, control);
+  var plane = _channelGroupsLayered(dev, control);
   var broadcast, compDacs, dacs;
   if (plane) {
     // the DECLARED plane: electrodes and switches come from the plane's own fields, where
@@ -1950,6 +2042,10 @@ var CALLS = {
     }
     var pos = [];
     for (var i = 1; i < args.length; i++) pos.push(_coord(unbox(args[i]), 'position'));
+    // a drag moves a node INSIDE its layer: (x, y) given to a node of a machine built in
+    // layers keeps the node's z (`Machine.move_site`)
+    var was = st.device.nodes[nid].pos;
+    if (pos.length === 2 && was.length === 3) pos.push(was[2]);
     st.device.nodes[nid].pos = pos;
     return st;
   },
@@ -2034,14 +2130,12 @@ function _builder(st, method) {
 function _dBuild(st, args, kw, kind) {
   _builder(st, 'd.' + kind);
   var nid = String(args[0]);
-  // EXACTLY TWO.  The schema admits one to three coordinates and nothing in the codebase
-  // reads a third, so a 3-D device would draw as a silent projection -- and this mirror
-  // reads `args[1]` and `args[2]` only, so a 1-D one becomes NaN.  `DeviceBuilder.site`
-  // refuses both; refuse them here, at the same statement and in the same words.
-  if (args.length - 1 !== 2) {
+  // TWO, OR THREE.  (x, y) is a node of a planar machine and (x, y, z) a node of one built
+  // in layers; `DeviceBuilder.site` takes both and refuses one coordinate, which this
+  // mirror would read as NaN.  Refuse it here, at the same statement and in the same words.
+  if (args.length - 1 !== 2 && args.length - 1 !== 3) {
     throw new EditError('DeviceBuilder.' + kind + '(' + pyRepr(nid) + ', ...) needs ' +
-                        'exactly two coordinates, got ' + (args.length - 1) +
-                        '; the layout is two-dimensional and nothing reads a third',
+                        'two coordinates (x, y) or three (x, y, z), got ' + (args.length - 1),
                         'ExpansionError', 'd.' + kind);
   }
   var n = _node(nid, _finite(args[1], 'an x coordinate', 'd.' + kind),
@@ -2049,7 +2143,8 @@ function _dBuild(st, args, kw, kind) {
                 kw.zone === undefined ? null : kw.zone,
                 kw.capacity === undefined ? 0
                   : Math.trunc(_finite(kw.capacity, 'a site capacity', 'd.' + kind)),
-                kw.labels ? kw.labels.slice() : []);
+                kw.labels ? kw.labels.slice() : [],
+                args.length - 1 === 3 ? _finite(args[3], 'a z coordinate', 'd.' + kind) : undefined);
   // `capacity_explicit=bool(capacity)` in `DeviceBuilder.site` -- a capacity of ZERO
   // means INHERIT, not "explicitly zero", and a NEGATIVE one is explicit (bool(-2) is
   // True), which is what lets the schema refuse it rather than the zone quietly
@@ -2407,7 +2502,7 @@ function deviceToJson(dev) {
   var nodes = [], nid;
   for (nid in dev.nodes) if (own(dev.nodes, nid)) {
     var n = dev.nodes[nid];
-    var d = { id: nid, pos: [n.pos[0], n.pos[1]], kind: n.kind };
+    var d = { id: nid, pos: n.pos.slice(), kind: n.kind };
     if (n.kind === 'site' || n.cap) d.capacity = Math.trunc(n.cap || 0);
     if (n.capacity_explicit) d.capacity_explicit = true;
     if (n.zone !== null && n.zone !== undefined) d.zone_type = n.zone;
@@ -4655,6 +4750,34 @@ function _xyOf(pos) {
   return [Number(unbox(pos[0])), pos.length > 1 ? Number(unbox(pos[1])) : 0.0];
 }
 
+// `Device.dim` / `Device.layers` / `Device.layer_of`.  A machine built in layers has three
+// coordinates a node; a layer is a distinct z, lowest first, and distinct means EXACTLY
+// distinct (a declared number naming a layer, compared as Python compares it: no rounding).
+// `null` on a planar machine, which is every machine written before layers.
+//   { z: [z0, z1, ...], of: {node id: layer index}, n: how many layers }
+function layersOf(dev) {
+  var nid, p, any = false, seen = {}, zs = [];
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    p = dev.nodes[nid].pos;
+    if (p.length > 2) {
+      any = true;
+      var z = Number(unbox(p[2])) + 0.0, key = String(z);
+      if (!own(seen, key)) { seen[key] = true; zs.push(z); }
+    }
+  }
+  if (!any) return null;
+  zs.sort(_cmpNum);
+  var rank = {}, of = {}, i;
+  for (i = 0; i < zs.length; i++) rank[String(zs[i])] = i;
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    p = dev.nodes[nid].pos;
+    of[nid] = p.length > 2 ? rank[String(Number(unbox(p[2])) + 0.0)] : 0;
+  }
+  return { z: zs, of: of, n: zs.length };
+}
+// `Device.layer_name`: A, B, C, ... from the lowest.
+function layerName(k) { return (k >= 0 && k < 26) ? String.fromCharCode(65 + k) : 'L' + k; }
+
 // `Device.incidence`: node id -> incident segment ids IN DECLARATION ORDER.  A self-loop
 // lands twice, by construction, which is also how `Device.degree` counts it.
 function _incidence(dev) {
@@ -4670,8 +4793,17 @@ function _incidence(dev) {
 
 function _otherEnd(seg, nid) { return seg.a === nid ? seg.b : seg.a; }
 
-// `rail_angle_deg`
-function _railAngleDeg(dev, nid, segA, segB) {
+// `rail_angle_deg`.  `lay` is `layersOf(dev)`: on a machine built in layers a riser is
+// vertical (R21), so its angles are stated, not computed from z -- see `rules.py`.
+function _railAngleDeg(dev, nid, segA, segB, lay) {
+  if (lay) {
+    var oa = _otherEnd(dev.segments[segA], nid), ob = _otherEnd(dev.segments[segB], nid);
+    var ra = lay.of[oa] !== lay.of[nid], rb = lay.of[ob] !== lay.of[nid];
+    if (ra || rb) {
+      if (!(ra && rb)) return 90.0;
+      return ((lay.of[oa] > lay.of[nid]) !== (lay.of[ob] > lay.of[nid])) ? 180.0 : 0.0;
+    }
+  }
   var o = _xyOf(dev.nodes[nid].pos);
   var a = _xyOf(dev.nodes[_otherEnd(dev.segments[segA], nid)].pos);
   var b = _xyOf(dev.nodes[_otherEnd(dev.segments[segB], nid)].pos);
@@ -4715,6 +4847,8 @@ function geometryViolations(st) {
   if (!st || !st.device) return [];
   var dev = st.device, out = [], lim = geometryLimits(st);
   var maxDeg = lim.maxDeg, minAng = lim.minAng, inc = _incidence(dev);
+  // R21 on a machine built in layers reads "rails lie in layers": see `rules.py`.
+  var lay = layersOf(dev);
   var nids = [], sids = [], pos = {}, nid, sid, i, j, k;
   for (nid in dev.nodes) if (own(dev.nodes, nid)) { nids.push(nid); pos[nid] = _xyOf(dev.nodes[nid].pos); }
   for (sid in dev.segments) if (own(dev.segments, sid)) sids.push(sid);
@@ -4732,7 +4866,7 @@ function geometryViolations(st) {
     }
     for (i = 0; i < segs.length; i++) {
       for (j = i + 1; j < segs.length; j++) {
-        var ang = _railAngleDeg(dev, nid, segs[i], segs[j]);
+        var ang = _railAngleDeg(dev, nid, segs[i], segs[j], lay);
         // R20_TOL_DEG in rules.py: a corner drawn at the limit is stored a hair under it
         if (ang < minAng - 1e-3) {
           out.push({ rule: 'R20', node: nid,
@@ -4754,12 +4888,38 @@ function geometryViolations(st) {
     boxes[sids[i]] = [Math.min(pa[0], pb[0]) - RAIL_EPS, Math.min(pa[1], pb[1]) - RAIL_EPS,
                       Math.max(pa[0], pb[0]) + RAIL_EPS, Math.max(pa[1], pb[1]) + RAIL_EPS];
   }
+  var riser = {};
+  for (i = 0; i < sids.length; i++) {
+    var sr = dev.segments[sids[i]];
+    riser[sids[i]] = !!lay && lay.of[sr.a] !== lay.of[sr.b];
+  }
+  if (lay) {
+    for (i = 0; i < sids.length; i++) {
+      sid = sids[i];
+      if (!riser[sid]) continue;
+      var rs = dev.segments[sid], qa = pos[rs.a], qb = pos[rs.b];
+      if (Math.abs(qa[0] - qb[0]) > RAIL_EPS || Math.abs(qa[1] - qb[1]) > RAIL_EPS) {
+        out.push({ rule: 'R21', segment: sid,
+                   message: 'rail ' + sid + ' (' + rs.a + '-' + rs.b + ') joins layers ' +
+                            layerName(lay.of[rs.a]) + ' and ' + layerName(lay.of[rs.b]) +
+                            ' but is not vertical; a rail lies in one layer or rises ' +
+                            'straight up to the next' });
+      } else if (Math.abs(lay.of[rs.a] - lay.of[rs.b]) !== 1) {
+        out.push({ rule: 'R21', segment: sid,
+                   message: 'rail ' + sid + ' (' + rs.a + '-' + rs.b + ') joins layers ' +
+                            layerName(lay.of[rs.a]) + ' and ' + layerName(lay.of[rs.b]) +
+                            ', which are not adjacent; a riser joins a layer to the next one' });
+      }
+    }
+  }
   for (i = 0; i < sids.length; i++) {
     sid = sids[i];
+    if (riser[sid]) continue;
     var s1 = dev.segments[sid], bx = boxes[sid];
     for (k = 0; k < nids.length; k++) {
       nid = nids[k];
       if (nid === s1.a || nid === s1.b) continue;
+      if (lay && lay.of[nid] !== lay.of[s1.a]) continue;
       var p = pos[nid];
       if (p[0] < bx[0] || p[0] > bx[2] || p[1] < bx[1] || p[1] > bx[3]) continue;
       if (_pointOnSegment(p, pos[s1.a], pos[s1.b])) {
@@ -4772,9 +4932,12 @@ function geometryViolations(st) {
   }
   for (i = 0; i < sids.length; i++) {
     var ida = sids[i], sa = dev.segments[ida], ba = boxes[ida];
+    if (riser[ida]) continue;
     for (j = i + 1; j < sids.length; j++) {
       var idb = sids[j], sb = dev.segments[idb];
+      if (riser[idb]) continue;
       if (sa.a === sb.a || sa.a === sb.b || sa.b === sb.a || sa.b === sb.b) continue;
+      if (lay && lay.of[sa.a] !== lay.of[sb.a]) continue;
       var bb = boxes[idb];
       if (bb[0] > ba[2] || bb[2] < ba[0] || bb[1] > ba[3] || bb[3] < ba[1]) continue;
       if (_segmentsCross(pos[sa.a], pos[sa.b], pos[sb.a], pos[sb.b])) {
@@ -5905,7 +6068,12 @@ var HOP_ANGLE_TIE = 1e-9;
 // `direction_label(dx, dy)`: `+x`, `-y` or `0` along an axis, `+x+y@30` off one -- the
 // angle in whole degrees counter-clockwise from +x, in [0, 360), rounded `floor(x + 0.5)`
 // after the tie nudge.  Python's `% 360` on a floor that can reach 360 is the `>= 360`.
-function _directionLabel(dx, dy) {
+function _directionLabel(dx, dy, dz) {
+  // a hop up or down a riser is `+z` / `-z`; see `rules.py::direction_label`
+  if (dz !== undefined && (dz > RAIL_EPS || dz < -RAIL_EPS)) {
+    var flat = _directionLabel(dx, dy);
+    return (dz > 0.0 ? '+z' : '-z') + (flat === '0' ? '' : flat);
+  }
   var sx = dx > RAIL_EPS ? '+x' : dx < -RAIL_EPS ? '-x' : '';
   var sy = dy > RAIL_EPS ? '+y' : dy < -RAIL_EPS ? '-y' : '';
   if (!sx || !sy) return (sx + sy) || '0';
@@ -5921,8 +6089,21 @@ function _directionLabel(dx, dy) {
 // back to the lab-frame direction.  The fall-through order is Python's and is load-bearing:
 // a segment that NAMES a loop it is not actually on skips the spur branch entirely, and a
 // chord (an off-path trap with two rails to the path) skips it too.
+function _layersW(w) {
+  if (w._lay === undefined) w._lay = layersOf(w.dev);
+  return w._lay;
+}
 function _hopLabel(w, m) {
   var dev = w.dev, seg = dev.segments[m.seg];
+  // A riser first: a hop between two layers is `+z` or `-z` whatever stands at its ends,
+  // and is never a dock (`rules.py::hop_label`).
+  var lay = _layersW(w);
+  if (lay && lay.of[m.src] !== lay.of[m.dst]) {
+    var pa = dev.nodes[m.src].pos, pb = dev.nodes[m.dst].pos;
+    return _directionLabel(Number(unbox(pb[0])) - Number(unbox(pa[0])),
+                           Number(unbox(pb[1])) - Number(unbox(pa[1])),
+                           Number(unbox(pb[2])) - Number(unbox(pa[2])));
+  }
   var loop = seg.loop === undefined ? null : seg.loop;
   // CLOSED loops only -- see `rules.py::hop_label`.  A rotation is one waveform whose ions
   // move in different lab-frame directions; an open path's step is a plain translation, and
@@ -5977,7 +6158,7 @@ function _r22(w) {
     hops[ion].push(i);
   }
   if (ions.length <= 1) return [];
-  var cls = w.cls || 'shuttle', seen = {}, sigs = [];
+  var cls = w.cls || 'shuttle', seen = {}, sigs = [], sigOf = {};
   for (i = 0; i < ions.length; i++) {
     var idxs = hops[ions[i]], labels = [];
     for (var j = 0; j < idxs.length; j++) {
@@ -5986,7 +6167,36 @@ function _r22(w) {
       if (!_entersBend(w, w.moves[idxs[j]])) labels.push(_hopLabel(w, w.moves[idxs[j]]));
     }
     var sig = cls + ' ' + labels.join(',');
+    sigOf[ions[i]] = sig;
     if (!own(seen, sig)) { seen[sig] = true; sigs.push(sig); }
+  }
+  // EACH LAYER HAS A BROADCAST OF ITS OWN (`rules.py::r22_uniform_motion`): one cycle is
+  // one waveform PER LAYER, and an ion on a riser is in both of its layers' cycles.
+  var lay = _layersW(w);
+  if (lay && lay.n > 1) {
+    var movers = {}, order = [], out = [], k;
+    for (i = 0; i < w.nmv; i++) {
+      var mv = w.moves[i], ls = [lay.of[mv.src]];
+      if (lay.of[mv.dst] !== lay.of[mv.src]) ls.push(lay.of[mv.dst]);
+      for (k = 0; k < ls.length; k++) {
+        if (!own(movers, ls[k])) { movers[ls[k]] = []; order.push(ls[k]); }
+        if (movers[ls[k]].indexOf(mv.ion) < 0) movers[ls[k]].push(mv.ion);
+      }
+    }
+    order.sort(_cmpNum);
+    for (k = 0; k < order.length; k++) {
+      var mine = movers[order[k]], ss = {}, sl = [];
+      for (i = 0; i < mine.length; i++) {
+        if (!own(ss, sigOf[mine[i]])) { ss[sigOf[mine[i]]] = true; sl.push(sigOf[mine[i]]); }
+      }
+      if (sl.length <= 1) continue;
+      sl.sort(_cmpStr);
+      out.push(_v('R22', w.id, 'in layer ' + layerName(order[k]) + ', ' + mine.length +
+                  ' ions move in ' + sl.length + ' different ways in one cycle (' + sl[0] +
+                  ' and ' + sl[1] + '); one cycle is one waveform a layer, so unlike ' +
+                  'motions in one layer need ' + sl.length + ' cycles'));
+    }
+    return out;
   }
   if (sigs.length <= 1) return [];
   sigs.sort(_cmpStr);
@@ -6282,7 +6492,7 @@ function explicitStatements(dev, opts) {
     if (n.labels && n.labels.length) kw.labels = n.labels.slice();
     if (n.capacity_explicit) kw.capacity = Math.trunc(n.cap);
     out.push({ method: n.kind === 'site' ? 'd.site' : 'd.junction',
-               args: [nid, new PyFloat(unbox(n.pos[0])), new PyFloat(unbox(n.pos[1]))],
+               args: [nid].concat(n.pos.map(function (c) { return new PyFloat(unbox(c)); })),
                kwargs: kw });
   }
   for (sid in dev.segments) if (own(dev.segments, sid)) {
@@ -6515,7 +6725,7 @@ function documentStatements(doc) {
       // which is a different document, and one `capacity_explicit` exists to distinguish.
       if (n.capacity_explicit) nkw.capacity = Math.trunc(n.capacity);
       out.push({ method: n.kind === 'junction' ? 'd.junction' : 'd.site',
-                 args: [n.id, new PyFloat(n.pos[0]), new PyFloat(n.pos[1])],
+                 args: [n.id].concat(n.pos.map(function (c) { return new PyFloat(c); })),
                  kwargs: nkw });
     }
     for (i = 0; i < (g.segments || []).length; i++) {
@@ -6609,6 +6819,7 @@ var API = {
   pyRepr: pyRepr, lit: lit, kwd: kwd,
   // layout
   computeLayout: computeLayout, layoutOf: layoutOf,
+  panelOffsets: panelOffsets, drawnOf: drawnOf,
   minNearestNeighbour: minNearestNeighbour, siteLength: siteLength, padTiling: padTiling,
   pointSegment: _pointSegment,
   LAYOUT_CONSTS: { W_MAX: W_MAX, W_MIN: W_MIN, H_MAX: H_MAX, H_MIN: H_MIN,
@@ -6655,6 +6866,7 @@ var API = {
   // lint
   lint: lint, architectureViolations: architectureViolations,
   geometryViolations: geometryViolations, geometryLimits: geometryLimits,
+  layersOf: layersOf, layerName: layerName,
   classParticipants: classParticipants, zonesInUse: zonesInUse,
   // the browser rule set -- 21 of the 28, derived from the dispatcher and never listed
   get MIRRORED_RULES() { return mirroredRules(); },

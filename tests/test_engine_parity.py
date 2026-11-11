@@ -1045,7 +1045,48 @@ def _geometry_shapes() -> list[tuple[str, list]]:
     hex6.append(_C("set_degree_curve", "junction_cross", 4,
                    [{"us": 120.0, "quanta": 3.0, "table": "qccdsim_jones", "source": "2004.04706",
                      "label": "four-way junction crossing"}]))
-    return [("star7", star), ("cross", cross), ("onrail", on_rail), ("hex6", hex6)]
+    # MACHINES BUILT IN LAYERS.  R21 reads "rails lie in layers" on these: a riser stands
+    # vertical between adjacent layers, and the planar tests are made layer by layer.
+    def lay(tag, x, y, z):
+        return _C("d.site", tag, float(x), float(y), float(z), zone="data")
+
+    # an X-junction with a riser up and one down: six rails, clean at the default budget
+    stack6 = [_C("DeviceBuilder", "explicit"),
+              _C("d.junction", "M", 0.0, 0.0, 1.0),
+              lay("Me", 1, 0, 1), lay("Mw", -1, 0, 1), lay("Mn", 0, 1, 1), lay("Ms", 0, -1, 1),
+              _C("d.junction", "U", 0.0, 0.0, 2.0), lay("Ue", 1, 0, 2),
+              _C("d.junction", "Dn", 0.0, 0.0, 0.0), lay("De", 1, 0, 0)]
+    for i, far in enumerate(("Me", "Mw", "Mn", "Ms")):
+        stack6.append(_C("d.segment", f"m{i}", "M", far))
+    stack6 += [_C("d.segment", "u0", "U", "Ue"), _C("d.segment", "d0", "Dn", "De"),
+               _C("d.segment", "R0", "Dn", "M"), _C("d.segment", "R1", "M", "U"),
+               _C("blank_device", name="stack6", zones=["data"]),
+               _C("set_degree_curve", "junction_cross", 4,
+                  [{"us": 120.0, "quanta": 3.0, "table": "qccdsim_jones", "source": "2004.04706",
+                    "label": "four-way junction crossing"}])]
+
+    # a riser that leans, and one that skips a layer: both break R21, each in its own words
+    lean = [_C("DeviceBuilder", "explicit"),
+            lay("a0", 0, 0, 0), lay("a1", 1, 0, 0), lay("b0", 0.5, 0, 1), lay("b1", 1.5, 0, 1),
+            lay("c0", 0, 0, 2), lay("c1", 1, 0, 2),
+            _C("d.segment", "ea", "a0", "a1"), _C("d.segment", "eb", "b0", "b1"),
+            _C("d.segment", "ec", "c0", "c1"),
+            _C("d.segment", "lean", "a0", "b0"), _C("d.segment", "skip", "a1", "c1"),
+            _C("blank_device", name="lean", zones=["data"])]
+
+    # one layer over another: a node of the upper layer stands over the MIDDLE of a rail of
+    # the lower, and a rail of the upper runs across a rail of the lower -- neither is a
+    # fault, because they are in different planes; the crossing INSIDE the upper layer is
+    over = [_C("DeviceBuilder", "explicit"),
+            lay("p0", 0, 0, 0), lay("p1", 4, 0, 0),
+            lay("q0", 2, 0, 1), lay("q1", 2, 2, 1), lay("q2", 1, 1, 1), lay("q3", 3, 1, 1),
+            lay("q4", 2, -2, 1),
+            _C("d.segment", "low", "p0", "p1"),
+            _C("d.segment", "up0", "q0", "q1"), _C("d.segment", "up1", "q2", "q3"),
+            _C("d.segment", "up2", "q0", "q4"),
+            _C("blank_device", name="over", zones=["data"])]
+    return [("star7", star), ("cross", cross), ("onrail", on_rail), ("hex6", hex6),
+            ("stack6", stack6), ("lean", lean), ("over", over)]
 
 
 def _lint_cases() -> list[dict]:
@@ -1470,9 +1511,36 @@ def _hand_build_shapes() -> list[tuple[str, list]]:
     case("FAIL-generator-not-in-enum",
          [_B("mygen"), _C("d.site", "S0", 0.0, 0.0, zone="data"),
           _C("blank_device", name="gen", zones=["data"])])
-    case("FAIL-3d-position",
+    # A THIRD COORDINATE IS A LAYER (docs/PLAN-3d.md).  It used to be refused on both
+    # sides, in the same words; it is now accepted on both, and what is refused is a
+    # fourth coordinate, a machine that mixes two and three, and a loop through two layers.
+    case("layered-position",
          [_B(), _C("d.site", "S0", 0.0, 0.0, 3.0, zone="data"),
           _C("blank_device", name="d3", zones=["data"])])
+    case("layered-two-layers-and-a-riser",
+         [_B(), _C("d.site", "A0", 0.0, 0.0, 0.0, zone="data"),
+          _C("d.junction", "AJ", 1.0, 0.0, 0.0),
+          _C("d.site", "A1", 2.0, 0.0, 0.0, zone="data"),
+          _C("d.junction", "BJ", 1.0, 0.0, 1.0),
+          _C("d.site", "B0", 1.0, 1.0, 1.0, zone="data"),
+          _C("d.segment", "E0", "A0", "AJ"), _C("d.segment", "E1", "AJ", "A1"),
+          _C("d.segment", "E2", "BJ", "B0"), _C("d.segment", "R0", "AJ", "BJ", labels=["riser"]),
+          _C("blank_device", name="two", zones=["data"])])
+    case("FAIL-4d-position",
+         [_B(), _C("d.site", "S0", 0.0, 0.0, 3.0, 4.0, zone="data"),
+          _C("blank_device", name="d4", zones=["data"])])
+    case("FAIL-mixed-dimensions",
+         [_B(), _C("d.site", "S0", 0.0, 0.0, 1.0, zone="data"),
+          _C("d.site", "S1", 1.0, 0.0, zone="data"),
+          _C("d.segment", "E0", "S0", "S1"),
+          _C("blank_device", name="mix", zones=["data"])])
+    case("FAIL-loop-through-two-layers",
+         [_B(), _C("d.site", "A", 0.0, 0.0, 0.0, zone="data"),
+          _C("d.site", "Bb", 1.0, 0.0, 0.0, zone="data"),
+          _C("d.site", "Cc", 1.0, 0.0, 1.0, zone="data"),
+          _C("d.segment", "E0", "A", "Bb"), _C("d.segment", "E1", "Bb", "Cc"),
+          _C("d.loop", "L0", ["A", "Bb", "Cc"], closed=False, kind="path"),
+          _C("blank_device", name="lz", zones=["data"])])
     case("FAIL-1d-position",
          [_B(), _C("d.site", "S0", 0.0, zone="data"),
           _C("blank_device", name="d1", zones=["data"])])
