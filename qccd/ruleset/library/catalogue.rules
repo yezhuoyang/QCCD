@@ -234,6 +234,32 @@ rule Y4 "A trap holds at most 30 ions"
   when cyclone_device():
   traps_within_thirty()
 
+# ---------------------------------------------------------------- Helios
+
+rule HL1 "Helios has one ring, one X junction and eight operation zones"
+  about "The published Helios functional floorplan is an 82-qubit rotatable storage ring joined through one four-way junction to upper and lower cache, logic and leg-storage paths. Eight operation zones process the other 16 qubits."
+  source "arXiv:2511.05465 Fig. 2 and Sec. II A"
+  when helios_device():
+  helios_topology()
+
+rule HL2 "Eight operation zones process at most sixteen qubits"
+  about "Each of Helios's eight high-fidelity operation zones holds two qubits, so one logic batch contains at most sixteen."
+  source "arXiv:2511.05465 Sec. II A"
+  when helios_device():
+  helios_logic_capacity()
+
+rule HL3 "Logic stays in the operation region"
+  about "Gates, state preparation and measurement are available only in the eight operation zones. Ring storage, cache and leg storage provide transport and sympathetic cooling, not logic."
+  source "arXiv:2511.05465 Sec. II A"
+  when helios_device():
+  helios_region_abilities()
+
+rule HL4 "The storage ring rotates under broadcast control"
+  about "Helios may rotate its storage ring in either direction to bring a selected crystal to the cache; the repeating triplet voltage pattern is shared across memory regions."
+  source "arXiv:2511.05465 Fig. 2 and Sec. II A"
+  when helios_device():
+  helios_ring_control()
+
 # ---------------------------------------------------------------- gates and their places
 
 rule R6 "Each operation runs only where the site is equipped for it"

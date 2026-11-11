@@ -58,6 +58,69 @@ def _cyclone_device(ctx: Ctx):
     return _params(ctx).get("family") == "cyclone"
 
 
+@term("helios_device()", "true or false", "Whether the machine declares the published Helios "
+      "functional floorplan.", "hardware")
+def _helios_device(ctx: Ctx):
+    return _params(ctx).get("family") == "helios"
+
+
+def _helios_regions(ctx: Ctx) -> tuple[list[Site], list[Site], list[Site], list[Site]]:
+    by_zone = {
+        zone: [s for s in ctx.hw.sites if ctx.hw.zone.get(s) == zone]
+        for zone in ("ring_storage", "cache", "operation", "leg_storage")
+    }
+    return (by_zone["ring_storage"], by_zone["cache"], by_zone["operation"],
+            by_zone["leg_storage"])
+
+
+@term("helios_topology()", "true or false", "Whether the machine has the published Helios "
+      "functional topology: 82 ring-storage sites on one closed ring, one degree-four X "
+      "junction, and eight operation zones split across upper and lower legs.", "hardware")
+def _helios_topology(ctx: Ctx):
+    ring, cache, operation, legs = _helios_regions(ctx)
+    params = _params(ctx)
+    loops = list(ctx.hw.loops.values())
+    if (params.get("qubits"), params.get("ring_storage_qubits"),
+            params.get("operation_zones")) != (98, 82, 8):
+        return False
+    if len(ring) != 82 or len(cache) != 2 or len(operation) != 8 or not legs:
+        return False
+    if len(loops) != 1 or not set(ring).issubset(set(loops[0])):
+        return False
+    return len(ctx.hw.junctions) == 1 and ctx.hw.degree[ctx.hw.junctions[0]] == 4
+
+
+@term("helios_logic_capacity()", "true or false", "Whether Helios's eight operation zones "
+      "hold a batch of at most sixteen qubits, two per zone.", "hardware")
+def _helios_logic_capacity(ctx: Ctx):
+    operation = _helios_regions(ctx)[2]
+    return len(operation) == 8 and all(ctx.hw.capacity[s] == 2 for s in operation) \
+        and sum(ctx.hw.capacity[s] for s in operation) == 16
+
+
+@term("helios_region_abilities()", "true or false", "Whether gates, preparation and "
+      "measurement are confined to Helios operation zones while all four functional regions "
+      "retain sympathetic cooling.", "hardware")
+def _helios_region_abilities(ctx: Ctx):
+    ring, cache, operation, legs = _helios_regions(ctx)
+    if not all({"gate", "spam", "cool"} <= set(ctx.hw.abilities[s]) for s in operation):
+        return False
+    return all("cool" in ctx.hw.abilities[s] and "gate" not in ctx.hw.abilities[s]
+               and "spam" not in ctx.hw.abilities[s] for s in ring + cache + legs)
+
+
+@term("helios_ring_control()", "true or false", "Whether the storage ring declares both "
+      "rigid rotation directions and memory transport uses the published broadcast grouping.",
+      "hardware")
+def _helios_ring_control(ctx: Ctx):
+    arch = ctx.hw.arch
+    extra = (arch.control.get("classes") or {}).get("extra") or []
+    classes = {c.get("id"): c for c in extra}
+    return ((arch.control.get("wiring") or {}).get("scheme") == "broadcast_groups"
+            and classes.get("helios_rotate_cw", {}).get("delta") == 1
+            and classes.get("helios_rotate_ccw", {}).get("delta") == -1)
+
+
 @term("one_parity(k)", "true or false", "Whether WISE step k plays one kind of pair at one parity "
       "in one direction: its class names them, each of its moves is one of the machine's pairs of "
       "that kind, and no zone takes part twice.", "execution", kinds=("programme",))

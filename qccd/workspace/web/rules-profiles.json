@@ -1,0 +1,207 @@
+[
+  {
+    "id": "c2lr",
+    "title": "C2LR swap-or-stay lattice",
+    "ruleset": "c2lr",
+    "scope": "A lattice of trap legs around shared junctions. Each leg supplies one direction bit; the junction waveform is shared by the whole chip.",
+    "source": "Delaney et al., arXiv:2403.00756",
+    "source_url": "https://arxiv.org/abs/2403.00756",
+    "architecture": {
+      "label": "3×3 Ba–Sr C2LR lattice",
+      "reference": "MemoryBoard/c2lr_rep5_mem_basr/c2lr3x3.arch.json",
+      "facts": ["9 junctions + 12 legs", "27 shared analog signals", "1 direction input + 1 switch per leg"]
+    },
+    "visual": {
+      "title": "One physical swap-or-stay step",
+      "steps": [
+        {"label": "Leg centre", "detail": "every crystal starts in a named leg"},
+        {"label": "Direction bit", "detail": "toward or away from its paired junction"},
+        {"label": "Shared exchange", "detail": "one matching and one waveform chip-wide"},
+        {"label": "Undo shift", "detail": "every crystal finishes at a leg centre"}
+      ]
+    },
+    "rule_ids": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10"],
+    "rule_label": "C2LR-only rules",
+    "changes": [
+      {
+        "kind": "Scoped exemption",
+        "rules": ["R2", "R3", "R5", "R22"],
+        "when": "only inside a valid swap-or-stay exchange",
+        "reason": "The machine's matching deliberately routes two crystals through the shared junction. C1, C2, C4, C6 and C7 check that exception. The general rules return immediately for an ordinary move. R4 and R4d are never removed."
+      }
+    ],
+    "verification": [
+      "A valid enter–gate–exit tour passes C1–C10 and the standard rules.",
+      "Mutations catch a wrong exit (C1), a hand-written route (C2), an unmatched leg (C6), and incomplete wiring metadata (C10).",
+      "The checkerboard form is reported as assumed; the demonstrated profile refuses it."
+    ]
+  },
+  {
+    "id": "wise",
+    "title": "WISE switched grid",
+    "ruleset": "wise",
+    "scope": "A grid of cells with switched dynamic electrodes and sample-and-hold shims. Zones are selected first; one shared operation then runs across the selected class.",
+    "source": "Malinowski, Allcock & Ballance, arXiv:2305.12773",
+    "source_url": "https://arxiv.org/abs/2305.12773",
+    "architecture": {
+      "label": "WISE h=3, 3×3 generated chip",
+      "reference": "qccd.arch.wise.device_doc(h=3, cx=3, cy=3)",
+      "facts": ["9 cells / 36 zones", "27 gate zones", "120 dynamic DACs + 3 shim DACs"]
+    },
+    "visual": {
+      "title": "One WISE layer",
+      "steps": [
+        {"label": "Charge shims", "detail": "pay the sample-and-hold setup"},
+        {"label": "Select parity", "detail": "odd or even swap partners"},
+        {"label": "Play one kind", "detail": "one motion or one gate and angle"},
+        {"label": "Split again", "detail": "no pair remains accidentally merged"}
+      ]
+    },
+    "rule_ids": ["W1", "W2", "W4", "W10", "W11"],
+    "rule_label": "WISE-only rules",
+    "changes": [
+      {
+        "kind": "Strengthen",
+        "rules": ["R4", "R22"],
+        "when": "for every WISE reconfiguration layer",
+        "reason": "W2 requires one parity, while W4 requires one operation kind across the chip. W10 applies the same idea to gates, and W11 requires the shim charge before the layer."
+      },
+      {
+        "kind": "Not applicable",
+        "rules": ["R11"],
+        "when": "only its loop-direction clause on this loop-free grid",
+        "reason": "There is no named loop direction to compare. R11's junction-pricing clause remains, and W2 plus R4d judge whether the grid motion can be driven."
+      }
+    ],
+    "verification": [
+      "The generated WISE compiler output passes its complete rule set.",
+      "Mutations independently fail mixed parity (W2), mixed gate angles (W10), missing shim charge (W11), and a pair left merged (W1)."
+    ]
+  },
+  {
+    "id": "cyclone",
+    "title": "Cyclone ring codesign",
+    "ruleset": "cyclone-deck",
+    "scope": "One closed ring of traps. Data stays in balanced partitions while every ancilla advances one trap in lockstep before the next local contacts.",
+    "source": "Khan et al., Cyclone, arXiv:2511.15910",
+    "source_url": "https://arxiv.org/abs/2511.15910",
+    "architecture": {
+      "label": "cyclone_base",
+      "reference": "arch/cyclone_base.arch.json",
+      "facts": ["72 traps on one closed loop", "144 data + 72 ancillas", "no junction on the rotation path"]
+    },
+    "visual": {
+      "title": "One Cyclone step",
+      "steps": [
+        {"label": "Data stays", "detail": "fixed, balanced trap partitions"},
+        {"label": "Ancillas rotate", "detail": "all advance one trap the same way"},
+        {"label": "Local gates", "detail": "one operation per trap"},
+        {"label": "Repeat", "detail": "the next contact pattern arrives"}
+      ]
+    },
+    "rule_ids": ["Y1", "Y2", "Y3", "Y4"],
+    "rule_label": "Cyclone-only rules",
+    "changes": [
+      {
+        "kind": "Replace",
+        "rules": ["R22"],
+        "when": "for declared Cyclone rotation steps",
+        "reason": "Y3 is stricter: the movers must be all ancillas, each moving exactly one trap in the same direction. Y2 separately forbids data movement."
+      },
+      {
+        "kind": "Replace",
+        "rules": ["R13"],
+        "when": "for Cyclone's trap-capacity contract",
+        "reason": "Y4 uses Cyclone's explicit hardware ceiling of 30 ions per trap instead of the standard gate-chain limit of 15."
+      }
+    ],
+    "verification": [
+      "The Cyclone compiler output passes Y1–Y4 and the deck's selected general rules.",
+      "Mutations catch moving data (Y2), leaving an ancilla behind (Y3), a non-ring floorplan (Y1), and capacity 31 (Y4)."
+    ]
+  },
+  {
+    "id": "conveyor",
+    "title": "General conveyor loop",
+    "ruleset": "conveyor",
+    "scope": "A named closed loop under broadcast wiring. Unlike Cyclone, a conveyor assigns no data/ancilla roles and promises no fixed number of rotations.",
+    "source": "H2 racetrack architecture and the repository's named-loop control model",
+    "source_url": "https://arxiv.org/abs/2305.03828",
+    "architecture": {
+      "label": "h2_racetrack",
+      "reference": "arch/h2_racetrack.arch.json",
+      "facts": ["40 wells on one closed RF null", "3 dynamic conveyor signals", "no junctions"]
+    },
+    "visual": {
+      "title": "One conveyor cycle",
+      "steps": [
+        {"label": "Choose direction", "detail": "clockwise or counter-clockwise"},
+        {"label": "Shift loaded wells", "detail": "same signed distance on the loop"},
+        {"label": "Preserve order", "detail": "no passing or head-on exchange"},
+        {"label": "Dock separately", "detail": "split or merge in another phase"}
+      ]
+    },
+    "rule_ids": ["R3", "R4", "R4d", "R5", "R11", "R14", "R22", "R23"],
+    "rule_label": "General rules that define a conveyor",
+    "changes": [
+      {
+        "kind": "Keep",
+        "rules": ["R4d", "R11", "R22"],
+        "when": "for every conveyor rail shift",
+        "reason": "No transport rule is suppressed. A valid rigid shift passes all three; counter-rotation or leaving a loaded switchless well behind fails them. Off-loop docks may stay because the rail channel does not drive them."
+      },
+      {
+        "kind": "Separate phase",
+        "rules": ["R14"],
+        "when": "when an ion enters or leaves a dock",
+        "reason": "The pure rail shift has no split. Docking restores R14: the departing ion must be at the chain end or the programme must pay to reorder it."
+      }
+    ],
+    "verification": [
+      "A full rigid rotation of h2_racetrack passes the complete standard rule set.",
+      "A two-ion counter-rotation fails R4d, R11 and R22 with the conflicting directions in the report."
+    ]
+  },
+  {
+    "id": "helios",
+    "title": "Quantinuum Helios",
+    "ruleset": "helios",
+    "scope": "The published 98-qubit Helios QCCD: a rotatable storage ring feeds upper and lower cache, logic and leg-storage regions through one X junction.",
+    "source": "Ransford et al., Helios, arXiv:2511.05465",
+    "source_url": "https://arxiv.org/abs/2511.05465",
+    "architecture": {
+      "label": "helios_98 functional floorplan",
+      "reference": "qccd.arch.helios.device_doc()",
+      "facts": ["98 Ba-137 qubits", "82-qubit rotatable storage ring + one X junction", "8 two-ion operation zones / 16-qubit batches"]
+    },
+    "visual": {
+      "title": "One Helios logic batch",
+      "steps": [
+        {"label": "Rotate ring", "detail": "bring selected crystals to the X junction"},
+        {"label": "Fill cache", "detail": "pre-sort upper and lower batches"},
+        {"label": "Process 16", "detail": "eight two-ion operation zones work in parallel"},
+        {"label": "Store / reload", "detail": "return results while preparing the next batch"}
+      ]
+    },
+    "rule_ids": ["HL1", "HL2", "HL3", "HL4", "R6", "R11", "R22"],
+    "rule_label": "Helios physical and transport rules",
+    "changes": [
+      {
+        "kind": "Add",
+        "rules": ["HL1", "HL2", "HL3", "HL4"],
+        "when": "for a machine declaring the Helios functional floorplan",
+        "reason": "These rules pin the published regions, 16-qubit operation batch, logic-zone abilities and bidirectional broadcast-controlled storage ring."
+      },
+      {
+        "kind": "Keep",
+        "rules": ["R6", "R11", "R22"],
+        "when": "during compilation and transport",
+        "reason": "Helios receives no general transport exemption: gates stay in operation zones and each shared transport step remains drivable and direction-consistent."
+      }
+    ],
+    "verification": [
+      "The Helios baseline compiler parses the circuit, routes operands through the published regions, emits a source certificate, and passes the Helios rule set.",
+      "Topology mutations catch a missing operation zone, an incorrect logic batch capacity, logic enabled in storage, and a missing ring direction."
+    ]
+  }
+]

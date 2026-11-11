@@ -528,6 +528,92 @@ def racetrack(
                           "segment_capacity": segment_capacity, "loop_id": loop_id})
 
 
+# ------------------------------------------------------------------------ Helios
+
+
+def helios(
+    ring_sites: int = 82,
+    *,
+    operation_zones_per_leg: int = 4,
+    leg_storage_sites: int = 4,
+    segment_capacity: int = 1,
+) -> Device:
+    """The public Helios floorplan from Ransford et al. (arXiv:2511.05465, Fig. 2).
+
+    The paper publishes the functional topology, not an electrode-by-electrode netlist:
+    82 qubits can remain in the rotatable storage ring while 16 occupy eight two-ion
+    operation zones.  A single four-way X junction joins that ring to upper and lower
+    cache/logic/leg-storage paths.  The drawing here preserves exactly those published
+    regions and capacities; the number of cache and far-leg drawing sites is a visual
+    discretisation, not a claim about unpublished electrode wells.
+    """
+    import math
+
+    if ring_sites < 4:
+        raise ExpansionError("Helios needs at least four ring-storage sites")
+    if operation_zones_per_leg < 1:
+        raise ExpansionError("Helios needs an operation zone on each leg")
+
+    nodes: dict[str, Node] = {}
+    segments: dict[str, Segment] = {}
+    loops: dict[str, Loop] = {}
+    radius = 3.0
+    # X0 is the only junction.  It lies on the ring and also opens the upper and lower legs.
+    nodes["X0"] = Node(id="X0", pos=(radius + 0.25, 0.0), kind="junction",
+                        labels=("x_junction",))
+    order = ["X0"]
+    for i in range(ring_sites):
+        theta = 2.0 * math.pi * (i + 1) / (ring_sites + 1)
+        nid = f"R{i}"
+        nodes[nid] = Node(id=nid,
+                          pos=(round(radius * math.cos(theta), 6),
+                               round(radius * math.sin(theta), 6)),
+                          kind="site", zone_type="ring_storage",
+                          labels=("ring_storage", "memory"))
+        order.append(nid)
+    for i, (a, b) in enumerate(zip(order, order[1:] + order[:1])):
+        sid = f"ER{i}"
+        segments[sid] = Segment(id=sid, ends=(a, b), capacity=segment_capacity,
+                                loop="storage_ring", labels=("ring_storage",))
+    loops["storage_ring"] = Loop(id="storage_ring", nodes=tuple(order), closed=True,
+                                  kind="ring", note="rotatable 82-qubit storage ring")
+
+    for prefix, y, label in (("U", 1.15, "upper"), ("L", -1.15, "lower")):
+        path = ["X0"]
+        cache = f"{prefix}C"
+        nodes[cache] = Node(id=cache, pos=(4.1, y), kind="site", zone_type="cache",
+                            labels=("cache", label, "memory"))
+        path.append(cache)
+        for i in range(operation_zones_per_leg):
+            nid = f"{prefix}O{i}"
+            nodes[nid] = Node(id=nid, pos=(5.2 + 1.15 * i, y), kind="site",
+                              zone_type="operation",
+                              labels=("operation", label, "logic"))
+            path.append(nid)
+        for i in range(leg_storage_sites):
+            nid = f"{prefix}L{i}"
+            nodes[nid] = Node(id=nid,
+                              pos=(5.2 + 1.15 * operation_zones_per_leg + 0.8 * i, y),
+                              kind="site", zone_type="leg_storage",
+                              labels=("leg_storage", label, "memory"))
+            path.append(nid)
+        for i, (a, b) in enumerate(zip(path, path[1:])):
+            sid = f"E{prefix}{i}"
+            segments[sid] = Segment(id=sid, ends=(a, b), capacity=segment_capacity,
+                                    labels=(label,))
+
+    return Device(
+        nodes=nodes, segments=segments, loops=loops, generator="helios",
+        params={"family": "helios", "qubits": 98, "ring_storage_qubits": 82,
+                "operation_zones": 2 * operation_zones_per_leg,
+                "operation_batch_qubits": 4 * operation_zones_per_leg,
+                "ring_sites": ring_sites,
+                "operation_zones_per_leg": operation_zones_per_leg,
+                "leg_storage_sites": leg_storage_sites,
+                "segment_capacity": segment_capacity},
+    )
+
+
 # ------------------------------------------------------------------------ dual loop
 
 
