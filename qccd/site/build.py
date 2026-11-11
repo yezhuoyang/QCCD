@@ -66,7 +66,8 @@ EXAMPLE = {"task": "five_qubit", "device": "ring24_8_j",
            "what": "The five-qubit code's syndrome round on a 24-site ring with 8 docks and junction corners"}
 
 #: The ranking pages' family colours (bb_studio.py's FAMHEX); everything else is grey.
-FAMHEX = {"ring + docks": "#2a78d6", "lattice": "#eb6834", "torus": "#1baf7a", "random graph": "#4a3aa7"}
+FAMHEX = {"ring + docks": "#2a78d6", "lattice": "#eb6834", "torus": "#1baf7a", "random graph": "#4a3aa7",
+          "conveyor sandwich": "#b5357f"}
 GREY = "#8a8985"
 
 #: One pictogram and one sentence per part of the course, keyed by the part id.
@@ -2358,6 +2359,8 @@ def build(out: Path) -> int:
     index += [{"t": html.unescape(re.sub(r"<[^>]+>", "", text)), "d": "Physics background",
                "u": f"physics/#{sid}", "k": "physics"} for lvl, sid, text in phys["headings"] if lvl == 2]
     index += machinepage.index_entries()
+    from . import layers as _layers
+    index += _layers.index_entries()
     index.append({"t": "People", "d": "who takes part in the project", "u": "people/", "k": "page"})
     index += [{"t": p["name"], "d": " \u00b7 ".join(x for x in (p.get("role"), p.get("affiliation")) if x),
                "u": f"people/#{slug(p['name'])}", "k": "person"} for p in PEOPLE]
@@ -2404,7 +2407,8 @@ def build(out: Path) -> int:
     # the studio, once: the one page Learn and Design both are
     from ..__main__ import main as qccd_main
     studio = out / "studio.html"
-    qccd_main(["studio", "-o", str(studio)])
+    # with the 3-D stage: any machine built on the Design page can be turned (docs/PLAN-3d.md)
+    qccd_main(["studio", "-o", str(studio), "--stage3d", "always"])
     from . import cowork, qec_cycle
     # the QEC-cycle panel rides in with the hash router: the studio itself is untouched,
     # and the panel reads the page's own priced round (qccd/site/qec_cycle.py); the Agent
@@ -2453,6 +2457,15 @@ def build(out: Path) -> int:
     put("machine/index.html", machinepage.page(PAGE, STYLE, mach), 1, "machine")
     print(f"  machine      {len(mach)} machines read as texts, each with a programme played on it")
     put("people/index.html", people_page(), 1, "people")
+    # machines built in layers: three Studio pages with the 3-D stage, and the page about them
+    from . import layers
+    shown = []
+    for rel, page_, facts in layers.studio_pages(out / ".layers_tmp"):
+        put(rel, page_, 1, "layers", app=True)
+        shown.append(facts)
+    shutil.rmtree(out / ".layers_tmp", ignore_errors=True)
+    put("layers/index.html", layers.page(PAGE, STYLE, shown), 1, "layers")
+    print(f"  layers       {len(shown)} machines built in layers, each with a programme played on it")
     from . import agentic
     put("agentic/index.html", agentic.page(PAGE, STYLE), 1, "agentic")
     # each paper's schedule opens in the Studio, like a leaderboard entry, with a card that

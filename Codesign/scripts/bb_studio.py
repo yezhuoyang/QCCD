@@ -71,7 +71,11 @@ ENGINE_WORDS = {"rotate": "rigid rotation (qccdc rotate)",
                 "general": "the general router (qccdc compile)",
                 "general-split": "the general router with split rounds (qccdc compile's fallback: "
                                  "an unroutable round runs in halves, the rest deferred)",
-                "racetrack": "the race track (qccdc compile's fallback)"}
+                "racetrack": "the race track (qccdc compile's fallback)",
+                "conveyor": "the conveyor router (the data stand still; the ancillas of a loop "
+                            "turn and hop together)"}
+#: the release every entry of this board is compiled from
+BB_RELEASE = "bb144@2"
 
 # --------------------------------------------------------------------------- catalogue
 
@@ -161,6 +165,39 @@ CATALOG: tuple[dict, ...] = (
                "general router alone does not route it; its fallback does, by running each round it "
                "cannot route in halves and deferring the rest, still in the circuit's order: 1,694 "
                "transport cycles and 7 cools, after 1,462 s of compiling.")},
+    # THE CONVEYOR SANDWICH (docs/PLAN-3d.md, Codesign/findings/q07-layers.md): data that never
+    # move, between two conveyor loops of ancillas.  One graph built on three layers, on two,
+    # and in a plane (`qccd.arch.sandwich`), each compiled by the machine's own router
+    # (`qccd.compile.conveyor_router`), NOT by qccdc.  Their files are made here, from the
+    # release (`make`, `_make_sandwich`), so these three rebuild on any checkout.
+    {"key": "sandwich72_L3", "family": "conveyor sandwich",
+     "title": "conveyor sandwich on three layers: 72 data traps between a loop below and a loop above",
+     "arch": BB2 / "sandwich72_L3.arch.json", "prefix": BB2 / "sandwich72_L3",
+     "make": {"positions": 72, "layers": 3},
+     "compiled": {"by": "the conveyor router", "date": "2026-11-10", "note": "then insert_cooling"},
+     "claim": ("The data ions never move: L and R ion k share trap k. The X checks ride a conveyor loop "
+               "on the layer below and the Z checks one on the layer above, with a riser from every slot "
+               "to the trap it faces. A layer of CNOTs is a turn of a loop and a hop, whatever the number "
+               "of checks, and each layer has a broadcast of its own, so the two loops turn in the same "
+               "cycle: 118 transport cycles and 19 cools. Compiled by a router written for this machine, "
+               "in under a second. Press 3D on its page to turn it.")},
+    {"key": "sandwich72_L2", "family": "conveyor sandwich",
+     "title": "conveyor sandwich on two layers: one loop in the data traps' plane, one above",
+     "arch": BB2 / "sandwich72_L2.arch.json", "prefix": BB2 / "sandwich72_L2",
+     "make": {"positions": 72, "layers": 2},
+     "compiled": {"by": "the conveyor router", "date": "2026-11-10", "note": "then insert_cooling"},
+     "claim": ("The same machine with the X checks' loop in the data traps' own plane, inside their "
+               "ring, and the Z checks' loop a layer above. The loops still turn together; the hops of "
+               "the loop in the plane are a planar machine's: 151 transport cycles and 19 cools.")},
+    {"key": "sandwich72_L1", "family": "conveyor sandwich",
+     "title": "conveyor sandwich in one plane: a loop inside the ring of 72 data traps and one outside",
+     "arch": BB2 / "sandwich72_L1.arch.json", "prefix": BB2 / "sandwich72_L1",
+     "make": {"positions": 72, "layers": 1},
+     "compiled": {"by": "the conveyor router", "date": "2026-11-10", "note": "then insert_cooling"},
+     "claim": ("The same machine as a planar one: nested racetracks. One broadcast, so the two loops "
+               "take turns, and a hop from the top row and one from the bottom row are two waveforms: "
+               "213 transport cycles and 19 cools. What the layers of the two entries above add is the "
+               "difference from this one.")},
     # the shapes the compiler does not serve yet: listed, never ranked; the router work for
     # them is a separate follow-up (the user, 2026-11-02).  ring146_h2_d72 is the device the probe
     # of 2026-11-02 compiled (export_arch gives the same expanded device) with the same compiler
@@ -237,6 +274,9 @@ SHORT = {
     "ring146_h2_d72": "ring(146,2,72) junction",
     "cyc76_h2": "ring(76,2,0) 4-ion traps",
     "racetrack150": "racetrack(150)",
+    "sandwich72_L3": "sandwich(72) on 3 layers",
+    "sandwich72_L2": "sandwich(72) on 2 layers",
+    "sandwich72_L1": "sandwich(72) in a plane",
 }
 
 #: each family's transport mechanism, and what the shape must have for it
@@ -244,7 +284,39 @@ FAMILY_NOTE = {
     "ring + docks": ("rigid rotation", "a closed loop AND a gate-capable dock for every check"),
     "loop without docks": ("the general router", "a closed loop of gate-capable traps that hold four ions, so two ions meet on the loop itself, and room enough to pass"),
     "lattice": ("none yet", "route diversity; the router does not finish this round on it yet"),
+    "conveyor sandwich": ("its own router: a loop turns, then its ancillas hop",
+                          "a conveyor loop for each kind of check, a slot of it facing every data trap"),
 }
+
+
+def _make_sandwich(entry: dict) -> None:
+    """Write a conveyor sandwich's files where `build_one` reads an entry's: the device entered
+    on the release, the release's circuit, the router's programme and certificate, and the
+    programme with cooling inserted.  Nothing here needs qccdc, and the router is
+    deterministic, so the files are made again on every build."""
+    from qccd.arch.device import Architecture
+    from qccd.arch.sandwich import conveyor_sandwich
+    from qccd.compile.conveyor_router import COMPILER_NAME, compile_conveyor
+    from qccd.compile.cooling import insert_cooling
+    from qccd.workspace.tasks import board_device, find_release
+    rel = find_release(BB_RELEASE)
+    make = entry["make"]
+    machine = conveyor_sandwich(make["positions"], layers=make["layers"], capacity=3)
+    doc = board_device(machine.arch.to_json(expanded=True), rel)
+    arch = Architecture.from_json(doc)
+    prefix = str(entry["prefix"])
+    Path(prefix).parent.mkdir(parents=True, exist_ok=True)
+    Path(entry["arch"]).write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8", newline="\n")
+    Path(prefix + ".qasm").write_text(rel.circuit_text(), encoding="utf-8", newline="\n")
+    prog, cert = compile_conveyor(rel.circuit_text(), arch, 144, name="bb144")
+    table = rel.manifest.get("rank_table", "qccdsim_jones")
+    cooled = insert_cooling(prog, arch, corrected_model(table)).program
+    cooled.meta.update(prog.meta)
+    prog.save(prefix + ".tsir.json", indent=None)
+    cooled.save(prefix + ".cooled.tsir.json", indent=None)
+    Path(prefix + ".qcert.json").write_text(json.dumps(cert), encoding="utf-8")
+    Path(prefix + ".stages.json").write_text(json.dumps({"engine": "conveyor", "compiler": COMPILER_NAME}),
+                                             encoding="utf-8")
 
 
 # --------------------------------------------------------------------------- numbers
@@ -271,7 +343,8 @@ def _numbers(entry: dict) -> dict:
         out["recompiled"] = f"recompiled {rc['date']} with qccdc {rc['compiler']}"
     if entry.get("compiled"):
         c = entry["compiled"]
-        out["compiled"] = f"compiled {c['date']} with qccdc {c['compiler']}" + (f" ({c['note']})" if c.get("note") else "")
+        by = c.get("by") or f"qccdc {c['compiler']}"
+        out["compiled"] = f"compiled {c['date']} with {by}" + (f" ({c['note']})" if c.get("note") else "")
     if entry.get("q06l"):
         # the graph's diameter is a property of the device the study generated, not of any
         # compile, so it is still read from the study's record of that graph
@@ -715,6 +788,8 @@ def _publishable(arch):
 
 
 def build_one(entry: dict, out_dir: Path, *, max_frames: int) -> dict:
+    if entry.get("make"):
+        _make_sandwich(entry)
     arch_p = Path(entry["arch"])
     if not arch_p.exists():
         return {**{k: str(v) for k, v in entry.items()}, "status": f"missing {arch_p.name}"}
@@ -998,7 +1073,7 @@ var METRICS = [
 ];
 // the control measures (opt) are offered only on a board whose rows carry them
 METRICS = METRICS.filter(function(m){ return !m.opt || DATA.some(function(d){ return d.numbers && typeof d.numbers[m.k] === 'number'; }); });
-var FAMHEX = {'ring + docks':'#2a78d6','lattice':'#eb6834','torus':'#1baf7a','random graph':'#4a3aa7','two loops':'#8a8985'};
+var FAMHEX = {'ring + docks':'#2a78d6','lattice':'#eb6834','torus':'#1baf7a','random graph':'#4a3aa7','conveyor sandwich':'#b5357f','two loops':'#8a8985'};
 var $ = function(id){ return document.getElementById(id); };
 var ysel = $('ysel'), xsel = $('xsel'), logbox = $('log');
 METRICS.forEach(function(m){ var o = document.createElement('option'); o.value = m.k; o.textContent = m.name; ysel.appendChild(o);
@@ -1147,7 +1222,8 @@ var ans = DATA.filter(function(d){ return d.key===Q.sel; })[0] || DATA.filter(fu
 
 BB_TITLE = "BB [[144,12,12]] on QCCD — Bravyi's syndrome round, every design ranked"
 BB_SUBTITLE = ("One syndrome round of the [[144,12,12]] bivariate-bicycle code in Bravyi et al.'s "
-               "schedule (release bb144@2), on every design our compiler serves today.")
+               "schedule (release bb144@2), on every design our compiler serves today, and on one "
+               "machine that has a router of its own.")
 
 
 def board_intro(rows: list[dict]) -> str:
@@ -1163,15 +1239,25 @@ def board_intro(rows: list[dict]) -> str:
     fams = sorted({r.get("family") for r in ranked})
     words = {"ring + docks": "rings with a dock for every check, which rigid rotation serves",
              "loop without docks": "loops without docks whose traps hold four ions, which the general "
-                                   "router serves"}
+                                   "router serves",
+             "conveyor sandwich": "the conveyor sandwich on three layers, on two and in a plane, which "
+                                  "its own router serves"}
+    n_ = lambda k: {1: "One", 2: "Two", 3: "Three"}.get(k, str(k))
+    own = [r for r in compiled if (r.get("numbers") or {}).get("engine") == "conveyor"]
+    theirs = ("" if not own else
+              f" {n_(len(own))} of them, the conveyor sandwich's, come from a router written for that one "
+              "machine instead (its data ions stand still and its check ions ride two conveyor loops); "
+              "it keeps the same order and writes the same certificate, and its machines may be built "
+              "in layers, each layer with a broadcast of its own.")
     n = lambda k, one, many: f"{k} {one if k == 1 else many}"
     out = [
         "<p><b>What is compiled.</b> Bravyi et al.'s depth-8 round (Fig. 5 of arXiv:2308.07915) as "
         "published: one ancilla per check, so 144 data ions and 144 check ions, 288 in all, and its 864 "
-        f"CNOTs in the schedule's order. Every programme here was compiled from that circuit by the "
+        f"CNOTs in the schedule's order. Every programme here was compiled from that circuit"
+        + (f", {len(compiled) - len(own)} of them" if own else "") + " by the "
         f"released compiler, qccdc {QCCDC}, which keeps each qubit's gates in the circuit's order; the "
         f"checker confirms it on {len(kept)} of {len(compiled)}: no operation starts before the one "
-        "before it on the same qubit has finished. Cooling is inserted where the heating model needs "
+        "before it on the same qubit has finished." + theirs + " Cooling is inserted where the heating model needs "
         "it, the one change the release allows, and R10 is decided by the proved Lean checker and the "
         f"stabilizer tableau (passed on {len(lean)} of {len(compiled)}).</p>",
         f"<p><b>What is ranked.</b> {n(len(ranked), 'design', 'designs')} whose programme passes every "
