@@ -1,4 +1,4 @@
-"""Four physical architectures, each compiled and judged by its own rule set.
+"""Physical architectures, each compiled and judged by its own rule set.
 
 The Rules page shows one compact, real run for each transport architecture it profiles.  The three
 architecture compilers consume the same small QASM circuit; the general conveyor plays its
@@ -93,9 +93,15 @@ def _cyclone_arch() -> Architecture:
     return Architecture.from_json(doc)
 
 
+def _helios_arch() -> Architecture:
+    from ..arch.helios import architecture
+
+    return architecture()
+
+
 def _compile_circuit(kind: str, arch: Architecture, work: Path) -> tuple[TSIR, dict, Path]:
     """Compile ``QASM`` with the architecture's real router."""
-    from ..compile import c2lr_router, cyclone_router, wise_router
+    from ..compile import c2lr_router, cyclone_router, helios_router, wise_router
 
     arch_path = work / "device.arch.json"
     arch_path.write_text(json.dumps(arch.to_json(), indent=1), encoding="utf-8")
@@ -108,6 +114,9 @@ def _compile_circuit(kind: str, arch: Architecture, work: Path) -> tuple[TSIR, d
     elif kind == "cyclone":
         final, cert_path = cyclone_router.compile_with_router(
             QASM, arch_path, work, n_data=2, table="helios", name="architecture demo")
+    elif kind == "helios":
+        final, cert_path = helios_router.compile_with_router(
+            QASM, arch_path, work, table="helios", name="architecture demo")
     else:  # pragma: no cover - the closed list below is the public surface
         raise KeyError(kind)
     return TSIR.load(str(final)), json.loads(cert_path.read_text(encoding="utf-8")), work / "circuit.qasm"
@@ -150,7 +159,7 @@ def _initial_ions(prog: TSIR) -> dict[str, list[str]]:
 
 
 def build_pages(out: Path, put: Callable, device_svg: Callable) -> list[dict]:
-    """Write four one-template Studio pages and return the Compilation-page card data."""
+    """Write one-template Studio pages and return the Rules-page card data."""
     profiles = {p["id"]: p for p in architecture_profiles()}
     specs = (
         ("c2lr", load_arch(str(ROOT / profiles["c2lr"]["architecture"]["reference"])), "c2lr"),
@@ -168,6 +177,13 @@ def build_pages(out: Path, put: Callable, device_svg: Callable) -> list[dict]:
             compiled.append((kind, arch, prog, cert, qasm, ruleset))
         conveyor_arch, conveyor_prog = _conveyor()
         compiled.append(("conveyor", conveyor_arch, conveyor_prog, None, None, "conveyor"))
+        helios_work = tmp / "helios"
+        helios_work.mkdir()
+        helios_arch = _helios_arch()
+        helios_prog, helios_cert, helios_qasm = _compile_circuit(
+            "helios", helios_arch, helios_work)
+        compiled.append(("helios", helios_arch, helios_prog, helios_cert, helios_qasm,
+                         "helios"))
 
         for kind, arch, prog, cert, qasm, ruleset in compiled:
             profile = profiles[kind]
@@ -243,7 +259,7 @@ def section(rows: list[dict], href_prefix: str = "../compilation/") -> str:
     return (
         '<h2 id="architecture-rule-demos">Architecture-specific rule demos</h2>'
         '<p class="sub">Executable evidence for the architecture profiles above. C2LR, WISE and Cyclone '
-        'compile a small four-qubit circuit with their own routers; the conveyor runs its native rigid '
+        'and Helios compile a small four-qubit circuit with their own routers; the conveyor runs its native rigid '
         'loop shift. Every linked page opens on Hardware with the architecture&rsquo;s complete checker rule '
         'set, including rules that do not apply to that short run.</p>'
         '<div class="archruns">' + "".join(cards) + '</div>')

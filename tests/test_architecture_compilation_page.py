@@ -1,4 +1,4 @@
-"""The Rules page's four physical, architecture-specific demos."""
+"""The Rules page's physical, architecture-specific demos."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def test_the_gallery_builds_real_runs_with_each_architecture_rule_set(tmp_path):
         written[rel] = {"html": html, "depth": depth, "active": active, "app": app}
 
     rows = page.build_pages(tmp_path, put, device_svg)
-    assert [r["id"] for r in rows] == ["c2lr", "wise", "cyclone", "conveyor"]
+    assert [r["id"] for r in rows] == ["c2lr", "wise", "cyclone", "conveyor", "helios"]
     assert all(r["focus_held"] == r["profile"]["rule_ids"] for r in rows)
     assert all(not any(x["verdict"] == "fails" for x in r["other"]) for r in rows)
     for r in rows:
@@ -37,7 +37,7 @@ def test_the_gallery_explains_passes_non_applicability_and_opens_every_run():
                      "ruleset": p["ruleset_title"], "poster": "<svg></svg>"})
     html = page.section(rows)
     assert "Architecture-specific rule demos" in html
-    assert html.count("Open compiled run and architecture rules") == 4
+    assert html.count("Open compiled run and architecture rules") == 5
     assert "not applicable" in html
     for p in profiles:
         assert p["title"] in html

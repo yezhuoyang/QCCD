@@ -161,5 +161,47 @@
       "A full rigid rotation of h2_racetrack passes the complete standard rule set.",
       "A two-ion counter-rotation fails R4d, R11 and R22 with the conflicting directions in the report."
     ]
+  },
+  {
+    "id": "helios",
+    "title": "Quantinuum Helios",
+    "ruleset": "helios",
+    "scope": "The published 98-qubit Helios QCCD: a rotatable storage ring feeds upper and lower cache, logic and leg-storage regions through one X junction.",
+    "source": "Ransford et al., Helios, arXiv:2511.05465",
+    "source_url": "https://arxiv.org/abs/2511.05465",
+    "architecture": {
+      "label": "helios_98 functional floorplan",
+      "reference": "qccd.arch.helios.device_doc()",
+      "facts": ["98 Ba-137 qubits", "82-qubit rotatable storage ring + one X junction", "8 two-ion operation zones / 16-qubit batches"]
+    },
+    "visual": {
+      "title": "One Helios logic batch",
+      "steps": [
+        {"label": "Rotate ring", "detail": "bring selected crystals to the X junction"},
+        {"label": "Fill cache", "detail": "pre-sort upper and lower batches"},
+        {"label": "Process 16", "detail": "eight two-ion operation zones work in parallel"},
+        {"label": "Store / reload", "detail": "return results while preparing the next batch"}
+      ]
+    },
+    "rule_ids": ["HL1", "HL2", "HL3", "HL4", "R6", "R11", "R22"],
+    "rule_label": "Helios physical and transport rules",
+    "changes": [
+      {
+        "kind": "Add",
+        "rules": ["HL1", "HL2", "HL3", "HL4"],
+        "when": "for a machine declaring the Helios functional floorplan",
+        "reason": "These rules pin the published regions, 16-qubit operation batch, logic-zone abilities and bidirectional broadcast-controlled storage ring."
+      },
+      {
+        "kind": "Keep",
+        "rules": ["R6", "R11", "R22"],
+        "when": "during compilation and transport",
+        "reason": "Helios receives no general transport exemption: gates stay in operation zones and each shared transport step remains drivable and direction-consistent."
+      }
+    ],
+    "verification": [
+      "The Helios baseline compiler parses the circuit, routes operands through the published regions, emits a source certificate, and passes the Helios rule set.",
+      "Topology mutations catch a missing operation zone, an incorrect logic batch capacity, logic enabled in storage, and a missing ring direction."
+    ]
   }
 ]

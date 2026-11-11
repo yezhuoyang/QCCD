@@ -253,7 +253,7 @@ def test_inject_adds_rule_categories_only_when_requested():
     assert "window.QCCD_RULE_PROFILES=" in grouped
     assert "Architecture rule profiles" in grouped
     for title in ("C2LR swap-or-stay lattice", "WISE switched grid",
-                  "Cyclone ring codesign", "General conveyor loop"):
+                  "Cyclone ring codesign", "General conveyor loop", "Quantinuum Helios"):
         assert title in grouped
     assert "A leg holds one crystal, or two between an enter and its exit" in grouped
     assert "Tested behaviour" in grouped
@@ -263,12 +263,13 @@ def test_architecture_rule_profiles_are_complete_scoped_and_unique():
     from qccd.ruleset import catalogue, load
 
     profiles = json.loads((REPO / "qccd/workspace/web/rules-profiles.json").read_text())
-    assert [p["id"] for p in profiles] == ["c2lr", "wise", "cyclone", "conveyor"]
-    assert [p["ruleset"] for p in profiles] == ["c2lr", "wise", "cyclone-deck", "conveyor"]
+    assert [p["id"] for p in profiles] == ["c2lr", "wise", "cyclone", "conveyor", "helios"]
+    assert [p["ruleset"] for p in profiles] == ["c2lr", "wise", "cyclone-deck", "conveyor", "helios"]
     assert set(profiles[0]["rule_ids"]) == {f"C{i}" for i in range(1, 11)}
     assert set(profiles[1]["rule_ids"]) == {"W1", "W2", "W4", "W10", "W11"}
     assert set(profiles[2]["rule_ids"]) == {"Y1", "Y2", "Y3", "Y4"}
     assert {"R4d", "R11", "R22"} <= set(profiles[3]["rule_ids"])
+    assert {"HL1", "HL2", "HL3", "HL4"} <= set(profiles[4]["rule_ids"])
     catalogue_ids = {r.id for r in catalogue().rules}
     assert all(set(p["rule_ids"]) <= catalogue_ids & set(load(p["ruleset"]).ids)
                for p in profiles)

@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 from qccd.api import Machine
-from qccd.arch import wise
+from qccd.arch import Architecture, wise
+from qccd.arch.helios import architecture as helios_architecture
 from qccd.cost.models import corrected_model
 from qccd.ir.tsir import Instruction, TSIR, swap_or_stay
 from qccd.ruleset import FAILS, check, load
@@ -48,6 +49,13 @@ def test_profiles_point_to_the_pulled_physical_architectures():
     assert all(conveyor.arch.device.degree(node) == 2 for node in conveyor.arch.device.nodes)
     assert conveyor.arch.control["wiring"]["dacs_dynamic"] == 3
 
+    helios = helios_architecture()
+    assert helios.device.params["qubits"] == 98
+    assert len(helios.device.labelled("ring_storage")) == 82
+    assert len(helios.device.labelled("operation")) == 8
+    assert len(helios.device.junction_nodes) == 1
+    assert helios.device.degree(helios.device.junction_nodes[0]) == 4
+
 
 def test_every_profile_rule_is_in_the_rule_set_the_website_names():
     expected = {
@@ -55,6 +63,7 @@ def test_every_profile_rule_is_in_the_rule_set_the_website_names():
         "wise": ("wise", {"W1", "W2", "W4", "W10", "W11"}),
         "cyclone": ("cyclone-deck", {"Y1", "Y2", "Y3", "Y4"}),
         "conveyor": ("conveyor", {"R3", "R4", "R4d", "R5", "R11", "R14", "R22", "R23"}),
+        "helios": ("helios", {"HL1", "HL2", "HL3", "HL4", "R6", "R11", "R22"}),
     }
     for profile in PROFILES:
         ruleset, focus = expected[profile["id"]]
@@ -62,6 +71,25 @@ def test_every_profile_rule_is_in_the_rule_set_the_website_names():
         assert set(profile["rule_ids"]) == focus
         assert focus <= set(load(ruleset).ids)
     assert load("conveyor").ids == load("standard").ids
+
+
+def test_helios_rules_accept_the_published_floorplan_and_reject_a_missing_logic_zone():
+    arch = helios_architecture()
+    good = TSIR("Helios floorplan", arch.name)
+    good.add(Instruction(type="init", id=good.next_id(), placement={"q0": "UO0"}))
+    verdicts = _verdicts("helios", Machine(arch), good)
+    assert all(verdicts[rid] != FAILS for rid in ("HL1", "HL2", "HL3", "HL4")), verdicts
+
+    doc = arch.to_json(expanded=True)
+    node = next(n for n in doc["geometry"]["nodes"] if n["id"] == "UO3")
+    node["zone_type"] = "leg_storage"
+    node["labels"] = ["leg_storage", "upper", "memory"]
+    broken = Architecture.from_json(doc)
+    bad = TSIR("broken Helios floorplan", broken.name)
+    bad.add(Instruction(type="init", id=bad.next_id(), placement={"q0": "UO0"}))
+    failed = _verdicts("helios", Machine(broken), bad)
+    assert failed["HL1"] == FAILS
+    assert failed["HL2"] == FAILS
 
 
 def test_c2lr_rules_accept_a_physical_swap_or_stay_step():
