@@ -783,6 +783,33 @@ def _stage3d_block() -> str:
             + "\n<script>document.body.setAttribute('data-3d-ready','1'); STAGE3D.wire();</script>")
 
 
+def stage3d_files() -> dict[str, str]:
+    """The 3-D stage's two files as a website serves them, once for all its pages:
+    `{file name: text}`, in the order a page loads them."""
+    return {Path(name).name: (_JS_DIR / name).read_text(encoding="utf-8") for name in STAGE3D_JS}
+
+
+def link_stage3d(page: str, prefix: str) -> str:
+    """`page` with the 3-D stage LINKED where `render_html(stage3d="always")` inlines it.
+
+    For a website.  A site carries hundreds of pages and the stage is 570 KB, so it serves
+    the two files once (`stage3d_files`, under `prefix`) and every page loads them from there.
+    They are the same two scripts, followed by the same line that shows the switch -- here
+    only once they have loaded, so a page read where the files are not is the page it was.
+
+    Nothing of the page is changed.  A page that carries the stage already comes back as it
+    is; so does one written before the template had a place for the stage.
+    """
+    if '<meta name="qccd-page-3d"' in page or 'id="stage3d"' not in page:
+        return page
+    tags = "".join(f'<script src="{prefix}{name}"></script>\n' for name in stage3d_files())
+    block = (f"<!-- the 3-D stage {stage3d_stamp()}, served beside the page -->\n" + tags
+             + "<script>if(globalThis.STAGE3D&&globalThis.QCCDTHREE){"
+               "document.body.setAttribute('data-3d-ready','1'); STAGE3D.wire();}</script>\n")
+    i = page.rindex("</body>")
+    return page[:i] + block + page[i:]
+
+
 def _js_block(names) -> str:
     out = []
     for name in names:

@@ -537,3 +537,34 @@ def test_the_browser_lays_a_layered_machine_out_exactly_as_python_does(tmp_path)
     # and both ways of setting panels out are exercised: across the page, and down it
     ways = {("across" if w["panels"][1][1] == 0.0 else "down") for w in want}
     assert ways == {"across", "down"}, ways
+
+
+def test_a_website_links_the_3d_stage_where_a_page_would_inline_it(grid_under_ring, tmp_path):
+    """`link_stage3d`: a site serves the stage's two files once and every page loads them.
+    A planar page gains two script tags and the line that shows the switch once they have
+    loaded; a page that carries the stage, and one with no place for it, come back as they
+    are; and the page's own code is untouched, so its stamp is the template's."""
+    planar = Machine.grid(3, 3, name="flat")
+    prog = planar.program("p").build() if hasattr(planar, "program") else None
+    page = tmp_path / "flat.html"
+    planar.render(prog, page, source=None)
+    text = page.read_text(encoding="utf-8")
+    assert '<meta name="qccd-page-3d"' not in text, "a planar page carries no stage of its own"
+    linked = R.link_stage3d(text, "../static/3d/abc/")
+    names = list(R.stage3d_files())
+    assert names == ["three.qccd.min.js", "stage3d.js"]
+    tags = [f'<script src="../static/3d/abc/{name}"></script>' for name in names]
+    assert all(linked.count(tag) == 1 for tag in tags)
+    assert text.rindex("</body>") <= linked.index(tags[0]) < linked.index(tags[1]) < linked.rindex("</body>")
+    assert "if(globalThis.STAGE3D&&globalThis.QCCDTHREE)" in linked
+    assert linked.replace(linked[text.rindex("</body>"):linked.rindex("</body>")], "") == text,         "nothing of the page changes: the link is added before </body> and that is all"
+    assert f'content="{R.page_stamp()}"' in linked
+    # a page that carries the stage already
+    layered = tmp_path / "layered.html"
+    grid_under_ring.render(grid_under_ring.program("p").build(), layered, source=None)
+    inline = layered.read_text(encoding="utf-8")
+    assert '<meta name="qccd-page-3d"' in inline and R.link_stage3d(inline, "x/") == inline
+    # a page written before the template had a place for the stage
+    old = text.replace('id="stage3d"', 'id="no-stage"')
+    assert R.link_stage3d(old, "x/") == old
+

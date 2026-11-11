@@ -508,6 +508,12 @@ any machine. Its switch is the `3D` button on the transport bar.
 - Controls: drag, wheel, right-drag; Corner, Top and Front; layer spacing; show one layer; PNG;
   hover names the ion.
 - Nothing is drawn while nothing changes, and the WebGL context is released when 3D is hidden.
+- A website does not inline it. `render.link_stage3d(page, prefix)` adds two script tags for
+  the same two files, served once under `prefix`, and the line that shows the switch once
+  they have loaded. `qccd/site/build.py` writes the files to `static/3d/<their stamp>/` and
+  links every Studio page it puts, so any machine on the site can be turned and no page grows
+  by the 570 KB. A page that carries the stage, and one written before the template had a
+  place for it, are left as they are; a linked page read away from the site is the page it was.
 - Measured in headless Chrome on the pages built here: 8 draw calls for a planar ring of 144
   ions, 13 for two layers, 22 for three; no frame drawn in 1.5 s of idle; no context held after
   the switch back.
@@ -533,26 +539,30 @@ ion exactly where the SVG mark is within its panel, at every frame and five phas
 - Per-layer wiring parameters, a `nm_per_unit_z`, and electrodes for more than one plane.
 
 **On the website since 2026-11-10** (built from this branch).
-- The Design page (`studio.html`) carries the 3-D stage.
+- Every Studio page of the sections rebuilt here has the 3-D switch, linked: the Design page,
+  the Leaderboard's entry pages, the examples of the Machine, Language, Rules, Compilation
+  and Physics pages, and the lesson companion.
 - `layers/` is new: a page about machines built in layers and three Studio pages
   (`qccd/site/layers.py`); the Learn menu of the bar links to it.
 - The BB board lists the conveyor sandwich on three layers, on two and in a plane
   (`Codesign/scripts/bb_studio.py`), in a family of their own, compiled by their own router.
-  The two layered entries' pages carry the 3-D stage.
 - The live site is 6.9 GB and this machine builds it without its gadget and Reproduce
-  sections, so those two, the Debug page and the book were left as they were, with the bar
-  they had. Every board entry but the three new ones keeps the page it had (see below).
+  sections, so those two, the Debug page, the book and the Goal 3 point pages were left as
+  they were: the bar and the template they had, and no 3-D switch.
 - What was replaced is in `/root/qccd-site-backups/` on the server (`site-before-3d-*`).
 - Not done: the official grading service. Its image predates layered machines, so it would
   refuse a layered entry, and the pages it draws have the template it was built with.
 
 **Before a merge.**
-1. **Rebuild the committed pages.** The template changed, so the page stamp changed, and
-   `tests/test_board_engine.py` fails until the 204 pages of `BBResults`, `SmallCode` and
-   `MemoryBoard` are rebuilt (the commands are in that test's message). The twelve BB pages
-   need the compiled programmes under `Compiler/build/bb2/`, which are not in the repository
-   and were not on the machine this branch was written on; the three sandwich pages are at
-   the new stamp already, since their files are made from the release.
+1. ~~Rebuild the committed pages.~~ Done 2026-11-10, at page stamp f65fc153934e7d9e. The
+   small-code, memory and C2LR boards were redrawn from their committed files
+   (`--pages-only`), and their manifests changed in page sizes only. The BB board's twelve
+   qccdc entries need the files of `Compiler/build/bb2/`, which are not in the repository:
+   `Codesign/scripts/bb2_remake.py` makes them again: the machine each entry's committed page
+   records (generator, parameters, template, borrowed control blocks, description), entered on
+   bb144@2, and the workspace's compile job run with the released qccdc cd3efedbbc10. All
+   eight programmes replay to the time their rows had, and the data of all twelve rebuilt
+   pages is equal, block for block, to the data of the pages they replace.
 2. **Publish the compiler.** `Compiler/ocaml` changed, so `tests/test_workspace_toolchain.py`
    will fail once this is committed, until the binaries are rebuilt and published and
    `qccd/workspace/toolchain.json` is updated (`deploy/toolchain/README.md`).

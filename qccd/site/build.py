@@ -2393,12 +2393,23 @@ def build(out: Path) -> int:
 
     app_pages: list[tuple[str, str]] = []      # every Studio page written: what the Debug page can open
 
+    # THE 3-D STAGE, SERVED ONCE.  Its two files go under static/3d/<their stamp>/ and every
+    # Studio page links them (`link_stage3d`): any machine on the site can be turned, and no
+    # page grows by the 570 KB.  A page that carries the stage itself is left as it is.
+    from ..viz.render import link_stage3d, stage3d_files, stage3d_stamp
+    stage3d_dir = f"static/3d/{stage3d_stamp()}/"
+    (out / stage3d_dir).mkdir(parents=True, exist_ok=True)
+    for name, text in stage3d_files().items():
+        (out / stage3d_dir / name).write_text(text, encoding="utf-8", newline="\n")
+
     def put(rel: str, page: str, depth: int, active: str | None, app: bool = False, extra: str = "") -> None:
         p = out / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         if app and debugpage.STUDIO_MARK in page:
             app_pages.append((rel, debugpage.page_title(page)))
         page = with_nav(page, depth, active, idx, app=app, extra=extra)
+        if app:
+            page = link_stage3d(page, "__SITEROOT__" + stage3d_dir)
         if app:
             page = debugpage.with_loader(page)  # its Debug button opens the debugger beside the program
         page = page.replace("__FOOTER__", FOOTER).replace("__SITEROOT__", "../" * depth)
@@ -2407,8 +2418,7 @@ def build(out: Path) -> int:
     # the studio, once: the one page Learn and Design both are
     from ..__main__ import main as qccd_main
     studio = out / "studio.html"
-    # with the 3-D stage: any machine built on the Design page can be turned (docs/PLAN-3d.md)
-    qccd_main(["studio", "-o", str(studio), "--stage3d", "always"])
+    qccd_main(["studio", "-o", str(studio)])
     from . import cowork, qec_cycle
     # the QEC-cycle panel rides in with the hash router: the studio itself is untouched,
     # and the panel reads the page's own priced round (qccd/site/qec_cycle.py); the Agent

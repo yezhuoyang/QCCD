@@ -2,8 +2,8 @@
 
 Three Studio pages and the page that introduces them.  Each Studio page is `render_html`
 over a board's circuit, compiled onto the conveyor sandwich (`qccd.arch.sandwich`) by its
-router (`qccd.compile.conveyor_router`) on the board's own physics; the 3-D stage is the
-template's (`stage3d=`).  Nothing here needs the OCaml compiler, so the site's build still
+router (`qccd.compile.conveyor_router`) on the board's own physics.  A layered machine's page
+carries the 3-D stage (the template's `stage3d="auto"`); the site links it into the planar one.  Nothing here needs the OCaml compiler, so the site's build still
 needs no install.  Every number the index quotes is measured on the programme its page shows.
 """
 
@@ -71,8 +71,7 @@ def render(key: str, path: Path) -> dict:
                       f"{cycles} transport cycles, {ms:.2f} ms on the board's clock. "
                       + ("Press 3D on the transport bar, then drag to turn it." if layers > 1 else
                          "One broadcast, so the two loops take turns.")),
-                source=build_source(cooled, cert, qasm), template_stems="*",
-                stage3d="always")
+                source=build_source(cooled, cert, qasm), template_stems="*")
     qasm.unlink()
     d = arch.device
     return {"key": key, "page": f"{key}.html", "title": title, "about": about, "board": release,
