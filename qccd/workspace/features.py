@@ -278,6 +278,12 @@ def _estimate_ler(be, a: dict) -> dict:
             "rules_failed": res.get("rules_failed"), "refusal": res.get("refusal")}
 
 
+def _get_review(be, a: dict):
+    if a.get("review_id"):
+        return be.call("GET", f"/api/reviews/{_enc(a['review_id'])}" + ("?brief=1" if a.get("brief") else ""))
+    return be.call("GET", "/api/reviews?" + _q({"limit": a.get("limit")}))
+
+
 def _get_leaderboard(be, a: dict):
     board, official = a.get("board"), bool(a.get("official"))
     if official:
@@ -656,6 +662,16 @@ FEATURES: tuple[Feature, ...] = (
         lambda be, a: be.call("POST", "/api/debug", dict(a), timeout=300),
         ("POST /api/debug",), read_only=True, group="runs"),
     Feature(
+        "qccd_get_review",
+        "The agent reviews of this workspace: the Debug page's Run agent review, the person's own Claude or ChatGPT in "
+        "Docker on their computer. Without review_id, the latest (title, agent, status, the rule check's line); with one, "
+        "its rule check -- the grader's own evaluator, whose verdicts are the only ones -- the agent's report (Markdown; "
+        "'step N' counts as the Debug page does) and its notes by step. Only the person starts a review or signs an agent "
+        "in, because it spends their own subscription: to have one, ask them to press Run agent review in the Debug "
+        "page's Rules tab; you read the result.",
+        _obj({"review_id": _S, "limit": _I, "brief": {"type": "boolean"}}),
+        _get_review, ("GET /api/reviews", "GET /api/reviews/{rid}"), read_only=True, group="runs"),
+    Feature(
         "qccd_get_bench",
         "The Compiler board's local reports: without report_id the list (compiler, coverage, speedup over the "
         "reference compiler, LER ratio, wrong pairs); with report_id one report, part summary (default) or pairs "
@@ -706,6 +722,9 @@ INTERNAL_ROUTES: dict[str, str] = {
     "GET /api/account": "the Studio's sign-in state; agents read it in qccd_get_context (account), and only a person signs in",
     "GET /api/board-view": "the Studio's Leaderboard panel; agents read the same through qccd_get_leaderboard and qccd_get_job",
     "GET /api/publications/{pid}": "the chat card of a request; an agent's own request comes back from qccd_submit_official",
+    "GET /api/reviewers": "the review page's sign-in state (Docker, who is signed in); only a person signs an agent in, "
+                          "and an agent reads reviews through qccd_get_review",
+    "GET /api/signins/{sid}": "the review page follows a sign-in the person started",
     "POST /api/debug/web": "the Debug panel on the workspace's pages runs its rule language here; an agent drives the same "
                            "panel through qccd_page_act (debug), or the same debugger headless through qccd_debug",
 }
@@ -726,6 +745,8 @@ LOCAL_VERBS: dict[str, str] = {
     "login": "a person signs this computer in to qccd.academy with their own account; an agent never can",
     "logout": "a person signs this computer out of qccd.academy",
     "grade": "re-grades a downloaded submission bundle with the reference evaluator; no workspace is involved",
+    "review": "a person signs an agent in for reviews, or runs one with their own account, at a terminal; an agent reads "
+              "reviews through qccd_get_review",
 }
 
 

@@ -163,14 +163,17 @@ def create_app(state: ServiceState) -> FastAPI:
         except JSONRejected as exc:
             raise WorkspaceError(exc.code, str(exc), status=422, detail=exc.to_json()) from None
 
-    def route(method: str, path: str, *, write: bool = True, human_only: bool = False, raw: bool = False):
+    def route(method: str, path: str, *, write: bool = True, human_only: bool = False, raw: bool = False,
+              limits: Limits | None = None):
         def deco(fn):
             async def handler(request: Request):
                 try:
                     actor = principal(request, write=write)
                     if human_only and actor["kind"] != "human":
                         raise WorkspaceError("forbidden", "this needs a person, not an agent", status=403)
-                    payload = await body(request) if method in ("POST", "PATCH", "PUT") else {}
+                    payload = {}
+                    if method in ("POST", "PATCH", "PUT"):
+                        payload = await body(request, limits) if limits else await body(request)
                     if not isinstance(payload, dict):
                         raise WorkspaceError("bad_request", "the body must be a JSON object", status=422)
                     out = await asyncio.to_thread(fn, request, actor, payload)
@@ -977,6 +980,73 @@ def create_app(state: ServiceState) -> FastAPI:
             raise WorkspaceError("bad_request", "fn must be open_session, call or rulesets, with string args", status=422)
         return {"text": getattr(dweb, fn)(*args)}
 
+    # ------------------------------------------------------------------ agent reviews (reviews.py, qccd/review)
+
+    @app.get("/review/new")
+    async def review_new(request: Request):
+        """The review page for a programme the Debug page hands over (by postMessage, from the
+        Studio or the website mirror): sign in, pick the agent, Run."""
+        try:
+            principal(request, write=False)
+        except WorkspaceError as e:
+            return err(e)
+        return HTMLResponse(_review_page(state, None, web_origin), headers={"Content-Security-Policy": _CSP})
+
+    @app.get("/reviewview/{rid}")
+    async def review_view(rid: str, request: Request):
+        """One review: its progress while it runs, its report when it is done."""
+        try:
+            principal(request, write=False)
+            ws.review(rid, brief=True)
+        except WorkspaceError as e:
+            return err(e)
+        return HTMLResponse(_review_page(state, rid, web_origin), headers={"Content-Security-Policy": _CSP})
+
+    @route("GET", "/api/reviews", write=False)
+    def reviews_list(request, actor, _):
+        return {"reviews": ws.reviews(q(request, "limit", 20, int))}
+
+    @route("GET", "/api/reviews/{rid}", write=False)
+    def review_one(request, actor, _):
+        return ws.review(request.path_params["rid"], brief=q(request, "brief", "0") == "1")
+
+    @route("POST", "/api/reviews", human_only=True, limits=Limits(max_bytes=_BODY_LIMIT, max_string=_BODY_LIMIT))
+    def review_start(request, actor, b):
+        return ws.start_review(actor, b.get("request") or {}, str(b.get("reviewer") or ""), b.get("model") or None)
+
+    @route("POST", "/api/reviews/{rid}/again", human_only=True)
+    def review_again(request, actor, b):
+        return ws.review_again(actor, request.path_params["rid"], b.get("reviewer") or None,
+                               b.get("model") if "model" in b else None)
+
+    @route("POST", "/api/reviews/{rid}/cancel", human_only=True)
+    def review_cancel(request, actor, b):
+        return ws.cancel_review(actor, request.path_params["rid"])
+
+    @route("GET", "/api/reviewers", write=False)
+    def reviewers(request, actor, _):
+        return ws.reviewers_view()
+
+    @route("POST", "/api/reviewers/{reviewer}/signin", human_only=True)
+    def reviewer_signin(request, actor, b):
+        return ws.start_signin(actor, request.path_params["reviewer"])
+
+    @route("POST", "/api/reviewers/{reviewer}/signout", human_only=True)
+    def reviewer_signout(request, actor, b):
+        return ws.sign_out_reviewer(actor, request.path_params["reviewer"])
+
+    @route("GET", "/api/signins/{sid}", write=False)
+    def signin_one(request, actor, _):
+        return ws.signin_view(request.path_params["sid"])
+
+    @route("POST", "/api/signins/{sid}/code", human_only=True)
+    def signin_code(request, actor, b):
+        return ws.signin_code(actor, request.path_params["sid"], str(b.get("code") or ""))
+
+    @route("POST", "/api/signins/{sid}/cancel", human_only=True)
+    def signin_cancel(request, actor, b):
+        return ws.signin_cancel(actor, request.path_params["sid"])
+
     @route("POST", "/api/publications")
     def publications_new(request, actor, b):
         return ws.request_publication(actor, board=b.get("board"), design=b.get("design"),
@@ -1394,6 +1464,20 @@ def _trace_page(state: ServiceState) -> str:
             "<style>\n" + (_WEB / "trace.css").read_text(encoding="utf-8") + "\n</style></head><body>"
             + '<script id="qccd-trace-config" type="application/json">' + json.dumps(cfg).replace("</", "<\\/")
             + "</script>\n<script>\n" + (_WEB / "trace.js").read_text(encoding="utf-8") + "\n</script>\n</body></html>")
+
+
+def _review_page(state: ServiceState, rid: str | None, web_origin: str | None) -> str:
+    """An agent review's page (review.js): a new one, for the programme the page that opened it
+    hands over, or one that runs or is done.  Only the workspace's own pages and the website
+    mirror may hand a programme over."""
+    openers = [o for o in (web_origin, web_origin and web_origin.replace("127.0.0.1", "localhost")) if o]
+    cfg = {"review_id": rid, "openers": openers, "web": f"{web_origin}/web/" if web_origin else None}
+    return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>QCCD: agent review</title>"
+            "<style>\n" + (_WEB / "review.css").read_text(encoding="utf-8") + "\n</style></head><body>"
+            + '<script id="qccd-review-config" type="application/json">' + json.dumps(cfg).replace("</", "<\\/")
+            + "</script>\n<main id=\"rv\"></main>\n<script>\n" + (_WEB / "review.js").read_text(encoding="utf-8")
+            + "\n</script>\n</body></html>")
 
 
 def _css() -> str:

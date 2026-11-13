@@ -1,6 +1,6 @@
 """`Workspace` = the design core + collaboration + results + runs + the logical error rate and the
-Compiler board + the official leaderboard (publications) + files saved for the person (exports), as
-one application object."""
+Compiler board + agent reviews on this computer + the official leaderboard (publications) + files
+saved for the person (exports), as one application object."""
 
 from __future__ import annotations
 
@@ -10,12 +10,14 @@ from .exports import ExportsMixin
 from .publications import PublicationsMixin
 from .qecjobs import QecMixin
 from .results import ResultsMixin
+from .reviews import ReviewsMixin
 from .runs import RunsMixin
 
 __all__ = ["Workspace", "WorkspaceError", "new_id"]
 
 
-class Workspace(CollabMixin, ResultsMixin, RunsMixin, QecMixin, PublicationsMixin, ExportsMixin, WorkspaceCore):
+class Workspace(CollabMixin, ResultsMixin, RunsMixin, QecMixin, ReviewsMixin, PublicationsMixin, ExportsMixin,
+                WorkspaceCore):
     """The application layer every door (Studio, MCP, CLI, file import) calls."""
 
     def _after_init(self) -> None:
@@ -26,6 +28,7 @@ class Workspace(CollabMixin, ResultsMixin, RunsMixin, QecMixin, PublicationsMixi
 
     def close(self) -> None:
         self._closed = True               # stops the cancellation watchers before the database closes
+        self._reviews_close()
         try:
             self._pool.shutdown(wait=False, cancel_futures=True)
         except Exception:
