@@ -2552,6 +2552,9 @@ function draftForAgent(text) {
   return true;
 }
 if (!CFG.framed) window.QCCD_AGENT_DRAFT = draftForAgent;
+// the Debug panel's "Run agent review" opens this workspace's review page and hands it the program
+// (debug.js, review.js); the person signs in and runs it there
+if (!CFG.framed) window.QCCD_AGENT_REVIEW_URL = '/review/new';
 function setPage(ctx) {
   var before = J(S.page || {});
   S.page = { url: ctx.url || (S.page || {}).url, title: ctx.title, kind: ctx.kind, selection: ctx.selection,

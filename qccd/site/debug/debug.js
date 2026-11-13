@@ -51,7 +51,7 @@ var S = {
   // Why: every rule at the step shown, and the cases of one of them (`rules_at`, `inspect`)
   why: { rule: null, at: null, key: '', list: null, cases: null, busy: false, error: '', closest: {}, guide: {} },
   notes: [], noteSeq: 0,               // what an agent reviewing the program pinned to a step
-  fixOpen: {}, agentHelp: false,
+  fixOpen: {}, agentHelp: false, runHelp: false,
   tab: 'state', pending: null, picking: false, flash: null,
   active: HOST === 'frame'             // in a Studio page: whether the panel is open
 };
@@ -1056,7 +1056,10 @@ function renderRules() {
           (S.rules.running ? 'Checking…' : 'Check') + '</button><span id="pyState" class="q-mut"></span></div>' +
           '<div class="q-row"><button type="button" id="rAgent" class="q-tgl' + (S.agentHelp ? ' q-on' : '') + '" aria-pressed="' + S.agentHelp +
           '" data-hint="debug:rules:agent">Review with my agent</button><span class="q-mut">your own Codex, Claude Code or Cursor, working in this panel while you watch</span></div>' +
-          (S.agentHelp ? agentHelpHTML() : '');
+          (S.agentHelp ? agentHelpHTML() : '') +
+          '<div class="q-row"><button type="button" id="rRun" class="q-tgl' + (S.runHelp ? ' q-on' : '') + '" aria-pressed="' + S.runHelp +
+          '" data-hint="debug:rules:run">Run agent review</button><span class="q-mut">with your own Claude or ChatGPT account, in Docker on your computer: a report page when it is done</span></div>' +
+          (S.runHelp ? runHelpHTML() : '');
   if (S.rules.error) h += '<p class="q-bad">' + esc(S.rules.error) + '</p>';
   var r = S.rules.result;
   if (r) {
@@ -1109,6 +1112,7 @@ function renderRules() {
   $('rAs').onchange = function () { writeUrl(); };
   $('rCheck').onclick = function () { runCheck({}).catch(function () { /* said */ }); };
   $('rAgent').onclick = function () { reviewWithAgent(); };
+  $('rRun').onclick = function () { runAgentReview(); };
   Array.prototype.forEach.call(el.querySelectorAll('[data-why]'), function (b) {
     b.onclick = function () { showWhy(b.getAttribute('data-why')).catch(function () { /* said */ }); };
   });
@@ -1403,6 +1407,50 @@ function reviewWithAgent() {
   S.agentHelp = !S.agentHelp;
   renderPane();
   return { drafted: false };
+}
+
+// "Run agent review": a review of this program by the person's own agent, in Docker, with a report
+// page (qccd/review).  It runs in their workspace: where this page has one (its Studio, or a website
+// page opened through it), the host says where its review page is (QCCD_AGENT_REVIEW_URL), and this
+// opens it and hands the program over by postMessage once it says it is ready.  The person signs in
+// and presses Run there -- this page never starts a review.  Elsewhere, how to open it with one.
+function reviewRequest() {
+  if (!S.win || !S.win.EDITOR) throw new Error('open a program first');
+  var pair = S.win.EDITOR.exportPair();
+  return { title: S.title || 'a programme', arch: pair.arch.text, program: pair.tsir.text, model: (S.B && S.B.D && S.B.D.model) || null,
+           rules: S.rules.set || 'standard', assertions: S.rules.assertions || '', steps: S.n, link: S.kind === 'file' ? null : link(),
+           source: { kind: S.kind || '', path: S.src || '' } };
+}
+function runHelpHTML() {
+  return '<div class="q-agenthelp"><p>An agent review runs on your computer, in Docker: you sign in once with your own Claude or ChatGPT ' +
+    'account, the grader\'s rule check judges every rule, and your agent explains what fails, where, and how to fix it. A report page ' +
+    'shows it when it is done.</p>' +
+    '<p><a class="q-go" href="' + esc(agentLink()) + '" target="_blank" rel="noopener" data-hint="debug:review:open">Open this page from my workspace</a></p>' +
+    '<p class="q-mut">This opens the same page from your own computer (127.0.0.1); it works while your workspace is running ' +
+    '(<code>qccd web</code>) and Docker is running.</p></div>';
+}
+function runAgentReview() {
+  var url = window.QCCD_AGENT_REVIEW_URL;
+  if (!url) { S.runHelp = !S.runHelp; renderPane(); return { opened: false }; }
+  var req;
+  try { req = reviewRequest(); } catch (e) { say(String(e.message || e)); return { opened: false, error: String(e.message || e) }; }
+  var w = window.open(url, '_blank');
+  if (!w) {
+    say('the browser kept the review page from opening: allow pop-ups for this page, then press Run agent review again');
+    return { opened: false, error: 'the browser blocked the new tab' };
+  }
+  var origin = new URL(url, location.href).origin, sent = false;
+  var onMsg = function (e) {
+    if (sent || e.source !== w || e.origin !== origin || !e.data || e.data.qccd !== 'review-ready') return;
+    sent = true; window.removeEventListener('message', onMsg);
+    w.postMessage({ qccd: 'review-request', request: req }, origin);
+  };
+  window.addEventListener('message', onMsg);
+  setTimeout(function () { window.removeEventListener('message', onMsg); }, 120000);
+  S.runHelp = false;
+  say('the review page opened in a new tab: pick your agent there, and press Run');
+  renderPane();
+  return { opened: true };
 }
 
 function renderBreaks() {
@@ -1956,6 +2004,8 @@ window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, {
   'debug:rules:closest': { t: 'Closest case', d: 'the case of this rule that holds with the least room, in the whole program' },
   'debug:rules:agent': { t: 'Review with my agent', d: 'write a review request into your own agent\'s chat (Codex, Claude Code or Cursor), which works in this panel while you watch; where this page has no chat, how to open it with one' },
   'debug:agent:open': { t: 'Open this page with my agent', d: 'this page from your own computer, with a chat to your agent (your workspace must be running: qccd web)' },
+  'debug:rules:run': { t: 'Run agent review', d: 'opens your workspace\'s review page with this program: you sign in with your own Claude or ChatGPT account and press Run there; the rule check judges every rule, your agent explains in Docker, and the page becomes its report. Only the person runs one; where this page has no workspace, how to open it with one' },
+  'debug:review:open': { t: 'Open this page from my workspace', d: 'this page from your own computer, where Run agent review opens the review page (your workspace and Docker must be running: qccd web)' },
   'debug:note:remove': { t: 'Remove note', d: 'remove this note' },
   'debug:tab:breaks': { t: 'Breakpoints', d: 'where Continue stops: steps, conditions, failures, watched changes' },
   'debug:tab:report': { t: 'Report', d: 'what the page shows as a bug report, with a link back to exactly here' },

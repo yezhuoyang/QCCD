@@ -36,7 +36,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python -m qccd.debug", description=__doc__.splitlines()[0])
     ap.add_argument("programme", help="a .tsir.json")
     ap.add_argument("--arch", required=True, help="the .arch.json it runs on")
-    ap.add_argument("--model", default="corrected", help="the clock: corrected (default) or deck")
+    ap.add_argument("--model", default="corrected",
+                    help="the clock: corrected (default) or deck, or @FILE: a page's own (its D.model, as JSON)")
     ap.add_argument("--cert", default=None, help="the compiler's .qcert.json: judges the circuit rules (R24, R25) too")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("summary")
@@ -82,7 +83,13 @@ def main(argv=None) -> int:
         print(json.dumps({"rule": a.rule, **row} if row else {"ok": False, "error": f"the guide has no row for {a.rule!r}"}))
         return 0 if row else 2
     try:
-        sess = open_files(a.arch, a.programme, a.model, a.cert)
+        model = a.model
+        if model.startswith("@"):
+            try:
+                model = json.loads(Path(model[1:]).read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise DebugError(f"the model file cannot be read: {exc}") from None
+        sess = open_files(a.arch, a.programme, model, a.cert)
         if a.cmd in ("rules_at", "inspect", "closest"):
             rules = _text(a.rules)
             if rules and rules.endswith(".rules") and Path(rules).exists():
