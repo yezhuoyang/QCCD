@@ -63,18 +63,27 @@ def one(shape, out: str) -> dict:
 
 
 def page(shape, out: str) -> dict:
-    """The program's design page: on the studio's stage, every rule replayed for its panels."""
+    """The program's design page: on the studio's stage, every rule replayed for its panels, the
+    hardware program beside the circuit it was compiled from (Hardware / Gates / Both)."""
+    import tempfile
+
     from qccd.fullstack.scale import programs as P
     from qccd.gadget.rsa import title
+    from qccd.ir.source_map import build as build_source
     from qccd.verify import verify
     from qccd.viz import render_html
     t = time.time()
     b = P.build(as_tuple(shape))
     prog = P.cooled(b)
     rep = verify(prog, b.arch, P._model(), check_metrics=False)
+    with tempfile.TemporaryDirectory() as tmp:
+        qasm = Path(tmp) / f"{key_of(shape)}.qasm"
+        qasm.write_text(b.qasm, encoding="utf-8")
+        source = build_source(prog, b.cert, qasm)
     f = Path(out) / "pages" / f"{key_of(shape)}.html"
     render_html(b.arch, prog, rep.result, P._model(), f, kicker="RSA-2048 at d = 11", headline=title(shape),
-                lede=f"{b.ions:,} ions, {rep.result.total_us / 1000:,.3f} ms: one of the programs a prime copies")
+                lede=f"{b.ions:,} ions, {rep.result.total_us / 1000:,.3f} ms: one of the programs a prime copies",
+                source=source, template_stems="*")
     raw = f.stat().st_size
     f.with_name(f.name + ".gz").write_bytes(gzip.compress(f.read_bytes(), 9, mtime=0))
     f.unlink()
