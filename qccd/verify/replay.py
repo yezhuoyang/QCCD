@@ -304,6 +304,11 @@ def _accepts_chain(fn) -> bool:
     )
 
 
+def _moves_a_path(spec: Mapping) -> bool:
+    """Whether a movement class is a shift along a named path (a loop, or "rail")."""
+    return spec.get("type") == "shift" and spec.get("orbit") not in (None, "any", "spurs")
+
+
 def conveyed_paths(prog: TSIR, arch: Architecture) -> frozenset[str]:
     """The named loops and open paths this programme moves as a conveyor (R23's exemption).
 
@@ -342,9 +347,24 @@ def conveyed_paths(prog: TSIR, arch: Architecture) -> frozenset[str]:
                 spec = arch.simd_class(ins.cls)
             except KeyError:
                 spec = {}
-            if spec.get("type") == "shift" and spec.get("orbit") not in (None, "any", "spurs"):
+            # ONE loop a cycle on a planar machine, under a class that moves a path.
+            groups = [list(parts)] if _moves_a_path(spec) else []
+            if dev.dim == 3 and len(dev.layers) > 1:
+                # ONE WAVEFORM A LAYER.  On a machine built in layers a cycle is a waveform in
+                # each layer, and the instruction names one class for them all.  So the same
+                # test is made a layer at a time, on the moves that stay in that layer, when
+                # the machine declares a class that moves a path: a loop may turn in one
+                # layer beside a hop between two others, or beside a loop in another layer.
+                groups = []
+                if _moves_a_path(spec) or any(_moves_a_path(c) for c in arch.simd_classes.values()):
+                    by_layer: dict = {}
+                    for q in parts:
+                        if dev.layer_of(q.src) == dev.layer_of(q.dst):
+                            by_layer.setdefault(dev.layer_of(q.src), []).append(q)
+                    groups = list(by_layer.values())
+            for moving in groups:
                 loops: set = set()
-                for p in parts:
+                for p in moving:
                     try:
                         loops.update(seg.loop for seg in _segments_for(arch, p))
                     except (KeyError, ReplayError):
@@ -354,7 +374,7 @@ def conveyed_paths(prog: TSIR, arch: Architecture) -> frozenset[str]:
                     if loop in dev.loops:
                         on = set(dev.loops[loop].nodes)
                         riders = {i for i, n in pos.items() if n in on}
-                        if riders <= {p.ion for p in parts}:
+                        if riders <= {p.ion for p in moving}:
                             out.add(loop)
         for p in parts:
             pos[p.ion] = p.dst

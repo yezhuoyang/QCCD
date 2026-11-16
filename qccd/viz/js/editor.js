@@ -194,20 +194,36 @@ function baseTexts() {
 }
 
 // ------------------------------------------------------------------- geometry helpers
+// WHERE A MACHINE IS DRAWN (`QCCD.drawnOf`): its own (x, y), or on a machine built in
+// layers its (x, y) plus its layer's panel offset -- and a riser, which joins two panels,
+// is not a segment to the fit.  On a planar machine these are the lists they always were.
 function nodesOf(st) {
-  var out = [];
-  for (var nid in st.device.nodes) if (has(st.device.nodes, nid)) {
-    var n = st.device.nodes[nid];
-    out.push({ id: nid, x: +Q.unbox(n.pos[0]), y: +Q.unbox(n.pos[1]) });
-  }
+  var d = Q.drawnOf(st.device).nodes, out = [];
+  for (var i = 0; i < d.length; i++) out.push({ id: d[i].id, x: d[i].x, y: d[i].y });
   return out;
 }
-function segsOf(st) {
-  var out = [];
-  for (var sid in st.device.segments) if (has(st.device.segments, sid)) {
-    out.push({ id: sid, a: st.device.segments[sid].a, b: st.device.segments[sid].b });
+function segsOf(st) { return Q.drawnOf(st.device).segments; }
+// the layout's panel offsets follow the device: present on a machine built in layers,
+// absent on any other (a stale `L.panels` would keep a planar machine in panels)
+function syncPanels() {
+  var d = STATE ? Q.drawnOf(STATE.device) : null;
+  if (d && d.panels) L.panels = d.panels; else delete L.panels;
+}
+// A MACHINE BUILT IN LAYERS IS NOT EDITED BY HAND ON THE STAGE, in this version.  Its
+// panels are a drawing of the layers side by side: a drag in a panel would have to be
+// taken back to the layer's own coordinates, and a new part would need a layer.  The text
+// of the machine can be edited (it writes x, y and z), each layer can be designed as its
+// own planar machine, and `Machine.layered` stacks them.  Said once, on the first press.
+var LAYERED_SAID = false;
+function layeredLock() {
+  if (!(L && L.panels && L.panels.length)) return false;
+  if (!LAYERED_SAID) {
+    LAYERED_SAID = true;
+    try { toast('info', 'this machine is built in layers: its parts are not dragged here. ' +
+                        'Edit its text in the Machine pane, or design a layer as its own machine.'); }
+    catch (e) { /* no toast strip */ }
   }
-  return out;
+  return true;
 }
 function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -384,6 +400,7 @@ function rebuild(opts) {
   //    page's own "true scale" state, so an edit cannot silently change the scale rule
   var lay = Q.computeLayout(nodesOf(STATE), segsOf(STATE), holdOpts());
   for (var k in lay) if (has(lay, k)) L[k] = lay[k];
+  syncPanels();
   // a device with no edits is a fresh device: its first layout is the boundary's unit
   if (!EDITS.length) BOUND = boundaryFrom(lay);
 
@@ -454,19 +471,26 @@ function syncArch() {
   var dev = STATE.device;
   var deriv = E.derived(dev);
   var nodes = [], segments = [], loops = {}, nid, sid, lid;
+  // drawn as `build_view_model` draws it: one panel a layer on a machine built in layers
+  var drawn = Q.drawnOf(dev), at = {}, di;
+  for (di = 0; di < drawn.nodes.length; di++) at[drawn.nodes[di].id] = drawn.nodes[di];
   for (nid in dev.nodes) if (has(dev.nodes, nid)) {
     var n = dev.nodes[nid];
-    nodes.push({ id: nid, x: +Q.unbox(n.pos[0]), y: +Q.unbox(n.pos[1]), kind: n.kind,
-                 zone: n.zone, cap: n.cap, deg: deriv.degree[nid],
-                 corner: !!deriv.corner[nid], labels: (n.labels || []).slice(),
-                 cap_explicit: !!n.capacity_explicit });
+    var rec = { id: nid, x: at[nid].x, y: at[nid].y, kind: n.kind,
+                zone: n.zone, cap: n.cap, deg: deriv.degree[nid],
+                corner: !!deriv.corner[nid], labels: (n.labels || []).slice(),
+                cap_explicit: !!n.capacity_explicit };
+    if (at[nid].z !== undefined) rec.z = at[nid].z;
+    nodes.push(rec);
   }
   for (sid in dev.segments) if (has(dev.segments, sid)) {
     var s = dev.segments[sid];
-    segments.push({ id: sid, a: s.a, b: s.b, loop: s.loop,
-                    labels: (s.labels || []).slice(), cap: s.cap,
-                    len: +Q.unbox(s.length),
-                    corner_endpoints: deriv.corner_endpoints[sid] });
+    var srec = { id: sid, a: s.a, b: s.b, loop: s.loop,
+                 labels: (s.labels || []).slice(), cap: s.cap,
+                 len: +Q.unbox(s.length),
+                 corner_endpoints: deriv.corner_endpoints[sid] };
+    if (drawn.riser[sid]) srec.riser = true;
+    segments.push(srec);
   }
   for (lid in dev.loops) if (has(dev.loops, lid)) loops[lid] = dev.loops[lid].nodes.slice();
   A.nodes = nodes; A.segments = segments; A.loops = loops;
@@ -583,7 +607,7 @@ function axisOf(nodes, segments, px, py, byId) {
   var AXIS = {}, arms = {}, i;
   for (i = 0; i < segments.length; i++) {
     var sg = segments[i], a = byId[sg.a], b = byId[sg.b];
-    if (!a || !b) continue;
+    if (!a || !b || sg.riser) continue;      // a riser leaves the layer: no axis of it
     var dx = px(b) - px(a), dy = py(b) - py(a), h = Math.sqrt(dx * dx + dy * dy);
     if (h < 1e-9) continue;
     var ux = dx / h, uy = dy / h;
@@ -1097,6 +1121,7 @@ var VIEW_ONLY_VERBS = { 'toggle-play': 1, 'glide': 1, 'escape': 1, 'seek-first':
 function claim(mx, my, mod) {
   mod = mod || {};
   if (VIEW_ONLY) return 'pan';
+  if (layeredLock()) return 'pan';
   // THE RULER TAKES EVERY LEFT PRESS while it is on: a click is a measurement, and a
   // measurement you have to aim around a drag would be no measurement at all.  A middle
   // or right press still pans, so the view can be moved without leaving the tool.
@@ -3469,6 +3494,7 @@ function rescale() {
   var lay = STATE ? Q.computeLayout(nodesOf(STATE), segsOf(STATE), holdOpts())
                   : ((TRUE_SCALE && D.layout_true) ? D.layout_true : D.layout);
   for (var k in lay) if (has(lay, k)) L[k] = lay[k];
+  if (STATE) syncPanels();
   if (!EDITS.length) BOUND = boundaryFrom(L);
   GRID = null;
   rebuildStatic();
@@ -4445,7 +4471,7 @@ function keyGesture(key, mods, ctx) {
     // nothing under the pointer.)
     if ((GHOST || BAND) && row.verb.indexOf('fold-') === 0) return null;
     if (row.verb === 'nudge-or-seek') {
-      if (SELSET.length && !VIEW_ONLY) return 'nudge';
+      if (SELSET.length && !VIEW_ONLY && !(L && L.panels)) return 'nudge';
       return (key === 'ArrowRight' || key === 'ArrowDown') ? 'seek-next' : 'seek-prev';
     }
     if (VIEW_ONLY && !VIEW_ONLY_VERBS[row.verb]) return null;
@@ -4668,6 +4694,11 @@ var HINTS = {
   'zoom:out': { t: 'Zoom out', d: 'Further away, about the middle of the canvas, as far out as twelve machines wide.' },
   'slider': { t: 'Position', d: 'Where you are in the programme. Drag to scrub.' },
   'speed':  { t: 'Speed', d: 'How fast the animation plays, relative to real time.' },
+  'stage3d': { t: '3D', d: 'The same machine and the same programme, drawn as a stack of layers you can turn: drag to rotate, wheel to zoom, right-drag to move. Every ion is where the flat picture has it; only the layers are laid out differently \u2014 one above another here, side by side there. Press again to go back.' },
+  's3view': { t: 'View', d: 'Look at the stack from a corner, straight down, or from the front. Double-click the picture for the corner view.' },
+  's3gap': { t: 'Layer spacing', d: 'How far apart the layers are drawn. It is not to scale: on the chip the layers are far closer than they are wide, and a riser drawn that short could not be seen.' },
+  's3only': { t: 'Show', d: 'Pick one layer to see it at full strength, the others faint. Use it when one layer hides another.' },
+  's3png': { t: 'PNG', d: 'Save the picture as it is now, for a figure.' },
   'colour': { t: 'Colour by', d: '\u201crole\u201d colours an ion by what it is doing; \u201cheating\u201d colours it by how hot it has become \u2014 a hot ion gates badly.' },
   'snap':   { t: 'Snap', d: 'Off (the default): a part lands exactly where you drop it, at any coordinate. On: it lands on the lattice; hold alt to place it freely anyway, shift for quarter steps. Marks never overlap: a drag stops against the next mark and slides along it.' },
   'hwlabels': { t: 'Hardware labels', d: 'The names a hardware program is written in, on the picture: every trapping site and junction (S0, J0) and every ion (d0, a0) carries its name beside it, so p.shuttle("d0", ["S0", "J0", "A0"]) reads straight off the canvas. On by default; this button hides them, and the choice is remembered. On a big machine they step aside while too small to read, and come back as you zoom in.' },
@@ -9639,6 +9670,7 @@ function clickStage(mx, my, mods) {
 // applier, one rule.
 function dblclickStage(mx, my) {
   if (VIEW_ONLY) return;
+  if (L && L.panels) return;
   if (hit(mx, my)) return null;
   if (isStampType(ARMED_EL)) return null;
   if (ARMED_EL) return clickStage(mx, my, { quiet: true });
@@ -9937,6 +9969,7 @@ function menuOpen(mx, my, opts) {
   // there, so this is unreachable from the pointer -- but a harness can call it, and a
   // menu of edits on a page where nothing may be edited would be a lie.
   if (VIEW_ONLY) return null;
+  if (L && L.panels) return null;
   var h = hit(mx, my);
   if (!h) { menuClose(); return null; }
   var sub = { kind: normKind(h.kind, h.id), id: h.id };

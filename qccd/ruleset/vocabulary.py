@@ -209,6 +209,11 @@ def _lies_on(ctx: Ctx, n, r):
     a, b = ctx.hw.ends[r]
     if n in (a, b):
         return False
+    # on a machine built in layers the test is made layer by layer (`geometry_violations`):
+    # a rail of one layer is nowhere near a node of another, and a riser is judged by
+    # `upright`
+    if dev.dim == 3 and (dev.is_riser(r.id) or dev.layer_of(n.id) != dev.layer_of(a.id)):
+        return False
     return _point_on_segment(_xy(dev.nodes[n.id].pos), _xy(dev.nodes[a.id].pos), _xy(dev.nodes[b.id].pos))
 
 
@@ -221,8 +226,25 @@ def _cross(ctx: Ctx, r1, r2):
     a2, b2 = ctx.hw.ends[r2]
     if {a1, b1} & {a2, b2}:
         return False
+    if dev.dim == 3 and (dev.is_riser(r1.id) or dev.is_riser(r2.id)
+                         or dev.layer_of(a1.id) != dev.layer_of(a2.id)):
+        return False                     # layer by layer, as `lies_on`
     p = lambda s: _xy(dev.nodes[s.id].pos)
     return _segments_cross(p(a1), p(b1), p(a2), p(b2))
+
+
+@term("upright(r)", "true or false", "Whether rail r lies in one layer, or stands vertical "
+      "between two adjacent layers of a machine built in layers. Always true on a machine "
+      "drawn in one plane.", "hardware", kinds=("programme",))
+def _upright(ctx: Ctx, r):
+    from ..verify.rules import RAIL_EPS, _xy
+    dev = ctx.hw.arch.device
+    if dev.dim != 3 or not dev.is_riser(r.id):
+        return True
+    a, b = ctx.hw.ends[r]
+    pa, pb = _xy(dev.nodes[a.id].pos), _xy(dev.nodes[b.id].pos)
+    return (abs(pa[0] - pb[0]) <= RAIL_EPS and abs(pa[1] - pb[1]) <= RAIL_EPS
+            and abs(dev.layer_of(a.id) - dev.layer_of(b.id)) == 1)
 
 
 @term("max_junction_degree()", "a number", "The most rails a junction of this machine may join, "
@@ -525,6 +547,25 @@ def _shift(ctx: Ctx, h):
       schedule="The class the paper's schedule records for the operation.")
 def _motion(ctx: Ctx, o):
     return _op(o, "motion").facts.get("motion")
+
+
+@term("same_broadcast(a, b)", "true or false", "Whether transport operations a and b are "
+      "driven by one broadcast. Each layer of a machine built in layers has a broadcast of "
+      "its own, so this is whether a and b move in a layer they share; an ion on a riser "
+      "moves in both of its layers. Always true on a machine drawn in one plane.",
+      "execution",
+      programme="Their routes pass through a common layer.",
+      schedule="Always: a schedule's machine is one plane.")
+def _same_broadcast(ctx: Ctx, a, b):
+    a, b = _op(a, "same_broadcast"), _op(b, "same_broadcast")
+    if ctx.exe.kind != "programme":
+        return True
+    dev = ctx.hw.arch.device
+    if dev.dim != 3 or len(dev.layers) < 2:
+        return True
+    la = {dev.layer_of(s.id) for s in (getattr(a, "path", None) or ())}
+    lb = {dev.layer_of(s.id) for s in (getattr(b, "path", None) or ())}
+    return bool(la & lb) if (la and lb) else True
 
 
 @term("simultaneous(a, b)", "true or false", "Whether operations a and b happen at the same "

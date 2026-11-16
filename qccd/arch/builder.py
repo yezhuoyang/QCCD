@@ -37,17 +37,20 @@ __all__ = ["DeviceBuilder"]
 
 
 def _pos2(who: str, id: str, pos: Sequence[float]) -> tuple[float, ...]:
-    """Exactly two coordinates.  The schema admits one to three and nothing reads a third.
+    """Two coordinates, or three.  `(x, y)` is a node of a planar machine; `(x, y, z)` is a
+    node of a machine built in layers, `z` naming its layer (`Device.layers`).
 
-    `compute_layout` is two-dimensional, so a 3-D machine would draw as a silent
-    projection and a 1-D one is unrepresentable in the browser mirror at all (it reads
-    `args[1]` and `args[2]` and produces `NaN`).  A design tool must not accept a
-    coordinate it will then quietly discard.
+    A third coordinate used to be refused, because nothing read it: the layout was
+    two-dimensional and a 3-D machine would have drawn as a silent projection.  The
+    layout now draws one panel a layer and the 3-D stage draws the stack, so it is read.
+    One coordinate is still refused: the browser mirror reads `args[1]` and `args[2]` and
+    would produce `NaN`.  A design tool must not accept a coordinate it will then quietly
+    discard.
     """
-    if len(pos) != 2:
+    if len(pos) not in (2, 3):
         raise ExpansionError(
-            f"DeviceBuilder.{who}({id!r}, ...) needs exactly two coordinates, got "
-            f"{len(pos)}; the layout is two-dimensional and nothing reads a third")
+            f"DeviceBuilder.{who}({id!r}, ...) needs two coordinates (x, y) or three "
+            f"(x, y, z), got {len(pos)}")
     return tuple(float(c) for c in pos)
 
 

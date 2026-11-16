@@ -1,0 +1,3613 @@
+[
+ {
+  "study": "board",
+  "circuit": "bb144@2",
+  "design": "sandwich72_L1",
+  "layers": 1,
+  "per_trap": 2,
+  "visitors": 1,
+  "nodes": 220,
+  "junctions": 144,
+  "dacs": 50,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 31.59,
+  "T_transport": 29.722,
+  "transport_cycles": 213,
+  "rotate_cycles": 151,
+  "cools": 19,
+  "placement": "index",
+  "compile_s": 0.58,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "cyc100_h2",
+   "T_jones": 288.37,
+   "source": "BBResults/studio/manifest.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "bb144@2",
+  "design": "sandwich72_L1_v2",
+  "layers": 1,
+  "per_trap": 2,
+  "visitors": 2,
+  "nodes": 220,
+  "junctions": 144,
+  "dacs": 50,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 29.075,
+  "T_transport": 28.079,
+  "transport_cycles": 195,
+  "rotate_cycles": 151,
+  "cools": 20,
+  "placement": "index",
+  "compile_s": 0.71,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "cyc100_h2",
+   "T_jones": 288.37,
+   "source": "BBResults/studio/manifest.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "bb144@2",
+  "design": "sandwich72_L2",
+  "layers": 2,
+  "per_trap": 2,
+  "visitors": 1,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 82,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 24.11,
+  "T_transport": 21.628,
+  "transport_cycles": 151,
+  "rotate_cycles": 93,
+  "cools": 19,
+  "placement": "index",
+  "compile_s": 0.51,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "cyc100_h2",
+   "T_jones": 288.37,
+   "source": "BBResults/studio/manifest.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "bb144@2",
+  "design": "sandwich72_L2_v2",
+  "layers": 2,
+  "per_trap": 2,
+  "visitors": 2,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 82,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 24.11,
+  "T_transport": 21.628,
+  "transport_cycles": 151,
+  "rotate_cycles": 93,
+  "cools": 19,
+  "placement": "index",
+  "compile_s": 0.55,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "cyc100_h2",
+   "T_jones": 288.37,
+   "source": "BBResults/studio/manifest.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "bb144@2",
+  "design": "sandwich72_L3",
+  "layers": 3,
+  "per_trap": 2,
+  "visitors": 1,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 114,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 20.265,
+  "T_transport": 19.014,
+  "transport_cycles": 118,
+  "rotate_cycles": 82,
+  "cools": 19,
+  "placement": "index",
+  "compile_s": 0.44,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "cyc100_h2",
+   "T_jones": 288.37,
+   "source": "BBResults/studio/manifest.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "bb144@2",
+  "design": "sandwich72_L3_v2",
+  "layers": 3,
+  "per_trap": 2,
+  "visitors": 2,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 114,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 20.265,
+  "T_transport": 19.014,
+  "transport_cycles": 118,
+  "rotate_cycles": 82,
+  "cools": 19,
+  "placement": "index",
+  "compile_s": 0.53,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "cyc100_h2",
+   "T_jones": 288.37,
+   "source": "BBResults/studio/manifest.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "five_qubit@1",
+  "design": "sandwich6_L1",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 22,
+  "junctions": 12,
+  "dacs": 34,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 11.01,
+  "T_transport": 9.742,
+  "transport_cycles": 47,
+  "rotate_cycles": 18,
+  "cools": 13,
+  "placement": "index",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "five_qubit_stationary_chain",
+   "T_jones": 9.155,
+   "source": "SmallCode/five_qubit/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "five_qubit@1",
+  "design": "sandwich6_L2",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 18,
+  "junctions": 12,
+  "dacs": 66,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 10.9,
+  "T_transport": 9.412,
+  "transport_cycles": 46,
+  "rotate_cycles": 14,
+  "cools": 13,
+  "placement": "index",
+  "compile_s": 0.01,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "five_qubit_stationary_chain",
+   "T_jones": 9.155,
+   "source": "SmallCode/five_qubit/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "five_qubit@1",
+  "design": "sandwich6_L3",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 18,
+  "junctions": 12,
+  "dacs": 98,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 10.715,
+  "T_transport": 9.27,
+  "transport_cycles": 44,
+  "rotate_cycles": 13,
+  "cools": 13,
+  "placement": "index",
+  "compile_s": 0.01,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "five_qubit_stationary_chain",
+   "T_jones": 9.155,
+   "source": "SmallCode/five_qubit/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "rep9@1",
+  "design": "sandwich10_L1",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 34,
+  "junctions": 20,
+  "dacs": 35,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 12.92,
+  "T_transport": 11.572,
+  "transport_cycles": 50,
+  "rotate_cycles": 18,
+  "cools": 17,
+  "placement": "index",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "repetition_stationary_chain",
+   "T_jones": 2.91,
+   "source": "SmallCode/repetition/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "rep9@1",
+  "design": "sandwich10_L2",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 30,
+  "junctions": 20,
+  "dacs": 67,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 12.72,
+  "T_transport": 11.232,
+  "transport_cycles": 49,
+  "rotate_cycles": 17,
+  "cools": 17,
+  "placement": "index",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "repetition_stationary_chain",
+   "T_jones": 2.91,
+   "source": "SmallCode/repetition/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "rep9@1",
+  "design": "sandwich10_L3",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 30,
+  "junctions": 20,
+  "dacs": 99,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 12.72,
+  "T_transport": 11.232,
+  "transport_cycles": 49,
+  "rotate_cycles": 17,
+  "cools": 17,
+  "placement": "index",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "repetition_stationary_chain",
+   "T_jones": 2.91,
+   "source": "SmallCode/repetition/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "steane@1",
+  "design": "sandwich8_L1",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 28,
+  "junctions": 16,
+  "dacs": 34,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 14.765,
+  "T_transport": 13.152,
+  "transport_cycles": 68,
+  "rotate_cycles": 30,
+  "cools": 17,
+  "placement": "vote",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "steane_stationary_chain",
+   "T_jones": 9.785,
+   "source": "SmallCode/steane/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "steane@1",
+  "design": "sandwich8_L2",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 24,
+  "junctions": 16,
+  "dacs": 66,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 15.115,
+  "T_transport": 12.976,
+  "transport_cycles": 70,
+  "rotate_cycles": 24,
+  "cools": 17,
+  "placement": "vote",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "steane_stationary_chain",
+   "T_jones": 9.785,
+   "source": "SmallCode/steane/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "steane@1",
+  "design": "sandwich8_L3",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 24,
+  "junctions": 16,
+  "dacs": 98,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 14.525,
+  "T_transport": 12.873,
+  "transport_cycles": 54,
+  "rotate_cycles": 15,
+  "cools": 20,
+  "placement": "vote",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "steane_stationary_chain",
+   "T_jones": 9.785,
+   "source": "SmallCode/steane/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "surface17@1",
+  "design": "sandwich12_L1",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 40,
+  "junctions": 24,
+  "dacs": 35,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 15.905,
+  "T_transport": 14.47,
+  "transport_cycles": 77,
+  "rotate_cycles": 42,
+  "cools": 17,
+  "placement": "vote",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "surface17_stationary_chain",
+   "T_jones": 11.665,
+   "source": "SmallCode/surface17/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "surface17@1",
+  "design": "sandwich12_L2",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 36,
+  "junctions": 24,
+  "dacs": 67,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 16.21,
+  "T_transport": 14.164,
+  "transport_cycles": 79,
+  "rotate_cycles": 35,
+  "cools": 17,
+  "placement": "vote",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "surface17_stationary_chain",
+   "T_jones": 11.665,
+   "source": "SmallCode/surface17/rows.json"
+  }
+ },
+ {
+  "study": "board",
+  "circuit": "surface17@1",
+  "design": "sandwich12_L3",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "nodes": 36,
+  "junctions": 24,
+  "dacs": 99,
+  "status": "ok",
+  "stages_not_passed": {},
+  "T_jones": 15.6,
+  "T_transport": 13.991,
+  "transport_cycles": 62,
+  "rotate_cycles": 24,
+  "cools": 20,
+  "placement": "vote",
+  "compile_s": 0.02,
+  "compiler": "conveyor-router",
+  "leader": {
+   "design": "surface17_stationary_chain",
+   "T_jones": 11.665,
+   "source": "SmallCode/surface17/rows.json"
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich36_L1_p2_free",
+  "layers": 1,
+  "per_trap": 2,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 6.05,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R23",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 462.795,
+  "rounds": 12,
+  "T_round_ms": 38.566,
+  "transport_cycles": 3697,
+  "rotate_cycles": 2541,
+  "cools": 303,
+  "instructions": 5773,
+  "nodes": 112,
+  "junctions": 72,
+  "dacs": 41,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich36_L1_p2_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich36_L1_p2_helios",
+  "layers": 1,
+  "per_trap": 2,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 6.25,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R23",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 1339.505,
+  "rounds": 12,
+  "T_round_ms": 111.625,
+  "transport_cycles": 3965,
+  "rotate_cycles": 2925,
+  "cools": 283,
+  "instructions": 5993,
+  "nodes": 112,
+  "junctions": 72,
+  "dacs": 41,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich36_L1_p2_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich36_L2_p2_free",
+  "layers": 2,
+  "per_trap": 2,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 5.41,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R23",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 313.475,
+  "rounds": 12,
+  "T_round_ms": 26.123,
+  "transport_cycles": 2405,
+  "rotate_cycles": 1415,
+  "cools": 303,
+  "instructions": 4481,
+  "nodes": 108,
+  "junctions": 72,
+  "dacs": 73,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich36_L2_p2_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich36_L2_p2_helios",
+  "layers": 2,
+  "per_trap": 2,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 5.56,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R23",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 1222.475,
+  "rounds": 12,
+  "T_round_ms": 101.873,
+  "transport_cycles": 2405,
+  "rotate_cycles": 1415,
+  "cools": 303,
+  "instructions": 4481,
+  "nodes": 108,
+  "junctions": 72,
+  "dacs": 73,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich36_L2_p2_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich36_L3_p2_free",
+  "layers": 3,
+  "per_trap": 2,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 5.58,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R23",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 246.385,
+  "rounds": 12,
+  "T_round_ms": 20.532,
+  "transport_cycles": 1823,
+  "rotate_cycles": 1197,
+  "cools": 303,
+  "instructions": 3899,
+  "nodes": 108,
+  "junctions": 72,
+  "dacs": 105,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich36_L3_p2_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich36_L3_p2_helios",
+  "layers": 3,
+  "per_trap": 2,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 5.61,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R23",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 1155.385,
+  "rounds": 12,
+  "T_round_ms": 96.282,
+  "transport_cycles": 1823,
+  "rotate_cycles": 1197,
+  "cools": 303,
+  "instructions": 3899,
+  "nodes": 108,
+  "junctions": 72,
+  "dacs": 105,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich36_L3_p2_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich72_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 10.06,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 673.25,
+  "rounds": 12,
+  "T_round_ms": 56.104,
+  "transport_cycles": 6062,
+  "rotate_cycles": 5350,
+  "cools": 179,
+  "instructions": 7496,
+  "nodes": 220,
+  "junctions": 144,
+  "dacs": 50,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich72_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich72_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 9.85,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 1210.25,
+  "rounds": 12,
+  "T_round_ms": 100.854,
+  "transport_cycles": 6062,
+  "rotate_cycles": 5350,
+  "cools": 179,
+  "instructions": 7496,
+  "nodes": 220,
+  "junctions": 144,
+  "dacs": 50,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich72_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich72_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 9.05,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 459.255,
+  "rounds": 12,
+  "T_round_ms": 38.271,
+  "transport_cycles": 3832,
+  "rotate_cycles": 2846,
+  "cools": 325,
+  "instructions": 6077,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 82,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich72_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich72_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 10.22,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 1078.195,
+  "rounds": 12,
+  "T_round_ms": 89.85,
+  "transport_cycles": 4783,
+  "rotate_cycles": 3781,
+  "cools": 179,
+  "instructions": 6217,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 82,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich72_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich72_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 9.43,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 389.325,
+  "rounds": 12,
+  "T_round_ms": 32.444,
+  "transport_cycles": 3213,
+  "rotate_cycles": 2568,
+  "cools": 325,
+  "instructions": 5458,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 114,
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich72_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "bb72",
+  "release": "goal3_bb72_mem@2",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich72_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 144,
+  "compile_s": 8.51,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 1031.085,
+  "rounds": 12,
+  "T_round_ms": 85.924,
+  "transport_cycles": 4426,
+  "rotate_cycles": 3778,
+  "cools": 179,
+  "instructions": 5860,
+  "nodes": 216,
+  "junctions": 144,
+  "dacs": 114,
+  "ler_check": true,
+  "ler_per_round": 0.0006259788064174598,
+  "ler": {
+   "ler": 0.00375,
+   "lo": 0.0032916834512553765,
+   "hi": 0.004271856611961333,
+   "shots": 60000,
+   "errors": 225,
+   "per_round": 0.0006259788064174598,
+   "per_round_lo": 0.0005493678687349401,
+   "per_round_hi": 0.000713246695282943,
+   "rounds": 6,
+   "decoder": "bposd",
+   "seconds": 330.887,
+   "seed": 20261029,
+   "stim_version": "1.15.0",
+   "stopped": "max_errors"
+  },
+  "study": "goal3",
+  "circuit": "bb72",
+  "design": "sandwich72_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr15x14",
+    "T_round_ms": 417.013,
+    "ler_per_round": 0.0014440923682945694
+   },
+   "WISE": {
+    "point": "wise_h3_8x7",
+    "T_round_ms": 807.27,
+    "ler_per_round": 0.008373337264328762
+   },
+   "Cyclone": {
+    "point": "cyclone16_n10",
+    "T_round_ms": 165.171,
+    "ler_per_round": 0.0008643656687791212
+   }
+  }
+ },
+ {
+  "code": "color3",
+  "release": "goal3_color3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich8_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 10,
+  "compile_s": 0.25,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 52.94,
+  "rounds": 6,
+  "T_round_ms": 8.823,
+  "transport_cycles": 359,
+  "rotate_cycles": 191,
+  "cools": 72,
+  "instructions": 902,
+  "nodes": 28,
+  "junctions": 16,
+  "dacs": 34,
+  "study": "goal3",
+  "circuit": "color3",
+  "design": "sandwich8_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr4x3",
+    "T_round_ms": 63.107,
+    "ler_per_round": 0.00898040628060326
+   },
+   "Cyclone": {
+    "point": "cyclone4_n3",
+    "T_round_ms": 5.427,
+    "ler_per_round": 0.008234283995341762
+   },
+   "WISE": {
+    "point": "wise_h5_2x2",
+    "T_round_ms": 79.8,
+    "ler_per_round": 0.010271815602003187
+   }
+  }
+ },
+ {
+  "code": "color3",
+  "release": "goal3_color3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich8_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 10,
+  "compile_s": 0.26,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 268.94,
+  "rounds": 6,
+  "T_round_ms": 44.823,
+  "transport_cycles": 359,
+  "rotate_cycles": 191,
+  "cools": 72,
+  "instructions": 902,
+  "nodes": 28,
+  "junctions": 16,
+  "dacs": 34,
+  "study": "goal3",
+  "circuit": "color3",
+  "design": "sandwich8_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr4x3",
+    "T_round_ms": 63.107,
+    "ler_per_round": 0.00898040628060326
+   },
+   "Cyclone": {
+    "point": "cyclone4_n3",
+    "T_round_ms": 5.427,
+    "ler_per_round": 0.008234283995341762
+   },
+   "WISE": {
+    "point": "wise_h5_2x2",
+    "T_round_ms": 79.8,
+    "ler_per_round": 0.010271815602003187
+   }
+  }
+ },
+ {
+  "code": "color3",
+  "release": "goal3_color3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich8_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 10,
+  "compile_s": 0.27,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": 0.0,
+  "T_ms": 64.07,
+  "rounds": 6,
+  "T_round_ms": 10.678,
+  "transport_cycles": 384,
+  "rotate_cycles": 120,
+  "cools": 107,
+  "instructions": 1188,
+  "nodes": 24,
+  "junctions": 16,
+  "dacs": 66,
+  "study": "goal3",
+  "circuit": "color3",
+  "design": "sandwich8_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr4x3",
+    "T_round_ms": 63.107,
+    "ler_per_round": 0.00898040628060326
+   },
+   "Cyclone": {
+    "point": "cyclone4_n3",
+    "T_round_ms": 5.427,
+    "ler_per_round": 0.008234283995341762
+   },
+   "WISE": {
+    "point": "wise_h5_2x2",
+    "T_round_ms": 79.8,
+    "ler_per_round": 0.010271815602003187
+   }
+  }
+ },
+ {
+  "code": "color3",
+  "release": "goal3_color3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich8_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 10,
+  "compile_s": 0.23,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 274.32,
+  "rounds": 6,
+  "T_round_ms": 45.72,
+  "transport_cycles": 384,
+  "rotate_cycles": 120,
+  "cools": 72,
+  "instructions": 927,
+  "nodes": 24,
+  "junctions": 16,
+  "dacs": 66,
+  "study": "goal3",
+  "circuit": "color3",
+  "design": "sandwich8_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr4x3",
+    "T_round_ms": 63.107,
+    "ler_per_round": 0.00898040628060326
+   },
+   "Cyclone": {
+    "point": "cyclone4_n3",
+    "T_round_ms": 5.427,
+    "ler_per_round": 0.008234283995341762
+   },
+   "WISE": {
+    "point": "wise_h5_2x2",
+    "T_round_ms": 79.8,
+    "ler_per_round": 0.010271815602003187
+   }
+  }
+ },
+ {
+  "code": "color3",
+  "release": "goal3_color3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich8_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 10,
+  "compile_s": 0.24,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": 0.0,
+  "T_ms": 54.415,
+  "rounds": 6,
+  "T_round_ms": 9.069,
+  "transport_cycles": 290,
+  "rotate_cycles": 73,
+  "cools": 107,
+  "instructions": 1094,
+  "nodes": 24,
+  "junctions": 16,
+  "dacs": 98,
+  "study": "goal3",
+  "circuit": "color3",
+  "design": "sandwich8_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr4x3",
+    "T_round_ms": 63.107,
+    "ler_per_round": 0.00898040628060326
+   },
+   "Cyclone": {
+    "point": "cyclone4_n3",
+    "T_round_ms": 5.427,
+    "ler_per_round": 0.008234283995341762
+   },
+   "WISE": {
+    "point": "wise_h5_2x2",
+    "T_round_ms": 79.8,
+    "ler_per_round": 0.010271815602003187
+   }
+  }
+ },
+ {
+  "code": "color3",
+  "release": "goal3_color3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich8_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 10,
+  "compile_s": 0.24,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 271.14,
+  "rounds": 6,
+  "T_round_ms": 45.19,
+  "transport_cycles": 360,
+  "rotate_cycles": 120,
+  "cools": 72,
+  "instructions": 903,
+  "nodes": 24,
+  "junctions": 16,
+  "dacs": 98,
+  "study": "goal3",
+  "circuit": "color3",
+  "design": "sandwich8_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr4x3",
+    "T_round_ms": 63.107,
+    "ler_per_round": 0.00898040628060326
+   },
+   "Cyclone": {
+    "point": "cyclone4_n3",
+    "T_round_ms": 5.427,
+    "ler_per_round": 0.008234283995341762
+   },
+   "WISE": {
+    "point": "wise_h5_2x2",
+    "T_round_ms": 79.8,
+    "ler_per_round": 0.010271815602003187
+   }
+  }
+ },
+ {
+  "code": "color5",
+  "release": "goal3_color5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich20_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 28,
+  "compile_s": 1.22,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 351.015,
+  "rounds": 10,
+  "T_round_ms": 35.102,
+  "transport_cycles": 2576,
+  "rotate_cycles": 1638,
+  "cools": 370,
+  "instructions": 5437,
+  "nodes": 64,
+  "junctions": 40,
+  "dacs": 37,
+  "study": "goal3",
+  "circuit": "color5",
+  "design": "sandwich20_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr7x7",
+    "T_round_ms": 72.975,
+    "ler_per_round": 0.00048046146466884654
+   },
+   "Cyclone": {
+    "point": "cyclone2_n15",
+    "T_round_ms": 30.456,
+    "ler_per_round": 0.0005430895722895457
+   },
+   "WISE": {
+    "point": "wise_h3_4x4",
+    "T_round_ms": 127.717,
+    "ler_per_round": 0.0006121776356430297
+   }
+  }
+ },
+ {
+  "code": "color5",
+  "release": "goal3_color5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich20_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 28,
+  "compile_s": 1.22,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 1461.015,
+  "rounds": 10,
+  "T_round_ms": 146.102,
+  "transport_cycles": 2576,
+  "rotate_cycles": 1638,
+  "cools": 370,
+  "instructions": 5437,
+  "nodes": 64,
+  "junctions": 40,
+  "dacs": 37,
+  "study": "goal3",
+  "circuit": "color5",
+  "design": "sandwich20_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr7x7",
+    "T_round_ms": 72.975,
+    "ler_per_round": 0.00048046146466884654
+   },
+   "Cyclone": {
+    "point": "cyclone2_n15",
+    "T_round_ms": 30.456,
+    "ler_per_round": 0.0005430895722895457
+   },
+   "WISE": {
+    "point": "wise_h3_4x4",
+    "T_round_ms": 127.717,
+    "ler_per_round": 0.0006121776356430297
+   }
+  }
+ },
+ {
+  "code": "color5",
+  "release": "goal3_color5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich20_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 28,
+  "compile_s": 1.15,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 378.595,
+  "rounds": 10,
+  "T_round_ms": 37.86,
+  "transport_cycles": 2393,
+  "rotate_cycles": 931,
+  "cools": 656,
+  "instructions": 7017,
+  "nodes": 60,
+  "junctions": 40,
+  "dacs": 69,
+  "study": "goal3",
+  "circuit": "color5",
+  "design": "sandwich20_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr7x7",
+    "T_round_ms": 72.975,
+    "ler_per_round": 0.00048046146466884654
+   },
+   "Cyclone": {
+    "point": "cyclone2_n15",
+    "T_round_ms": 30.456,
+    "ler_per_round": 0.0005430895722895457
+   },
+   "WISE": {
+    "point": "wise_h3_4x4",
+    "T_round_ms": 127.717,
+    "ler_per_round": 0.0006121776356430297
+   }
+  }
+ },
+ {
+  "code": "color5",
+  "release": "goal3_color5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich20_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 28,
+  "compile_s": 1.34,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 1485.54,
+  "rounds": 10,
+  "T_round_ms": 148.554,
+  "transport_cycles": 2666,
+  "rotate_cycles": 1206,
+  "cools": 370,
+  "instructions": 5527,
+  "nodes": 60,
+  "junctions": 40,
+  "dacs": 69,
+  "study": "goal3",
+  "circuit": "color5",
+  "design": "sandwich20_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr7x7",
+    "T_round_ms": 72.975,
+    "ler_per_round": 0.00048046146466884654
+   },
+   "Cyclone": {
+    "point": "cyclone2_n15",
+    "T_round_ms": 30.456,
+    "ler_per_round": 0.0005430895722895457
+   },
+   "WISE": {
+    "point": "wise_h3_4x4",
+    "T_round_ms": 127.717,
+    "ler_per_round": 0.0006121776356430297
+   }
+  }
+ },
+ {
+  "code": "color5",
+  "release": "goal3_color5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich20_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 28,
+  "compile_s": 1.08,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 323.515,
+  "rounds": 10,
+  "T_round_ms": 32.352,
+  "transport_cycles": 1801,
+  "rotate_cycles": 528,
+  "cools": 656,
+  "instructions": 6425,
+  "nodes": 60,
+  "junctions": 40,
+  "dacs": 101,
+  "study": "goal3",
+  "circuit": "color5",
+  "design": "sandwich20_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr7x7",
+    "T_round_ms": 72.975,
+    "ler_per_round": 0.00048046146466884654
+   },
+   "Cyclone": {
+    "point": "cyclone2_n15",
+    "T_round_ms": 30.456,
+    "ler_per_round": 0.0005430895722895457
+   },
+   "WISE": {
+    "point": "wise_h3_4x4",
+    "T_round_ms": 127.717,
+    "ler_per_round": 0.0006121776356430297
+   }
+  }
+ },
+ {
+  "code": "color5",
+  "release": "goal3_color5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich20_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 28,
+  "compile_s": 1.32,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 1479.18,
+  "rounds": 10,
+  "T_round_ms": 147.918,
+  "transport_cycles": 2618,
+  "rotate_cycles": 1206,
+  "cools": 370,
+  "instructions": 5479,
+  "nodes": 60,
+  "junctions": 40,
+  "dacs": 101,
+  "study": "goal3",
+  "circuit": "color5",
+  "design": "sandwich20_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr7x7",
+    "T_round_ms": 72.975,
+    "ler_per_round": 0.00048046146466884654
+   },
+   "Cyclone": {
+    "point": "cyclone2_n15",
+    "T_round_ms": 30.456,
+    "ler_per_round": 0.0005430895722895457
+   },
+   "WISE": {
+    "point": "wise_h3_4x4",
+    "T_round_ms": 127.717,
+    "ler_per_round": 0.0006121776356430297
+   }
+  }
+ },
+ {
+  "code": "color7",
+  "release": "goal3_color7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich38_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 55,
+  "compile_s": 6.02,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 1107.11,
+  "rounds": 14,
+  "T_round_ms": 79.079,
+  "transport_cycles": 8468,
+  "rotate_cycles": 5976,
+  "cools": 1052,
+  "instructions": 16531,
+  "nodes": 118,
+  "junctions": 76,
+  "dacs": 42,
+  "study": "goal3",
+  "circuit": "color7",
+  "design": "sandwich38_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr9x9",
+    "T_round_ms": 165.128,
+    "ler_per_round": 0.00025137997245616717
+   },
+   "WISE": {
+    "point": "wise_h3_7x7",
+    "T_round_ms": 206.534,
+    "ler_per_round": 0.00029883920979223433
+   },
+   "Cyclone": {
+    "point": "cyclone6_n10",
+    "T_round_ms": 55.047,
+    "ler_per_round": 0.00022322635749250086
+   }
+  }
+ },
+ {
+  "code": "color7",
+  "release": "goal3_color7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich38_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 55,
+  "compile_s": 5.62,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 4263.11,
+  "rounds": 14,
+  "T_round_ms": 304.508,
+  "transport_cycles": 8468,
+  "rotate_cycles": 5976,
+  "cools": 1052,
+  "instructions": 16531,
+  "nodes": 118,
+  "junctions": 76,
+  "dacs": 42,
+  "study": "goal3",
+  "circuit": "color7",
+  "design": "sandwich38_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr9x9",
+    "T_round_ms": 165.128,
+    "ler_per_round": 0.00025137997245616717
+   },
+   "WISE": {
+    "point": "wise_h3_7x7",
+    "T_round_ms": 206.534,
+    "ler_per_round": 0.00029883920979223433
+   },
+   "Cyclone": {
+    "point": "cyclone6_n10",
+    "T_round_ms": 55.047,
+    "ler_per_round": 0.00022322635749250086
+   }
+  }
+ },
+ {
+  "code": "color7",
+  "release": "goal3_color7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich38_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 55,
+  "compile_s": 6.52,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 1120.76,
+  "rounds": 14,
+  "T_round_ms": 80.054,
+  "transport_cycles": 7240,
+  "rotate_cycles": 3076,
+  "cools": 1885,
+  "instructions": 20457,
+  "nodes": 114,
+  "junctions": 76,
+  "dacs": 74,
+  "study": "goal3",
+  "circuit": "color7",
+  "design": "sandwich38_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr9x9",
+    "T_round_ms": 165.128,
+    "ler_per_round": 0.00025137997245616717
+   },
+   "WISE": {
+    "point": "wise_h3_7x7",
+    "T_round_ms": 206.534,
+    "ler_per_round": 0.00029883920979223433
+   },
+   "Cyclone": {
+    "point": "cyclone6_n10",
+    "T_round_ms": 55.047,
+    "ler_per_round": 0.00022322635749250086
+   }
+  }
+ },
+ {
+  "code": "color7",
+  "release": "goal3_color7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich38_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 55,
+  "compile_s": 5.24,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 4307.015,
+  "rounds": 14,
+  "T_round_ms": 307.644,
+  "transport_cycles": 8429,
+  "rotate_cycles": 4231,
+  "cools": 1052,
+  "instructions": 16492,
+  "nodes": 114,
+  "junctions": 76,
+  "dacs": 74,
+  "study": "goal3",
+  "circuit": "color7",
+  "design": "sandwich38_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr9x9",
+    "T_round_ms": 165.128,
+    "ler_per_round": 0.00025137997245616717
+   },
+   "WISE": {
+    "point": "wise_h3_7x7",
+    "T_round_ms": 206.534,
+    "ler_per_round": 0.00029883920979223433
+   },
+   "Cyclone": {
+    "point": "cyclone6_n10",
+    "T_round_ms": 55.047,
+    "ler_per_round": 0.00022322635749250086
+   }
+  }
+ },
+ {
+  "code": "color7",
+  "release": "goal3_color7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich38_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 55,
+  "compile_s": 5.46,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 957.01,
+  "rounds": 14,
+  "T_round_ms": 68.358,
+  "transport_cycles": 5430,
+  "rotate_cycles": 1718,
+  "cools": 1885,
+  "instructions": 18647,
+  "nodes": 114,
+  "junctions": 76,
+  "dacs": 106,
+  "study": "goal3",
+  "circuit": "color7",
+  "design": "sandwich38_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr9x9",
+    "T_round_ms": 165.128,
+    "ler_per_round": 0.00025137997245616717
+   },
+   "WISE": {
+    "point": "wise_h3_7x7",
+    "T_round_ms": 206.534,
+    "ler_per_round": 0.00029883920979223433
+   },
+   "Cyclone": {
+    "point": "cyclone6_n10",
+    "T_round_ms": 55.047,
+    "ler_per_round": 0.00022322635749250086
+   }
+  }
+ },
+ {
+  "code": "color7",
+  "release": "goal3_color7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich38_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 55,
+  "compile_s": 5.32,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 4306.915,
+  "rounds": 14,
+  "T_round_ms": 307.637,
+  "transport_cycles": 8428,
+  "rotate_cycles": 4230,
+  "cools": 1052,
+  "instructions": 16491,
+  "nodes": 114,
+  "junctions": 76,
+  "dacs": 106,
+  "study": "goal3",
+  "circuit": "color7",
+  "design": "sandwich38_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr9x9",
+    "T_round_ms": 165.128,
+    "ler_per_round": 0.00025137997245616717
+   },
+   "WISE": {
+    "point": "wise_h3_7x7",
+    "T_round_ms": 206.534,
+    "ler_per_round": 0.00029883920979223433
+   },
+   "Cyclone": {
+    "point": "cyclone6_n10",
+    "T_round_ms": 55.047,
+    "ler_per_round": 0.00022322635749250086
+   }
+  }
+ },
+ {
+  "code": "hgp58",
+  "release": "goal3_hgp58_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich58_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 100,
+  "compile_s": 8.87,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 1029.11,
+  "rounds": 6,
+  "T_round_ms": 171.518,
+  "transport_cycles": 7988,
+  "rotate_cycles": 5998,
+  "cools": 1000,
+  "instructions": 17680,
+  "nodes": 178,
+  "junctions": 116,
+  "dacs": 46,
+  "study": "goal3",
+  "circuit": "hgp58",
+  "design": "sandwich58_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr13x12",
+    "T_round_ms": 250.363,
+    "ler_per_round": 0.04525001290730801
+   },
+   "WISE": {
+    "point": "wise_h3_7x6",
+    "T_round_ms": 375.277,
+    "ler_per_round": 0.05414548705032873
+   },
+   "Cyclone": {
+    "point": "cyclone12_n9",
+    "T_round_ms": 151.412,
+    "ler_per_round": 0.03436760111519277
+   }
+  }
+ },
+ {
+  "code": "hgp58",
+  "release": "goal3_hgp58_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich58_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 100,
+  "compile_s": 8.88,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 3825.505,
+  "rounds": 6,
+  "T_round_ms": 637.584,
+  "transport_cycles": 8355,
+  "rotate_cycles": 6501,
+  "cools": 925,
+  "instructions": 17220,
+  "nodes": 178,
+  "junctions": 116,
+  "dacs": 46,
+  "study": "goal3",
+  "circuit": "hgp58",
+  "design": "sandwich58_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr13x12",
+    "T_round_ms": 250.363,
+    "ler_per_round": 0.04525001290730801
+   },
+   "WISE": {
+    "point": "wise_h3_7x6",
+    "T_round_ms": 375.277,
+    "ler_per_round": 0.05414548705032873
+   },
+   "Cyclone": {
+    "point": "cyclone12_n9",
+    "T_round_ms": 151.412,
+    "ler_per_round": 0.03436760111519277
+   }
+  }
+ },
+ {
+  "code": "hgp58",
+  "release": "goal3_hgp58_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich58_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 100,
+  "compile_s": 7.89,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 800.525,
+  "rounds": 6,
+  "T_round_ms": 133.421,
+  "transport_cycles": 5868,
+  "rotate_cycles": 3798,
+  "cools": 1000,
+  "instructions": 15560,
+  "nodes": 174,
+  "junctions": 116,
+  "dacs": 78,
+  "study": "goal3",
+  "circuit": "hgp58",
+  "design": "sandwich58_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr13x12",
+    "T_round_ms": 250.363,
+    "ler_per_round": 0.04525001290730801
+   },
+   "WISE": {
+    "point": "wise_h3_7x6",
+    "T_round_ms": 375.277,
+    "ler_per_round": 0.05414548705032873
+   },
+   "Cyclone": {
+    "point": "cyclone12_n9",
+    "T_round_ms": 151.412,
+    "ler_per_round": 0.03436760111519277
+   }
+  }
+ },
+ {
+  "code": "hgp58",
+  "release": "goal3_hgp58_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich58_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 100,
+  "compile_s": 9.37,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 3723.115,
+  "rounds": 6,
+  "T_round_ms": 620.519,
+  "transport_cycles": 7440,
+  "rotate_cycles": 5298,
+  "cools": 925,
+  "instructions": 16305,
+  "nodes": 174,
+  "junctions": 116,
+  "dacs": 78,
+  "study": "goal3",
+  "circuit": "hgp58",
+  "design": "sandwich58_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr13x12",
+    "T_round_ms": 250.363,
+    "ler_per_round": 0.04525001290730801
+   },
+   "WISE": {
+    "point": "wise_h3_7x6",
+    "T_round_ms": 375.277,
+    "ler_per_round": 0.05414548705032873
+   },
+   "Cyclone": {
+    "point": "cyclone12_n9",
+    "T_round_ms": 151.412,
+    "ler_per_round": 0.03436760111519277
+   }
+  }
+ },
+ {
+  "code": "hgp58",
+  "release": "goal3_hgp58_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich58_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 100,
+  "compile_s": 8.2,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": 0.0,
+  "T_ms": 724.99,
+  "rounds": 6,
+  "T_round_ms": 120.832,
+  "transport_cycles": 5058,
+  "rotate_cycles": 3129,
+  "cools": 1000,
+  "instructions": 14750,
+  "nodes": 174,
+  "junctions": 116,
+  "dacs": 110,
+  "study": "goal3",
+  "circuit": "hgp58",
+  "design": "sandwich58_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr13x12",
+    "T_round_ms": 250.363,
+    "ler_per_round": 0.04525001290730801
+   },
+   "WISE": {
+    "point": "wise_h3_7x6",
+    "T_round_ms": 375.277,
+    "ler_per_round": 0.05414548705032873
+   },
+   "Cyclone": {
+    "point": "cyclone12_n9",
+    "T_round_ms": 151.412,
+    "ler_per_round": 0.03436760111519277
+   }
+  }
+ },
+ {
+  "code": "hgp58",
+  "release": "goal3_hgp58_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich58_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": false,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 100,
+  "compile_s": 9.4,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "index",
+  "wait_steps": null,
+  "T_ms": 3716.235,
+  "rounds": 6,
+  "T_round_ms": 619.373,
+  "transport_cycles": 7381,
+  "rotate_cycles": 5275,
+  "cools": 925,
+  "instructions": 16246,
+  "nodes": 174,
+  "junctions": 116,
+  "dacs": 110,
+  "study": "goal3",
+  "circuit": "hgp58",
+  "design": "sandwich58_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr13x12",
+    "T_round_ms": 250.363,
+    "ler_per_round": 0.04525001290730801
+   },
+   "WISE": {
+    "point": "wise_h3_7x6",
+    "T_round_ms": 375.277,
+    "ler_per_round": 0.05414548705032873
+   },
+   "Cyclone": {
+    "point": "cyclone12_n9",
+    "T_round_ms": 151.412,
+    "ler_per_round": 0.03436760111519277
+   }
+  }
+ },
+ {
+  "code": "surface3",
+  "release": "goal3_surface3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich12_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 17,
+  "compile_s": 0.23,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 35.11,
+  "rounds": 6,
+  "T_round_ms": 5.852,
+  "transport_cycles": 246,
+  "rotate_cycles": 150,
+  "cools": 24,
+  "instructions": 499,
+  "nodes": 40,
+  "junctions": 24,
+  "dacs": 35,
+  "study": "goal3",
+  "circuit": "surface3",
+  "design": "sandwich12_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr5x4",
+    "T_round_ms": 18.154,
+    "ler_per_round": 0.0002931414790855458
+   },
+   "Cyclone": {
+    "point": "cyclone2_n9",
+    "T_round_ms": 9.205,
+    "ler_per_round": 0.00031221868248176854
+   },
+   "WISE": {
+    "point": "wise_h3_3x3",
+    "T_round_ms": 35.635,
+    "ler_per_round": 0.0003334445062139757
+   }
+  }
+ },
+ {
+  "code": "surface3",
+  "release": "goal3_surface3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich12_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 17,
+  "compile_s": 0.21,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 107.11,
+  "rounds": 6,
+  "T_round_ms": 17.852,
+  "transport_cycles": 246,
+  "rotate_cycles": 150,
+  "cools": 24,
+  "instructions": 499,
+  "nodes": 40,
+  "junctions": 24,
+  "dacs": 35,
+  "study": "goal3",
+  "circuit": "surface3",
+  "design": "sandwich12_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr5x4",
+    "T_round_ms": 18.154,
+    "ler_per_round": 0.0002931414790855458
+   },
+   "Cyclone": {
+    "point": "cyclone2_n9",
+    "T_round_ms": 9.205,
+    "ler_per_round": 0.00031221868248176854
+   },
+   "WISE": {
+    "point": "wise_h3_3x3",
+    "T_round_ms": 35.635,
+    "ler_per_round": 0.0003334445062139757
+   }
+  }
+ },
+ {
+  "code": "surface3",
+  "release": "goal3_surface3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich12_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 17,
+  "compile_s": 0.21,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": 0.0,
+  "T_ms": 37.455,
+  "rounds": 6,
+  "T_round_ms": 6.242,
+  "transport_cycles": 216,
+  "rotate_cycles": 72,
+  "cools": 55,
+  "instructions": 687,
+  "nodes": 36,
+  "junctions": 24,
+  "dacs": 67,
+  "study": "goal3",
+  "circuit": "surface3",
+  "design": "sandwich12_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr5x4",
+    "T_round_ms": 18.154,
+    "ler_per_round": 0.0002931414790855458
+   },
+   "Cyclone": {
+    "point": "cyclone2_n9",
+    "T_round_ms": 9.205,
+    "ler_per_round": 0.00031221868248176854
+   },
+   "WISE": {
+    "point": "wise_h3_3x3",
+    "T_round_ms": 35.635,
+    "ler_per_round": 0.0003334445062139757
+   }
+  }
+ },
+ {
+  "code": "surface3",
+  "release": "goal3_surface3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich12_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 17,
+  "compile_s": 0.2,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 107.3,
+  "rounds": 6,
+  "T_round_ms": 17.883,
+  "transport_cycles": 237,
+  "rotate_cycles": 93,
+  "cools": 24,
+  "instructions": 490,
+  "nodes": 36,
+  "junctions": 24,
+  "dacs": 67,
+  "study": "goal3",
+  "circuit": "surface3",
+  "design": "sandwich12_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr5x4",
+    "T_round_ms": 18.154,
+    "ler_per_round": 0.0002931414790855458
+   },
+   "Cyclone": {
+    "point": "cyclone2_n9",
+    "T_round_ms": 9.205,
+    "ler_per_round": 0.00031221868248176854
+   },
+   "WISE": {
+    "point": "wise_h3_3x3",
+    "T_round_ms": 35.635,
+    "ler_per_round": 0.0003334445062139757
+   }
+  }
+ },
+ {
+  "code": "surface3",
+  "release": "goal3_surface3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich12_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 17,
+  "compile_s": 0.2,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": 0.0,
+  "T_ms": 29.785,
+  "rounds": 6,
+  "T_round_ms": 4.964,
+  "transport_cycles": 145,
+  "rotate_cycles": 45,
+  "cools": 55,
+  "instructions": 616,
+  "nodes": 36,
+  "junctions": 24,
+  "dacs": 99,
+  "study": "goal3",
+  "circuit": "surface3",
+  "design": "sandwich12_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr5x4",
+    "T_round_ms": 18.154,
+    "ler_per_round": 0.0002931414790855458
+   },
+   "Cyclone": {
+    "point": "cyclone2_n9",
+    "T_round_ms": 9.205,
+    "ler_per_round": 0.00031221868248176854
+   },
+   "WISE": {
+    "point": "wise_h3_3x3",
+    "T_round_ms": 35.635,
+    "ler_per_round": 0.0003334445062139757
+   }
+  }
+ },
+ {
+  "code": "surface3",
+  "release": "goal3_surface3_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich12_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 17,
+  "compile_s": 0.24,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 100.94,
+  "rounds": 6,
+  "T_round_ms": 16.823,
+  "transport_cycles": 189,
+  "rotate_cycles": 93,
+  "cools": 24,
+  "instructions": 442,
+  "nodes": 36,
+  "junctions": 24,
+  "dacs": 99,
+  "ler_check": true,
+  "ler_per_round": 0.00030767040894819075,
+  "ler": {
+   "ler": 0.0009227272727272728,
+   "lo": 0.0008042696848349162,
+   "hi": 0.0010586135089451633,
+   "shots": 220000,
+   "errors": 203,
+   "per_round": 0.00030767040894819075,
+   "per_round_lo": 0.00026816179926769657,
+   "per_round_hi": 0.0003529957609939016,
+   "rounds": 3,
+   "decoder": "pymatching",
+   "seconds": 0.506,
+   "seed": 20261029,
+   "stim_version": "1.15.0",
+   "stopped": "max_errors"
+  },
+  "study": "goal3",
+  "circuit": "surface3",
+  "design": "sandwich12_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr5x4",
+    "T_round_ms": 18.154,
+    "ler_per_round": 0.0002931414790855458
+   },
+   "Cyclone": {
+    "point": "cyclone2_n9",
+    "T_round_ms": 9.205,
+    "ler_per_round": 0.00031221868248176854
+   },
+   "WISE": {
+    "point": "wise_h3_3x3",
+    "T_round_ms": 35.635,
+    "ler_per_round": 0.0003334445062139757
+   }
+  }
+ },
+ {
+  "code": "surface5",
+  "release": "goal3_surface5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich30_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 49,
+  "compile_s": 0.86,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 70.93,
+  "rounds": 10,
+  "T_round_ms": 7.093,
+  "transport_cycles": 530,
+  "rotate_cycles": 370,
+  "cools": 40,
+  "instructions": 943,
+  "nodes": 94,
+  "junctions": 60,
+  "dacs": 40,
+  "study": "goal3",
+  "circuit": "surface5",
+  "design": "sandwich30_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr8x8",
+    "T_round_ms": 53.658,
+    "ler_per_round": 7.661551255899735e-05
+   },
+   "Cyclone": {
+    "point": "cyclone4_n13",
+    "T_round_ms": 31.323,
+    "ler_per_round": 9.536702521362184e-05
+   },
+   "WISE": {
+    "point": "wise_h3_6x6",
+    "T_round_ms": 71.931,
+    "ler_per_round": 7.215326857989979e-05
+   }
+  }
+ },
+ {
+  "code": "surface5",
+  "release": "goal3_surface5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich30_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 49,
+  "compile_s": 0.8,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 190.93,
+  "rounds": 10,
+  "T_round_ms": 19.093,
+  "transport_cycles": 530,
+  "rotate_cycles": 370,
+  "cools": 40,
+  "instructions": 943,
+  "nodes": 94,
+  "junctions": 60,
+  "dacs": 40,
+  "study": "goal3",
+  "circuit": "surface5",
+  "design": "sandwich30_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr8x8",
+    "T_round_ms": 53.658,
+    "ler_per_round": 7.661551255899735e-05
+   },
+   "Cyclone": {
+    "point": "cyclone4_n13",
+    "T_round_ms": 31.323,
+    "ler_per_round": 9.536702521362184e-05
+   },
+   "WISE": {
+    "point": "wise_h3_6x6",
+    "T_round_ms": 71.931,
+    "ler_per_round": 7.215326857989979e-05
+   }
+  }
+ },
+ {
+  "code": "surface5",
+  "release": "goal3_surface5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich30_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 49,
+  "compile_s": 0.79,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 66.46,
+  "rounds": 10,
+  "T_round_ms": 6.646,
+  "transport_cycles": 475,
+  "rotate_cycles": 235,
+  "cools": 40,
+  "instructions": 888,
+  "nodes": 90,
+  "junctions": 60,
+  "dacs": 72,
+  "study": "goal3",
+  "circuit": "surface5",
+  "design": "sandwich30_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr8x8",
+    "T_round_ms": 53.658,
+    "ler_per_round": 7.661551255899735e-05
+   },
+   "Cyclone": {
+    "point": "cyclone4_n13",
+    "T_round_ms": 31.323,
+    "ler_per_round": 9.536702521362184e-05
+   },
+   "WISE": {
+    "point": "wise_h3_6x6",
+    "T_round_ms": 71.931,
+    "ler_per_round": 7.215326857989979e-05
+   }
+  }
+ },
+ {
+  "code": "surface5",
+  "release": "goal3_surface5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich30_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 49,
+  "compile_s": 0.77,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 186.46,
+  "rounds": 10,
+  "T_round_ms": 18.646,
+  "transport_cycles": 475,
+  "rotate_cycles": 235,
+  "cools": 40,
+  "instructions": 888,
+  "nodes": 90,
+  "junctions": 60,
+  "dacs": 72,
+  "study": "goal3",
+  "circuit": "surface5",
+  "design": "sandwich30_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr8x8",
+    "T_round_ms": 53.658,
+    "ler_per_round": 7.661551255899735e-05
+   },
+   "Cyclone": {
+    "point": "cyclone4_n13",
+    "T_round_ms": 31.323,
+    "ler_per_round": 9.536702521362184e-05
+   },
+   "WISE": {
+    "point": "wise_h3_6x6",
+    "T_round_ms": 71.931,
+    "ler_per_round": 7.215326857989979e-05
+   }
+  }
+ },
+ {
+  "code": "surface5",
+  "release": "goal3_surface5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich30_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 49,
+  "compile_s": 0.75,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": 0.0,
+  "T_ms": 58.245,
+  "rounds": 10,
+  "T_round_ms": 5.824,
+  "transport_cycles": 325,
+  "rotate_cycles": 139,
+  "cools": 93,
+  "instructions": 1123,
+  "nodes": 90,
+  "junctions": 60,
+  "dacs": 104,
+  "study": "goal3",
+  "circuit": "surface5",
+  "design": "sandwich30_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr8x8",
+    "T_round_ms": 53.658,
+    "ler_per_round": 7.661551255899735e-05
+   },
+   "Cyclone": {
+    "point": "cyclone4_n13",
+    "T_round_ms": 31.323,
+    "ler_per_round": 9.536702521362184e-05
+   },
+   "WISE": {
+    "point": "wise_h3_6x6",
+    "T_round_ms": 71.931,
+    "ler_per_round": 7.215326857989979e-05
+   }
+  }
+ },
+ {
+  "code": "surface5",
+  "release": "goal3_surface5_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich30_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 49,
+  "compile_s": 0.72,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 175.86,
+  "rounds": 10,
+  "T_round_ms": 17.586,
+  "transport_cycles": 395,
+  "rotate_cycles": 235,
+  "cools": 40,
+  "instructions": 808,
+  "nodes": 90,
+  "junctions": 60,
+  "dacs": 104,
+  "ler_check": true,
+  "ler_per_round": 6.966487812809508e-05,
+  "ler": {
+   "ler": 0.0003482758620689655,
+   "lo": 0.0003034516232775659,
+   "hi": 0.0003997186484828673,
+   "shots": 580000,
+   "errors": 202,
+   "per_round": 6.966487812809508e-05,
+   "per_round_lo": 6.069769262806446e-05,
+   "per_round_hi": 7.99565147627801e-05,
+   "rounds": 5,
+   "decoder": "pymatching",
+   "seconds": 0.428,
+   "seed": 20261029,
+   "stim_version": "1.15.0",
+   "stopped": "max_errors"
+  },
+  "study": "goal3",
+  "circuit": "surface5",
+  "design": "sandwich30_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr8x8",
+    "T_round_ms": 53.658,
+    "ler_per_round": 7.661551255899735e-05
+   },
+   "Cyclone": {
+    "point": "cyclone4_n13",
+    "T_round_ms": 31.323,
+    "ler_per_round": 9.536702521362184e-05
+   },
+   "WISE": {
+    "point": "wise_h3_6x6",
+    "T_round_ms": 71.931,
+    "ler_per_round": 7.215326857989979e-05
+   }
+  }
+ },
+ {
+  "code": "surface7",
+  "release": "goal3_surface7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich56_L1_p1_free",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 97,
+  "compile_s": 3.82,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 115.89,
+  "rounds": 14,
+  "T_round_ms": 8.278,
+  "transport_cycles": 910,
+  "rotate_cycles": 686,
+  "cools": 56,
+  "instructions": 1483,
+  "nodes": 172,
+  "junctions": 112,
+  "dacs": 46,
+  "study": "goal3",
+  "circuit": "surface7",
+  "design": "sandwich56_L1_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr12x12",
+    "T_round_ms": 78.473,
+    "ler_per_round": 3.1400132004422154e-05
+   },
+   "Cyclone": {
+    "point": "cyclone10_n10",
+    "T_round_ms": 73.156,
+    "ler_per_round": 5.743846801398167e-05
+   },
+   "WISE": {
+    "point": "wise_h3_10x9",
+    "T_round_ms": 140.233,
+    "ler_per_round": 3.6817253094012514e-05
+   }
+  }
+ },
+ {
+  "code": "surface7",
+  "release": "goal3_surface7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich56_L1_p1_helios",
+  "layers": 1,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 97,
+  "compile_s": 3.17,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 283.89,
+  "rounds": 14,
+  "T_round_ms": 20.278,
+  "transport_cycles": 910,
+  "rotate_cycles": 686,
+  "cools": 56,
+  "instructions": 1483,
+  "nodes": 172,
+  "junctions": 112,
+  "dacs": 46,
+  "study": "goal3",
+  "circuit": "surface7",
+  "design": "sandwich56_L1_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr12x12",
+    "T_round_ms": 78.473,
+    "ler_per_round": 3.1400132004422154e-05
+   },
+   "Cyclone": {
+    "point": "cyclone10_n10",
+    "T_round_ms": 73.156,
+    "ler_per_round": 5.743846801398167e-05
+   },
+   "WISE": {
+    "point": "wise_h3_10x9",
+    "T_round_ms": 140.233,
+    "ler_per_round": 3.6817253094012514e-05
+   }
+  }
+ },
+ {
+  "code": "surface7",
+  "release": "goal3_surface7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich56_L2_p1_free",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 97,
+  "compile_s": 3.37,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 104.02,
+  "rounds": 14,
+  "T_round_ms": 7.43,
+  "transport_cycles": 777,
+  "rotate_cycles": 441,
+  "cools": 56,
+  "instructions": 1350,
+  "nodes": 168,
+  "junctions": 112,
+  "dacs": 78,
+  "study": "goal3",
+  "circuit": "surface7",
+  "design": "sandwich56_L2_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr12x12",
+    "T_round_ms": 78.473,
+    "ler_per_round": 3.1400132004422154e-05
+   },
+   "Cyclone": {
+    "point": "cyclone10_n10",
+    "T_round_ms": 73.156,
+    "ler_per_round": 5.743846801398167e-05
+   },
+   "WISE": {
+    "point": "wise_h3_10x9",
+    "T_round_ms": 140.233,
+    "ler_per_round": 3.6817253094012514e-05
+   }
+  }
+ },
+ {
+  "code": "surface7",
+  "release": "goal3_surface7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich56_L2_p1_helios",
+  "layers": 2,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 97,
+  "compile_s": 2.93,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 272.02,
+  "rounds": 14,
+  "T_round_ms": 19.43,
+  "transport_cycles": 777,
+  "rotate_cycles": 441,
+  "cools": 56,
+  "instructions": 1350,
+  "nodes": 168,
+  "junctions": 112,
+  "dacs": 78,
+  "study": "goal3",
+  "circuit": "surface7",
+  "design": "sandwich56_L2_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr12x12",
+    "T_round_ms": 78.473,
+    "ler_per_round": 3.1400132004422154e-05
+   },
+   "Cyclone": {
+    "point": "cyclone10_n10",
+    "T_round_ms": 73.156,
+    "ler_per_round": 5.743846801398167e-05
+   },
+   "WISE": {
+    "point": "wise_h3_10x9",
+    "T_round_ms": 140.233,
+    "ler_per_round": 3.6817253094012514e-05
+   }
+  }
+ },
+ {
+  "code": "surface7",
+  "release": "goal3_surface7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich56_L3_p1_free",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "free",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 97,
+  "compile_s": 3.28,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": 0.0,
+  "T_ms": 91.08,
+  "rounds": 14,
+  "T_round_ms": 6.506,
+  "transport_cycles": 557,
+  "rotate_cycles": 303,
+  "cools": 133,
+  "instructions": 1667,
+  "nodes": 168,
+  "junctions": 112,
+  "dacs": 110,
+  "study": "goal3",
+  "circuit": "surface7",
+  "design": "sandwich56_L3_p1_free",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr12x12",
+    "T_round_ms": 78.473,
+    "ler_per_round": 3.1400132004422154e-05
+   },
+   "Cyclone": {
+    "point": "cyclone10_n10",
+    "T_round_ms": 73.156,
+    "ler_per_round": 5.743846801398167e-05
+   },
+   "WISE": {
+    "point": "wise_h3_10x9",
+    "T_round_ms": 140.233,
+    "ler_per_round": 3.6817253094012514e-05
+   }
+  }
+ },
+ {
+  "code": "surface7",
+  "release": "goal3_surface7_mem@1",
+  "physics": "qccd-physics@3",
+  "family": "Sandwich",
+  "point": "sandwich56_L3_p1_helios",
+  "layers": 3,
+  "per_trap": 1,
+  "visitors": 1,
+  "cooling": "helios",
+  "lattice": true,
+  "compiler": "conveyor-router",
+  "rule_set": "standard",
+  "ions": 97,
+  "compile_s": 3.16,
+  "status": "ok",
+  "rules_skipped": [
+   "R10",
+   "R7b",
+   "R9"
+  ],
+  "placement": "vote",
+  "wait_steps": null,
+  "T_ms": 257.18,
+  "rounds": 14,
+  "T_round_ms": 18.37,
+  "transport_cycles": 665,
+  "rotate_cycles": 441,
+  "cools": 56,
+  "instructions": 1238,
+  "nodes": 168,
+  "junctions": 112,
+  "dacs": 110,
+  "study": "goal3",
+  "circuit": "surface7",
+  "design": "sandwich56_L3_p1_helios",
+  "goal3_best": {
+   "C2LR": {
+    "point": "c2lr12x12",
+    "T_round_ms": 78.473,
+    "ler_per_round": 3.1400132004422154e-05
+   },
+   "Cyclone": {
+    "point": "cyclone10_n10",
+    "T_round_ms": 73.156,
+    "ler_per_round": 5.743846801398167e-05
+   },
+   "WISE": {
+    "point": "wise_h3_10x9",
+    "T_round_ms": 140.233,
+    "ler_per_round": 3.6817253094012514e-05
+   }
+  }
+ },
+ {
+  "study": "qccdc",
+  "circuit": "steane",
+  "design": "grid2x2x4",
+  "layers": 4,
+  "risers": 12,
+  "nodes": 32,
+  "traps": 16,
+  "capacity": 32,
+  "junctions": 16,
+  "dacs": 640,
+  "geometry": [],
+  "compile_s": 0.2,
+  "status": "ok",
+  "T_jones": 17.035,
+  "T_transport": 14.722,
+  "transport_cycles": 41,
+  "transport_ms": 12.965,
+  "cools": 10,
+  "instructions": 107,
+  "ions_per_cycle": 1.02,
+  "layers_used": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "riser_hops": 36,
+  "peak_quanta": 42.87
+ },
+ {
+  "study": "qccdc",
+  "circuit": "steane",
+  "design": "grid3x2x2",
+  "layers": 2,
+  "risers": 6,
+  "nodes": 26,
+  "traps": 14,
+  "capacity": 28,
+  "junctions": 12,
+  "dacs": 560,
+  "geometry": [],
+  "compile_s": 0.2,
+  "status": "ok",
+  "T_jones": 17.145,
+  "T_transport": 14.596,
+  "transport_cycles": 43,
+  "transport_ms": 13.075,
+  "cools": 10,
+  "instructions": 109,
+  "ions_per_cycle": 1.12,
+  "layers_used": [
+   0,
+   1
+  ],
+  "riser_hops": 31,
+  "peak_quanta": 36.66
+ },
+ {
+  "study": "qccdc",
+  "circuit": "steane",
+  "design": "grid3x3",
+  "layers": 1,
+  "risers": 0,
+  "nodes": 21,
+  "traps": 12,
+  "capacity": 24,
+  "junctions": 5,
+  "dacs": 480,
+  "geometry": [],
+  "compile_s": 0.2,
+  "status": "ok",
+  "T_jones": 16.93,
+  "T_transport": 12.74,
+  "transport_cycles": 63,
+  "transport_ms": 12.86,
+  "cools": 10,
+  "instructions": 129,
+  "ions_per_cycle": 1.11,
+  "layers_used": [
+   0
+  ],
+  "riser_hops": 0,
+  "peak_quanta": 45.71
+ },
+ {
+  "study": "qccdc",
+  "circuit": "steane",
+  "design": "grid3x3x2",
+  "layers": 2,
+  "risers": 9,
+  "nodes": 42,
+  "traps": 24,
+  "capacity": 48,
+  "junctions": 18,
+  "dacs": 960,
+  "geometry": [],
+  "compile_s": 0.2,
+  "status": "ok",
+  "T_jones": 17.595,
+  "T_transport": 14.82,
+  "transport_cycles": 45,
+  "transport_ms": 13.525,
+  "cools": 10,
+  "instructions": 111,
+  "ions_per_cycle": 1.07,
+  "layers_used": [
+   0,
+   1
+  ],
+  "riser_hops": 29,
+  "peak_quanta": 36.72
+ },
+ {
+  "study": "qccdc",
+  "circuit": "steane",
+  "design": "grid4x3",
+  "layers": 1,
+  "risers": 0,
+  "nodes": 29,
+  "traps": 17,
+  "capacity": 34,
+  "junctions": 8,
+  "dacs": 680,
+  "geometry": [],
+  "compile_s": 0.2,
+  "status": "ok",
+  "T_jones": 15.715,
+  "T_transport": 12.714,
+  "transport_cycles": 56,
+  "transport_ms": 11.645,
+  "cools": 10,
+  "instructions": 122,
+  "ions_per_cycle": 1.12,
+  "layers_used": [
+   0
+  ],
+  "riser_hops": 0,
+  "peak_quanta": 61.34
+ },
+ {
+  "study": "qccdc",
+  "circuit": "steane",
+  "design": "grid5x5",
+  "layers": 1,
+  "risers": 0,
+  "nodes": 65,
+  "traps": 40,
+  "capacity": 80,
+  "junctions": 21,
+  "dacs": 1600,
+  "geometry": [],
+  "compile_s": 0.2,
+  "status": "ok",
+  "T_jones": 15.29,
+  "T_transport": 12.654,
+  "transport_cycles": 52,
+  "transport_ms": 11.22,
+  "cools": 10,
+  "instructions": 118,
+  "ions_per_cycle": 1.25,
+  "layers_used": [
+   0
+  ],
+  "riser_hops": 0,
+  "peak_quanta": 52.11
+ }
+]

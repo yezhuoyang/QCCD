@@ -276,6 +276,35 @@ function checkStructure(dev) {
     if (n.kind === 'site' && n.cap < 1) errors.push(`node '${nid}': a site needs capacity >= 1`);
     if (n.kind === 'junction' && n.cap !== 0) errors.push(`node '${nid}': a bare junction holds no ions, so capacity must be 0`);
   }
+  // A machine is planar or built in layers, never both; and on one built in layers a loop
+  // stays in one layer, because a loop is one conveyor on one layer's broadcast.  Mirror of
+  // the last block of `Device.check_structure`, in its words.
+  let flat = null, deep = false;
+  const lens = new Set();
+  for (const nid of nodeIds(dev)) {
+    const len = dev.nodes[nid].pos.length;
+    lens.add(len);
+    if (len > 2) deep = true;
+    else if (flat === null) flat = nid;
+  }
+  if (deep && lens.size > 1) {
+    errors.push(`node '${flat}' has ${dev.nodes[flat].pos.length} coordinate(s) and others ` +
+                `have 3; a machine is drawn in a plane (x, y) or built in layers ` +
+                `(x, y, z), not both`);
+  } else if (deep) {
+    const zs = Array.from(new Set(nodeIds(dev).map((n) => Number(dev.nodes[n].pos[2]) + 0)))
+      .sort((a, b) => a - b);
+    const rank = new Map(zs.map((z, i) => [z, i]));
+    for (const lid in dev.loops) {
+      const seen = Array.from(new Set(dev.loops[lid].nodes
+        .filter((n) => n in dev.nodes)
+        .map((n) => rank.get(Number(dev.nodes[n].pos[2]) + 0)))).sort((a, b) => a - b);
+      if (seen.length > 1) {
+        errors.push(`loop '${lid}' runs through layers [${seen.join(', ')}]; a loop is one ` +
+                    `conveyor on one layer's broadcast, so it stays in one layer`);
+      }
+    }
+  }
   return errors;
 }
 

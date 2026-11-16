@@ -636,6 +636,91 @@ class Machine:
             "geometry": _geometry_of(device, name)}))
 
     @classmethod
+    def layered(cls, layers: "Sequence[Machine | Device]",
+                risers: Sequence[Sequence[str]] = (), *, name: str = "layered",
+                names: Sequence[str] | None = None,
+                offsets: Sequence[Sequence[float]] | None = None,
+                spacing: float = 1.0, strict: bool = True) -> "Machine":
+        """A machine built in layers: planar machines one above another, joined by risers.
+
+            a = Machine.grid(3, 3)
+            b = Machine.ring(8, 2, site_zone="trap")
+            m = Machine.layered([a, b], risers=[("A.J1_1", "B.S3")])
+
+        Layer A is the lowest.  Every id of a layer is prefixed with its name (`A.J1_1`,
+        `B.L0`), so the layers may be different machines with the same ids.  A riser is an
+        ordinary rail between a node and the node directly above it: it is priced, drawn
+        and driven like any shuttling segment.  Each layer has a broadcast of its own
+        (R22, R4d).  See `qccd.arch.layers.stack` for `offsets`, `spacing` and `strict`.
+
+        Zone types, primitive curves, wiring and budget are the FIRST machine's.  A zone a
+        later layer defines differently is kept as `<layer>.<zone>`; a movement class a
+        later layer defines is added, renamed `<layer>.<class>` only when its id is taken.
+        The control declaration is one text, instantiated once a layer.
+        """
+        from .arch.layers import layer_names, merge_zone_types, stack
+        from .arch.listing import class_participants
+
+        layers = list(layers)
+        names = list(names) if names is not None else list(layer_names(len(layers)))
+        machines = [m if isinstance(m, Machine) else None for m in layers]
+        devices = [m.arch.device if isinstance(m, Machine) else m for m in layers]
+        base = next((m for m in machines if m is not None), None)
+        doc = dict(base.arch.to_json(expanded=True)) if base is not None \
+            else dict(_template_doc(None))
+        for drop in ("geometry", "description", "provenance"):
+            doc.pop(drop, None)
+        doc["name"] = name
+
+        # zones: one table, a layer's own definition kept where it differs
+        blocks = [dict(m.arch.zone_types) if m is not None else {} for m in machines]
+        zones, renames = merge_zone_types(blocks, names)
+        doc["zone_types"] = {**doc.get("zone_types", {}), **zones}
+        devices = [
+            dev if not ren else Device(
+                nodes={nid: (replace(n, zone_type=ren[n.zone_type])
+                             if n.zone_type in ren else n) for nid, n in dev.nodes.items()},
+                segments=dev.segments, loops=dev.loops, generator=dev.generator,
+                params=dev.params)
+            for dev, ren in zip(devices, renames)]
+
+        # movement classes: every layer's, with the loop a class runs on renamed to the
+        # stacked loop's id
+        control = dict(doc.get("control", {}) or {})
+        classes = dict(control.get("classes", {}) or {})
+        extra: list[dict] = []
+        taken: dict[str, dict] = {}
+        for k, m in enumerate(machines):
+            if m is None:
+                continue
+            loops = set(m.arch.device.loops)
+            for cid, spec in m.arch.simd_classes.items():
+                # a class no site of its own layer can take part in (a template's
+                # `rotate_cw` on a lattice with no loop) is not carried into the stack,
+                # where it would take the id a layer that CAN rotate needs
+                if not class_participants(m.arch, cid):
+                    continue
+                spec = dict(spec)
+                if spec.get("orbit") in loops:
+                    spec["orbit"] = f"{names[k]}.{spec['orbit']}"
+                want = {kk: v for kk, v in spec.items() if kk != "id"}
+                if cid in taken and taken[cid] != want:
+                    cid = f"{names[k]}.{cid}"
+                if cid in taken:
+                    continue
+                taken[cid] = want
+                extra.append({"id": cid, **want})
+        if extra or "extra" in classes:
+            classes["extra"] = extra
+            control["classes"] = classes
+            doc["control"] = control
+
+        doc["geometry"] = _geometry_of(
+            stack(devices, risers, names=names, offsets=offsets, spacing=spacing,
+                  strict=strict), name)
+        return cls(Architecture.from_json(doc))
+
+    @classmethod
     def ring(cls, width, height=2, verticals=0, *, name="ring",
              template=None, **kw) -> "Machine":
         return cls._gen("ring", name, template,
@@ -907,7 +992,12 @@ class Machine:
         if site not in self.arch.device.nodes:
             raise ValueError(f"no such node {site!r} on {self.name}")
         nodes = dict(self.arch.device.nodes)
-        nodes[site] = replace(nodes[site], pos=tuple(float(c) for c in pos))
+        new = tuple(float(c) for c in pos)
+        # a drag moves a node INSIDE its layer: (x, y) given to a node of a machine built
+        # in layers keeps the node's z
+        if len(new) == 2 and len(nodes[site].pos) == 3:
+            new = new + (nodes[site].pos[2],)
+        nodes[site] = replace(nodes[site], pos=new)
         d = self.arch.device
         self._rebuild(device=Device(nodes=nodes, segments=d.segments, loops=d.loops,
                                     generator=d.generator, params=d.params))

@@ -429,6 +429,25 @@ def build_control_plane(device, control: Mapping) -> ControlPlane:
         raise ValueError(
             f"unknown channel grouping {plane.grouping!r}; have: {', '.join(GROUPINGS)}")
 
+    # EACH LAYER HAS A BROADCAST OF ITS OWN.  A machine built in layers is several planar
+    # traps, each with its own electrodes on its own DACs, so no channel drives sites of
+    # two layers: the declaration above is instantiated once a layer.  The channel count is
+    # therefore the declared count times the layers, and what one layer's sites are asked
+    # to do never constrains another's (R4d reads these groups; R22 groups the same way).
+    if getattr(device, "dim", 2) == 3 and len(device.layers) > 1:
+        split: list[ChannelGroup] = []
+        for g in groups:
+            by_layer: dict[int, set[str]] = {}
+            for s in g.sites:
+                by_layer.setdefault(device.layer_of(s), set()).add(s)
+            for k in sorted(by_layer):
+                split.append(ChannelGroup(
+                    f"{device.layer_name(k)}.{g.id}", g.role, frozenset(by_layer[k])))
+        groups = split
+        plane.notes.append(
+            f"{len(device.layers)} layers, each with a broadcast of its own: no channel "
+            f"drives sites of two layers")
+
     plane.groups = tuple(groups)
     if plane.switch_per_site:
         plane.notes.append(

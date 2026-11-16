@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="qccd-page" content="5d0d2457e2ac0e05">
+<meta name="qccd-page" content="f65fc153934e7d9e">
 <title>stationary_chain - five_qubit_esm+cooling</title>
 <style>
 :root{
@@ -754,6 +754,29 @@ body:not([data-noprog="1"]) .lede{display:none}
 .hud.warn{background:var(--warn_ink)}
 .hud.bad{background:var(--z)}
 .canvas{position:relative;flex:1 1 auto;min-height:0;display:flex}
+/* THE 3-D STAGE (js/stage3d.js) lies over the SVG in the same box.  The SVG keeps being
+   drawn underneath it -- the labels and the harnesses read ion positions off its marks --
+   and is only made invisible, so it takes no pointer either. */
+#stage3d{position:absolute;inset:0;display:none;overflow:hidden}
+#stage3d[data-on="1"]{display:block}
+.canvas[data-3d="1"] #svg{visibility:hidden}
+#stage3d .s3canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#stage3d .s3canvas:active{cursor:grabbing}
+#stage3d .s3bar{position:absolute;right:10px;bottom:32px;display:flex;gap:6px;align-items:center;
+ flex-wrap:wrap;justify-content:flex-end;padding:6px 8px;border:1px solid var(--line);
+ border-radius:8px;background:rgba(255,255,255,.92);font-size:12px;color:var(--muted)}
+#stage3d .s3bar button,#stage3d .s3bar select{font:inherit;padding:3px 8px;border:1px solid var(--line);
+ border-radius:6px;background:var(--panel);color:var(--ink);cursor:pointer}
+#stage3d .s3bar label{display:flex;gap:5px;align-items:center}
+#stage3d .s3bar input[type=range]{width:86px}
+#stage3d .s3note{position:absolute;left:10px;bottom:8px;font-size:11px;color:var(--muted);
+ background:rgba(255,255,255,.85);padding:2px 6px;border-radius:5px;pointer-events:none}
+#stage3d .s3label{position:absolute;transform:translate(-100%,-50%);font-size:12px;font-weight:700;
+ color:var(--navy);white-space:nowrap;pointer-events:none;padding-right:6px}
+#s3tip{position:absolute;display:none;pointer-events:none;z-index:3;font-size:12px;padding:3px 7px;
+ border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);white-space:nowrap}
+#t3d{display:none}
+body[data-3d-ready="1"] #t3d{display:inline-block}
 .toasts{position:absolute;left:12px;bottom:12px;z-index:4;display:flex;
  flex-direction:column;gap:6px;max-width:min(560px,86%);pointer-events:none}
 .toast{background:var(--panel);border:1px solid var(--line);pointer-events:auto;
@@ -877,6 +900,23 @@ textarea.src.out{min-height:120px;opacity:.85}
            refusal is drawn over the picture it refers to and not below the legend. -->
       <div class="canvas" id="canvas">
         <svg id="svg" preserveAspectRatio="xMidYMid meet"></svg>
+        <!-- THE 3-D STAGE.  Empty, and its switch (#t3d) hidden, on a page built without
+             it (`render_html(stage3d=...)`); `js/stage3d.js` puts its canvas here when 3D
+             is shown and takes it away when it is hidden. -->
+        <div id="stage3d" aria-label="the machine in three dimensions">
+          <div class="s3bar">
+            <button id="s3corner" data-hint="s3view" title="look at the stack from a corner">Corner</button>
+            <button id="s3top" data-hint="s3view" title="look straight down">Top</button>
+            <button id="s3front" data-hint="s3view" title="look from the front">Front</button>
+            <label title="how far apart the layers are drawn">Layer spacing
+              <input type="range" id="s3gap" min="0.3" max="3" step="0.05" value="1" data-hint="s3gap"></label>
+            <label id="s3layers" title="show one layer at full strength">Show
+              <select id="s3only" data-hint="s3only"><option value="-1">all layers</option></select></label>
+            <button id="s3png" data-hint="s3png" title="save this picture as a PNG">PNG</button>
+          </div>
+          <div class="s3note" id="s3note">Drag to turn, wheel to zoom, right-drag to move.</div>
+          <div id="s3tip"></div>
+        </div>
         <!-- THE EXECUTING INSTRUCTION, filled by `syncCursor()`: #snHw the hardware line,
              #snQ the circuit statement (empty without a circuit). -->
         <div id="stageNow" data-hint="stagenow"></div>
@@ -948,6 +988,10 @@ textarea.src.out{min-height:120px;opacity:.85}
         <select id="mode" title="colour the marks by role or by heating" data-hint="colour">
         <option value="role" selected>role</option>
         <option value="heat">heating</option></select>
+        <!-- 3D: the same machine and programme as a stack of layers you can turn
+             (`js/stage3d.js`).  Shown only on a page that carries the 3-D stage. -->
+        <button class="tgl" id="t3d" aria-pressed="false" data-hint="stage3d"
+                title="show the machine in 3D: drag to turn it, wheel to zoom">3D</button>
         <!-- HARDWARE LABELS: the names a hardware programme is written in, on the picture.
              On by default and on every page (here, not in #etools, which the view-only
              embeds hide); the choice is remembered (`qccd.studio.hwlabels`). -->
@@ -2604,6 +2648,35 @@ function checkStructure(dev) {
     if (n.kind === 'site' && n.cap < 1) errors.push(`node '${nid}': a site needs capacity >= 1`);
     if (n.kind === 'junction' && n.cap !== 0) errors.push(`node '${nid}': a bare junction holds no ions, so capacity must be 0`);
   }
+  // A machine is planar or built in layers, never both; and on one built in layers a loop
+  // stays in one layer, because a loop is one conveyor on one layer's broadcast.  Mirror of
+  // the last block of `Device.check_structure`, in its words.
+  let flat = null, deep = false;
+  const lens = new Set();
+  for (const nid of nodeIds(dev)) {
+    const len = dev.nodes[nid].pos.length;
+    lens.add(len);
+    if (len > 2) deep = true;
+    else if (flat === null) flat = nid;
+  }
+  if (deep && lens.size > 1) {
+    errors.push(`node '${flat}' has ${dev.nodes[flat].pos.length} coordinate(s) and others ` +
+                `have 3; a machine is drawn in a plane (x, y) or built in layers ` +
+                `(x, y, z), not both`);
+  } else if (deep) {
+    const zs = Array.from(new Set(nodeIds(dev).map((n) => Number(dev.nodes[n].pos[2]) + 0)))
+      .sort((a, b) => a - b);
+    const rank = new Map(zs.map((z, i) => [z, i]));
+    for (const lid in dev.loops) {
+      const seen = Array.from(new Set(dev.loops[lid].nodes
+        .filter((n) => n in dev.nodes)
+        .map((n) => rank.get(Number(dev.nodes[n].pos[2]) + 0)))).sort((a, b) => a - b);
+      if (seen.length > 1) {
+        errors.push(`loop '${lid}' runs through layers [${seen.join(', ')}]; a loop is one ` +
+                    `conveyor on one layer's broadcast, so it stays in one layer`);
+      }
+    }
+  }
   return errors;
 }
 
@@ -3741,16 +3814,75 @@ function _scale(pts, sx, sy) {
 // [{id,a,b}] arrays `compute_layout` takes.  Order is preserved because order is what
 // `_bows` and `_sample` depend on.
 function layoutOf(dev, opts) {
-  var nodes = [], segments = [];
-  for (var nid in dev.nodes) if (own(dev.nodes, nid)) {
-    var n = dev.nodes[nid];
-    nodes.push({ id: nid, x: Number(unbox(n.pos[0])), y: Number(unbox(n.pos[1])) });
+  var d = drawnOf(dev), lay = computeLayout(d.nodes, d.segments, opts);
+  if (d.panels) lay.panels = d.panels;       // `render.py::_with_panels`
+  return lay;
+}
+
+// PANELS -- `layout.py::panel_offsets`, the same operations in the same order.
+//
+// A machine built in layers is drawn on the flat stage as one panel a layer.  Every layer
+// keeps its own (x, y); the panels are set apart along one axis so that no layer is drawn
+// over another, and `computeLayout` then lays the shifted nodes out like any planar
+// machine.  The 3-D stage slides the panels back over one another (`js/stage3d.js`).
+var PANEL_ASPECT = 16.0 / 9.0, PANEL_GAP_STEPS = 2.0, PANEL_GAP_FRAC = 0.15;
+function panelOffsets(xs, ys, nLayers) {
+  var n = Math.trunc(nLayers), out = [], k;
+  if (n < 2) return [[0.0, 0.0]];
+  if (!xs.length) { for (k = 0; k < n; k++) out.push([0.0, 0.0]); return out; }
+  var x0 = xs[0], x1 = xs[0], y0 = ys[0], y1 = ys[0], i;
+  for (i = 1; i < xs.length; i++) {
+    if (xs[i] < x0) x0 = xs[i]; if (xs[i] > x1) x1 = xs[i];
+    if (ys[i] < y0) y0 = ys[i]; if (ys[i] > y1) y1 = ys[i];
   }
-  for (var sid in dev.segments) if (own(dev.segments, sid)) {
+  var w = x1 - x0, h = y1 - y0;
+  var ux = _latticeStep(xs), uy = _latticeStep(ys);
+  var step = ux > _EPS ? ux : (uy > _EPS ? uy : 1.0);
+  var gapX = Math.max(PANEL_GAP_STEPS * (ux > _EPS ? ux : step), PANEL_GAP_FRAC * w);
+  var gapY = Math.max(PANEL_GAP_STEPS * (uy > _EPS ? uy : step), PANEL_GAP_FRAC * h);
+  // the whole picture, panels across the page and panels down it
+  var acrossW = n * w + (n - 1) * gapX, acrossH = h > _EPS ? h : step;
+  var downW = w > _EPS ? w : step, downH = n * h + (n - 1) * gapY;
+  var ra = acrossW / acrossH, rd = downW / downH;
+  var fa = ra > PANEL_ASPECT ? ra / PANEL_ASPECT : PANEL_ASPECT / ra;
+  var fd = rd > PANEL_ASPECT ? rd / PANEL_ASPECT : PANEL_ASPECT / rd;
+  var pitch;
+  if (fa <= fd) { pitch = w + gapX; for (k = 0; k < n; k++) out.push([k * pitch, 0.0]); }
+  else { pitch = h + gapY; for (k = 0; k < n; k++) out.push([0.0, k * pitch]); }
+  return out;
+}
+
+// WHERE A MACHINE IS DRAWN, as the flat stage draws it: `render.py::build_view_model`'s
+// node and segment lists.  On a planar machine that is its own (x, y).  On one built in
+// layers each node is at its (x, y) plus its layer's panel offset and carries its layer
+// as `z`, and a riser is left out of the segments the fit is computed from -- its two ends
+// are in two panels, and it has no drawn length.
+//   { nodes: [{id, x, y[, z]}], segments: [{id, a, b}], panels: [[dx, dy], ...] | null,
+//     riser: {segment id: true}, layers: layersOf(dev) }
+function drawnOf(dev) {
+  var lay = layersOf(dev), nodes = [], segments = [], riser = {}, panels = null, nid, sid, p;
+  if (lay) {
+    var xs = [], ys = [];
+    for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+      p = dev.nodes[nid].pos;
+      xs.push(Number(unbox(p[0]))); ys.push(Number(unbox(p[1])));
+    }
+    panels = panelOffsets(xs, ys, lay.n);
+  }
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    p = dev.nodes[nid].pos;
+    var x = Number(unbox(p[0])), y = Number(unbox(p[1]));
+    if (lay) {
+      var k = lay.of[nid];
+      nodes.push({ id: nid, x: x + panels[k][0], y: y + panels[k][1], z: k });
+    } else nodes.push({ id: nid, x: x, y: y });
+  }
+  for (sid in dev.segments) if (own(dev.segments, sid)) {
     var s = dev.segments[sid];
+    if (lay && lay.of[s.a] !== lay.of[s.b]) { riser[sid] = true; continue; }
     segments.push({ id: sid, a: s.a, b: s.b });
   }
-  return computeLayout(nodes, segments, opts);
+  return { nodes: nodes, segments: segments, panels: panels, riser: riser, layers: lay };
 }
 function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -3771,11 +3903,13 @@ function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 // Errors carry Python's exact message text, so the editor's error strip says what
 // `python -m qccd` would say.
 
-function _node(id, x, y, kind, zone, cap, labels) {
+function _node(id, x, y, kind, zone, cap, labels, z) {
   // plain numbers, not PyFloat boxes: `pos` is `tuple(float)` in Python and `length` is a
   // float, so there is no ambiguity to carry, and a box here would travel into edit.js's
   // reports and serialize as {"v": ...}.  The tag lives only where the ambiguity is real.
-  return { id: id, pos: [Number(x), Number(y)], kind: kind || 'site',
+  // A node of a machine built in layers has a third coordinate, its layer's z.
+  return { id: id, pos: z === undefined ? [Number(x), Number(y)] : [Number(x), Number(y), Number(z)],
+           kind: kind || 'site',
            cap: cap || 0, zone: zone === undefined ? null : zone,
            labels: labels || [], capacity_explicit: false };
 }
@@ -4525,6 +4659,37 @@ function _channelGroups(dev, control) {
   return { grouping: grouping, groups: groups, n_sites: sites.length };
 }
 
+// EACH LAYER HAS A BROADCAST OF ITS OWN (`build_control_plane`): on a machine built in
+// layers every channel group is split by layer, so the count is, group by group, the
+// number of layers its members stand in.  The planar count above is what one layer gets;
+// this re-runs it on each layer's own sites and adds.
+function _channelGroupsLayered(dev, control) {
+  var lay = layersOf(dev);
+  if (!lay || lay.n < 2) return _channelGroups(dev, control);
+  var spec = (control && control.channels) || {};
+  if (!_nonEmpty(spec)) return null;
+  var total = null, k, nid;
+  for (k = 0; k < lay.n; k++) {
+    var sub = { nodes: {}, segments: {}, loops: {} }, some = false;
+    for (nid in dev.nodes) if (own(dev.nodes, nid) && lay.of[nid] === k) { sub.nodes[nid] = dev.nodes[nid]; some = true; }
+    if (!some) continue;
+    var ctl = control;
+    if (String(spec.grouping === undefined ? 'direct' : spec.grouping) === 'explicit') {
+      // an explicit map lists its members: a channel counts once for every layer it reaches
+      var ex = (spec.explicit || []).filter(function (e) {
+        return (e.drives || []).some(function (d) { return own(sub.nodes, d); });
+      });
+      ctl = Object.assign({}, control, { channels: Object.assign({}, spec, { explicit: ex }) });
+    }
+    var one = _channelGroups(sub, ctl);
+    if (!one) continue;
+    if (!total) total = { grouping: one.grouping, groups: 0, n_sites: 0 };
+    total.groups += one.groups;
+    total.n_sites += one.n_sites;
+  }
+  return total;
+}
+
 function _nonEmpty(o) {
   if (!o) return false;
   for (var k in o) if (own(o, k)) return true;
@@ -4559,7 +4724,7 @@ function hardwareReport(dev, control, budget, name) {
   var electrodes = eTrap + eJunction;
   var switches = electrodes * 2;
 
-  var plane = _channelGroups(dev, control);
+  var plane = _channelGroupsLayered(dev, control);
   var broadcast, compDacs, dacs;
   if (plane) {
     // the DECLARED plane: electrodes and switches come from the plane's own fields, where
@@ -5085,6 +5250,10 @@ var CALLS = {
     }
     var pos = [];
     for (var i = 1; i < args.length; i++) pos.push(_coord(unbox(args[i]), 'position'));
+    // a drag moves a node INSIDE its layer: (x, y) given to a node of a machine built in
+    // layers keeps the node's z (`Machine.move_site`)
+    var was = st.device.nodes[nid].pos;
+    if (pos.length === 2 && was.length === 3) pos.push(was[2]);
     st.device.nodes[nid].pos = pos;
     return st;
   },
@@ -5169,14 +5338,12 @@ function _builder(st, method) {
 function _dBuild(st, args, kw, kind) {
   _builder(st, 'd.' + kind);
   var nid = String(args[0]);
-  // EXACTLY TWO.  The schema admits one to three coordinates and nothing in the codebase
-  // reads a third, so a 3-D device would draw as a silent projection -- and this mirror
-  // reads `args[1]` and `args[2]` only, so a 1-D one becomes NaN.  `DeviceBuilder.site`
-  // refuses both; refuse them here, at the same statement and in the same words.
-  if (args.length - 1 !== 2) {
+  // TWO, OR THREE.  (x, y) is a node of a planar machine and (x, y, z) a node of one built
+  // in layers; `DeviceBuilder.site` takes both and refuses one coordinate, which this
+  // mirror would read as NaN.  Refuse it here, at the same statement and in the same words.
+  if (args.length - 1 !== 2 && args.length - 1 !== 3) {
     throw new EditError('DeviceBuilder.' + kind + '(' + pyRepr(nid) + ', ...) needs ' +
-                        'exactly two coordinates, got ' + (args.length - 1) +
-                        '; the layout is two-dimensional and nothing reads a third',
+                        'two coordinates (x, y) or three (x, y, z), got ' + (args.length - 1),
                         'ExpansionError', 'd.' + kind);
   }
   var n = _node(nid, _finite(args[1], 'an x coordinate', 'd.' + kind),
@@ -5184,7 +5351,8 @@ function _dBuild(st, args, kw, kind) {
                 kw.zone === undefined ? null : kw.zone,
                 kw.capacity === undefined ? 0
                   : Math.trunc(_finite(kw.capacity, 'a site capacity', 'd.' + kind)),
-                kw.labels ? kw.labels.slice() : []);
+                kw.labels ? kw.labels.slice() : [],
+                args.length - 1 === 3 ? _finite(args[3], 'a z coordinate', 'd.' + kind) : undefined);
   // `capacity_explicit=bool(capacity)` in `DeviceBuilder.site` -- a capacity of ZERO
   // means INHERIT, not "explicitly zero", and a NEGATIVE one is explicit (bool(-2) is
   // True), which is what lets the schema refuse it rather than the zone quietly
@@ -5542,7 +5710,7 @@ function deviceToJson(dev) {
   var nodes = [], nid;
   for (nid in dev.nodes) if (own(dev.nodes, nid)) {
     var n = dev.nodes[nid];
-    var d = { id: nid, pos: [n.pos[0], n.pos[1]], kind: n.kind };
+    var d = { id: nid, pos: n.pos.slice(), kind: n.kind };
     if (n.kind === 'site' || n.cap) d.capacity = Math.trunc(n.cap || 0);
     if (n.capacity_explicit) d.capacity_explicit = true;
     if (n.zone !== null && n.zone !== undefined) d.zone_type = n.zone;
@@ -7790,6 +7958,34 @@ function _xyOf(pos) {
   return [Number(unbox(pos[0])), pos.length > 1 ? Number(unbox(pos[1])) : 0.0];
 }
 
+// `Device.dim` / `Device.layers` / `Device.layer_of`.  A machine built in layers has three
+// coordinates a node; a layer is a distinct z, lowest first, and distinct means EXACTLY
+// distinct (a declared number naming a layer, compared as Python compares it: no rounding).
+// `null` on a planar machine, which is every machine written before layers.
+//   { z: [z0, z1, ...], of: {node id: layer index}, n: how many layers }
+function layersOf(dev) {
+  var nid, p, any = false, seen = {}, zs = [];
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    p = dev.nodes[nid].pos;
+    if (p.length > 2) {
+      any = true;
+      var z = Number(unbox(p[2])) + 0.0, key = String(z);
+      if (!own(seen, key)) { seen[key] = true; zs.push(z); }
+    }
+  }
+  if (!any) return null;
+  zs.sort(_cmpNum);
+  var rank = {}, of = {}, i;
+  for (i = 0; i < zs.length; i++) rank[String(zs[i])] = i;
+  for (nid in dev.nodes) if (own(dev.nodes, nid)) {
+    p = dev.nodes[nid].pos;
+    of[nid] = p.length > 2 ? rank[String(Number(unbox(p[2])) + 0.0)] : 0;
+  }
+  return { z: zs, of: of, n: zs.length };
+}
+// `Device.layer_name`: A, B, C, ... from the lowest.
+function layerName(k) { return (k >= 0 && k < 26) ? String.fromCharCode(65 + k) : 'L' + k; }
+
 // `Device.incidence`: node id -> incident segment ids IN DECLARATION ORDER.  A self-loop
 // lands twice, by construction, which is also how `Device.degree` counts it.
 function _incidence(dev) {
@@ -7805,8 +8001,17 @@ function _incidence(dev) {
 
 function _otherEnd(seg, nid) { return seg.a === nid ? seg.b : seg.a; }
 
-// `rail_angle_deg`
-function _railAngleDeg(dev, nid, segA, segB) {
+// `rail_angle_deg`.  `lay` is `layersOf(dev)`: on a machine built in layers a riser is
+// vertical (R21), so its angles are stated, not computed from z -- see `rules.py`.
+function _railAngleDeg(dev, nid, segA, segB, lay) {
+  if (lay) {
+    var oa = _otherEnd(dev.segments[segA], nid), ob = _otherEnd(dev.segments[segB], nid);
+    var ra = lay.of[oa] !== lay.of[nid], rb = lay.of[ob] !== lay.of[nid];
+    if (ra || rb) {
+      if (!(ra && rb)) return 90.0;
+      return ((lay.of[oa] > lay.of[nid]) !== (lay.of[ob] > lay.of[nid])) ? 180.0 : 0.0;
+    }
+  }
   var o = _xyOf(dev.nodes[nid].pos);
   var a = _xyOf(dev.nodes[_otherEnd(dev.segments[segA], nid)].pos);
   var b = _xyOf(dev.nodes[_otherEnd(dev.segments[segB], nid)].pos);
@@ -7850,6 +8055,8 @@ function geometryViolations(st) {
   if (!st || !st.device) return [];
   var dev = st.device, out = [], lim = geometryLimits(st);
   var maxDeg = lim.maxDeg, minAng = lim.minAng, inc = _incidence(dev);
+  // R21 on a machine built in layers reads "rails lie in layers": see `rules.py`.
+  var lay = layersOf(dev);
   var nids = [], sids = [], pos = {}, nid, sid, i, j, k;
   for (nid in dev.nodes) if (own(dev.nodes, nid)) { nids.push(nid); pos[nid] = _xyOf(dev.nodes[nid].pos); }
   for (sid in dev.segments) if (own(dev.segments, sid)) sids.push(sid);
@@ -7867,7 +8074,7 @@ function geometryViolations(st) {
     }
     for (i = 0; i < segs.length; i++) {
       for (j = i + 1; j < segs.length; j++) {
-        var ang = _railAngleDeg(dev, nid, segs[i], segs[j]);
+        var ang = _railAngleDeg(dev, nid, segs[i], segs[j], lay);
         // R20_TOL_DEG in rules.py: a corner drawn at the limit is stored a hair under it
         if (ang < minAng - 1e-3) {
           out.push({ rule: 'R20', node: nid,
@@ -7889,12 +8096,38 @@ function geometryViolations(st) {
     boxes[sids[i]] = [Math.min(pa[0], pb[0]) - RAIL_EPS, Math.min(pa[1], pb[1]) - RAIL_EPS,
                       Math.max(pa[0], pb[0]) + RAIL_EPS, Math.max(pa[1], pb[1]) + RAIL_EPS];
   }
+  var riser = {};
+  for (i = 0; i < sids.length; i++) {
+    var sr = dev.segments[sids[i]];
+    riser[sids[i]] = !!lay && lay.of[sr.a] !== lay.of[sr.b];
+  }
+  if (lay) {
+    for (i = 0; i < sids.length; i++) {
+      sid = sids[i];
+      if (!riser[sid]) continue;
+      var rs = dev.segments[sid], qa = pos[rs.a], qb = pos[rs.b];
+      if (Math.abs(qa[0] - qb[0]) > RAIL_EPS || Math.abs(qa[1] - qb[1]) > RAIL_EPS) {
+        out.push({ rule: 'R21', segment: sid,
+                   message: 'rail ' + sid + ' (' + rs.a + '-' + rs.b + ') joins layers ' +
+                            layerName(lay.of[rs.a]) + ' and ' + layerName(lay.of[rs.b]) +
+                            ' but is not vertical; a rail lies in one layer or rises ' +
+                            'straight up to the next' });
+      } else if (Math.abs(lay.of[rs.a] - lay.of[rs.b]) !== 1) {
+        out.push({ rule: 'R21', segment: sid,
+                   message: 'rail ' + sid + ' (' + rs.a + '-' + rs.b + ') joins layers ' +
+                            layerName(lay.of[rs.a]) + ' and ' + layerName(lay.of[rs.b]) +
+                            ', which are not adjacent; a riser joins a layer to the next one' });
+      }
+    }
+  }
   for (i = 0; i < sids.length; i++) {
     sid = sids[i];
+    if (riser[sid]) continue;
     var s1 = dev.segments[sid], bx = boxes[sid];
     for (k = 0; k < nids.length; k++) {
       nid = nids[k];
       if (nid === s1.a || nid === s1.b) continue;
+      if (lay && lay.of[nid] !== lay.of[s1.a]) continue;
       var p = pos[nid];
       if (p[0] < bx[0] || p[0] > bx[2] || p[1] < bx[1] || p[1] > bx[3]) continue;
       if (_pointOnSegment(p, pos[s1.a], pos[s1.b])) {
@@ -7907,9 +8140,12 @@ function geometryViolations(st) {
   }
   for (i = 0; i < sids.length; i++) {
     var ida = sids[i], sa = dev.segments[ida], ba = boxes[ida];
+    if (riser[ida]) continue;
     for (j = i + 1; j < sids.length; j++) {
       var idb = sids[j], sb = dev.segments[idb];
+      if (riser[idb]) continue;
       if (sa.a === sb.a || sa.a === sb.b || sa.b === sb.a || sa.b === sb.b) continue;
+      if (lay && lay.of[sa.a] !== lay.of[sb.a]) continue;
       var bb = boxes[idb];
       if (bb[0] > ba[2] || bb[2] < ba[0] || bb[1] > ba[3] || bb[3] < ba[1]) continue;
       if (_segmentsCross(pos[sa.a], pos[sa.b], pos[sb.a], pos[sb.b])) {
@@ -9040,7 +9276,12 @@ var HOP_ANGLE_TIE = 1e-9;
 // `direction_label(dx, dy)`: `+x`, `-y` or `0` along an axis, `+x+y@30` off one -- the
 // angle in whole degrees counter-clockwise from +x, in [0, 360), rounded `floor(x + 0.5)`
 // after the tie nudge.  Python's `% 360` on a floor that can reach 360 is the `>= 360`.
-function _directionLabel(dx, dy) {
+function _directionLabel(dx, dy, dz) {
+  // a hop up or down a riser is `+z` / `-z`; see `rules.py::direction_label`
+  if (dz !== undefined && (dz > RAIL_EPS || dz < -RAIL_EPS)) {
+    var flat = _directionLabel(dx, dy);
+    return (dz > 0.0 ? '+z' : '-z') + (flat === '0' ? '' : flat);
+  }
   var sx = dx > RAIL_EPS ? '+x' : dx < -RAIL_EPS ? '-x' : '';
   var sy = dy > RAIL_EPS ? '+y' : dy < -RAIL_EPS ? '-y' : '';
   if (!sx || !sy) return (sx + sy) || '0';
@@ -9056,8 +9297,21 @@ function _directionLabel(dx, dy) {
 // back to the lab-frame direction.  The fall-through order is Python's and is load-bearing:
 // a segment that NAMES a loop it is not actually on skips the spur branch entirely, and a
 // chord (an off-path trap with two rails to the path) skips it too.
+function _layersW(w) {
+  if (w._lay === undefined) w._lay = layersOf(w.dev);
+  return w._lay;
+}
 function _hopLabel(w, m) {
   var dev = w.dev, seg = dev.segments[m.seg];
+  // A riser first: a hop between two layers is `+z` or `-z` whatever stands at its ends,
+  // and is never a dock (`rules.py::hop_label`).
+  var lay = _layersW(w);
+  if (lay && lay.of[m.src] !== lay.of[m.dst]) {
+    var pa = dev.nodes[m.src].pos, pb = dev.nodes[m.dst].pos;
+    return _directionLabel(Number(unbox(pb[0])) - Number(unbox(pa[0])),
+                           Number(unbox(pb[1])) - Number(unbox(pa[1])),
+                           Number(unbox(pb[2])) - Number(unbox(pa[2])));
+  }
   var loop = seg.loop === undefined ? null : seg.loop;
   // CLOSED loops only -- see `rules.py::hop_label`.  A rotation is one waveform whose ions
   // move in different lab-frame directions; an open path's step is a plain translation, and
@@ -9112,7 +9366,7 @@ function _r22(w) {
     hops[ion].push(i);
   }
   if (ions.length <= 1) return [];
-  var cls = w.cls || 'shuttle', seen = {}, sigs = [];
+  var cls = w.cls || 'shuttle', seen = {}, sigs = [], sigOf = {};
   for (i = 0; i < ions.length; i++) {
     var idxs = hops[ions[i]], labels = [];
     for (var j = 0; j < idxs.length; j++) {
@@ -9121,7 +9375,36 @@ function _r22(w) {
       if (!_entersBend(w, w.moves[idxs[j]])) labels.push(_hopLabel(w, w.moves[idxs[j]]));
     }
     var sig = cls + ' ' + labels.join(',');
+    sigOf[ions[i]] = sig;
     if (!own(seen, sig)) { seen[sig] = true; sigs.push(sig); }
+  }
+  // EACH LAYER HAS A BROADCAST OF ITS OWN (`rules.py::r22_uniform_motion`): one cycle is
+  // one waveform PER LAYER, and an ion on a riser is in both of its layers' cycles.
+  var lay = _layersW(w);
+  if (lay && lay.n > 1) {
+    var movers = {}, order = [], out = [], k;
+    for (i = 0; i < w.nmv; i++) {
+      var mv = w.moves[i], ls = [lay.of[mv.src]];
+      if (lay.of[mv.dst] !== lay.of[mv.src]) ls.push(lay.of[mv.dst]);
+      for (k = 0; k < ls.length; k++) {
+        if (!own(movers, ls[k])) { movers[ls[k]] = []; order.push(ls[k]); }
+        if (movers[ls[k]].indexOf(mv.ion) < 0) movers[ls[k]].push(mv.ion);
+      }
+    }
+    order.sort(_cmpNum);
+    for (k = 0; k < order.length; k++) {
+      var mine = movers[order[k]], ss = {}, sl = [];
+      for (i = 0; i < mine.length; i++) {
+        if (!own(ss, sigOf[mine[i]])) { ss[sigOf[mine[i]]] = true; sl.push(sigOf[mine[i]]); }
+      }
+      if (sl.length <= 1) continue;
+      sl.sort(_cmpStr);
+      out.push(_v('R22', w.id, 'in layer ' + layerName(order[k]) + ', ' + mine.length +
+                  ' ions move in ' + sl.length + ' different ways in one cycle (' + sl[0] +
+                  ' and ' + sl[1] + '); one cycle is one waveform a layer, so unlike ' +
+                  'motions in one layer need ' + sl.length + ' cycles'));
+    }
+    return out;
   }
   if (sigs.length <= 1) return [];
   sigs.sort(_cmpStr);
@@ -9417,7 +9700,7 @@ function explicitStatements(dev, opts) {
     if (n.labels && n.labels.length) kw.labels = n.labels.slice();
     if (n.capacity_explicit) kw.capacity = Math.trunc(n.cap);
     out.push({ method: n.kind === 'site' ? 'd.site' : 'd.junction',
-               args: [nid, new PyFloat(unbox(n.pos[0])), new PyFloat(unbox(n.pos[1]))],
+               args: [nid].concat(n.pos.map(function (c) { return new PyFloat(unbox(c)); })),
                kwargs: kw });
   }
   for (sid in dev.segments) if (own(dev.segments, sid)) {
@@ -9650,7 +9933,7 @@ function documentStatements(doc) {
       // which is a different document, and one `capacity_explicit` exists to distinguish.
       if (n.capacity_explicit) nkw.capacity = Math.trunc(n.capacity);
       out.push({ method: n.kind === 'junction' ? 'd.junction' : 'd.site',
-                 args: [n.id, new PyFloat(n.pos[0]), new PyFloat(n.pos[1])],
+                 args: [n.id].concat(n.pos.map(function (c) { return new PyFloat(c); })),
                  kwargs: nkw });
     }
     for (i = 0; i < (g.segments || []).length; i++) {
@@ -9744,6 +10027,7 @@ var API = {
   pyRepr: pyRepr, lit: lit, kwd: kwd,
   // layout
   computeLayout: computeLayout, layoutOf: layoutOf,
+  panelOffsets: panelOffsets, drawnOf: drawnOf,
   minNearestNeighbour: minNearestNeighbour, siteLength: siteLength, padTiling: padTiling,
   pointSegment: _pointSegment,
   LAYOUT_CONSTS: { W_MAX: W_MAX, W_MIN: W_MIN, H_MAX: H_MAX, H_MIN: H_MIN,
@@ -9790,6 +10074,7 @@ var API = {
   // lint
   lint: lint, architectureViolations: architectureViolations,
   geometryViolations: geometryViolations, geometryLimits: geometryLimits,
+  layersOf: layersOf, layerName: layerName,
   classParticipants: classParticipants, zonesInUse: zonesInUse,
   // the browser rule set -- 21 of the 28, derived from the dispatcher and never listed
   get MIRRORED_RULES() { return mirroredRules(); },
@@ -10907,6 +11192,9 @@ const AXIS = {};
 {
   const arms = {};
   for (const sg of A.segments){
+    // a riser leaves the layer: on the flat stage its two ends are in two panels, and the
+    // line between them is no direction a trap of either layer lies along
+    if(sg.riser) continue;
     const a=nodeById[sg.a], b=nodeById[sg.b]; if(!a||!b) continue;
     const dx=px(b)-px(a), dy=py(b)-py(a), h=Math.hypot(dx,dy); if(h<1e-9) continue;
     let ux=dx/h, uy=dy/h; if(ux<-1e-12 || (Math.abs(ux)<1e-12 && uy<0)){ux=-ux;uy=-uy;}
@@ -10926,6 +11214,8 @@ const AXIS = {};
 // ---------- the static picture: built once, never rebuilt per frame ----------
 const SEGEL={}, SEGINFO={}, PAD_BY_SEG={}, PAD_BY_SITE={}, SITE_SPAN={},
       SEG_BY_PAIR={}, NODEEL={}, CAPTXT={};
+// what a layer of a machine built in layers is called: A, B, C, ... from the lowest
+const layerName = k => (k>=0 && k<26) ? String.fromCharCode(65+k) : 'L'+k;
 // A SEGMENT'S ROLE COLOUR IS DERIVED FROM ITS LABELS, here as in Python.  `D.roles`
 // is a snapshot keyed by segment id, taken when the page was emitted, and it has no
 // answer for a segment the user creates -- every one of those drew as 'rail' whatever it
@@ -11030,6 +11320,12 @@ function edgePoint(aId, bId, t){
     return a ? {x:px(a), y:py(a), norail:true} : null;
   }
   const I=SEGINFO[sid];
+  // A RISER joins two layers, which the flat stage draws as two panels.  The ion does not
+  // cross the page between them: it is at its port in the first panel for the first half
+  // of the hop and at the matching port in the second for the rest (`draw()` closes the
+  // mark into the one and opens it out of the other).
+  if(I && I.riser){ const n=nodeById[t<0.5 ? aId : bId];
+    return n ? {x:px(n), y:py(n)} : null; }
   if(I && I.cp){ const q=bezPoint(I, segById[sid].a===aId ? t : 1-t);
     return {x:q.x, y:q.y}; }
   const a=nodeById[aId], b=nodeById[bId]; if(!a||!b) return null;
@@ -11072,6 +11368,22 @@ function buildStatic(S){
   // --- segments: the RF null the ions ride, in the deck's role colours -------------
   // butt caps, not round: 144 collinear round caps overlap by half a stroke each and
   // fuse the whole rail into one slab.
+  // --- layers: a machine built in layers is one panel a layer (`L.panels`), each framed
+  // and named, so the reader sees at once that these are separate planes ---------------
+  if(L.panels && L.panels.length>1){
+    const box={};
+    for(const n of A.nodes){ const k=n.z||0, x=px(n), y=py(n);
+      const q=box[k]||(box[k]={x0:x,y0:y,x1:x,y1:y});
+      if(x<q.x0)q.x0=x; if(x>q.x1)q.x1=x; if(y<q.y0)q.y0=y; if(y>q.y1)q.y1=y; }
+    const m=0.62*L.g, fs=Math.max(10, L.g*0.26);
+    for(const k in box){ const q=box[k];
+      gLoop.append(el('rect',{x:q.x0-m, y:q.y0-m, width:(q.x1-q.x0)+2*m, height:(q.y1-q.y0)+2*m,
+        rx:0.18*L.g, fill:C.navy, 'fill-opacity':0.025, stroke:C.grid_faint,
+        'stroke-width':Math.max(1, L.sw_node), 'pointer-events':'none'}));
+      const t=el('text',{x:q.x0-m+0.35*fs, y:q.y0-m+0.95*fs, fill:C.navy, 'fill-opacity':0.7,
+        'font-size':fs, 'font-weight':700, 'pointer-events':'none'});
+      t.textContent='layer '+layerName(+k); gLoop.append(t); }
+  }
   let pads=0;
   const BOW=L.bows||{};
   for (const sg of A.segments){
@@ -11079,6 +11391,32 @@ function buildStatic(S){
     const ax=px(a), ay=py(a), bx=px(b), by=py(b);
     const dx=bx-ax, dy=by-ay, len=Math.hypot(dx,dy);
     const I={ax,ay,dx,dy,len,cp:null};
+    if(sg.riser){
+      // A RISER HAS NO LENGTH ON THE FLAT STAGE.  Its two ends are in two panels, and a line
+      // between them would be a rail the machine does not have.  It is drawn as a PORT at
+      // each end -- a ring in the rail's colour, labelled with the layer it leads to -- and
+      // is as long, for the timing of a hop, as one lattice step (`edgeLen`).
+      I.riser=true; I.dx=0; I.dy=0; I.len=0; I.alen=L.g;
+      SEGINFO[sg.id]=I;
+      SEG_BY_PAIR[sg.a+'>'+sg.b]=sg.id; SEG_BY_PAIR[sg.b+'>'+sg.a]=sg.id;
+      for(const [here,there,x,y] of [[a,b,ax,ay],[b,a,bx,by]]){
+        const up=(there.z||0)>(here.z||0), r=1.5*L.r_junc, fs=Math.max(7, L.g*0.2);
+        const ring=el('circle',{cx:x, cy:y, r:r, fill:'none', stroke:C.rail,
+          'stroke-width':L.sw_rail, opacity:0.95});
+        const tip=el('title',{});
+        tip.textContent = sg.id+' · riser · '+here.id+' ↔ '+there.id+' · '+(up?'up':'down')+
+                          ' to layer '+layerName(there.z||0)+
+                          ' · declared length '+(+(sg.len===undefined?1:sg.len).toFixed(3))+
+                          ' · cap '+(sg.cap===undefined?1:sg.cap);
+        ring.append(tip); gSeg.append(ring);
+        const t=el('text',{x:x+0.78*r, y:y-0.95*r, fill:C.accent, 'font-size':fs, 'font-weight':700,
+          'pointer-events':'none', stroke:'#ffffff', 'stroke-width':fs*0.26,
+          'stroke-linejoin':'round', 'paint-order':'stroke'});
+        t.textContent=(up?'↑':'↓')+layerName(there.z||0); gSeg.append(t);
+        if(here===a) SEGEL[sg.id]=ring;
+      }
+      continue;
+    }
     const bw=BOW[sg.id];
     if(bw && len>1e-6) I.cp={x:(ax+bx)/2 - (dy/len)*2*bw, y:(ay+by)/2 + (dx/len)*2*bw};
     I.alen = bezLen(I);          // the DRAWN length, arc included: pointOnPath needs it
@@ -11348,6 +11686,9 @@ function buildStatic(S){
       if(HWL_SHOWN === false) t.setAttribute('display','none');
       gNode.append(t); HWT_[n.id]=t; HWLG_[n.id]=g;
     }
+    // the stage's own scene (the only one with hardware labels) has just been redrawn:
+    // the 3-D stage, while it is the one shown, rebuilds its machine from the same data
+    if(globalThis.STAGE3D) STAGE3D.rebuild();
   }
 }
 
@@ -11966,6 +12307,15 @@ function draw(){
       r0 = r;
       if(pt.room) r = Math.min(r, pt.room);
     }
+    // what the 3-D stage draws this ion with: the same radius and the same beam
+    p.r3 = r; p.b3 = beam;
+    // ON A RISER the ion leaves one panel and arrives in the other: the mark closes into
+    // its port over the first half of the hop and opens out of the matching port over the
+    // second.  (In 3D it simply rides the riser.)
+    if(pt.fly){ const q=flying[ion];
+      if(q && q.a && q.b){ const rs=SEG_BY_PAIR[q.a+'>'+q.b];
+        if(rs!==undefined && SEGINFO[rs] && SEGINFO[rs].riser){
+          const k=Math.max(0.1, Math.abs(1-2*q.u)); r*=k; r0*=k; } } }
     if(pt.fly && wells){
       p.w.setAttribute('cx',pt.x); p.w.setAttribute('cy',pt.y); show(p.w);
     } else hide(p.w);
@@ -12074,6 +12424,9 @@ function draw(){
   slider.value=String(frame);
   syncCursor();
   paintQLabels();
+  // THE SAME FRAME, to the 3-D stage: where `TRANSIT.place` put every ion, as drawn above.
+  // It computes no position of its own (`js/stage3d.js`).
+  if(globalThis.STAGE3D) STAGE3D.frame(live, flying, f, stt);
 }
 
 // ---------- drop a design onto the page ----------
@@ -14428,20 +14781,36 @@ function baseTexts() {
 }
 
 // ------------------------------------------------------------------- geometry helpers
+// WHERE A MACHINE IS DRAWN (`QCCD.drawnOf`): its own (x, y), or on a machine built in
+// layers its (x, y) plus its layer's panel offset -- and a riser, which joins two panels,
+// is not a segment to the fit.  On a planar machine these are the lists they always were.
 function nodesOf(st) {
-  var out = [];
-  for (var nid in st.device.nodes) if (has(st.device.nodes, nid)) {
-    var n = st.device.nodes[nid];
-    out.push({ id: nid, x: +Q.unbox(n.pos[0]), y: +Q.unbox(n.pos[1]) });
-  }
+  var d = Q.drawnOf(st.device).nodes, out = [];
+  for (var i = 0; i < d.length; i++) out.push({ id: d[i].id, x: d[i].x, y: d[i].y });
   return out;
 }
-function segsOf(st) {
-  var out = [];
-  for (var sid in st.device.segments) if (has(st.device.segments, sid)) {
-    out.push({ id: sid, a: st.device.segments[sid].a, b: st.device.segments[sid].b });
+function segsOf(st) { return Q.drawnOf(st.device).segments; }
+// the layout's panel offsets follow the device: present on a machine built in layers,
+// absent on any other (a stale `L.panels` would keep a planar machine in panels)
+function syncPanels() {
+  var d = STATE ? Q.drawnOf(STATE.device) : null;
+  if (d && d.panels) L.panels = d.panels; else delete L.panels;
+}
+// A MACHINE BUILT IN LAYERS IS NOT EDITED BY HAND ON THE STAGE, in this version.  Its
+// panels are a drawing of the layers side by side: a drag in a panel would have to be
+// taken back to the layer's own coordinates, and a new part would need a layer.  The text
+// of the machine can be edited (it writes x, y and z), each layer can be designed as its
+// own planar machine, and `Machine.layered` stacks them.  Said once, on the first press.
+var LAYERED_SAID = false;
+function layeredLock() {
+  if (!(L && L.panels && L.panels.length)) return false;
+  if (!LAYERED_SAID) {
+    LAYERED_SAID = true;
+    try { toast('info', 'this machine is built in layers: its parts are not dragged here. ' +
+                        'Edit its text in the Machine pane, or design a layer as its own machine.'); }
+    catch (e) { /* no toast strip */ }
   }
-  return out;
+  return true;
 }
 function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -14618,6 +14987,7 @@ function rebuild(opts) {
   //    page's own "true scale" state, so an edit cannot silently change the scale rule
   var lay = Q.computeLayout(nodesOf(STATE), segsOf(STATE), holdOpts());
   for (var k in lay) if (has(lay, k)) L[k] = lay[k];
+  syncPanels();
   // a device with no edits is a fresh device: its first layout is the boundary's unit
   if (!EDITS.length) BOUND = boundaryFrom(lay);
 
@@ -14688,19 +15058,26 @@ function syncArch() {
   var dev = STATE.device;
   var deriv = E.derived(dev);
   var nodes = [], segments = [], loops = {}, nid, sid, lid;
+  // drawn as `build_view_model` draws it: one panel a layer on a machine built in layers
+  var drawn = Q.drawnOf(dev), at = {}, di;
+  for (di = 0; di < drawn.nodes.length; di++) at[drawn.nodes[di].id] = drawn.nodes[di];
   for (nid in dev.nodes) if (has(dev.nodes, nid)) {
     var n = dev.nodes[nid];
-    nodes.push({ id: nid, x: +Q.unbox(n.pos[0]), y: +Q.unbox(n.pos[1]), kind: n.kind,
-                 zone: n.zone, cap: n.cap, deg: deriv.degree[nid],
-                 corner: !!deriv.corner[nid], labels: (n.labels || []).slice(),
-                 cap_explicit: !!n.capacity_explicit });
+    var rec = { id: nid, x: at[nid].x, y: at[nid].y, kind: n.kind,
+                zone: n.zone, cap: n.cap, deg: deriv.degree[nid],
+                corner: !!deriv.corner[nid], labels: (n.labels || []).slice(),
+                cap_explicit: !!n.capacity_explicit };
+    if (at[nid].z !== undefined) rec.z = at[nid].z;
+    nodes.push(rec);
   }
   for (sid in dev.segments) if (has(dev.segments, sid)) {
     var s = dev.segments[sid];
-    segments.push({ id: sid, a: s.a, b: s.b, loop: s.loop,
-                    labels: (s.labels || []).slice(), cap: s.cap,
-                    len: +Q.unbox(s.length),
-                    corner_endpoints: deriv.corner_endpoints[sid] });
+    var srec = { id: sid, a: s.a, b: s.b, loop: s.loop,
+                 labels: (s.labels || []).slice(), cap: s.cap,
+                 len: +Q.unbox(s.length),
+                 corner_endpoints: deriv.corner_endpoints[sid] };
+    if (drawn.riser[sid]) srec.riser = true;
+    segments.push(srec);
   }
   for (lid in dev.loops) if (has(dev.loops, lid)) loops[lid] = dev.loops[lid].nodes.slice();
   A.nodes = nodes; A.segments = segments; A.loops = loops;
@@ -14817,7 +15194,7 @@ function axisOf(nodes, segments, px, py, byId) {
   var AXIS = {}, arms = {}, i;
   for (i = 0; i < segments.length; i++) {
     var sg = segments[i], a = byId[sg.a], b = byId[sg.b];
-    if (!a || !b) continue;
+    if (!a || !b || sg.riser) continue;      // a riser leaves the layer: no axis of it
     var dx = px(b) - px(a), dy = py(b) - py(a), h = Math.sqrt(dx * dx + dy * dy);
     if (h < 1e-9) continue;
     var ux = dx / h, uy = dy / h;
@@ -15331,6 +15708,7 @@ var VIEW_ONLY_VERBS = { 'toggle-play': 1, 'glide': 1, 'escape': 1, 'seek-first':
 function claim(mx, my, mod) {
   mod = mod || {};
   if (VIEW_ONLY) return 'pan';
+  if (layeredLock()) return 'pan';
   // THE RULER TAKES EVERY LEFT PRESS while it is on: a click is a measurement, and a
   // measurement you have to aim around a drag would be no measurement at all.  A middle
   // or right press still pans, so the view can be moved without leaving the tool.
@@ -17703,6 +18081,7 @@ function rescale() {
   var lay = STATE ? Q.computeLayout(nodesOf(STATE), segsOf(STATE), holdOpts())
                   : ((TRUE_SCALE && D.layout_true) ? D.layout_true : D.layout);
   for (var k in lay) if (has(lay, k)) L[k] = lay[k];
+  if (STATE) syncPanels();
   if (!EDITS.length) BOUND = boundaryFrom(L);
   GRID = null;
   rebuildStatic();
@@ -18679,7 +19058,7 @@ function keyGesture(key, mods, ctx) {
     // nothing under the pointer.)
     if ((GHOST || BAND) && row.verb.indexOf('fold-') === 0) return null;
     if (row.verb === 'nudge-or-seek') {
-      if (SELSET.length && !VIEW_ONLY) return 'nudge';
+      if (SELSET.length && !VIEW_ONLY && !(L && L.panels)) return 'nudge';
       return (key === 'ArrowRight' || key === 'ArrowDown') ? 'seek-next' : 'seek-prev';
     }
     if (VIEW_ONLY && !VIEW_ONLY_VERBS[row.verb]) return null;
@@ -18902,6 +19281,11 @@ var HINTS = {
   'zoom:out': { t: 'Zoom out', d: 'Further away, about the middle of the canvas, as far out as twelve machines wide.' },
   'slider': { t: 'Position', d: 'Where you are in the programme. Drag to scrub.' },
   'speed':  { t: 'Speed', d: 'How fast the animation plays, relative to real time.' },
+  'stage3d': { t: '3D', d: 'The same machine and the same programme, drawn as a stack of layers you can turn: drag to rotate, wheel to zoom, right-drag to move. Every ion is where the flat picture has it; only the layers are laid out differently \u2014 one above another here, side by side there. Press again to go back.' },
+  's3view': { t: 'View', d: 'Look at the stack from a corner, straight down, or from the front. Double-click the picture for the corner view.' },
+  's3gap': { t: 'Layer spacing', d: 'How far apart the layers are drawn. It is not to scale: on the chip the layers are far closer than they are wide, and a riser drawn that short could not be seen.' },
+  's3only': { t: 'Show', d: 'Pick one layer to see it at full strength, the others faint. Use it when one layer hides another.' },
+  's3png': { t: 'PNG', d: 'Save the picture as it is now, for a figure.' },
   'colour': { t: 'Colour by', d: '\u201crole\u201d colours an ion by what it is doing; \u201cheating\u201d colours it by how hot it has become \u2014 a hot ion gates badly.' },
   'snap':   { t: 'Snap', d: 'Off (the default): a part lands exactly where you drop it, at any coordinate. On: it lands on the lattice; hold alt to place it freely anyway, shift for quarter steps. Marks never overlap: a drag stops against the next mark and slides along it.' },
   'hwlabels': { t: 'Hardware labels', d: 'The names a hardware program is written in, on the picture: every trapping site and junction (S0, J0) and every ion (d0, a0) carries its name beside it, so p.shuttle("d0", ["S0", "J0", "A0"]) reads straight off the canvas. On by default; this button hides them, and the choice is remembered. On a big machine they step aside while too small to read, and come back as you zoom in.' },
@@ -23873,6 +24257,7 @@ function clickStage(mx, my, mods) {
 // applier, one rule.
 function dblclickStage(mx, my) {
   if (VIEW_ONLY) return;
+  if (L && L.panels) return;
   if (hit(mx, my)) return null;
   if (isStampType(ARMED_EL)) return null;
   if (ARMED_EL) return clickStage(mx, my, { quiet: true });
@@ -24171,6 +24556,7 @@ function menuOpen(mx, my, opts) {
   // there, so this is unreachable from the pointer -- but a harness can call it, and a
   // menu of edits on a page where nothing may be edited would be a lie.
   if (VIEW_ONLY) return null;
+  if (L && L.panels) return null;
   var h = hit(mx, my);
   if (!h) { menuClose(); return null; }
   var sub = { kind: normKind(h.kind, h.id), id: h.id };
@@ -27054,4 +27440,5 @@ if (typeof globalThis !== 'undefined' && globalThis.EDITOR && globalThis.EDITOR.
 }
 
 </script>
+
 </body></html>

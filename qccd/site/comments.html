@@ -199,7 +199,23 @@ body.qc-placing,body.qc-placing *{cursor:crosshair!important}
     document.addEventListener('click', function(ev){ if(MENU && !MENU.contains(ev.target) && !(ev.target.id === 'qc-me' || (ev.target.closest && ev.target.closest('#qc-me')))) closeMenu(); });
     renderNav();
   }
+  // A courtesy, not the guard: what is marked data-perm is shown to a reader granted that
+  // permission (the web server refuses the page itself to anyone else), and the page is told.
+  function showGranted(){
+    var old = document.querySelectorAll('a[data-granted]'), i;
+    for(i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+    var menu = document.querySelector('#sitenav .sn-drop'), links = (ME && ME.links) || [];
+    for(i = 0; menu && i < links.length; i++){
+      // the accounts service names the page and its words; this file names neither
+      var a = document.createElement('a'), s = document.createElement('small');
+      a.href = links[i].href; a.setAttribute('role', 'menuitem'); a.setAttribute('data-granted', '1');
+      a.textContent = links[i].title; s.textContent = links[i].note || ''; a.appendChild(s);
+      menu.appendChild(a);
+    }
+    try { window.dispatchEvent(new CustomEvent('qccd:me', { detail: ME })); } catch(e) {}
+  }
   function renderNav(){
+    showGranted();
     if(!NAV) return;
     NAV.innerHTML = ''; MENU = null;
     if(!ME){

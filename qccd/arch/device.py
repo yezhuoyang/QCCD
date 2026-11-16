@@ -270,6 +270,68 @@ class Device:
     def is_junction(self, node_id: str) -> bool:
         return self.degree(node_id) >= 3
 
+    # ---------------------------------------------------------------- layers
+    #
+    # A machine is drawn in a plane (two coordinates a node) or built in LAYERS (three):
+    # planar trap layers one above another, joined by vertical rails.  Like degree and
+    # corners, nothing here is declared.  A layer is a distinct `z`; a RISER is a rail
+    # whose two ends are in different layers.  A riser is an ordinary shuttling segment --
+    # it is priced, drawn and driven as one -- and each layer has a broadcast of its own
+    # (`qccd.arch.control`, R22).
+
+    @cached_property
+    def dim(self) -> int:
+        """2 for a planar machine, 3 for one built in layers."""
+        return 3 if any(len(n.pos) > 2 for n in self.nodes.values()) else 2
+
+    @cached_property
+    def layers(self) -> tuple[float, ...]:
+        """The distinct `z` of the nodes, lowest first.  A planar machine has one, 0.0.
+
+        Distinct means EXACTLY distinct: `z` is a declared number naming a layer, not a
+        measurement, and an exact comparison is the one the browser mirror
+        (`engine.js::layersOf`) can make identically.  No rounding, which has no twin
+        there."""
+        if self.dim < 3:
+            return (0.0,)
+        zs = {float(n.pos[2]) + 0.0 for n in self.nodes.values() if len(n.pos) > 2}
+        return tuple(sorted(zs)) or (0.0,)
+
+    @cached_property
+    def _layer_index(self) -> Mapping[str, int]:
+        if self.dim < 3:
+            return {}
+        rank = {z: i for i, z in enumerate(self.layers)}
+        return {nid: rank.get(float(n.pos[2]) + 0.0, 0) if len(n.pos) > 2 else 0
+                for nid, n in self.nodes.items()}
+
+    def layer_of(self, node_id: str) -> int:
+        """Which layer a node is in, as an index into `layers`.  0 on a planar machine."""
+        return self._layer_index.get(node_id, 0)
+
+    def is_riser(self, segment_id: str) -> bool:
+        """Does this rail join two layers?"""
+        if self.dim < 3:
+            return False
+        a, b = self.segments[segment_id].ends
+        return self.layer_of(a) != self.layer_of(b)
+
+    @cached_property
+    def risers(self) -> tuple[str, ...]:
+        """The rails that join two layers, in declaration order."""
+        if self.dim < 3:
+            return ()
+        return tuple(s for s in self.segments if self.is_riser(s))
+
+    def layer_nodes(self, layer: int) -> tuple[str, ...]:
+        """The nodes of one layer, in declaration order."""
+        return tuple(n for n in self.nodes if self.layer_of(n) == layer)
+
+    @staticmethod
+    def layer_name(layer: int) -> str:
+        """What a layer is called on a page and in a message: A, B, C, ... from the lowest."""
+        return chr(ord("A") + layer) if 0 <= layer < 26 else f"L{layer}"
+
     # ---------------------------------------------------------------- corners
 
     def corners(self, loop_id: str) -> frozenset[str]:
@@ -412,7 +474,11 @@ class Device:
             deg_hist[self.degree(n)] = deg_hist.get(self.degree(n), 0) + 1
         corners = self.all_corners
         docks = {n.id for n in self.labelled("dock")}
+        # only a layered machine says so: a planar summary is what it always was
+        layered = ({"n_layers": len(self.layers), "n_risers": len(self.risers)}
+                   if self.dim == 3 else {})
         return {
+            **layered,
             "generator": self.generator,
             "params": dict(self.params),
             "n_nodes": len(self.nodes),
@@ -518,6 +584,24 @@ class Device:
                 errors.append(
                     f"node {node.id!r}: a bare junction holds no ions, so capacity must be 0"
                 )
+        # A machine is planar or layered, never both: `_unit` compares two positions
+        # coordinate by coordinate, and a 2-D one beside a 3-D one would lose its `z`
+        # without a word.
+        dims = sorted({len(n.pos) for n in self.nodes.values()})
+        if len(dims) > 1 and dims[-1] > 2:
+            flat = next(n.id for n in self.nodes.values() if len(n.pos) < 3)
+            errors.append(
+                f"node {flat!r} has {len(self.nodes[flat].pos)} coordinate(s) and others "
+                f"have 3; a machine is drawn in a plane (x, y) or built in layers "
+                f"(x, y, z), not both")
+        elif self.dim == 3:
+            # one conveyor is one waveform, and each layer has a broadcast of its own
+            for loop in self.loops.values():
+                seen = sorted({self.layer_of(n) for n in loop.nodes if n in self.nodes})
+                if len(seen) > 1:
+                    errors.append(
+                        f"loop {loop.id!r} runs through layers {seen}; a loop is one "
+                        f"conveyor on one layer's broadcast, so it stays in one layer")
         if errors:
             return errors  # derived checks below assume a well-formed graph
 

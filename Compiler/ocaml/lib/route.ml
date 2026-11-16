@@ -177,19 +177,34 @@ let index_in (seq : string array) (x : string) =
    the router must label at least as finely as the verifier, so it labels identically. *)
 let direction_label (c : sigctx) src dst =
   let p id =
-    match Arch.node c.sarch id with Some (n : Arch.node) -> n.pos | None -> (0.0, 0.0)
+    match Arch.node c.sarch id with
+    | Some (n : Arch.node) -> (n.pos, n.z)
+    | None -> ((0.0, 0.0), 0.0)
   in
-  let ax, ay = p src and bx, by = p dst in
-  let dx = bx -. ax and dy = by -. ay in
-  let sx = if dx > sig_eps then "+x" else if dx < -.sig_eps then "-x" else "" in
-  let sy = if dy > sig_eps then "+y" else if dy < -.sig_eps then "-y" else "" in
-  if sx = "" || sy = "" then (if sx = "" && sy = "" then "0" else sx ^ sy)
-  else begin
-    let deg = Float.atan2 dy dx *. rad_to_deg in
-    let deg = if deg < 0.0 then deg +. 360.0 else deg in
-    let r = int_of_float (Float.floor (deg +. 0.5 +. hop_angle_tie)) in
-    Printf.sprintf "%s%s@%d" sx sy (if r >= 360 then r - 360 else r)
-  end
+  let (ax, ay), az = p src and (bx, by), bz = p dst in
+  let dx = bx -. ax and dy = by -. ay and dz = bz -. az in
+  let flat =
+    let sx = if dx > sig_eps then "+x" else if dx < -.sig_eps then "-x" else "" in
+    let sy = if dy > sig_eps then "+y" else if dy < -.sig_eps then "-y" else "" in
+    if sx = "" || sy = "" then (if sx = "" && sy = "" then "0" else sx ^ sy)
+    else begin
+      let deg = Float.atan2 dy dx *. rad_to_deg in
+      let deg = if deg < 0.0 then deg +. 360.0 else deg in
+      let r = int_of_float (Float.floor (deg +. 0.5 +. hop_angle_tie)) in
+      Printf.sprintf "%s%s@%d" sx sy (if r >= 360 then r - 360 else r)
+    end
+  in
+  (* a hop up or down a riser is [+z] / [-z]; see [direction_label] in rules.py *)
+  if dz > sig_eps || dz < -.sig_eps then
+    (if dz > 0.0 then "+z" else "-z") ^ (if flat = "0" then "" else flat)
+  else flat
+
+(* Is this hop along a riser: are its two ends in different layers?  ([layer_of] in
+   device.py compares [z] exactly, and so does this.) *)
+let is_riser_hop (c : sigctx) src dst =
+  match (Arch.node c.sarch src, Arch.node c.sarch dst) with
+  | Some (a : Arch.node), Some (b : Arch.node) -> a.z <> b.z
+  | _ -> false
 
 (* The Python labels a step along an OPEN path by its lab-frame direction alone, and a
    step along a closed loop by the loop.  This labels the open-path step by both,
@@ -203,6 +218,9 @@ let direction_label (c : sigctx) src dst =
    kept apart, changing every ladder programme; with both, a straight path splits exactly
    as it did and a bent one splits where the verifier does. *)
 let hop_label (c : sigctx) (seg : Arch.segment) src dst =
+  (* A riser first, as in rules.py: a hop between two layers is [+z] or [-z] whatever
+     stands at its ends, and is never a dock. *)
+  if is_riser_hop c src dst then direction_label c src dst else
   let along =
     match seg.loop with
     | None -> None
