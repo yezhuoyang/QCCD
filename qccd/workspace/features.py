@@ -724,7 +724,7 @@ INTERNAL_ROUTES: dict[str, str] = {
     "GET /api/publications/{pid}": "the chat card of a request; an agent's own request comes back from qccd_submit_official",
     "GET /api/reviewers": "the review page's sign-in state (Docker, who is signed in); only a person signs an agent in, "
                           "and an agent reads reviews through qccd_get_review",
-    "GET /api/signins/{sid}": "the review page follows a sign-in the person started",
+    "GET /api/signins/{sid}": "the review page follows a sign-in the person started (person only: its link and one-time code are theirs)",
     "POST /api/debug/web": "the Debug panel on the workspace's pages runs its rule language here; an agent drives the same "
                            "panel through qccd_page_act (debug), or the same debugger headless through qccd_debug",
 }

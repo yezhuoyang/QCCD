@@ -13,6 +13,7 @@ import importlib.util
 import json
 import os
 import stat
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -34,13 +35,21 @@ def docker(tmp_path, monkeypatch):
     """The stand-in docker on QCCD_DOCKER, a home of the test's own, and the stand-in's log."""
     script = REPO / "tests" / "fake_docker.py"
     log = tmp_path / "docker.log"
+    exe = tmp_path / "docker"
+    exe.write_text(f"#!{sys.executable}\nFAKE_LOG = {str(log)!r}\n" + script.read_text(encoding="utf-8"), encoding="utf-8")
+    exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
     if os.name == "nt":
-        exe = tmp_path / "docker.cmd"
-        exe.write_text(f'@set "FAKE_DOCKER_LOG={log}"\r\n@"{sys.executable}" "{script}" %*\r\n', encoding="utf-8")
-    else:
-        exe = tmp_path / "docker"
-        exe.write_text(f"#!{sys.executable}\nFAKE_LOG = {str(log)!r}\n" + script.read_text(encoding="utf-8"), encoding="utf-8")
-        exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
+        # Windows runs no script by its #! line, and a .cmd wrapper would cut every argument at its
+        # first newline (cmd.exe's %*): the prompt.  So the stand-in is started by Python itself,
+        # with its argv intact, as docker.exe would be.
+        popen = subprocess.Popen
+
+        class Popen(popen):
+            def __init__(self, args, *a, **kw):
+                if isinstance(args, (list, tuple)) and args and str(args[0]) == str(exe):
+                    args = [sys.executable, str(exe), *args[1:]]
+                super().__init__(args, *a, **kw)
+        monkeypatch.setattr(subprocess, "Popen", Popen)
     monkeypatch.setenv("QCCD_DOCKER", str(exe))
     monkeypatch.setenv("QCCD_HOME", str(tmp_path / "home"))
     container._READY.clear()
@@ -252,6 +261,9 @@ def test_a_sign_in_from_the_page(svc):
     s = c.post("/api/reviewers/claude/signin", json={}, headers=OWNER).json()
     v = wait(lambda: (lambda x: x if x["needs_code"] else None)(c.get(f"/api/signins/{s['signin_id']}", headers=OWNER).json()))
     assert v["url"].startswith("https://claude.com/")
+    # a live sign-in's link and code are the person's: an agent cannot read them, nor type the code
+    assert c.get(f"/api/signins/{s['signin_id']}", headers=AGENT).status_code == 403
+    assert c.get("/api/reviewers", headers=AGENT).status_code == 403
     assert c.post(f"/api/signins/{s['signin_id']}/code", json={"code": "good-code#state"}, headers=AGENT).status_code == 403
     assert c.post(f"/api/signins/{s['signin_id']}/code", json={"code": "good-code#state"}, headers=OWNER).status_code == 200
     wait(lambda: c.get(f"/api/signins/{s['signin_id']}", headers=OWNER).json()["state"] == "signed_in")

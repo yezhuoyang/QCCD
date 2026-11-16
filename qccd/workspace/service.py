@@ -1023,7 +1023,8 @@ def create_app(state: ServiceState) -> FastAPI:
     def review_cancel(request, actor, b):
         return ws.cancel_review(actor, request.path_params["rid"])
 
-    @route("GET", "/api/reviewers", write=False)
+    # the review page's own: a live sign-in's link and one-time code are the person's to use
+    @route("GET", "/api/reviewers", write=False, human_only=True)
     def reviewers(request, actor, _):
         return ws.reviewers_view()
 
@@ -1035,7 +1036,7 @@ def create_app(state: ServiceState) -> FastAPI:
     def reviewer_signout(request, actor, b):
         return ws.sign_out_reviewer(actor, request.path_params["reviewer"])
 
-    @route("GET", "/api/signins/{sid}", write=False)
+    @route("GET", "/api/signins/{sid}", write=False, human_only=True)
     def signin_one(request, actor, _):
         return ws.signin_view(request.path_params["sid"])
 

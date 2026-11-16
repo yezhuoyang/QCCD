@@ -22,6 +22,7 @@ import sys
 
 TOKEN = "sk-ant-oat01-" + "T" * 40
 args = sys.argv[1:]
+sys.stdout.reconfigure(encoding="utf-8")             # a container's output is UTF-8 (Windows' pipe default is not)
 
 
 def log(**kw):
@@ -65,7 +66,8 @@ elif cmd == "run" and any("setup-token" in a for a in args):
     sys.stdout.flush()
     code = ""
     while True:                                      # a terminal in raw mode: Enter is a carriage return
-        ch = sys.stdin.read(1)
+        # bytes: text-mode stdin holds a lone "\r" back, waiting to see whether "\n" follows
+        ch = sys.stdin.buffer.read(1).decode("utf-8", "replace")
         if ch in ("", "\r", "\n"):
             break
         code += ch
