@@ -1,0 +1,10 @@
+# Conveyor-belt transport on a named closed loop.  This is the general control model:
+# unlike Cyclone it assigns no data/ancilla roles and promises no two-rotation schedule.
+# Its architecture-specific rules are the standard transport rules themselves, because a
+# conveyor earns no exception from one waveform, one direction, or rail ordering.
+
+ruleset "conveyor"
+title "Conveyor-belt transport"
+about "A named closed loop under broadcast control. Every loaded well driven by a rail channel follows the same shift in a step; the cyclic order of ions is preserved; and docking, splitting or merging is a separate declared operation. Off-loop docks may stay put, but a loaded well on a switchless rail may not. This is the website's standard machine with no transport rule removed."
+
+include "standard"

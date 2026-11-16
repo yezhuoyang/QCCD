@@ -78,6 +78,18 @@ def site_url() -> str:
     return (os.environ.get("QCCD_SITE_URL") or "https://qccd.academy").rstrip("/")
 
 
+def _architecture_rule_profiles() -> list[dict]:
+    """Website profiles joined to the rule language, so their human text cannot drift.
+
+    The JSON owns presentation and the physical-machine references.  Rule titles and
+    explanations always come from ``catalogue.rules``, the same source the checker and
+    the public Rules page read.
+    """
+    from ..ruleset.profiles import architecture_profiles
+
+    return architecture_profiles()
+
+
 @dataclass
 class Page:
     status: int
@@ -257,6 +269,10 @@ def inject(page: str, cfg: dict, contract: dict | None = None) -> str:
     comment layer switched off, the site's own Agent button hidden (this IS the agent), and
     the chat + page actions before `</body>`."""
     marker = "<script>window.QCCD_MIRROR=1;</script>"
+    profiles = _architecture_rule_profiles() if cfg.get("rules_categories") else []
+    if profiles:
+        marker += ("<script>window.QCCD_RULE_PROFILES="
+                   + json.dumps(profiles).replace("</", "<\\/") + ";</script>")
     if cfg.get("design_redirect"):
         # the Design page IS the person's live workspace: what the agent does to the design shows
         # there as it happens (lessons, #learn..., stay on the site's own Studio)

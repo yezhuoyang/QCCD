@@ -9,6 +9,7 @@ compiler is given.
 from __future__ import annotations
 
 import html
+import json
 import re
 from pathlib import Path
 
@@ -36,6 +37,7 @@ SETS = (
     # Goal 3's WISE and Cyclone, as the transport deck writes them (goals/goal3/DECK.md)
     ("wise", "WISE"),
     ("cyclone-deck", "Cyclone, as the transport deck writes it"),
+    ("conveyor", "Conveyor-belt transport"),
 )
 
 #: The Reproduce papers that are not replays of an artifact's runs, and their rule sets.
@@ -160,7 +162,8 @@ def _card(ex: dict, rid: str, device: str | None) -> str:
             + f'<a class="open" href="{ex["page"]}#step=1">open the page, with its Report pane</a></div>')
 
 
-def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_set: dict) -> str:
+def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_set: dict,
+         architecture_runs: list[dict] | None = None) -> str:
     """`built`: rule id -> {"pass": card data, "fail": card data} (the example programmes);
     `examples_by_rule`: rule id -> the example entry of `qccd.site.examples.RULES`;
     `papers_by_set`: rule-set name -> [(paper key, short name)] judged by it on Reproduce."""
@@ -388,13 +391,22 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
         'The compiler plans with a rule set and is then judged by it, including rules it never saw. A failed '
         'rule on a compiled programme is a compiler bug made visible, not a programme a machine would refuse.',
         'You can write a rule set. The checker decides a new rule the same way it decides the shipped ones.',
-    ], "rules", more='The Compilation page shows the other side: how the compiler keeps a programme inside '
-                     'these rules while it routes, and which checks run on its output afterwards.'))
+    ], "rules", more='The architecture-specific rule demos below show the other side: how each compiler keeps '
+                     'a programme inside its machine\'s rules, and which checks run on its output afterwards.'))
     # "Every rule" grouped into categories in the reader's browser, the cards and ids unchanged
     page_body = learn.apply("\n".join(b), "rules/", 1)
-    page_body += "<script>\n" + (CATEGORIES / "rules.js").read_text(encoding="utf-8") + "\n</script>"
+    architecture_css = ""
+    if architecture_runs:
+        from . import architecture_compilation
+        page_body += architecture_compilation.section(architecture_runs)
+        architecture_css = architecture_compilation.CSS
+    from ..ruleset.profiles import architecture_profiles
+    profiles = json.dumps(architecture_profiles()).replace("</", "<\\/")
+    page_body += ("<script>window.QCCD_RULE_PROFILES=" + profiles + ";</script>\n"
+                  + "<script>\n" + (CATEGORIES / "rules.js").read_text(encoding="utf-8") + "\n</script>")
     return PAGE.format(title="Rules - QCCD studio", style=STYLE,
-                       extra_css=CSS + (CATEGORIES / "rules.css").read_text(encoding="utf-8") + learn.LAYOUT_CSS,
+                       extra_css=CSS + (CATEGORIES / "rules.css").read_text(encoding="utf-8")
+                       + learn.LAYOUT_CSS + architecture_css,
                        body=page_body)
 
 

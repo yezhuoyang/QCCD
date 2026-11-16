@@ -1,0 +1,9 @@
+# Quantinuum Helios's published functional architecture plus the website's general QCCD rules.
+
+ruleset "helios"
+title "Helios architecture rules"
+about "The general programme and transport rules, plus the physical region, batch and storage-ring contract published for Quantinuum Helios."
+
+include "standard"
+use HL1, HL2, HL3, HL4
+
