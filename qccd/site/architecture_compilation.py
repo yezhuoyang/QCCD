@@ -243,7 +243,7 @@ def section(rows: list[dict], href_prefix: str = "../compilation/") -> str:
         flow = "".join(f"<span>{html.escape(s['label'])}</span>" for s in p["visual"]["steps"])
         focus = ", ".join(p["rule_ids"])
         cards.append(
-            f'<article class="archrun" id="architecture-{html.escape(row["id"])}">'
+            f'<article class="archrun" id="architecture-demo-{html.escape(row["id"])}">'
             f'<div class="pic">{row["poster"]}</div><div class="body">'
             f'<h3>{html.escape(p["title"])}</h3>'
             f'<p class="machine">{html.escape(p["architecture"]["label"])} · '

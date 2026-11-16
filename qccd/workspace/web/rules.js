@@ -39,6 +39,12 @@
       title: 'Ring codesign (Cyclone)',
       blurb: 'What a Cyclone ring may do: one closed ring, the data still, every ancilla one trap on in lockstep, at most 30 ions a trap.',
       rules: ['Y1', 'Y2', 'Y3', 'Y4']
+    },
+    {
+      id: 'rules-helios',
+      title: 'Ring, cache and operation zones (Helios)',
+      blurb: 'What a Helios machine must be: one storage ring and one X junction, eight two-ion operation zones, logic only there, and a ring that turns under broadcast control.',
+      rules: ['HL1', 'HL2', 'HL3', 'HL4']
     }
   ];
   var ARCHITECTURES = window.QCCD_RULE_PROFILES || [];

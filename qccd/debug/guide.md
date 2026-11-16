@@ -94,6 +94,10 @@ here). Machine rules first, in the catalogue's groups; the machine rules (F, G, 
 | Y2 | a data qubit moves in a transport step | move only ancillas. Spread the data qubits evenly round the ring at the start and leave them there |
 | Y3 | the ancillas do not all move together, one trap the same way round, in a transport step | move every ancilla one trap per step in the same direction; never move only some of them |
 | Y4 | a trap holds more than 30 ions | give no trap a capacity above 30, or use more traps |
+| HL1 | on a Helios machine, the floorplan is not the published one: not 82 ring-storage sites on one closed ring, one four-way X junction, two caches and eight operation zones | keep the published floorplan (the Helios machine the website ships) and change only what the paper leaves open: how many drawing sites a cache or leg region has |
+| HL2 | there are not exactly eight operation zones, each holding two ions (a batch of sixteen) | eight operation zones of capacity two |
+| HL3 | an operation zone cannot gate, prepare, measure and cool, or a ring, cache or leg-storage place can gate or measure, or cannot cool | logic only in the operation zones, cooling everywhere: bring the ions to an operation zone for every gate and readout |
+| HL4 | the storage ring does not declare both rotation directions (`helios_rotate_cw` delta +1, `helios_rotate_ccw` delta -1), or memory wiring is not broadcast groups | declare both classes and broadcast-group wiring for the memory regions, as the shipped Helios machine does |
 | budget (machine stage) | too many DACs (B1) or junctions (B2) for the board's budget | broadcast wiring instead of direct drive (a direct-wired grid needs thousands of DACs), or fewer junctions. Declaring fewer electrodes buys nothing, because counts are floored by the physics |
 
 **Re-cooling under the board's physics**, for an agent working in a checkout (fixes R7 and R7c

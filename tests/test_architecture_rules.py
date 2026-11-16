@@ -122,3 +122,21 @@ def test_conveyor_keeps_the_general_rules_and_catches_counter_rotation():
     assert {rid for rid, verdict in bad_verdicts.items() if verdict == FAILS} >= {
         "R4d", "R11", "R22",
     }
+
+
+def test_every_profile_says_what_its_rule_set_adds_and_leaves_out():
+    """A profile's rule changes are hand-written: hold them to the rule sets themselves, so the
+    page cannot say a set keeps a rule it leaves out, or miss one it drops."""
+    standard = {r.id for r in load("standard").rules}
+    for profile in PROFILES:
+        mine = {r.id for r in load(profile["ruleset"]).rules}
+        said: dict[str, set] = {}
+        for change in profile["changes"]:
+            said.setdefault(change["kind"], set()).update(change["rules"])
+        dropped = standard - mine
+        out = said.get("Leave out", set()) | said.get("Replace", set())
+        assert dropped == out & dropped and out <= standard, (profile["id"], sorted(dropped ^ out))
+        assert said.get("Leave out", set()) <= dropped, (profile["id"], sorted(said.get("Leave out", set()) - dropped))
+        assert said.get("Add", set()) <= mine - standard, (profile["id"], sorted(said.get("Add", set()) - (mine - standard)))
+        for kind in ("Keep", "Strengthen", "Scoped exemption", "Separate phase", "Not applicable"):
+            assert said.get(kind, set()) <= mine, (profile["id"], kind, sorted(said.get(kind, set()) - mine))
