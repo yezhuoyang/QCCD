@@ -140,16 +140,20 @@ class MemoryExperiment:
     #: part of the spec either
     faces: tuple[tuple[int, int], ...] = ()
 
-    #: PR A D1: source measurement-bit sidecar and explicit logical-round boundaries.
-    phase_metadata: dict | None = None
+    #: noise@4's D1 idle clock: each source measurement bit's check (role, Pauli type, data support,
+    #: round) and the bits that complete each logical round.  A dict, so neither hashed nor
+    #: compared: two experiments with the same detectors are the same experiment
+    phase_metadata: dict | None = field(default=None, hash=False, compare=False)
 
     def readout_plan(self) -> list[tuple[int, int, str]]:
         """(data qubit, classical bit, basis) for each appended readout, in order."""
         bases = self.readout_basis or (self.basis,) * len(self.readout_bits)
         return [(q, b, s) for (q, b), s in zip(self.readout_bits, bases)]
 
-    def spec(self) -> dict:
-        """The detector declaration, JSON-safe; with the QASM it is the whole experiment."""
+    def spec(self, *, phase: bool = False) -> dict:
+        """The detector declaration, JSON-safe; with the QASM it is the whole experiment.
+        `phase`: with noise@4's D1 sidecar (`phase_metadata`) too.  Off by default, so a board's
+        detectors.json, and its digest, stay what they were until a release asks for @4."""
         return {
             "kind": SPEC_KIND,
             "version": 1,
@@ -163,7 +167,7 @@ class MemoryExperiment:
             "detectors": [list(d) for d in self.detectors],
             "observables": [list(o) for o in self.observables],
             "readout": self.readout,
-            **({"phase_metadata": self.phase_metadata} if self.phase_metadata is not None else {}),
+            **({"phase_metadata": self.phase_metadata} if phase and self.phase_metadata is not None else {}),
             **({"readout_bits": {str(q): b for q, b in self.readout_bits}}
                if self.readout == "appended" else {}),
             **({"readout_basis": {str(q): s for (q, _), s in zip(self.readout_bits,
