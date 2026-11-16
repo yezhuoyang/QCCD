@@ -72,9 +72,23 @@ class Evaluation:
         verifier's rule verdicts from the same replay, in `run.facts["verification"]`).
         `cost_model` replaces the clock's own model -- a studio page priced by another model
         (`deck`) is evaluated on the replay it shows; the grader never passes one."""
-        return build_run(prog, arch, self.clock or "qccdsim_jones", experiment=experiment,
+        at4 = self.name == "qccd-noise@4"
+        if at4:
+            from ..qec.noise_at4_source import parse_source
+        run = build_run(prog, arch, self.clock or "qccdsim_jones", experiment=experiment,
                          qasm=qasm, qubit_map=qubit_map, cert=cert, rules=rules,
-                         cost_model=cost_model)
+                         cost_model=cost_model, source_parser=parse_source if at4 else None)
+        if at4:
+            from ..qec.noise_at4_idle import prepare
+            policy = self.params["idle_policy"].value
+            if policy == "per_interval":
+                prepare(run, policy, None)
+            elif experiment is None:
+                raise ValueError("D1 requires an experiment with source measurement metadata")
+            else:
+                source = parse_source(qasm if qasm is not None else experiment.qasm, keep_barriers=True)
+                prepare(run, policy, source)
+        return run
 
     def evaluator(self, run: Run, sample=None, checks: Mapping | None = None) -> Evaluator:
         return Evaluator(self, run, sample=sample, checks=checks)

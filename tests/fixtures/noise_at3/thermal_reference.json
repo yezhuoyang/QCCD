@@ -1,0 +1,37 @@
+{
+  "source": "qccd-noise-model bca3de9 src/qccd_noise/engine.py:164-170, gate_error_budget.py:58-105; full-precision API",
+  "values": [
+    {
+      "excess": -1,
+      "stim_excess": 0.0
+    },
+    {
+      "excess": 0,
+      "stim_excess": 0.0
+    },
+    {
+      "excess": 0.01,
+      "stim_excess": 9.468031346085895e-06
+    },
+    {
+      "excess": 0.1,
+      "stim_excess": 9.649947894406794e-05
+    },
+    {
+      "excess": 1,
+      "stim_excess": 0.0011469113377615588
+    },
+    {
+      "excess": 2,
+      "stim_excess": 0.002698081671791738
+    },
+    {
+      "excess": 5,
+      "stim_excess": 0.009777146651493995
+    },
+    {
+      "excess": 10,
+      "stim_excess": 0.0296607682097035
+    }
+  ]
+}

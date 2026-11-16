@@ -1,0 +1,211 @@
+{
+  "name": "grid9x9",
+  "schema_version": "0.3",
+  "description": "Baseline grid QCCD for BB [[144,12,12]]: a 9x9 lattice of junctions with a trap in the middle of each of the 144 wires. 49 degree-4 X-junctions, 28 degree-3 T-junctions and 4 degree-2 bends, all read off the incidence count.",
+  "provenance": {
+    "baseline": "PLAN \u00a77.1 baseline 3 (2004.04706, static EJF scheduling)",
+    "note": "2ab - a - b = 144 traps at a = b = 9, one per data qubit"
+  },
+  "zone_types": {
+    "data": {
+      "capacity": 2,
+      "gate": false,
+      "spam": false,
+      "cool": true
+    },
+    "trap": {
+      "capacity": 2,
+      "gate": true,
+      "spam": true,
+      "cool": true,
+      "note": "general-purpose trap: gate, measure and cool all available"
+    },
+    "load": {
+      "capacity": 8,
+      "gate": false,
+      "spam": true,
+      "cool": true,
+      "photoionization": true
+    }
+  },
+  "primitives": {
+    "1q_gate": {
+      "fidelity": 0.9999862,
+      "note": "r = 1 - F_avg = 1.38e-5; Stim p = 3r/2 = 2.07e-5, written by qccd-noise@3. Duration: the model's example clock, since neither its Sec. 3 nor (outside WISE) the deck gives one",
+      "residual_inactive": 0,
+      "source": "Helios Nominal Noise Model Sec. 1 and Sec. 7",
+      "us": 5
+    },
+    "cool": {
+      "broadcastable": true,
+      "note": "reference ground-state cooling. It leaves the gate-mode occupation 0.05 that qccd-noise@3's cooled gate error already includes; the ledger counts the excess from 0",
+      "removes_quanta": "all",
+      "scope": "global",
+      "source": "Helios Nominal Noise Model Sec. 3 and Sec. 4",
+      "us": 3000
+    },
+    "gate_swap": {
+      "gates": 3,
+      "note": "GateSwap: 3 CX",
+      "source": "QCCD Transport Architectures deck, Cyclone T3"
+    },
+    "ion_swap": {
+      "curve": [
+        {
+          "label": "a crystal rotation: the C2LR reorder-or-not figures, the only ones either document gives",
+          "quanta": 0.007,
+          "source": "Helios Nominal Noise Model Sec. 5; QCCD Transport Architectures deck, C2LR T5",
+          "table": "helios",
+          "us": 93
+        }
+      ]
+    },
+    "junction_cross": {
+      "curve_by_degree": {
+        "3": [
+          {
+            "label": "a three-rail crossing: 100 us (both documents); heat is the H-series proxy per crossing",
+            "quanta": 0.014,
+            "source": "QCCD Transport Architectures deck, Cyclone T2; Helios Nominal Noise Model Sec. 4 and Sec. 7",
+            "table": "helios",
+            "us": 100
+          }
+        ],
+        "4": [
+          {
+            "label": "a four-rail crossing: 120 us; heat is the H-series proxy per crossing",
+            "quanta": 0.014,
+            "source": "QCCD Transport Architectures deck, Cyclone T2; Helios Nominal Noise Model Sec. 4",
+            "table": "helios",
+            "us": 120
+          }
+        ]
+      }
+    },
+    "measure": {
+      "fidelity": 0.99957,
+      "note": "symmetric readout, of the total SPAM 4.8e-4. Duration marked a placeholder by the model",
+      "source": "Helios Nominal Noise Model Sec. 1 and Sec. 3",
+      "us": 150
+    },
+    "merge": {
+      "curve": [
+        {
+          "label": "merge two chains: 80 us; no separate heat, grouped with the split",
+          "quanta": 0,
+          "source": "Helios Nominal Noise Model Sec. 5 and Sec. 7",
+          "table": "helios",
+          "us": 80
+        }
+      ]
+    },
+    "ms_gate": {
+      "error_vs_quanta": "linear:9.5e-4",
+      "fidelity_at_n0": 0.999461,
+      "max_quanta": 1,
+      "note": "native 2Q gate, 70 us; r = 5.5e-4 less the 1.1e-5 pre-gate cooling leaves in the idle window. max_quanta is R7's budget, which the model calls a scheduler setting",
+      "source": "Helios Nominal Noise Model Sec. 1, Sec. 3 and Sec. 4",
+      "us": 70
+    },
+    "reset": {
+      "error": 5e-05,
+      "note": "physical prep / reset. Duration marked a placeholder by the model",
+      "source": "Helios Nominal Noise Model Sec. 1 and Sec. 3",
+      "us": 20
+    },
+    "shuttle_segment": {
+      "curve": [
+        {
+          "label": "shuttle one rail: 5 us, 0.1 quanta",
+          "quanta": 0.1,
+          "source": "Helios Nominal Noise Model Sec. 5 and Sec. 7",
+          "table": "helios",
+          "us": 5
+        }
+      ]
+    },
+    "split": {
+      "curve": [
+        {
+          "label": "split one chain: 80 us, 2 quanta (the lower of the model's two experiments, 2 or 4.16); the merge's heat is grouped here",
+          "quanta": 2,
+          "source": "Helios Nominal Noise Model Sec. 5 and Sec. 7",
+          "table": "helios",
+          "us": 80
+        }
+      ]
+    },
+    "z_gate": {
+      "note": "a frame change is virtual: the model's idle-window convention names 'virtual frame changes' among the things that take no physical operation",
+      "source": "Helios Nominal Noise Model Sec. 2",
+      "us": 0
+    }
+  },
+  "heating": {
+    "anomalous_rate_quanta_per_ms": 0.003,
+    "note": "background stretch-mode heating, 3 quanta/s, assumed from H-series; R17: accrues whether or not the ion moves",
+    "source": "Helios Nominal Noise Model Sec. 4"
+  },
+  "species": {
+    "T_coh_s": 183.28657936,
+    "coolant": "171Yb+",
+    "coolant_fraction": 0.5,
+    "note": "T_coh_s is the model's T_lin, for the coarse idle estimate of qccd.cost.physical; qccd-noise@3 writes the idle channels itself",
+    "qubit": "137Ba+",
+    "source": "Helios Nominal Noise Model Sec. 2",
+    "sympathetic": true
+  },
+  "budget": {
+    "junction_electrode_multiplier": 2,
+    "max_area_mm2": 100,
+    "max_dacs": 128,
+    "max_junctions": 200
+  },
+  "geometry": {
+    "generator": "grid",
+    "params": {
+      "a": 9,
+      "b": 9
+    }
+  },
+  "control": {
+    "model": "simd_classes",
+    "classes": {
+      "generator": "x_junction_grid",
+      "count": 18,
+      "note": "12 directional shifts + 6 directional swaps (JT-SIMD, 2504.17886)",
+      "extra": [
+        {
+          "id": "shuttle",
+          "type": "shift",
+          "orbit": "any",
+          "note": "one ion, one trap to the next; the lowest common denominator move"
+        }
+      ]
+    },
+    "max_simd_classes_per_cycle": 1,
+    "intra_inter_exclusive": true,
+    "wiring": {
+      "scheme": "direct",
+      "dacs_dynamic": 100,
+      "shim_per_dac": 1,
+      "electrodes_per_trap": 24,
+      "electrodes_per_junction": 48,
+      "compensation_electrodes_per_trap": 8
+    },
+    "optical": {
+      "addressing": "global_beam",
+      "per_zone_switch": true
+    },
+    "channels": {
+      "grouping": "direct",
+      "roles": {
+        "linear_h": 6,
+        "linear_v": 6,
+        "junction": 4
+      },
+      "differential": 2,
+      "switch_per_site": true
+    }
+  }
+}

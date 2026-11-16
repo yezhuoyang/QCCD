@@ -43,6 +43,7 @@ class QasmOp:
     qubits: tuple[int, ...]
     bit: int | None = None
     line: int = 0
+    params: tuple[float, ...] = ()
 
 
 @dataclass
