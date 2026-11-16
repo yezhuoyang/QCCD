@@ -38,6 +38,7 @@ SETS = (
     ("wise", "WISE"),
     ("cyclone-deck", "Cyclone, as the transport deck writes it"),
     ("conveyor", "Conveyor-belt transport"),
+    ("helios", "Quantinuum Helios: ring, cache and operation zones"),
 )
 
 #: The Reproduce papers that are not replays of an artifact's runs, and their rule sets.
