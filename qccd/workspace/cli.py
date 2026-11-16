@@ -52,7 +52,7 @@ __all__ = ["main", "COMMANDS"]
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
             "publish", "import", "export", "releases", "boards", "leaderboard", "trace", "ler", "bench", "login",
-            "logout", "grade")
+            "logout", "grade", "review")
 
 
 def _root(args) -> Path:
@@ -842,6 +842,135 @@ def cmd_agent(a) -> int:
     return 2
 
 
+def cmd_review(a) -> int:
+    """An agent review with the person's own account (qccd/review): who is signed in, signing an agent
+    in or out, and reviewing a machine and its programme here -- the Debug page's Run agent review, at
+    a terminal.  Signing in is per computer; list, show and run are this workspace's."""
+    from ..review import agents, container
+    if a.action == "status":
+        ok, why = container.ready(fresh=True)
+        built = ok and container.image_built()
+        print("docker    " + (f"running; the reviewer image {container.image_tag()} is "
+                              + ("built" if built else "built on the first sign-in or review (a few minutes, once)")
+                              if ok else why))
+        for s in agents.statuses():
+            print(f"{s['id']:<9} {s['title']} ({s['cli']}): "
+                  + (f"signed in, {s['account']}" if s["signed_in"] else f"not signed in: qccd review login {s['id']}"))
+        return 0
+    if a.action in ("login", "logout"):
+        if a.target not in agents.REVIEWERS:
+            print(f"name the agent: {' or '.join(agents.REVIEWERS)}", file=sys.stderr)
+            return 2
+        title = agents.REVIEWERS[a.target]["title"]
+        if a.action == "logout":
+            agents.sign_out(a.target)
+            print(f"{title} is signed out for reviews (your own {agents.REVIEWERS[a.target]['cli']} is not touched)")
+            return 0
+        if a.token:
+            if a.target != "claude":
+                print("--token is Claude's: the token `claude setup-token` printed, on stdin", file=sys.stderr)
+                return 2
+            try:
+                agents.save_claude_token(sys.stdin.readline())
+            except ValueError as exc:
+                print(exc, file=sys.stderr)
+                return 2
+            print("Claude is signed in for reviews (its token is kept in ~/.qccd/reviewers/claude, readable by you only).")
+            return 0
+        return _review_login(a.target)
+    info = _svc(a)
+    if a.action == "list":
+        rows = _call(info, "GET", "/api/reviews?limit=30")["reviews"]
+        for r in rows:
+            fail = ", ".join((r.get("verdict") or {}).get("failing") or []) or "-"
+            print(f"{r['review_id']}  {r['status']:<9} {r.get('reviewer_title') or r['reviewer']:<8} failing: {fail:<16} {r.get('title')}")
+        if not rows:
+            print("no reviews yet: the Debug page's Run agent review, or qccd review run --arch A --program P")
+        return 0
+    if a.action == "show":
+        if not a.target:
+            print("name the review: qccd review show <review id> (qccd review list)", file=sys.stderr)
+            return 2
+        _print_review(_call(info, "GET", f"/api/reviews/{a.target}"))
+        return 0
+    if not (a.arch and a.program):
+        print("qccd review run --arch MACHINE.arch.json --program PROGRAMME.tsir.json [--agent claude|codex]", file=sys.stderr)
+        return 2
+    prog = Path(a.program)
+    assertions = Path(a.assertions[1:]).read_text(encoding="utf-8") if (a.assertions or "").startswith("@") else a.assertions
+    body = {"request": {"title": a.title or prog.name, "arch": Path(a.arch).read_text(encoding="utf-8"),
+                        "program": prog.read_text(encoding="utf-8"), "model": {"name": a.clock}, "rules": a.rules,
+                        "assertions": assertions or "", "source": {"kind": "file", "path": prog.name}},
+            "reviewer": a.agent, "model": a.model}
+    r = _call(info, "POST", "/api/reviews", body)
+    rid = r["review_id"]
+    print(f"review   {rid}, by {r.get('reviewer_title')}: http://127.0.0.1:{info['port']}/reviewview/{rid}")
+    if not a.wait:
+        return 0
+    seen = 0
+    while True:
+        v = _call(info, "GET", f"/api/reviews/{rid}?brief=1")
+        lines = v.get("progress") or []
+        start = next((i for i, ln in enumerate(lines) if ln["t"] > seen), len(lines))
+        for ln in lines[start:]:
+            print(f"  {ln['text']}")
+            seen = ln["t"]
+        if v["status"] not in ("queued", "checking", "reviewing"):
+            break
+        time.sleep(2)
+    full = _call(info, "GET", f"/api/reviews/{rid}")
+    _print_review(full)
+    return 0 if full["status"] == "done" else 1
+
+
+def _review_login(rid: str) -> int:
+    """Sign `rid` in for reviews at this terminal: its CLI's own sign-in, in Docker (agents.SigninSession)."""
+    from ..review import agents
+    spec = agents.REVIEWERS[rid]
+    print(f"Signing {spec['title']} ({spec['cli']}) in for reviews, with {spec['plan']}: its own sign-in, in Docker. "
+          f"Your own {spec['cli']} and its sign-in are not touched.", flush=True)
+    s = agents.SigninSession(rid).start(say=lambda lines: print("  " + str(lines[-1]), flush=True))
+    shown: set = set()
+    try:
+        while True:
+            v = s.view()
+            if v["url"] and "url" not in shown:
+                shown.add("url")
+                print(f"\n1. Open {v['url']}\n   and sign in with your {spec['title']} account.", flush=True)
+            if v["code"] and "code" not in shown:
+                shown.add("code")
+                print(f"2. Enter this one-time code there: {v['code']}  (it expires in 15 minutes)", flush=True)
+            if v["needs_code"] and "ask" not in shown:
+                shown.add("ask")
+                s.send(input("2. Approve, then paste the code that page shows: "))
+            if v["state"] in ("signed_in", "failed", "cancelled"):
+                break
+            time.sleep(0.5)
+    except (KeyboardInterrupt, EOFError):
+        s.cancel()
+        print("\ncancelled", file=sys.stderr)
+        return 1
+    v = s.view()
+    if v["state"] == "signed_in":
+        print(f"\n{spec['title']} is signed in for reviews (kept in ~/.qccd/reviewers/{rid}, readable by you only).")
+        return 0
+    print(f"\n{v.get('error') or 'the sign-in did not finish'}", file=sys.stderr)
+    return 1
+
+
+def _print_review(r: dict) -> None:
+    print(f"{r['review_id']}  {r['status']}  {r.get('title')}  by {r.get('reviewer_title')}"
+          + (f" ({r['model']})" if r.get("model") else ""))
+    if r.get("verdict"):
+        print(f"rule check  {r['verdict']['line']}")
+    if r.get("error"):
+        print(f"error       {r['error']}")
+    if r.get("review_md"):
+        print("\n" + r["review_md"].rstrip())
+    for n in r.get("notes") or []:
+        print(f"  step {n['step']}" + (f" {n['rule']}" if n.get("rule") else "") + f": {n['text']}")
+
+
 def cmd_mcp(a) -> int:
     from .mcp_server import main as mcp_main
     argv = ["--client", a.client] + (["--channel"] if a.channel else []) + (["--root", a.root] if a.root else [])
@@ -924,6 +1053,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--url")
     p.add_argument("--label")
     p.add_argument("--root", default=None)
+    p = sub.add_parser("review", help="an agent review with your own Claude or ChatGPT account, in Docker: sign in, "
+                                      "who is signed in, run one, read them")
+    p.add_argument("action", choices=["status", "login", "logout", "run", "list", "show"])
+    p.add_argument("target", nargs="?", default=None, help="login/logout: claude or codex; show: a review id")
+    p.add_argument("--token", action="store_true", help="login claude: read a token `claude setup-token` printed from stdin")
+    p.add_argument("--arch", default=None, help="run: the machine (.arch.json)")
+    p.add_argument("--program", default=None, help="run: its programme (.tsir.json)")
+    p.add_argument("--agent", default="claude", choices=["claude", "codex"], help="run: who reviews")
+    p.add_argument("--model", default=None, help="run: a model the agent's CLI takes (default: your plan's own)")
+    p.add_argument("--rules", default="standard", help="run: a rule set the website ships, or none")
+    p.add_argument("--assert", dest="assertions", default=None, help="run: your own assertions, or @file")
+    p.add_argument("--clock", default="corrected", choices=["corrected", "deck"], help="run: the programme's clock")
+    p.add_argument("--title", default=None)
+    p.add_argument("--wait", action="store_true", help="run: follow it, and print the report")
+    p.add_argument("--root", default=None)
     p = sub.add_parser("mcp")
     p.add_argument("--client", default="generic", choices=["codex", "claude", "cursor", "generic"])
     p.add_argument("--channel", action="store_true")
@@ -999,7 +1143,7 @@ def main(argv=None) -> int:
           "validate": cmd_validate, "compile": cmd_compile, "submit": cmd_submit, "publish": cmd_publish,
           "import": cmd_import, "export": cmd_export, "releases": cmd_releases, "boards": cmd_releases, "agent": cmd_agent, "mcp": cmd_mcp,
           "leaderboard": cmd_leaderboard, "trace": cmd_trace, "ler": cmd_ler, "bench": cmd_bench,
-          "login": cmd_login, "logout": cmd_logout, "grade": cmd_grade}[a.cmd]
+          "login": cmd_login, "logout": cmd_logout, "grade": cmd_grade, "review": cmd_review}[a.cmd]
     from .core import WorkspaceError
     from .tasks import LOCK_NAME
     if a.cmd not in ("mcp", "serve"):

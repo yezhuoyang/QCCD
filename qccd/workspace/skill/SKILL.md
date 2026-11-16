@@ -181,7 +181,10 @@ included ("scroll back and forth ten times" is `scroll by: 'page'` / `'-page'` i
   (a grade's eligibility, the checker's per-rule verdicts); never add another. How to read a
   failure, what to look at beyond the checkers and their blind spots: `references/review-guide.md`.
   Without a page, `qccd_debug` has the same actions (`rules_at`, `inspect`, `closest`); prefer
-  the panel, so the person sees what you see.
+  the panel, so the person sees what you see. A review in Docker with the person's own Claude or
+  ChatGPT account (the Rules tab's Run agent review) is theirs to start: you never sign an agent
+  in or run one. Read what it found with `qccd_get_review`: its rule check, the report, the notes
+  by step.
 - **Comments, as the person.** Only when the person asks you to comment. They must be
   signed in on the page (`comments` says so; you never sign in). One issue per comment,
   pinned on the exact element it is about (`comment` with a target), in plain words with

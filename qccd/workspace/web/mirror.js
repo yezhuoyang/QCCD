@@ -12,7 +12,9 @@
 //                   {qccd:'page', context}          the selection changed
 //                   {qccd:'draft', text}            text for the person to send (the Debug
 //                                                   panel's "Review with my agent"); never sent
-// Messages are accepted only from that frame's window and origin.
+// Messages are accepted only from that frame's window and origin.  The Debug panel's "Run agent
+// review" opens the workspace's review page in a tab of its own (QCCD_AGENT_REVIEW_URL, debug.js):
+// the person signs in and runs it there, on the workspace's origin, never on this one.
 
 (function () {
 'use strict';
@@ -68,6 +70,9 @@ window.QCCD_AGENT_DRAFT = function (text) {
   reply({ qccd: 'draft', text: String(text || '').slice(0, 4000) });
   return true;
 };
+// the Debug panel's "Run agent review": the workspace's review page, which the panel opens and hands
+// the program it shows (review.js takes one only from the workspace's own pages and this mirror)
+window.QCCD_AGENT_REVIEW_URL = CHAT + '/review/new';
 window.addEventListener('message', function (e) {
   if (e.origin !== CHAT || e.source !== frame.contentWindow) return;
   var m = e.data || {};

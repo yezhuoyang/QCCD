@@ -114,6 +114,14 @@ qccd.academy itself, the button says how to open the page with their agent.  The
 in the same panel, through the declared verbs below, while the person watches its cursor: every
 verb shows what it returns.
 
+**Run agent review** (Rules tab): a review by the person's own agent in Docker on their computer,
+with a report page (docs/agent-review.md).  Where the page has a workspace -- its Studio, or a
+website page opened through it -- the button opens the workspace's review page and hands it the
+program; the person signs in there once with their own Claude or ChatGPT account, and presses
+Run.  The rule check judges every rule, and its verdicts are the only ones; the agent explains
+them, and the page becomes the report, every "step N" a link back to this page at that step.  On
+qccd.academy itself, the button says how to open the page with a workspace.
+
 ## For agents
 
 **On the page** (the person watches): `qccd_page_act` with `action: "debug"`, `verb` and
@@ -162,6 +170,7 @@ diff, rules_at, inspect, closest.  A compiler bug hunt is usually: `check`, then
 | the headless tool | `qccd/workspace/debugging.py`, `features.py` (`qccd_debug`) |
 | the review guide | `qccd/debug/guide.md` (hand-written), `qccd/debug/guide.py`; the page gets it in `config.json`, the skill as `references/review-guide.md` |
 | the panel in the person's workspace | `debugpage.workspace_inject` (the Studio and every run's page, `service.py`), its Python behind `POST /api/debug/web` |
+| Run agent review: the review page, the agents, Docker | `qccd/review/`, `qccd/workspace/reviews.py`, `web/review.js` (docs/agent-review.md) |
 
 * **In a Studio page**, the site build appends `LOADER` (after the hash router): a Debug button in
   `#stagebar .ctrl` and a listener on the bar's Debug link, both of which load `debug/inpage.js`
