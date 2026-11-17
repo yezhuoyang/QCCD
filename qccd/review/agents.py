@@ -193,6 +193,7 @@ class SigninSession:
     was sent) | signed_in | failed | cancelled."""
 
     TIMEOUT_S = 900.0
+    ENTER_AFTER_S = 0.5      # the pause between a pasted code and its Enter (`send`)
 
     def __init__(self, rid: str):
         if rid not in REVIEWERS:
@@ -297,13 +298,18 @@ class SigninSession:
         self._remove()
 
     def send(self, text: str) -> None:
-        """Type the code Claude's page showed, and Enter, into the sign-in."""
+        """Type the code Claude's page showed into the sign-in, then Enter on its own, as a person
+        does: Claude Code takes characters that arrive together as one paste, an Enter among them
+        too, and goes on waiting for the Enter."""
         code = str(text or "").strip()
         if self.rid != "claude" or self.state != "waiting" or self.proc is None:
             raise RuntimeError("this sign-in is not waiting for a code")
         if not code or len(code) > 400 or any(ord(c) < 32 for c in code):
             raise ValueError("paste the code the sign-in page shows: one line")
-        self.proc.stdin.write((code + "\r").encode("utf-8"))
+        self.proc.stdin.write(code.encode("utf-8"))
+        self.proc.stdin.flush()
+        time.sleep(self.ENTER_AFTER_S)
+        self.proc.stdin.write(b"\r")
         self.proc.stdin.flush()
         self._set(state="finishing", note="checking the code", needs_code=False)
 

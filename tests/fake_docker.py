@@ -3,7 +3,8 @@ without Docker, accounts or a network.
 
     version / image inspect / build / ps / network ... / rm / logs   the plumbing, logged
     run ... script ... claude setup-token     Claude's sign-in: its screen, a link, "Paste code here",
-                                              then (after a line on stdin) a subscription token
+                                              then (after the code, and Enter on its own, on stdin)
+                                              a subscription token
     run ... script ... codex login ...        Codex's: a link and a one-time code, then auth.json in
                                               the mounted profile
     run ... claude -p PROMPT ... / codex exec  a review: out/review.md and out/notes.json in the mounted
@@ -66,11 +67,13 @@ elif cmd == "run" and any("setup-token" in a for a in args):
     sys.stdout.flush()
     code = ""
     while True:                                      # a terminal in raw mode: Enter is a carriage return
-        # bytes: text-mode stdin holds a lone "\r" back, waiting to see whether "\n" follows
-        ch = sys.stdin.buffer.read(1).decode("utf-8", "replace")
-        if ch in ("", "\r", "\n"):
+        # read as Claude Code reads: what arrives together is one paste, and a carriage return in a
+        # paste is not Enter, so Enter is a read of its own (bytes: text-mode stdin holds a lone "\r"
+        # back, waiting to see whether "\n" follows)
+        got = os.read(sys.stdin.fileno(), 4096).decode("utf-8", "replace")
+        if got in ("", "\r", "\n"):
             break
-        code += ch
+        code += got.replace("\r", "").replace("\n", "")
     if code != "good-code#state":
         print("\r\nOAuth error: Invalid code")
         sys.exit(1)
