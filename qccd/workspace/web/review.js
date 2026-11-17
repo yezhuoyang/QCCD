@@ -94,16 +94,22 @@ function machineName(req) {
 
 // ------------------------------------------------------------------ the agents and signing in
 
+function signinLive() { return !!(S.signin && LIVE.indexOf(S.signin.state) >= 0); }
 function loadWho() {
   return api('GET', '/api/reviewers').then(function (w) {
     S.who = w;
+    // an ended sign-in's message stays while it is still so: not once its agent has been signed in, or
+    // out, since (by a terminal's `qccd review login`, or another tab)
+    var done = S.signin && !signinLive() && whoOf(S.signin.reviewer);
+    if (done && (S.signin.state === 'signed_in') !== !!done.signed_in) S.signin = null;
     var live = (w.signins || []).filter(function (s) { return LIVE.indexOf(s.state) >= 0; })[0];
-    if (live && !S.signin) { S.signin = live; pollSignin(); }
+    if (live && !signinLive()) { S.signin = live; pollSignin(); }
     render();
   }).catch(fail);
 }
 function watchWho() {
-  if (!(S.rev && ACTIVE.indexOf(S.rev.status) >= 0) && !S.signin) loadWho();
+  // a sign-in under way is asked after by pollSignin; once it has ended, this asks again
+  if (!(S.rev && ACTIVE.indexOf(S.rev.status) >= 0) && !signinLive()) loadWho();
   setTimeout(watchWho, 4000);
 }
 function signIn(rid) {
@@ -123,7 +129,9 @@ function pollSignin() {
 }
 function sendCode() {
   var s = S.signin, code = (S.code || '').trim();
-  if (!s || !code) return;
+  if (!s || !code || s.state !== 'waiting') return;          // one code to a sign-in: Enter, then Send, sends it once
+  S.signin = Object.assign({}, s, { state: 'finishing', note: 'checking the code' });
+  render();
   api('POST', '/api/signins/' + s.signin_id + '/code', { code: code }).then(function (v) { S.signin = v; S.code = ''; render(); }).catch(fail);
 }
 function cancelSignin() {
@@ -355,7 +363,7 @@ function modelOptions(rid) {
   if (!list.length || list[0].id) list.unshift({ id: '', label: 'Default' });
   return list;
 }
-function liveSignin(rid) { return !!(S.signin && S.signin.reviewer === rid && LIVE.indexOf(S.signin.state) >= 0); }
+function liveSignin(rid) { return signinLive() && S.signin.reviewer === rid; }
 function signinView(rid) {
   var s = S.signin;
   if (!s || s.reviewer !== rid) return null;
