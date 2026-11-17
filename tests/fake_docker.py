@@ -4,7 +4,8 @@ without Docker, accounts or a network.
     version / image inspect / build / ps / network ... / rm / logs   the plumbing, logged
     run ... script ... claude setup-token     Claude's sign-in: its screen, a link, "Paste code here",
                                               then (after the code, and Enter on its own, on stdin)
-                                              a subscription token
+                                              a subscription token, or for a wrong code "OAuth
+                                              error" and a wait for an Enter
     run ... script ... codex login ...        Codex's: a link and a one-time code, then auth.json in
                                               the mounted profile
     run ... claude -p PROMPT ... / codex exec  a review: out/review.md and out/notes.json in the mounted
@@ -59,11 +60,17 @@ elif cmd == "logs":
 elif cmd == "run" and "-d" in args:
     print("f" * 64)                                  # the egress proxy, detached
 elif cmd == "run" and any("setup-token" in a for a in args):
-    # Claude Code's screen: words drawn with cursor moves, the link, then the prompt for the code
+    # Claude Code's screen, as 2.1.322 draws it: words with cursor moves (the banner's moved right,
+    # the others' each set at its column, with no spaces between), the link, then the prompt
+    def at_columns(line):
+        out, col = "", 2
+        for w in line.split(" "):
+            out, col = out + f"\x1b[{col}G{w}", col + len(w) + 1
+        return out
     sys.stdout.write("\x1b[2J\x1b[1CWelcome\x1b[1Cto\x1b[1CClaude\x1b[1CCode\r\n"
-                     "Browser didn't open? Use the url below to sign in (c to copy)\r\n\r\n"
-                     "https://claude.com/cai/oauth/authorize?code=true&client_id=x&state=y\r\n\r\n"
-                     "Paste code here if prompted > ")
+                     + at_columns("Browser didn't open? Use the url below to sign in (c to copy)") + "\r\r\n\r\r\n"
+                     "https://claude.com/cai/oauth/authorize?code=true&client_id=x&state=y\r\r\n\r\r\n"
+                     + at_columns("Paste code here if prompted >") + "\r\r\n")
     sys.stdout.flush()
     code = ""
     while True:                                      # a terminal in raw mode: Enter is a carriage return
@@ -75,7 +82,10 @@ elif cmd == "run" and any("setup-token" in a for a in args):
             break
         code += got.replace("\r", "").replace("\n", "")
     if code != "good-code#state":
-        print("\r\nOAuth error: Invalid code")
+        # as Claude Code does: it says why, then waits for an Enter to start over
+        sys.stdout.write("\r\n OAuth error: Invalid code\r\n Press Enter to retry.\r\n")
+        sys.stdout.flush()
+        os.read(sys.stdin.fileno(), 4096)
         sys.exit(1)
     sys.stdout.write("\r\n\x1b[32m✓\x1b[0m Long-lived authentication token created successfully!\r\n\r\n"
                      f"Your OAuth token (valid for 1 year):\r\n\r\n{TOKEN}\r\n\r\nStore this token securely.\r\n")

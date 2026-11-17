@@ -58,6 +58,7 @@ REVIEWERS = {
 #: Claude Code's subscription token, as `claude setup-token` prints it
 CLAUDE_TOKEN = re.compile(r"sk-ant-oat01-[A-Za-z0-9_\-]{20,}")
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]")
+_CURSOR = re.compile(r"\x1b\[(\d*)([CG])")            # the cursor moved right (C), or to a column (G)
 #: where each CLI's sign-in link points
 _SIGNIN_HOSTS = {"claude": ("claude.com/", "claude.ai/"), "codex": ("auth.openai.com/",)}
 
@@ -173,10 +174,24 @@ def sign_out(rid: str) -> None:
 # ---------------------------------------------------------------------- signing in
 
 def clean_output(raw: str) -> str:
-    """A terminal's output as text: a cursor moved right is the spaces it skipped (Claude Code's
-    screens are drawn that way), every other escape goes, and a carriage return ends a line."""
-    raw = re.sub(r"\x1b\[(\d*)C", lambda m: " " * min(int(m.group(1) or 1), 200), raw)
-    return _ANSI.sub("", raw).replace("\r\n", "\n").replace("\r", "\n")
+    """A terminal's output as text: a cursor moved right, or on to a column, is the spaces it skipped
+    (Claude Code's screens are drawn that way: 2.1 sets each word at its column), a cursor sent back
+    along its line starts a new one, as a carriage return does, and every other escape goes."""
+    parts = _CURSOR.split(raw)                   # text, n, C or G, text, n, C or G, ..., text
+    out, col = [], 0
+    for i in range(0, len(parts), 3):
+        text = _ANSI.sub("", parts[i]).replace("\r\n", "\n").replace("\r", "\n")
+        out.append(text)
+        col = len(text) - text.rfind("\n") - 1 if "\n" in text else col + len(text)
+        if i + 1 < len(parts):
+            n = int(parts[i + 1] or 1)
+            if parts[i + 2] == "G" and n - 1 < col:
+                out.append("\n")
+                col = 0
+            gap = min(n if parts[i + 2] == "C" else n - 1 - col, 200)
+            out.append(" " * gap)
+            col += gap
+    return "".join(out)
 
 
 def scrub(text: str) -> str:
@@ -273,11 +288,16 @@ class SigninSession:
             save_claude_token(tok)
             self._set(state="signed_in", note="signed in", needs_code=False, finished=time.time())
             self._remove()                       # its job is done: the token is kept
+        elif self.rid == "claude" and self.state == "finishing" and (no := re.search(r"OAuth error:[^\n]*", text)):
+            # Claude Code turned the code down, and waits for an Enter to start again: say so now, in
+            # its words, not at the deadline; a new sign-in brings a new link and code
+            self._set(state="failed", error=no.group(0).strip()[:400], finished=time.time())
+            self._remove()
 
     def _ended(self, rc: int | None) -> None:
         ok, _ = signed_in(self.rid)
         with self.lock:
-            if self.state in ("cancelled", "signed_in"):
+            if self.state in ("cancelled", "signed_in", "failed"):        # what it ended with is said already
                 return
             if ok and (self.rid == "codex" or self.state == "finishing"):
                 self.state, self.note = "signed_in", "signed in"
@@ -302,16 +322,17 @@ class SigninSession:
         does: Claude Code takes characters that arrive together as one paste, an Enter among them
         too, and goes on waiting for the Enter."""
         code = str(text or "").strip()
-        if self.rid != "claude" or self.state != "waiting" or self.proc is None:
-            raise RuntimeError("this sign-in is not waiting for a code")
         if not code or len(code) > 400 or any(ord(c) < 32 for c in code):
             raise ValueError("paste the code the sign-in page shows: one line")
+        with self.lock:                          # one code to a sign-in: a second Send is turned away
+            if self.rid != "claude" or self.state != "waiting" or self.proc is None:
+                raise RuntimeError("this sign-in is not waiting for a code")
+            self.state, self.note, self.needs_code = "finishing", "checking the code", False
         self.proc.stdin.write(code.encode("utf-8"))
         self.proc.stdin.flush()
         time.sleep(self.ENTER_AFTER_S)
         self.proc.stdin.write(b"\r")
         self.proc.stdin.flush()
-        self._set(state="finishing", note="checking the code", needs_code=False)
 
     def cancel(self) -> None:
         self._set(state="cancelled", note="cancelled", finished=self.finished or time.time())

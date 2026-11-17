@@ -15,6 +15,7 @@ import os
 import stat
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -103,6 +104,11 @@ def test_a_claude_token_is_kept_for_this_user_and_never_shown(tmp_path, monkeypa
 
 def test_a_terminal_screen_reads_as_text():
     assert agents.clean_output("\x1b[1CWelcome\x1b[1Cto\x1b[2CClaude\r\nnext") == " Welcome to  Claude\nnext"
+    # Claude Code 2.1 sets each word at its column, with no spaces drawn between
+    assert agents.clean_output("\x1b[2GPaste\x1b[8Gcode\x1b[13Ghere\x1b[18Gif\x1b[21Gprompted\x1b[30G>\r\r\n") == \
+        " Paste code here if prompted >\n\n"
+    # a line drawn again from further back is a line of its own, as after a carriage return
+    assert agents.clean_output("\x1b[2G\x1b[38;5;246mstarting\x1b[39m\x1b[2Gready") == " starting\n ready"
 
 
 def test_the_notes_kept_are_steps_of_the_programme(tmp_path):
@@ -133,11 +139,44 @@ def test_claude_signs_in_in_docker_and_its_token_is_kept_not_shown(docker):
 
 
 def test_a_wrong_code_fails_the_sign_in_and_says_so(docker):
+    # Claude Code says so and waits for an Enter to start over: the sign-in ends then, not at its deadline
     s = agents.SigninSession("claude").start()
     wait(lambda: s.view()["needs_code"])
     s.send("bad-code")
     v = wait(lambda: (lambda x: x if x["state"] == "failed" else None)(s.view()))
-    assert "Invalid code" in v["error"] and agents.claude_token() is None
+    assert v["error"] == "OAuth error: Invalid code" and agents.claude_token() is None
+
+
+def test_one_code_to_a_sign_in(docker, monkeypatch):
+    # the page's Enter and its Send button, one after the other: the code is typed in once
+    monkeypatch.setattr(agents.SigninSession, "ENTER_AFTER_S", 2.0)
+    s = agents.SigninSession("claude").start()
+    wait(lambda: s.view()["needs_code"])
+    first = threading.Thread(target=s.send, args=("good-code#state",))
+    first.start()
+    time.sleep(0.3)
+    with pytest.raises(RuntimeError):
+        s.send("good-code#state")
+    first.join()
+    wait(lambda: s.view()["state"] == "signed_in")
+
+
+def test_claude_signs_in_at_a_terminal(docker, monkeypatch, capsys):
+    from qccd.workspace import cli
+    monkeypatch.setattr(agents.SigninSession, "TIMEOUT_S", 20.0)
+    monkeypatch.setattr("builtins.input", lambda ask="": print(ask) or "good-code#state")
+    assert cli._review_login("claude") == 0
+    out = capsys.readouterr().out
+    assert "1. Open https://claude.com/cai/oauth/authorize?" in out and "paste the code that page shows" in out
+    assert agents.claude_token() == "sk-ant-oat01-" + "T" * 40
+
+
+def test_a_sign_in_not_finished_in_time_says_so(docker, monkeypatch):
+    monkeypatch.setattr(agents.SigninSession, "TIMEOUT_S", 1.0)
+    s = agents.SigninSession("claude").start()
+    v = wait(lambda: (lambda x: x if x["state"] == "failed" else None)(s.view()))
+    time.sleep(1.0)                              # the CLI it stopped has ended too
+    assert s.view()["error"] == v["error"] and "was not finished within" in v["error"]
 
 
 def test_chatgpt_signs_in_with_a_device_code_in_docker(docker):
