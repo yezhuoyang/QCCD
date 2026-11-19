@@ -101,9 +101,18 @@ def test_the_gate_time_law_is_flat_to_twelve_ions_and_scaled_to_the_noise_model(
 
 
 def test_the_families_are_the_deck_s_three_and_their_sizes_the_deck_s():
+    """The deck's three, and since 2026-11-19 the Rules page's Helios and general conveyor loop."""
     import families
-    assert families.FAMILIES == ("C2LR", "WISE", "Cyclone")
+    assert families.FAMILIES == ("C2LR", "WISE", "Cyclone", "Helios", "Conveyor")
     assert set(families.RULES) == set(families.FAMILIES) == set(families.COLOURS)
+    assert all("R34" in __import__("qccd.ruleset", fromlist=["load"]).load(s).ids for s in families.RULES.values())
+    for code in ("surface3", "surface7", "color5", "bb72", "hgp58"):
+        meta = json.loads((GOAL / "codes" / f"{code}_z" / "meta.json").read_text(encoding="utf-8"))
+        # Helios's floorplan is fixed: one point where the code's qubits fit its 98, none where not
+        assert len(families.points_for("Helios", meta)) == (1 if meta["ions"] <= families.HELIOS_QUBITS else 0), code
+        for p in families.points_for("Conveyor", meta):
+            w, v = p["params"]["width"] - 2, p["params"]["verticals"]
+            assert (2 * w) % v == 0 and 2 * w >= meta["ions"] * 1.3 and v >= meta["n_ancilla"], p["name"]
     for code in ("surface3", "surface7", "color5", "bb72", "hgp58"):
         meta = json.loads((GOAL / "codes" / f"{code}_z" / "meta.json").read_text(encoding="utf-8"))
         ions, anc = meta["ions"], meta["n_ancilla"]

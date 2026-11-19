@@ -86,6 +86,17 @@ def device_doc(point: dict, exp) -> dict:
         # assumption, not hardware)
         doc = cyclone.device_doc(p["x"], p["n"], name=point["name"])
         prims, species = cyclone.primitives(phys["primitives"], p["n"]), phys["species"]
+    elif point["generator"] == "helios":
+        # the published floorplan as the Rules page draws it (qccd.arch.helios), on the same physics
+        from qccd.arch import helios
+        doc = helios.device_doc(point["name"])
+        prims, species = phys["primitives"], phys["species"]
+    elif point["generator"] == "ring":
+        # the general conveyor loop: a ring with dock spurs and junction corners, as Goal 3's
+        # Conveyor family was before the deck (results/pre_deck/)
+        doc = Machine.ring(p["width"], p["height"], verticals=p["verticals"], corners=p.get("corners", "site"),
+                           name=point["name"]).arch.to_json()
+        prims, species = phys["primitives"], phys["species"]
     else:
         raise KeyError(point["generator"])
     if point.get("cool_us") is not None:
@@ -103,17 +114,52 @@ def census(point: dict, exp) -> dict:
         return {**c2lr.deck_census(p["a"], p["b"]), "legs_drawn": 2 * p["a"] * p["b"] - p["a"] - p["b"]}
     if point["generator"] == "wise":
         return wise.census(p["h"], p["cx"], p["cy"])
+    if point["generator"] == "helios":
+        return {"ring_sites": 82, "x_junctions": 1, "caches": 2, "operation_zones": 8, "qubits": 98,
+                "batch_qubits": 16}
+    if point["generator"] == "ring":
+        w, v = p["width"] - 2, p["verticals"]
+        return {"loop_slots": 2 * w, "docks": v, "corners": p.get("corners", "site")}
     return cyclone.census(exp.n_data, exp.n_ancilla, p["x"], p["n"], ancillas=exp.n_ancilla)
 
 
 def compile_point(point: dict, exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
-    from qccd.compile import c2lr_router, cyclone_router, wise_router
+    from qccd.compile import c2lr_router, cyclone_router, helios_router, wise_router
+    if point["generator"] == "helios":
+        return helios_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE)
+    if point["generator"] == "ring":
+        return conveyor_compile(exp, arch_p, work)
     if point["generator"] == "grid":
         return c2lr_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE, reads_together=True,
                                                positions=True, lazy_cooling=True)
     if point["generator"] == "wise":
         return wise_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE)
     return cyclone_router.compile_with_router(exp.qasm, arch_p, work, n_data=exp.n_data, table=TABLE)
+
+
+def conveyor_compile(exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
+    """The conveyor loop by the released qccdc (rotation first on the loop), cooled as the other
+    families are (lazily: heat since the last inserted cool, `CoolingPolicy(lazy=True)`)."""
+    from qccd.arch import load
+    from qccd.compile.cooling import CoolingPolicy, insert_cooling
+    from qccd.cost.models import corrected_model
+    from qccd.ir.tsir import TSIR
+    from qccd.qec import compile_with_qccdc
+    from qccd.compile.laser_positions import split_by_position
+    tsir, cert = compile_with_qccdc(exp.qasm, arch_p, work, cool=False, timeout=3600.0, table=TABLE)
+    arch = load(str(arch_p))
+    # qccdc knows no chain order: a laser step it writes may reach two positions; R34 (F2) wants one
+    prog, cert_doc, added = split_by_position(TSIR.load(str(tsir)), json.loads(Path(cert).read_text(encoding="utf-8")),
+                                              arch)
+    prog.save(str(tsir), indent=None)
+    Path(cert).write_text(json.dumps(cert_doc), encoding="utf-8")
+    info = json.loads((work / "compile.json").read_text(encoding="utf-8"))
+    (work / "compile.json").write_text(json.dumps({**info, "position_split": added}, indent=1), encoding="utf-8")
+    cooled = insert_cooling(prog, arch, corrected_model(TABLE), policy=CoolingPolicy(lazy=True)).program
+    cooled.meta.update(prog.meta)
+    final = work / "prog.cooled.tsir.json"
+    cooled.save(str(final), indent=None)
+    return final, cert
 
 
 def grade(code: str, point: dict, work_root: str) -> dict:

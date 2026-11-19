@@ -627,18 +627,24 @@ class OfficialService:
 
     #: Goal 3's architecture families, in the figure's order (goals/goal3/families.py); a design
     #: of any other kind stays on its board as Other
-    GOAL3_FAMILIES = ("C2LR", "WISE", "Cyclone", "Other")
+    GOAL3_FAMILIES = ("C2LR", "WISE", "Cyclone", "Helios", "Conveyor", "Other")
 
     @staticmethod
     def architecture_family(doc: dict) -> str:
-        """The Goal 3 family a device declares, the transport deck's three: a lattice under the
-        swap-or-stay control is C2LR, and a chip or a ring whose drawing says so (`geometry.params.
-        family`) is WISE or Cyclone.  Anything else is Other."""
+        """The Goal 3 family a device declares: a lattice under the swap-or-stay control is C2LR; a
+        chip, a ring or a floorplan whose drawing says so (`geometry.params.family`) is WISE, Cyclone
+        or Helios; a ring with dock spurs that says nothing more is the general conveyor loop.
+        Anything else is Other."""
         geo = doc.get("geometry") or {}
-        fam = (geo.get("params") or {}).get("family")
+        params = geo.get("params") or {}
+        fam = params.get("family")
         if geo.get("generator") == "grid" and (doc.get("control") or {}).get("model") == "c2lr":
             return "C2LR"
-        return {"wise": "WISE", "cyclone": "Cyclone"}.get(fam, "Other")
+        if fam in ("wise", "cyclone", "helios"):
+            return {"wise": "WISE", "cyclone": "Cyclone", "helios": "Helios"}[fam]
+        if geo.get("generator") == "ring" and int(params.get("verticals") or 0) > 0:
+            return "Conveyor"
+        return "Other"
 
     def _goal3_board(self, rules: str | None = None) -> dict:
         """Goal 3, code by code: each release's public eligible entries with the family their

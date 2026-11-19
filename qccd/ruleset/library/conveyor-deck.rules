@@ -1,0 +1,12 @@
+# The general conveyor loop as Goal 3 judges it: the rule set `conveyor` (the website's standard rules,
+# no transport rule removed) and R34, the team's feedback F2 (Ke, 2026-11-07), which Goal 3 applies to
+# every architecture: a laser step addresses one chain position.  `conveyor` itself is left as it is
+# (the Rules page's demo).
+
+ruleset "conveyor-deck"
+title "Conveyor-belt transport, as Goal 3 judges it"
+about "A named closed loop under broadcast control, judged by the standard rules with no transport rule removed, and a laser step reaches one chain position: where a trap holds several ions, a pulse reaches the ones at the same position in every trap it plays in."
+
+include "conveyor"
+
+use R34

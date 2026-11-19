@@ -1,0 +1,12 @@
+# Quantinuum Helios as Goal 3 judges it: the rule set `helios` (the website's general rules and the
+# published floorplan, HL1-HL4) and R34, the team's feedback F2 (Ke, 2026-11-07), which Goal 3 applies
+# to every architecture: a laser step addresses one chain position, so the two ions of an operation
+# zone are pulsed one position at a time.  `helios` itself is left as it is (the Rules page's demo).
+
+ruleset "helios-deck"
+title "Quantinuum Helios, as Goal 3 judges it"
+about "The general programme and transport rules, the published Helios floorplan (one storage ring, one X junction, eight two-ion operation zones, logic only there, a ring that turns under broadcast control), and a laser step reaches one chain position: where a zone holds two ions, a pulse reaches the ones at the same position in every zone it plays in."
+
+include "helios"
+
+use R34
