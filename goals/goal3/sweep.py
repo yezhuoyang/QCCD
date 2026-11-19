@@ -144,9 +144,15 @@ def conveyor_compile(exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
     from qccd.compile.cooling import CoolingPolicy, insert_cooling
     from qccd.cost.models import corrected_model
     from qccd.ir.tsir import TSIR
-    from qccd.qec import compile_with_qccdc
+    from qccd.compile.c2lr_router import Refused
+    from qccd.qec import CompileFailed, compile_with_qccdc
     from qccd.compile.laser_positions import split_by_position
-    tsir, cert = compile_with_qccdc(exp.qasm, arch_p, work, cool=False, timeout=3600.0, table=TABLE)
+    try:
+        tsir, cert = compile_with_qccdc(exp.qasm, arch_p, work, cool=False, timeout=3600.0, table=TABLE)
+    except CompileFailed as exc:
+        if exc.kind == "refused":         # qccdc declined the pair (fewer docks than qubits), as before the deck
+            raise Refused(f"qccdc: {exc}") from exc
+        raise
     arch = load(str(arch_p))
     # qccdc knows no chain order: a laser step it writes may reach two positions; R34 (F2) wants one
     prog, cert_doc, added = split_by_position(TSIR.load(str(tsir)), json.loads(Path(cert).read_text(encoding="utf-8")),

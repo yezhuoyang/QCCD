@@ -21,7 +21,8 @@ family is data here, a generator and a rule for which sizes to try for a code; i
 * Helios  -- Quantinuum Helios's published floorplan (arXiv:2511.05465): one 82-site storage ring
              that turns, one X junction, upper and lower caches and eight two-ion operation zones.
              The floorplan is fixed (rules HL1, HL2), so a code has one point, or none where its
-             qubits do not fit the machine's 98.  Added 2026-11-19 from the Rules page's profiles.
+             qubits do not fit the machine's 98 (the baseline router takes 81: see CAVEATS).
+             Added 2026-11-19 from the Rules page's profiles.
 * Conveyor -- the general conveyor loop: a ring of rail slots with dock spurs, the loop turned
              rigidly and ions docked to gate (the Rules page's profile; Goal 3's family before the
              deck, rows in results/pre_deck/): sweep the loop length and the number of docks.
@@ -54,8 +55,10 @@ CAVEATS = {
     "Cyclone": "keeps the circuit's gate order, so a round takes about 3 rotations where the paper takes 2 "
                "(fine with a fixed order, feedback Q1); it heats and cools as the other two do (Q2)",
     "Helios": "a baseline batch router, not Quantinuum's real-time compiler: up to sixteen qubits a batch in the "
-              "eight zones, every qubit home on the ring between batches; prices are the noise model's, as for "
-              "the others, where the Helios paper gives none",
+              "eight zones, every qubit home on the ring between batches, so it holds 81 qubits (one ring site "
+              "kept free to turn), not the machine's 98, and refuses surface d=7's 97; a round's time is mostly "
+              "the one junction (a qubit crosses it at least twice a batch, 100 us a crossing) and the zones' splits "
+              "and merges; prices are the noise model's, as for the others, where the Helios paper gives none",
     "Conveyor": "compiled by qccdc as the board entries are; not one of the deck's three architectures, so its "
                 "prices are the noise model's defaults",
 }
