@@ -1,4 +1,12 @@
-# bb144@1 · BB [[144,12,12]] — 96.74 ms
+# bb144@1 (retired) · BB [[144,12,12]] — 96.74 ms under the physics of 2026-10-20
+
+> **Graded on 2026-10-20 against the retired `bb144@1` release, not re-graded since.** `bb144@1` was the
+> board's 168-qubit circuit (144 data qubits, 24 reused ancillas). Since 2026-11-03 the board is `bb144@2`,
+> Bravyi's 288-qubit round as published, so nothing here compares with today's board. Every number on this
+> page is from the first campaign, under the physics and compilers of 2026-10-19/20 (search `c7c535380bfb`,
+> ranked under `dbd13d8952f3`), before the platform fixes #15-#21. On 2026-10-22, under the fixes (qccdc
+> `c774b87b677f`), all ten design files were one machine written in ten orders and graded 2,313.66 ms,
+> eligible ([../README.md](../README.md#bb144)). The live rows below are the retired board's.
 
 **Best: 96.74 ms**, against 417.89 ms for the best live design that reproduces here (`grid13x13 broadcast`).
 The page also lists lattices that cannot be rebuilt here, with no machine file or generator: among
