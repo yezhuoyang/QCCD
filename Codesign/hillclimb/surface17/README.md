@@ -1,5 +1,11 @@
 # surface17@1 · Surface code, distance 3 — 3.49 ms (v2)
 
+> **Re-graded on 2026-11-19**, when the PRs were merged, with today's grader (`compiler` at `2ad35a4`, qccdc `cd3efedbbc10`, qcheck `e8acd6640fd3`): all 10 files
+> in `designs/` reproduce, at 3.49, 3.565, 3.565, 3.565, 3.585, 3.66, 3.97, 11.30, 12.735 and 12.755 ms, all eligible, with the same DACs, traps and junctions,
+> and `stationary_chain` still grades 11.665 ms. `results.csv` has today's grade beside each row. Everything
+> else on this page is as of 2026-10-22: the live-board figures were fetched on 2026-10-21, and the
+> trap-label, #22 and floor figures were not re-measured ([details](../README.md#re-graded-on-2026-11-19)).
+
 **Best: 3.49 ms** in its graded orientation ([`01-a07-ccb4e9ed`](designs/01-a07-ccb4e9ed.arch.json)). The same
 machine with its trap ids reversed grades 6.085 ms. The best result whose score did not change under any labeling
 tried is **3.585 ms** ([`08-a01-cbd1eaa8`](designs/08-a01-cbd1eaa8.arch.json)): 4 hc-grade variants and 17 hc-fast

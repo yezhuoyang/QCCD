@@ -1,5 +1,11 @@
 # steane@1 · Steane code [[7,1,3]] — 2.100 ms (v2)
 
+> **Re-graded on 2026-11-19**, when the PRs were merged, with today's grader (`compiler` at `2ad35a4`, qccdc `cd3efedbbc10`, qcheck `e8acd6640fd3`): all 2 files
+> in `designs/` reproduce, at 2.100 and 2.780 ms, all eligible, with the same DACs, traps and junctions,
+> and `stationary_chain` still grades 9.785 ms. `results.csv` has today's grade beside each row. Everything
+> else on this page is as of 2026-10-22: the live-board figures were fetched on 2026-10-21, and the
+> trap-label, #22 and floor figures were not re-measured ([details](../README.md#re-graded-on-2026-11-19)).
+
 **Best: 2.100 ms**, against 9.785 ms for the best live design (`stationary_chain`), 7.685 ms lower.
 [`01-a01-88922e3c`](designs/01-a01-88922e3c.arch.json) is one trap that can gate, read out and cool,
 holding all 13 ions (capacity 13), direct wiring, 24 DACs. Nothing moves and no cool is inserted. It

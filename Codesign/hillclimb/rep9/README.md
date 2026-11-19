@@ -1,5 +1,11 @@
 # rep9@1 · Repetition code, distance 9 — 2.445 ms (v2)
 
+> **Re-graded on 2026-11-19**, when the PRs were merged, with today's grader (`compiler` at `2ad35a4`, qccdc `cd3efedbbc10`, qcheck `e8acd6640fd3`): all 4 files
+> in `designs/` reproduce, at 2.445, 2.445, 3.305 and 3.55 ms, all eligible, with the same DACs, traps and junctions,
+> and `stationary_chain` still grades 2.91 ms. `results.csv` has today's grade beside each row. Everything
+> else on this page is as of 2026-10-22: the live-board figures were fetched on 2026-10-21, and the
+> trap-label, #22 and floor figures were not re-measured ([details](../README.md#re-graded-on-2026-11-19)).
+
 **Best: 2.445 ms**, against 2.91 ms for the best live design (`stationary_chain`), graded the same
 way. Two machines tie at 2.445 ms. One is the low-motion seed the search started from, graded
 unchanged: [`01-a01-e9056d95`](designs/01-a01-e9056d95.arch.json), 3 traps on a path with capacities

@@ -1,5 +1,11 @@
 # five_qubit@1 · Five-qubit code [[5,1,3]] — 1.980 ms (v2)
 
+> **Re-graded on 2026-11-19**, when the PRs were merged, with today's grader (`compiler` at `2ad35a4`, qccdc `cd3efedbbc10`, qcheck `e8acd6640fd3`): all 3 files
+> in `designs/` reproduce, at 1.980, 1.980 and 5.045 ms, all eligible, with the same DACs, traps and junctions,
+> and `stationary_chain` still grades 9.155 ms. `results.csv` has today's grade beside each row. Everything
+> else on this page is as of 2026-10-22: the live-board figures were fetched on 2026-10-21, and the
+> trap-label, #22 and floor figures were not re-measured ([details](../README.md#re-graded-on-2026-11-19)).
+
 **Best: 1.980 ms**, against 9.155 ms for the best live design (`stationary_chain`), 4.62× faster.
 [`01-a01-c671484c`](designs/01-a01-c671484c.arch.json) is one trap holding all 9 ions: zone `G`
 (gates and readout), capacity 9, direct control, 24 DACs, no rails. It is the single-trap seed the

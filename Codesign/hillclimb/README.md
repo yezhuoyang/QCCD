@@ -8,9 +8,36 @@ landed on `compiler` on 2026-10-21 and changed the physics, and the v1 numbers n
 2026-10-22, for `surface17`, `steane`, `five_qubit` and `rep9`. `bb144` was not re-run, and its folder is
 still v1's ([below](#bb144)).
 
-Every v2 number here was graded with QCCD `compiler` at `84e8c5d`, the published Linux compiler
-`c774b87b677f` and the published Linux qcheck `e8acd6640fd3`. Production grades these boards with the same
-compiler ([toolchain](#the-toolchain)). Nothing has been submitted to the official leaderboard.
+Every v2 number here was graded on 2026-10-22 with QCCD `compiler` at `84e8c5d`, the published Linux
+compiler `c774b87b677f` and the published Linux qcheck `e8acd6640fd3` ([toolchain](#the-toolchain)). Nothing
+has been submitted to the official leaderboard.
+
+### Re-graded on 2026-11-19
+
+When these PRs were merged, every file in `designs/` of the four boards whose release is still current (19
+files: `surface17@1`, `steane@1`, `five_qubit@1`, `rep9@1`) was graded again with `grade.py` on `compiler` at
+`2ad35a4` with this folder merged, qccdc `cd3efedbbc10` (the released compiler, Windows build) and qcheck
+`e8acd6640fd3`. That grader includes everything that landed after the search: the junction-corner release, the
+rule-set language and declared rules, and the reader-facing renames. **All 19 reproduce**: the same `T_jones`,
+all eligible, and the same DACs, traps and junctions. Each board's `results.csv` has today's grade beside the
+search's (`T_jones_ms_2026_11_19`, `eligible_2026_11_19`). The worst-labeling, #22 and floor figures were not
+re-measured, and the v1 rows of `results.csv` (files only in the PRs' history) were not re-graded.
+
+| board | v2 best (2026-10-22) | today (2026-11-19) | `stationary_chain` then | `stationary_chain` today |
+|---|---:|---:|---:|---:|
+| `surface17@1` | 3.49 ms | 3.49 ms, eligible | 11.665 ms | 11.665 ms |
+| `steane@1` | 2.100 ms | 2.100 ms, eligible | 9.785 ms | 9.785 ms |
+| `five_qubit@1` | 1.980 ms | 1.980 ms, eligible | 9.155 ms | 9.155 ms |
+| `rep9@1` | 2.445 ms | 2.445 ms, eligible | 2.91 ms | 2.91 ms |
+| `bb144@1` | not re-run | retired, not re-graded | | |
+
+`stationary_chain` today is `arch/stationary_chain.arch.json` as committed, graded the same way; the live
+boards' own numbers are not quoted here. `bb144@1` is retired: since 2026-11-03 the board is `bb144@2`, Bravyi's
+published 288-qubit round, so [`bb144/`](bb144/) stays as graded on 2026-10-20 (and on 2026-10-22 under the
+fixes) against the retired release. The questions asked on #10 on 2026-10-21 (long chains, #22, placements) had
+no answer on the PR by 2026-11-19, and #22 and #23 are still open, so the caveats below still apply.
+
+The table below is the search's own, as of 2026-10-22.
 
 | board | v2 best | worst labeling | best id-independent | best live design, graded here | faster by | the machine |
 |---|---:|---:|---:|---:|---:|---|
@@ -41,6 +68,12 @@ from 4.375 ms, the best machine measured before the run (a 2-trap path), to 3.49
 
 ### bb144
 
+**Retired release.** Everything in this subsection and in [`bb144/`](bb144/) was graded on 2026-10-20 (and
+re-graded on 2026-10-22) against `bb144@1`, the board's 168-qubit circuit with 24 reused ancillas. That release
+is retired: since 2026-11-03 the board is `bb144@2`, Bravyi's 288-qubit round as published, whose live numbers
+are not comparable. The folder was not re-graded on 2026-11-19, and the "live rows" below are the retired
+board's, as fetched on 2026-10-21.
+
 `bb144` was not re-run. [`bb144/`](bb144/) is the first campaign's folder: machines found and graded under the
 old physics (96.74 ms then). Under the fixes its ten design files are one machine written in ten orders,
 compile to one program (#20) and grade 2,313.66 ms, eligible, 2,271 ms of it transport. The board's live top
@@ -69,44 +102,54 @@ Codesign/hillclimb/
 
 ## The toolchain
 
+The v2 search, 2026-10-22:
+
 | | version | identity |
 |---|---|---|
 | QCCD | `compiler` at `84e8c5d` | evaluator source `sha256:e9be78cc47e8dd7d9f20b88ead9802c54f219ccb34eadb0717cb5b459bf8ae24`, bridge `sha256:eafcb423e98b496136ec5aac9fc7603832c8288afc40f70798a853d94a077ed0` |
 | qccdc | `c774b87b677f`, the published Linux build | `sha256:ed8838c6a2ea36369157916d7e011e1dc858b613f9a8462e1bae7d55c8a8440a` |
 | qcheck | `e8acd6640fd3`, the published Linux build | `sha256:c18484bd7b807ed63edacfe61be87143729ee188fe6cddcbede6bdcec34c050e` (unpacked) |
 
-These are the digests the evaluator writes into every report (`evaluator.source_digest` and
-`evaluator.toolchain`), and every one of the 24 grades the v2 search logged carries them. `grade.py` prints
-them first. Production's image keeps qccdc `c774b87b677f` (`deploy/official/README.md` on `compiler` at
-`fbe4ab1`: the later `b4a003dbb4ae` is byte-identical on the suite and the seeds), and for these boards the
-grading code at `84e8c5d` is that of `751d443`, deployed on 2026-10-22. Under this toolchain the 46 v1 PR files
-re-grade to everything John posted about them on 2026-10-21: each board's best file, the ten `bb144` files at
-2,313.66 ms, and the files that fail R20 or R21.
+The re-grade, 2026-11-19 ([above](#re-graded-on-2026-11-19)):
 
-To grade the designs again, use yezhuoyang/QCCD's `compiler` branch at `84e8c5d`, the base of these PRs, with
-this folder copied in. From the root of a checkout that has `Codesign/hillclimb`:
+| | version | identity |
+|---|---|---|
+| QCCD | `compiler` at `2ad35a4`, with this folder merged | evaluator source `sha256:24ac340727d6286cafba046b31d10fa1ed114f1406f3a3c22755c769041ee0c8`, bridge `sha256:e7745848d1f58e9f43a533bf66e1fb8dd72fdb65f962f2277f17b050d67b647c` |
+| qccdc | `cd3efedbbc10`, the published Windows build | `sha256:b00acc7881e7fbd6be255740d7ae2c1ccd36d489da02f22cf32831517c39dee4` |
+| qcheck | `e8acd6640fd3`, the published Windows build | `sha256:8e962ac288401298ae1302d5be3820dd7f38967c918efa35640d758ef4110d5f` |
+
+These are the digests the evaluator writes into every report (`evaluator.source_digest` and
+`evaluator.toolchain`), and every one of the 24 grades the v2 search logged carries the first set. `grade.py`
+prints them first. As of 2026-10-22, production's image kept qccdc `c774b87b677f` (`deploy/official/README.md`
+on `compiler` at `fbe4ab1`: the later `b4a003dbb4ae` is byte-identical on the suite and the seeds), and for these
+boards the grading code at `84e8c5d` was that of `751d443`, deployed on 2026-10-22. Under that toolchain the 46
+v1 PR files re-graded to everything John posted about them on 2026-10-21: each board's best file, the ten
+`bb144` files at 2,313.66 ms, and the files that fail R20 or R21. Since 2026-11-01 the released compiler, the
+one `qccd toolchain install` installs, is `cd3efedbbc10`; it gives the same `T_jones` on all 19 v2 design files.
+
+To grade the designs again, from the root of a checkout of yezhuoyang/QCCD's `compiler` branch (this folder is
+in it):
 
 ```bash
-git fetch https://github.com/yezhuoyang/QCCD compiler
-git worktree add ../qccd-84e8c5d 84e8c5d
-cp -R Codesign/hillclimb ../qccd-84e8c5d/Codesign/
-cd ../qccd-84e8c5d
 pip install -e '.[agent]'      # `qccd`, and stim, qiskit and numpy for the semantics stage
-qccd toolchain install         # compiler c774b87b677f; qcheck e8acd6640fd3 on Linux and Windows
+qccd toolchain install         # the released compiler (cd3efedbbc10 on 2026-11-19) and qcheck e8acd6640fd3
 qccd toolchain status          # which compiler and checker the evaluator will use
 python Codesign/hillclimb/grade.py rep9@1 Codesign/hillclimb/rep9/designs/*.arch.json
 ```
+
+To reproduce the v2 search's own grades byte for byte, check out `84e8c5d` (the base of these PRs), copy this
+folder in, and point `QCCD_QCCDC` at the published `c774b87b677f`.
 
 The evaluator takes `QCCD_QCCDC` and `QCCD_QCHECK` if they are set, then a build in the checkout, then what
 `qccd toolchain install` installed. `grade.py` prints the paths it resolved and their sha256, and the commit
 and digests of the QCCD source it imported (commit "unknown" when that is not a git checkout), then one line
 per machine: the board's ranked metric, eligibility, and the DACs, traps and junctions as the grader counts
 them (DACs with the physics' wiring floors). Without qcheck the required `lean_certificate` stage is
-`unsupported`, so every design comes out not eligible. On macOS `qccd toolchain install` fetches the macOS
-build of `c774b87b677f`, a different binary (it gives the Linux build's `T_jones` on the 19 v2 design files
-and the 46 v1 PR files), and there is no macOS qcheck of `e8acd6640fd3`: build it from the checkout with
+`unsupported`, so every design comes out not eligible. There is no macOS build of
+`cd3efedbbc10` and no macOS qcheck of `e8acd6640fd3` (2026-11-19): build the checker from the checkout with
 `qccd toolchain build-checker`, which needs Lean's `elan` and fetches the pinned
-`leanprover/lean4:v4.29.0-rc2`.
+`leanprover/lean4:v4.29.0-rc2`, and the compiler as `deploy/toolchain/README.md` says. (On 2026-10-22 the macOS
+build of `c774b87b677f` gave the Linux build's `T_jones` on the 19 v2 design files and the 46 v1 PR files.)
 
 ## How the v2 search ran
 

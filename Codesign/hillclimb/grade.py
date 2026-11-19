@@ -1,13 +1,14 @@
-"""Grade device files on a leaderboard with the reference evaluator, as `qccd submit --local` does.
+"""Grade machine files on a leaderboard with the reference evaluator, as `qccd submit --local` does.
 
-Each device is imported into a throwaway workspace, the board's circuit is compiled for it by the
+Each machine is imported into a throwaway workspace, the board's circuit is compiled for it by the
 reference compiler (qccdc, compiler "auto"), and the result is frozen and graded under the reference
-profile. Run it from the root of a checkout of yezhuoyang/QCCD's `compiler` branch at 84e8c5d with
-this folder copied in, with compiler c774b87b677f and qcheck e8acd6640fd3 (README.md has the steps):
+profile. Run it from the root of a checkout of yezhuoyang/QCCD's `compiler` branch, with the
+toolchain `qccd toolchain install` installs (README.md has the steps and the toolchain each
+recorded grade used):
 
     python Codesign/hillclimb/grade.py rep9@1 Codesign/hillclimb/rep9/designs/*.arch.json
 
-Prints the toolchain it grades with, then one line per device: the board's ranked metric,
+Prints the toolchain it grades with, then one line per machine: the board's ranked metric,
 eligibility, and the DACs, traps and junctions as the grader counts them.
 """
 
