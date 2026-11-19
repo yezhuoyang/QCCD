@@ -56,9 +56,9 @@ def test_jones_wise_rules_and_timed_applicability(d):
 
 def test_jones_wise_rejects_direct_wiring_schedule():
     res, exe = _wise_rules(*_wise_schedule(kind="ours"))
-    assert res["W1"].verdict == FAILS
+    assert res["R34"].verdict == FAILS
     assert not any("idle_sites" in o.facts for o in exe.ops)
-    assert res["W3"].verdict == FAILS
+    assert res["R36"].verdict == FAILS
 
 
 def test_jones_wise_rejects_five_us_delayed_move():
@@ -67,7 +67,7 @@ def test_jones_wise_rejects_five_us_delayed_move():
     bad = replace(move, t0=move.t0 + 5, t1=move.t1 + 5)
     sched = replace(sched, events=[bad if e.id == bad.id else e for e in sched.events])
     res, _ = _wise_rules(sched, circuit)
-    assert res["W1"].verdict == FAILS
+    assert res["R34"].verdict == FAILS
 
 
 def test_jones_wise_geometry_rejects_uniform_false_cycle_without_changing_motion():
@@ -80,7 +80,7 @@ def test_jones_wise_geometry_rejects_uniform_false_cycle_without_changing_motion
     assert split.facts["motion"] == "split:S"  # John's existing input is preserved.
     assert split.facts["displacement"] == "split:N"
     assert res["R22"].verdict == HOLDS  # uniform strings alone do not detect this.
-    assert res["W1"].verdict == FAILS
+    assert res["R34"].verdict == FAILS
 
 
 def test_jones_wise_opt_out_requires_each_idle_site_switch():
@@ -89,8 +89,8 @@ def test_jones_wise_opt_out_requires_each_idle_site_switch():
     idle = next(t for t, ch in sched.chains.items() if not ch)
     dev.sites[idle].pop("broadcast_switch")
     res, _ = _wise_rules(replace(sched, device=dev), circuit)
-    assert res["W3"].verdict == FAILS
-    assert res["W1"].verdict == HOLDS
+    assert res["R36"].verdict == FAILS
+    assert res["R34"].verdict == HOLDS
 
 
 def test_jones_wise_transport_excludes_gates_on_idle_traps():
@@ -101,7 +101,7 @@ def test_jones_wise_transport_excludes_gates_on_idle_traps():
     gate = Event(100000, "gate1", 60, 65, (ion,), at=trap,
                  meta={"op": "XRotation", "locks": [f"ion:{ion}", f"trap:{trap[1:]}"]})
     res, _ = _wise_rules(replace(sched, events=sched.events + [gate]), circuit)
-    assert res["W2"].verdict == FAILS
+    assert res["R35"].verdict == FAILS
 
 
 def test_jones_wise_r2_still_rejects_two_ions_in_a_junction():

@@ -1,17 +1,12 @@
-# Opaque global reconfigurations captured from the artifact, without its formula.
+# The Jones artifact's own WISE mode (process_circuit_wise_arch at d235a22), replayed: its router
+# records each reconfiguration as one global permutation with a formula duration and no routes.
+# R29 times every other operation (a reconfiguration has no clock, so R29 does not judge it);
+# R37 holds the whole machine for one.
+
 ruleset "jones-wise-artifact"
-title "Jones's recorded WISE artifact"
-about "Jones's ordinary operations, plus recorded global permutations. Global durations are recorded, not checked; internal paths are not recorded."
+title "Surface-code QCCD, the artifact's WISE mode"
+about "Jones's rules, plus the global reconfigurations the artifact records: each one holds every trap, rail and junction, takes positive time and overlaps nothing. Their durations are recorded, not checked; their internal routes are not recorded."
+
 include "jones"
 param allow_reconfigure = true
-
-rule R29 "Ordinary operations last what the clock says; global durations are recorded, not checked"
-  about "Only the primitive operations have an independent clock law. Global permutation durations are recorded, not checked, even in strict mode."
-  for all o in operations where kind(o) != "reconfigure" and clocked(o):
-    approx(duration(o), clock(o))
-
-rule A1 "A global reconfiguration holds the whole device"
-  about "Every trap, rail and junction is held; no other operation may overlap, including operations on ions not in the recorded permutation."
-  (for all a in operations where kind(a) = "reconfigure": holds_device(a) and duration(a) > 0)
-  and (for all a, b in operations where a != b and kind(a) = "reconfigure":
-       not simultaneous(a, b))
+use R37

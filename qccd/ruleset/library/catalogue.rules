@@ -407,3 +407,29 @@ rule R31 "Broadcast transport moves in lockstep"
   and (for all a, b in operations where kind(a) = "hop" and kind(b) = "hop" and a != b
          and simultaneous(a, b):
        start(a) = start(b) and end(a) = end(b) and motion(a) = motion(b))
+
+rule R34 "Broadcast moves go in lockstep, in the direction the machine's geometry gives"
+  about "Under broadcast control one waveform drives every transport move of a cycle. On a timed schedule: every move's motion (its primitive and its direction) is read off the machine's coordinates, the motion the schedule records for it must agree, and moves that overlap start and end together with the same motion. R31 takes the recorded class on trust; this rule measures it. It fails on a schedule whose machine does not declare broadcast control."
+  source "arXiv:2305.12773; arXiv:2510.23519"
+  control() = "broadcast"
+  and (for all a in transport: displacement(a) != none and motion(a) = displacement(a))
+  and (for all a, b in transport where a != b and simultaneous(a, b):
+       start(a) = start(b) and end(a) = end(b) and displacement(a) = displacement(b))
+
+rule R35 "Transport within traps, transport between them and gates never overlap"
+  about "R4b read on a timed schedule: moves within a trap and moves between traps use different control pathways and never run at the same time, and neither runs alongside a gate, preparation, measurement or cooling."
+  source "arXiv:2504.17886"
+  for all a, b in operations where a != b and simultaneous(a, b) and movement_mode(a) != none:
+    (movement_mode(b) != none implies movement_mode(a) = movement_mode(b))
+    and kind(b) not in {"gate1", "gate2", "measure", "reset", "cool"}
+
+rule R36 "Every trap that sits a broadcast move out has its own switch"
+  about "R4d's opt-out read on a timed schedule: while a broadcast move runs, every trap outside the legs the moves of that time use must declare its own switch, so that it can hold still. R34 asks for the shared waveform."
+  source "deck_v3; arXiv:2305.12773"
+  for all a in transport: opt_out_ready(a)
+
+rule R37 "A recorded global reconfiguration holds the whole machine"
+  about "A reconfiguration a paper's tool records as one global permutation, without its routes, holds every trap, rail and junction while it runs, takes positive time, and overlaps no other operation, not even one on an ion it does not move. Its duration is recorded, not checked: R29 has no law for it."
+  (for all a in operations where kind(a) = "reconfigure": holds_machine(a) and duration(a) > 0)
+  and (for all a, b in operations where a != b and kind(a) = "reconfigure":
+       not simultaneous(a, b))

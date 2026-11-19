@@ -602,7 +602,7 @@ def check(
             if a.kind == "reconfigure":
                 for b in events:
                     if a.id != b.id and a.t0 < b.t1 - tol and b.t0 < a.t1 - tol:
-                        v("global_hold", f"reconfigure {a.id} holds the whole device while event {b.id} runs",
+                        v("global_hold", f"reconfigure {a.id} holds the whole machine while event {b.id} runs",
                           a.id, b.id)
 
     # -- close open residencies at +inf --------------------------------------------

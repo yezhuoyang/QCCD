@@ -27,6 +27,8 @@ SETS = (
     ("qccdsim-gateset", "QCCDSim, gates as a set"),
     ("cyclone", "Cyclone"),
     ("jones", "Surface-code QCCD"),
+    ("jones-wise", "Surface-code QCCD under broadcast control"),
+    ("jones-wise-artifact", "Surface-code QCCD, the artifact's WISE mode"),
     ("tiscc", "TISCC"),
     ("trapsimd", "TrapSIMD"),
     ("ionshuttler", "IonShuttler, exact router"),
