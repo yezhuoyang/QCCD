@@ -1,7 +1,7 @@
 # The Jones artifact's own WISE mode (process_circuit_wise_arch at d235a22), replayed: its router
 # records each reconfiguration as one global permutation with a formula duration and no routes.
 # R29 times every other operation (a reconfiguration has no clock, so R29 does not judge it);
-# R37 holds the whole machine for one.
+# R38 holds the whole machine for one.
 
 ruleset "jones-wise-artifact"
 title "Surface-code QCCD, the artifact's WISE mode"
@@ -9,4 +9,4 @@ about "Jones's rules, plus the global reconfigurations the artifact records: eac
 
 include "jones"
 param allow_reconfigure = true
-use R37
+use R38

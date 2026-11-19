@@ -217,7 +217,7 @@ PAPERS: list[dict] = [
                     "reconfiguration as one global permutation of the ions, with a duration from a "
                     "formula and no moves inside it, so these runs are replayed with each "
                     "reconfiguration as one step: it must find its ions where the replay has them, "
-                    "it holds the whole machine while it runs (R37), and its duration is recorded, "
+                    "it holds the whole machine while it runs (R38), and its duration is recorded, "
                     "not checked; every other operation is timed by the paper's law. The replay "
                     "gives their code's start of the last step exactly. All three fail the circuit "
                     "check (R26): at d = 3, data qubit 5 meets Z-check ancilla 13 at 4,420 µs, before "

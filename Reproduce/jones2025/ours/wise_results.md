@@ -70,15 +70,15 @@ the included Jones commuting-order rule R26 for our schedules.
 | R27 trap exclusion | holds |
 | R29 durations | holds |
 | R30 declared component locks | holds |
-| R34 geometry, labels and lockstep | holds |
-| R35 timed R4b counterpart | holds |
-| R36 timed R4d counterpart | holds |
+| R35 geometry, labels and lockstep | holds |
+| R36 timed R4b counterpart | holds |
+| R37 timed R4d counterpart | holds |
 
 R4b and R4d themselves quantify programme steps and explicitly do not apply
-to timed schedules. R35 enforces their intra/inter transport separation and
-exclusion of simultaneous gates, resets, measurements and cooling. R36 checks
-every idle trap for a per-site switch; R34 supplies R4d's common-waveform part.
-R22 evaluates on schedules; its legacy `motion` still reads the label. R34
+to timed schedules. R36 enforces their intra/inter transport separation and
+exclusion of simultaneous gates, resets, measurements and cooling. R37 checks
+every idle trap for a per-site switch; R35 supplies R4d's common-waveform part.
+R22 evaluates on schedules; its legacy `motion` still reads the label. R35
 compares a separate `displacement` fact derived from the machine's coordinates and
 requires the label to agree, so uniformly lying labels are rejected as well.
 

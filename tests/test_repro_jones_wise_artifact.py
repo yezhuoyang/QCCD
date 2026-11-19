@@ -112,7 +112,7 @@ def test_wise_catalog_replay_has_exact_tool_comparison(distance):
     verdicts = {r["id"]: r["verdict"] for r in row["rules"]["results"]}
     assert {key for key, value in verdicts.items() if value != "holds"} == {"R26"}
     assert verdicts["R26"] == "fails"
-    assert verdicts["R0"] == verdicts["R6b"] == verdicts["R37"] == "holds"
+    assert verdicts["R0"] == verdicts["R6b"] == verdicts["R38"] == "holds"
     assert verdicts["R29"] == "holds"
     assert "recorded, not checked" in row["rules"]["recorded_checks"]["reconfigure_durations"]
 
@@ -174,7 +174,7 @@ def test_rules_global_hold_excludes_junction_crossing():
     from qccd.ruleset import check_schedule
     rep = check_schedule("jones-wise-artifact", _junction_overlap_schedule(),
                          duration=jones_duration)
-    assert rep.failed() == ["R37"]
+    assert rep.failed() == ["R38"]
 
 
 def test_rules_apply_global_permutation_only_at_its_end(tmp_path):

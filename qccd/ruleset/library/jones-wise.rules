@@ -1,7 +1,7 @@
 # Jones et al. 2025's rules under WISE broadcast control (arXiv:2305.12773), on the paper's own
 # junction grid: our schedules of qccd/repro/sched_wise.py are judged by it.
 #
-# R4b, R4d and R22 are about a programme's steps and do not apply to a timed schedule; R34-R36
+# R4b, R4d and R22 are about a programme's steps and do not apply to a timed schedule; R35-R37
 # say the same things of a schedule's moves, with every move's direction read off the machine's
 # coordinates rather than taken from its label.
 
@@ -10,4 +10,4 @@ title "Surface-code QCCD under broadcast control"
 about "Jones's rules, plus WISE control: one waveform drives every transport move of a cycle, so moves that overlap in time start and end together and make the same motion (primitive and direction, read off the machine's geometry); a trap may sit a cycle out only by its own switch, never do something else; and moves within traps, moves between them and gates never overlap."
 
 include "jones"
-use R4d, R4b, R22, R34, R35, R36
+use R4d, R4b, R22, R35, R36, R37

@@ -36,7 +36,7 @@ searched. Exact timing reproduction therefore does not certify a valid round.
 Both checkers verify conservation and unique ion IDs, recorded input chains,
 capacity after the permutation, positions changing at its end, and exclusion
 on held ions and the **entire machine** (every trap, segment and junction).
-All rule verdicts except R26 hold: R37, R0, R1, R2, R3, R6b, R8, R14, R24,
+All rule verdicts except R26 hold: R38, R0, R1, R2, R3, R6b, R8, R14, R24,
 R27, R29 and R30. R29 checks ordinary operations only; the rule result's
 `recorded_checks` field explicitly excludes global durations and paths.
 

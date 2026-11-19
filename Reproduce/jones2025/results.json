@@ -200,7 +200,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.02
+   "seconds": 0.03
   },
   {
    "id": "grid_rot_d3_c2",
@@ -383,7 +383,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.05
+   "seconds": 0.06
   },
   {
    "id": "grid_rot_d6_c2",
@@ -566,7 +566,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.19
+   "seconds": 0.27
   },
   {
    "id": "grid_rot_d12_c2",
@@ -749,7 +749,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.74
+   "seconds": 1.51
   },
   {
    "id": "grid_rot_d2_c2_afbd1b4",
@@ -918,7 +918,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.02
+   "seconds": 0.04
   },
   {
    "id": "grid_rot_d3_c2_afbd1b4",
@@ -1087,7 +1087,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.04
+   "seconds": 0.08
   },
   {
    "id": "grid_rot_d6_c2_afbd1b4",
@@ -1256,7 +1256,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.18
+   "seconds": 0.37
   },
   {
    "id": "grid_rot_d12_c2_afbd1b4",
@@ -1425,7 +1425,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.72
+   "seconds": 1.42
   },
   {
    "id": "grid_rot_d2_c2_afbd1b4_hb",
@@ -1932,7 +1932,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.17
+   "seconds": 0.24
   },
   {
    "id": "grid_rot_d12_c2_afbd1b4_hb",
@@ -2101,7 +2101,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.74
+   "seconds": 1.2
   },
   {
    "id": "linear_rep_d3_c2",
@@ -2786,7 +2786,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.05
+   "seconds": 0.08
   },
   {
    "id": "switch_rot_d3_c2_at6d4b467",
@@ -2957,7 +2957,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.05
+   "seconds": 0.07
   },
   {
    "id": "wise_rot_d2_c2",
@@ -3062,7 +3062,7 @@
       "core": false
      },
      {
-      "id": "R37",
+      "id": "R38",
       "title": "A recorded global reconfiguration holds the whole machine",
       "verdict": "holds",
       "core": false
@@ -3143,7 +3143,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.01
+   "seconds": 0.02
   },
   {
    "id": "wise_rot_d3_c2",
@@ -3248,7 +3248,7 @@
       "core": false
      },
      {
-      "id": "R37",
+      "id": "R38",
       "title": "A recorded global reconfiguration holds the whole machine",
       "verdict": "holds",
       "core": false
@@ -3329,7 +3329,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.01
+   "seconds": 0.04
   },
   {
    "id": "wise_rot_d6_c2",
@@ -3437,7 +3437,7 @@
       "core": false
      },
      {
-      "id": "R37",
+      "id": "R38",
       "title": "A recorded global reconfiguration holds the whole machine",
       "verdict": "holds",
       "core": false
@@ -3518,7 +3518,7 @@
     },
     "circuit_file": "circuit.stim"
    },
-   "seconds": 0.07
+   "seconds": 0.14
   }
  ],
  "ratios": [],
@@ -3642,7 +3642,7 @@
     "moves": 0
    },
    "theirs_ok": true,
-   "seconds": 0.01,
+   "seconds": 0.04,
    "beside": [
     {
      "id": "grid_rot_d2_c2_afbd1b4",
@@ -3783,7 +3783,7 @@
     "moves": 0
    },
    "theirs_ok": true,
-   "seconds": 0.04,
+   "seconds": 0.11,
    "beside": [
     {
      "id": "grid_rot_d3_c2_afbd1b4",
@@ -3924,7 +3924,7 @@
     "moves": 0
    },
    "theirs_ok": true,
-   "seconds": 0.19,
+   "seconds": 0.29,
    "beside": [
     {
      "id": "grid_rot_d6_c2_afbd1b4",
@@ -4065,7 +4065,7 @@
     "moves": 0
    },
    "theirs_ok": true,
-   "seconds": 0.8,
+   "seconds": 0.83,
    "beside": [
     {
      "id": "grid_rot_d12_c2_afbd1b4",
@@ -4218,19 +4218,19 @@
           "core": false
          },
          {
-          "id": "R34",
+          "id": "R35",
           "title": "Broadcast moves go in lockstep, in the direction the machine's geometry gives",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R35",
+          "id": "R36",
           "title": "Transport within traps, transport between them and gates never overlap",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R36",
+          "id": "R37",
           "title": "Every trap that sits a broadcast move out has its own switch",
           "verdict": "holds",
           "core": false
@@ -4253,7 +4253,7 @@
       "moves": 0
      },
      "theirs_ok": true,
-     "seconds": 0.03
+     "seconds": 0.04
     },
     {
      "id": "grid_rot_d3_c2_wise",
@@ -4377,19 +4377,19 @@
           "core": false
          },
          {
-          "id": "R34",
+          "id": "R35",
           "title": "Broadcast moves go in lockstep, in the direction the machine's geometry gives",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R35",
+          "id": "R36",
           "title": "Transport within traps, transport between them and gates never overlap",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R36",
+          "id": "R37",
           "title": "Every trap that sits a broadcast move out has its own switch",
           "verdict": "holds",
           "core": false
@@ -4412,7 +4412,7 @@
       "moves": 0
      },
      "theirs_ok": true,
-     "seconds": 0.09
+     "seconds": 0.11
     },
     {
      "id": "grid_rot_d6_c2_wise",
@@ -4536,19 +4536,19 @@
           "core": false
          },
          {
-          "id": "R34",
+          "id": "R35",
           "title": "Broadcast moves go in lockstep, in the direction the machine's geometry gives",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R35",
+          "id": "R36",
           "title": "Transport within traps, transport between them and gates never overlap",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R36",
+          "id": "R37",
           "title": "Every trap that sits a broadcast move out has its own switch",
           "verdict": "holds",
           "core": false
@@ -4571,7 +4571,7 @@
       "moves": 0
      },
      "theirs_ok": true,
-     "seconds": 1.25
+     "seconds": 1.16
     },
     {
      "id": "grid_rot_d12_c2_wise",
@@ -4695,19 +4695,19 @@
           "core": false
          },
          {
-          "id": "R34",
+          "id": "R35",
           "title": "Broadcast moves go in lockstep, in the direction the machine's geometry gives",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R35",
+          "id": "R36",
           "title": "Transport within traps, transport between them and gates never overlap",
           "verdict": "holds",
           "core": false
          },
          {
-          "id": "R36",
+          "id": "R37",
           "title": "Every trap that sits a broadcast move out has its own switch",
           "verdict": "holds",
           "core": false
@@ -4730,7 +4730,7 @@
       "moves": 0
      },
      "theirs_ok": true,
-     "seconds": 19.92
+     "seconds": 19.83
     }
    ]
   }
