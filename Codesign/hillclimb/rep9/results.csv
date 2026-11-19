@@ -1,0 +1,8 @@
+rank,T_jones_ms,eligible,audit_ok,long_chain_splits,T_ms_worst_labeling,id_dependent,dacs,traps,junctions,agent,board_id,file,note
+1,2.445,True,True,1,5.4,yes,72,3,0,a01,1792701966-a01-e9056d95,designs/01-a01-e9056d95.arch.json,seed: 3-trap path caps 2/14/4 (incumbent)
+2,2.445,True,True,1,5.13,yes,96,4,0,a01,1792703555-a01-a1d85afb,designs/02-a01-a1d85afb.arch.json,"orientation-robust 2.445: 4-trap path caps 2/14/4/2 zone G seg cap 2, direct 96 DACs; mirror also 2.445"
+3,3.305,True,True,0,3.645,yes,80,6,0,a01,1792704195-a01-8cf213c8,designs/03-a01-8cf213c8.arch.json,lcs0 3.305: 6-trap wise path caps 1/1/1/2/1/15 zones G/Mo/Go/Go/Mo/G seg cap 1; mirror also 3.305
+4,3.55,True,True,0,5.275,yes,120,5,0,a01,1792702527-a01-398bbd34,designs/04-a01-398bbd34.arch.json,"lcs0: 5-trap path caps 15/1/1/2/2 zones G/G/G/Go/Go seg cap 1, direct"
+,8.665,True,True,0,,unchecked,34,20,0,v1:a01,1792369913-a01-fffd85a7,,"v1 PR file 01-a01-fffd85a7 (1.305 ms in v1, 1.305 at search): racetrack ring(10,2,0), gate trap cap2 every 2nd site (no spam), cap-1 spam sites between: readouts deferred to one measure instruction"
+,9.585,True,True,0,,unchecked,34,18,0,v1:a02,1792370091-a02-e1d135de,,"v1 PR file 02-a02-e1d135de (1.305 ms in v1, 1.305 at search): race-track pass, ring(9,2,0) loop of 18 sites alternating gate-only (Go, cap2, no readout) and readout-only (Mo, cap1) zones; racetrack.ml defers readouts to one batched measure"
+,15.18,True,True,0,,unchecked,34,18,8,v1:a02,1792369849-a02-883f375b,,"v1 PR file 03-a02-883f375b (15.18 ms in v1, 2.06 at search): rotate regime, ring(5,2,10) with docks only at rails 1..8 so ancilla i docks beside data i+1; batches at offset 0 and +1 (one 100us rotation). Matches the 2.06 estimate"
