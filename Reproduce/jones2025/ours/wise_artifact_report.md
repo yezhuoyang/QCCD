@@ -35,8 +35,8 @@ searched. Exact timing reproduction therefore does not certify a valid round.
 
 Both checkers verify conservation and unique ion IDs, recorded input chains,
 capacity after the permutation, positions changing at its end, and exclusion
-on held ions and the **entire device** (every trap, segment and junction).
-All rule verdicts except R26 hold: A1, R0, R1, R2, R3, R6b, R8, R14, R24,
+on held ions and the **entire machine** (every trap, segment and junction).
+All rule verdicts except R26 hold: R37, R0, R1, R2, R3, R6b, R8, R14, R24,
 R27, R29 and R30. R29 checks ordinary operations only; the rule result's
 `recorded_checks` field explicitly excludes global durations and paths.
 
@@ -46,7 +46,7 @@ The dumps supply no internal routes or topology: routing feasibility,
 waveforms, and the global pricing formula are **not checked**, never passed.
 A positive recorded permutation alone provides no certificate of a physical
 route. The tests also reject a concurrent junction crossing by an untouched
-ion; the whole-device hold does not invent extra ion occupancy.
+ion; the whole-machine hold does not invent extra ion occupancy.
 
 The all-paper before/after audit found **no ok/BAD changes in any of the 97 rows**
 (77 ok / 20 BAD in both runs). Both commands exit 1 for the existing failures.

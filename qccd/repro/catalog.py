@@ -209,7 +209,21 @@ PAPERS: list[dict] = [
                     "the circuit's gate order; it also adds pass_barriers=False, which orders the "
                     "same operations by the components' happens-before relation alone, without "
                     "barriers. Both are run here at every distance, with the same driver as "
-                    "above. The operations, and each ion's route, are the same as at d235a22."}},
+                    "above. The operations, and each ion's route, are the same as at d235a22."},
+            "wise": {
+            "title": "The artifact's own WISE mode (d235a22)",
+            "text": "The code behind Table 2 also compiles a round for a WISE machine "
+                    "(process_circuit_wise_arch, capacity 2). Its router records each "
+                    "reconfiguration as one global permutation of the ions, with a duration from a "
+                    "formula and no moves inside it, so these runs are replayed with each "
+                    "reconfiguration as one step: it must find its ions where the replay has them, "
+                    "it holds the whole machine while it runs (R37), and its duration is recorded, "
+                    "not checked; every other operation is timed by the paper's law. The replay "
+                    "gives their code's start of the last step exactly. All three fail the circuit "
+                    "check (R26): at d = 3, data qubit 5 meets Z-check ancilla 13 at 4,420 µs, before "
+                    "X-check ancilla 11 at 13,925 µs, the reverse of the circuit's order; rebuilt in "
+                    "the order run, the noiseless detectors are not deterministic, in either memory "
+                    "basis."}},
         "what": "A compiler for surface-code rounds on grid, linear and switch QCCD machines, and a "
                 "design-space study of trap capacity, wiring and logical error.",
         "model": {"profile": "JONES", "law": "jones"},
@@ -266,8 +280,8 @@ PAPERS: list[dict] = [
              "circuit": {"kind": "stim", "file": f"rotated_memory_z_d{d}_r1.stim"},
              "expect": {"tool": {"last_start_us": [
                  "metrics", "time for operations (us) = max(parallelOpsMap.keys())*1e6 [start of last step]"]}},
-             "label": f"rotated surface code d={d}, artifact WISE global reconfiguration, capacity 2",
-             "no_studio": "the artifact records WISE reconfiguration as one global permutation with a formula duration, without internal shuttle paths; replayed as a lumped state transition"}
+             "label": f"rotated surface code d={d}, one round, WISE, capacity 2", "group": "wise",
+             "no_studio": "each reconfiguration is recorded as one permutation of the ions, without the moves inside it, so the Studio has nothing to draw; it is replayed, not drawn"}
             for d in (2, 3, 6)
         ],
     },
@@ -678,18 +692,34 @@ OURS: dict[str, dict] = {
                  "other kind alternates ends (8 trips); those tours set the round's length, about the "
                  "same at every distance. The table gives the start of the last operation, the time "
                  "the paper reports; for every schedule here it is a final reset, 50 µs before the end.",
+        # a second box, under broadcast (WISE) control, so that the box above and the index's
+        # "ours" keep meaning the standard control (PR #8 review)
         "boxes": [{
             "id": "wise",
             "title": "Ours, WISE control",
-            "how": "Broadcast control on Jones's junction grid: the same geometry, mapping and native "
-                   "operations, exact per-qubit Stim order, one geometric transport class per cycle. "
-                   "Every idle trap declares a per-site switch; intra/inter transport and gates do not overlap.",
-            "found": "All four split schedules retain full searched distance in both memory bases. "
-                     "Last start is 4070 µs (makespan 4120 µs); John's current Ours is faster. "
-                     "No waveform switching cost is charged. This is broadcast control on Jones's junction grid.",
+            "tool": ("qccd/repro/sched_wise.py", "a broadcast-control scheduler we wrote for this comparison"),
+            "keeps": "the paper's machine, its placement of qubits in traps, its native decomposition of "
+                     "H and CNOT, its timing law and each qubit's gates in the circuit's exact order",
+            "changes": "the control: one waveform per transport cycle",
+            "theirs_label": "their code, fixed, without barriers",
+            "how": "Broadcast control on the paper's junction grid, not a different machine: one waveform "
+                   "drives every transport move of a cycle, so the moves that run together start and end "
+                   "together and make the same motion, read off the machine's geometry rather than taken "
+                   "from a label. A trap that sits a cycle out holds still by a switch of its own, which "
+                   "every trap of these schedules declares; moves within traps, moves between them and "
+                   "gates never overlap. Each pass sends one group of ancillas out in one direction, runs "
+                   "their CNOTs in every trap at once and brings every visitor home.",
+            "found": "Under one waveform per cycle the round takes 72 transport cycles at every distance, "
+                     "3,240 µs of them transport, and its last operation starts at 4,070 µs (the round "
+                     "ends at 4,120 µs): slower than our schedules above, which may move ions in "
+                     "different ways at once, and slower than the authors' fixed code. Switching "
+                     "waveforms between cycles is charged nothing. Rebuilt in the order these schedules "
+                     "run their CNOTs, every detector is deterministic in both memory bases, and a "
+                     "bounded search finds no logical error shorter than the code's distance.",
             "runs": [{"id": f"grid_rot_d{d}_c2_wise", "file": f"ours/grid_rot_d{d}_c2_wise.schedule.json.gz",
-                      "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES_WISE",),
-                      "label": f"rotated surface code d={d}, broadcast control on Jones's junction grid"}
+                      "against": f"grid_rot_d{d}_c2_afbd1b4_hb", "same_ops": "sequence",
+                      "profiles": ("JONES_WISE",),
+                      "label": f"rotated surface code d={d}, one round, grid, capacity 2, broadcast control"}
                      for d in (2, 3, 6, 12)],
         }],
     },
