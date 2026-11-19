@@ -77,7 +77,7 @@ def test_jones_wise_geometry_rejects_uniform_false_cycle_without_changing_motion
                                    if e.kind == "split" and e.t0 == cycle else e for e in sched.events])
     res, exe = _wise_rules(sched, circuit)
     split = next(o for o in exe.ops if o.kind == "split")
-    assert split.facts["motion"] == "split:S"  # John's existing input is preserved.
+    assert split.facts["motion"] == "split:S"  # the recorded label is kept as it was.
     assert split.facts["displacement"] == "split:N"
     assert res["R22"].verdict == HOLDS  # uniform strings alone do not detect this.
     assert res["R34"].verdict == FAILS
