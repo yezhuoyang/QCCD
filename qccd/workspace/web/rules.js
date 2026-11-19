@@ -13,14 +13,14 @@
       id: 'rules-transport',
       title: 'Transport & control',
       blurb: 'How ions may move: declared movement classes, rail ordering, loop direction, split placement and the waveforms that can run together.',
-      rules: ['R4', 'R4b', 'R4d', 'R5', 'R11', 'R14', 'R22', 'R31']
+      rules: ['R4', 'R4b', 'R4d', 'R5', 'R11', 'R14', 'R22', 'R31', 'R35', 'R36', 'R37']
     },
     {
       id: 'rules-operation',
       title: 'Operations & timing',
       blurb: 'What may run at a site and when: capabilities, cooling and heating, gate serialization, circuit correctness, ordering and duration.',
       rules: ['R6', 'R6b', 'R7', 'R7b', 'R7c', 'R8', 'R9', 'R10', 'R12', 'R15', 'R16', 'R17',
-              'R24', 'R25', 'R26', 'R27', 'R29', 'R30', 'R32', 'R33']
+              'R24', 'R25', 'R26', 'R27', 'R29', 'R30', 'R32', 'R33', 'R38']
     },
     {
       id: 'rules-c2lr',

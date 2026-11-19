@@ -87,7 +87,8 @@ compiles, cools, checks R10 (with the proved checker when it is built) and judge
 ## The rule sets
 
 `standard` (this website's machine), `qccdsim`, `qccdsim-physical`, `qccdsim-gateset`,
-`cyclone`, `jones`, `tiscc`, `trapsimd`, `ionshuttler`, `ionshuttler-heuristic`.
+`cyclone`, `jones`, `jones-wise` (broadcast control on its grid), `jones-wise-artifact` (its
+artifact's WISE mode), `tiscc`, `trapsimd`, `ionshuttler`, `ionshuttler-heuristic`.
 `python -m qccd.ruleset list` / `show <set>`.  Our own schedules on Reproduce are judged by
 the paper's set with R25 (each qubit's exact order) in place of R26 (`keeping_order`).
 

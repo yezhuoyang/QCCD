@@ -14,7 +14,7 @@ sees every event with the state before it and accumulates whatever the paper acc
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Mapping
 
 from .timed import Context, Event, Profile
@@ -25,6 +25,8 @@ __all__ = [
     "QCCDSIM_GATESET",
     "TISCC",
     "JONES",
+    "JONES_WISE",
+    "JONES_WISE_ARTIFACT",
     "QCCDSimParams",
     "qccdsim_gate_us",
     "qccdsim_duration",
@@ -284,11 +286,24 @@ JONES = Profile(
     declared_locks=True,             # the artifact lists every component an op holds
 )
 
+#: Jones's device and exclusion rules with one transport waveform per cycle.
+#: Events must declare their waveform class in meta["class"]; physical direction
+#: belongs in that class when the waveform distinguishes directions.
+JONES_WISE = replace(
+    JONES,
+    name="jones-wise",
+    broadcast=("split", "merge", "transit", "j_enter", "j_exit", "swap"),
+)
+
+# This profile permits replay of opaque global permutations, not broadcast primitives.
+JONES_WISE_ARTIFACT = replace(JONES, name="jones-wise-artifact", allow_reconfigure=True)
+
 JONES_US = {"gate": 40.0, "gate1": 5.0, "measure": 400.0, "reset": 50.0, "split": 80.0,
             "merge": 80.0, "transit": 5.0, "j_enter": 50.0, "j_exit": 50.0, "swap": 120.0}
 
 
 def jones_duration(e: Event, ctx: Context) -> float | None:
+    # Global reconfiguration's operationTime is an observation, not a clock law.
     return JONES_US.get(e.kind)
 
 

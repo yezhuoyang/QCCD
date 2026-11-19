@@ -164,6 +164,11 @@ def _rules_section(p: dict, res: dict | None) -> str:
         for pr in (o.get("profiles") or {}).values():
             if pr.get("rules"):
                 rows.append((f'ours: {o.get("label", o["id"])}', pr["rules"]))
+    for box in (res or {}).get("ours_boxes", []):
+        for o in box.get("runs", []):
+            for pr in (o.get("profiles") or {}).values():
+                if pr.get("rules"):
+                    rows.append((f'{box["title"].lower()}: {o.get("label", o["id"])}', pr["rules"]))
     if not rows:
         return ""
     sets: list[str] = []
@@ -342,12 +347,16 @@ def _paper_section(p: dict, res: dict | None) -> str:
                    f'<th>{head}: their code</th><th>our replay</th><th>the paper\'s rules</th></tr>')
         for r in grows:
             t, o, _ = _compare_cells(r, metric)
-            watch = (f'<br><a class="rp-watch" href="{_e(p["key"])}/{_e(r["id"])}.html">▶ watch it in the Studio</a>'
+            spec = next((x for x in p["runs"] if x["id"] == r["id"]), {})
+            watch = (f'<br><small class="rp-skip">{_e(spec["no_studio"])}</small>' if spec.get("no_studio")
+                     else f'<br><a class="rp-watch" href="{_e(p["key"])}/{_e(r["id"])}.html">▶ watch it in the Studio</a>'
                      + _timed_link(p, r["id"]))
             out.append(f'<tr><td>{_e(r.get("label", r["id"]))}{watch}</td><td class="n">{t}</td>'
                        f'<td class="n">{o}</td><td>{_rules_pill(r.get("rules")) or _checks(r)}</td></tr>')
         out.append("</table>")
     out.append(_ours_box(p, res))
+    for box in (res or {}).get("ours_boxes", []):
+        out.append(_ours_box(p, res, box))
     out.append(_rules_section(p, res))
     note = _studio_note(p, res) or _clock_note(p, res)
     if note:
@@ -550,19 +559,26 @@ def _made_by(spec: dict) -> str:
     return out + "</p>"
 
 
-def _ours_box(p: dict, res: dict | None) -> str:
+def _ours_box(p: dict, res: dict | None, box: dict | None = None) -> str:
     """Our own schedules on the paper's machine, each checked like the paper's (strict
-    durations, the paper's circuit), next to the paper's own run."""
+    durations, the paper's circuit), next to the paper's own run.  With `box` (an entry of
+    the results' "ours_boxes"), a further set of ours under rules of its own (Jones: WISE
+    control), in a box of its own so that the first box keeps meaning the standard one."""
     key = p["key"]
     spec = catalog.OURS.get(key)
     rows = [o for o in (res or {}).get("ours", []) if o.get("ok")]
     head = '<div class="rp-ours"><b>Our schedule on the same machine, under the same rules</b>'
+    if box is not None:
+        spec = next((b for b in (spec or {}).get("boxes", []) if b["id"] == box["id"]), None)
+        rows = [o for o in box.get("runs", []) if o.get("ok")]
+        head = f'<div class="rp-ours"><b>{_e(box["title"])}</b>'
     if not spec or not rows:
         return (head + "Not yet: no schedule of ours for this paper has been checked. Nothing "
                 "is shown here until one passes every rule the paper's own schedules are held to."
                 "</div>")
     books = {"qccdsim": "QCCDSim's chain bookkeeping", "qccdsim-physical-swap": "the physical one",
              "cyclone": "Cyclone's rules", "jones": "the paper's rules, its declared locks included",
+             "jones-wise": "the paper's rules under broadcast control",
              "tiscc": "TISCC's rules", "qccdsim (gates as a set)": "QCCDSim's rules, gates in any order the "
              "paper allows"}
     out = [head + _made_by(spec) + f"<p>{_e(spec['how'])} Each schedule below is replayed by the same checker "
@@ -1356,8 +1372,10 @@ def studio_pages(tmp: Path, only: set[str] | None = None):
                     yield _model_studio(p, run, tmp, model)
             continue
         res = _results(p["key"]) or {}
-        for o in catalog.OURS.get(p["key"], {}).get("runs", []):
-            row = next((x for x in res.get("ours", []) if x["id"] == o["id"] and x.get("ok")), None)
+        ours_spec = catalog.OURS.get(p["key"], {})
+        checked = res.get("ours", []) + [x for b in res.get("ours_boxes", []) for x in b.get("runs", [])]
+        for o in ours_spec.get("runs", []) + [x for b in ours_spec.get("boxes", []) for x in b["runs"]]:
+            row = next((x for x in checked if x["id"] == o["id"] and x.get("ok")), None)
             if row is None or (only and o["id"] not in only):
                 continue
             spec = next(x for x in p["runs"] if x["id"] == o["against"])

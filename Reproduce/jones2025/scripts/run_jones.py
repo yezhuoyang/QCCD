@@ -7,6 +7,7 @@ functions from the outside to *observe* their inputs/outputs:
 
   * src.simulator.qccd_circuit.ionRouting               -> device + initial layout (at entry),
                                                            allOps + barriers (at exit)
+  * src.simulator.qccd_circuit.ionRoutingWISEArch       -> the same for the WISE recipe
   * src.simulator.qccd_circuit.paralleliseOperationsWithBarriers -> the {start time: ParallelOperation} map
   * Operation.run / QubitOperation.run                  -> chain order of the touched traps,
                                                            junction/segment occupancy after every op
@@ -19,6 +20,8 @@ happens-before relation alone.  `--pass-barriers false` asks for that; the defau
 d235a22 call byte for byte, and at d235a22 `layerBarriers` is never passed.
 
 Recipes
+  wise            : process_circuit_wise_arch(distance=d, capacity=2,
+                    gate_improvements=[], num_shots=1); global moves remain lumped
   process_circuit : src.simulator.qccd_circuit.process_circuit(d, c, gate_improvements=[], num_shots=1)
                     (the driver used by experiments/trap_capacity_experiments.py; gate_improvements=[]
                     skips the stim sampling / decoding loop entirely; it does not touch the schedule)
@@ -39,7 +42,7 @@ def main():
     ap.add_argument("--repo", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--name", required=True)
-    ap.add_argument("--recipe", choices=["process_circuit", "notebook"], required=True)
+    ap.add_argument("--recipe", choices=["process_circuit", "notebook", "wise"], required=True)
     ap.add_argument("--code", choices=["rotated", "repetition"], default="rotated")
     ap.add_argument("--distance", type=int, required=True)
     ap.add_argument("--capacity", type=int, required=True)
@@ -183,6 +186,24 @@ def main():
 
     qc.ionRouting = ionRouting
 
+    if hasattr(qc, "ionRoutingWISEArch"):
+        real_wise_routing = qc.ionRoutingWISEArch
+
+        def ionRoutingWISEArch(arch, wiseArch, instructions):
+            cap["device"] = snapshot_device(arch)
+            cap["initial_layout"] = {str(t.idx): [i.idx for i in t.ions]
+                                     for t in arch._manipulationTraps if t.ions}
+            cap["ion_labels"] = {str(i.idx): i.label for i in arch.ions.values()}
+            cap["instructions"] = list(instructions)
+            cap["trapCapacity_arg"] = wiseArch.k
+            cap["wise_arch"] = {key: int(getattr(wiseArch, key)) for key in ("m", "n", "k")}
+            allOps, barriers = real_wise_routing(arch, wiseArch, instructions)
+            cap["allOps"] = list(allOps)
+            cap["barriers"] = list(barriers)
+            return allOps, barriers
+
+        qc.ionRoutingWISEArch = ionRoutingWISEArch
+
     real_par = qc.paralleliseOperationsWithBarriers
 
     def paralleliseOperationsWithBarriers(ops, barriers):
@@ -216,9 +237,11 @@ def main():
         print(s)
         printed.append(s)
 
-    if args.recipe == "process_circuit":
+    if args.recipe in ("process_circuit", "wise"):
         if args.code != "rotated":
             raise SystemExit("process_circuit only builds the rotated surface code")
+        if args.recipe == "wise" and c != 2:
+            raise SystemExit("the wise recipe requires capacity=2")
         circuit_holder = {}
         real_generated = qc.QCCDCircuit.generated.__func__
 
@@ -229,9 +252,12 @@ def main():
             circuit_holder["args"] = (a, k)
             return circ
         qc.QCCDCircuit.generated = generated
+        if args.recipe == "wise":
+            results = qc.process_circuit_wise_arch(
+                distance=d, capacity=2, gate_improvements=[], num_shots=1)
         # ADAPTATION (afbd1b4): pass_barriers is a keyword of process_circuit; pass it only when
         # asked for False, so the default call is byte-for-byte the call made at d235a22.
-        if args.pass_barriers == "false":
+        elif args.pass_barriers == "false":
             results = qc.process_circuit(d, c, [], 1, pass_barriers=False)
         else:
             results = qc.process_circuit(d, c, [], 1)
@@ -334,6 +360,13 @@ def main():
             "involvedComponents": [comp_ref(x) for x in o.involvedComponents],
             "fidelity": float(o.fidelity()),
         }
+        if type(o).__name__ == "GlobalReconfigurations":
+            if rl is None:
+                raise RuntimeError("global reconfiguration has no observed state transition")
+            e["chains_before"] = rl["pre"]["traps"]
+            e["reconfigured_ions"] = sorted({i for ions in rl["pre"]["traps"].values() for i in ions}
+                                             | {i for ions in rl["post"]["traps"].values() for i in ions})
+            e["wise_arch"] = dict(cap["wise_arch"])
         if isinstance(o, qq.QubitOperation):
             e["ions"] = [i.idx for i in o.ions]
             e["trap"] = o._trap.idx if o._trap is not None else None
@@ -430,7 +463,7 @@ def main():
             "capacity": c, "rows": args.rows, "cols": args.cols, "padding": args.padding, "traps": args.traps,
             "rounds": 1, "seed_numpy": args.seed, "topology_note": args.topology_note,
             "generated_args": [list(gen_args[0]), {k: (v if not isinstance(v, (list, tuple)) else list(v)) for k, v in gen_args[1].items()}],
-            "gate_improvements": [] if args.recipe == "process_circuit" else None,
+            "gate_improvements": [] if args.recipe in ("process_circuit", "wise") else None,
             "trapCapacity_passed_to_ionRouting": cap["trapCapacity_arg"],
             "layerBarriers_passed_to_ionRouting": cap.get("layerBarriers_arg"),
             "pass_barriers_arg": args.pass_barriers,
@@ -465,6 +498,8 @@ def main():
             "wall_seconds": round(wall, 2),
         },
     }
+    if args.recipe == "wise":
+        sched["config"]["wise_arch"] = dict(cap["wise_arch"])
     if results is not None:
         sched["metrics"]["process_circuit_results"] = json.loads(json.dumps(results, default=float))
     with open(os.path.join(out, "schedule.json"), "w", newline="\n") as f:
