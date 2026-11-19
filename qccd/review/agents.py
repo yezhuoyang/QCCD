@@ -328,11 +328,17 @@ class SigninSession:
             if self.rid != "claude" or self.state != "waiting" or self.proc is None:
                 raise RuntimeError("this sign-in is not waiting for a code")
             self.state, self.note, self.needs_code = "finishing", "checking the code", False
-        self.proc.stdin.write(code.encode("utf-8"))
-        self.proc.stdin.flush()
-        time.sleep(self.ENTER_AFTER_S)
-        self.proc.stdin.write(b"\r")
-        self.proc.stdin.flush()
+        try:
+            self.proc.stdin.write(code.encode("utf-8"))
+            self.proc.stdin.flush()
+            time.sleep(self.ENTER_AFTER_S)
+            self.proc.stdin.write(b"\r")
+            self.proc.stdin.flush()
+        except OSError:                          # the CLI has gone: say so now, not at the deadline
+            self._set(state="failed", error="the sign-in stopped before it took the code: start it again",
+                      finished=time.time())
+            self._remove()
+            raise RuntimeError("the sign-in stopped before it took the code: start it again") from None
 
     def cancel(self) -> None:
         self._set(state="cancelled", note="cancelled", finished=self.finished or time.time())

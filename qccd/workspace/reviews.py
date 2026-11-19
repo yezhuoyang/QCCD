@@ -54,18 +54,43 @@ def _err(code: str, message: str, status: int = 422, **detail):
     return WorkspaceError(code, message, status=status, detail=detail or None)
 
 
+#: how long a write waits for readers to let go of the file it replaces (Windows), and a read for
+#: the replace to finish
+_BUSY_S = 2.0
+
+
 def _write_json(path: Path, data) -> None:
+    """Write `path` whole, by a replace.  On Windows a file another thread has open cannot be replaced
+    (the review page reads state.json every second and a half while the review writes it every
+    second), so the replace waits a moment for the reader instead of failing the review."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(f"{path.name}.{threading.get_ident()}.tmp")
     tmp.write_text(json.dumps(data, indent=1, default=str), encoding="utf-8")
-    os.replace(tmp, path)
+    end = time.monotonic() + _BUSY_S
+    while True:
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if time.monotonic() > end:
+                tmp.unlink(missing_ok=True)
+                raise
+            time.sleep(0.01)
 
 
 def _read_json(path: Path):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
+    """`path`'s JSON, or None when there is none.  A file held for a moment by a replace (Windows) is
+    read again, not taken for missing: a review's state read as missing would be written back empty."""
+    end = time.monotonic() + _BUSY_S
+    while True:
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except PermissionError:
+            if time.monotonic() > end:
+                return None
+            time.sleep(0.01)
+        except (OSError, ValueError):
+            return None
 
 
 def _clean_link(v) -> str | None:

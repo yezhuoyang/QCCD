@@ -330,3 +330,54 @@ def test_a_request_is_checked_before_anything_runs():
     assert clean_request({**REQUEST, "link": "javascript:alert(1)"})["link"] is None
     assert clean_request({**REQUEST, "link": "https://evil.example/debug/"})["link"] is None
     assert clean_request({**REQUEST, "link": "https://qccd.academy/debug/?src=x"})["link"] == "https://qccd.academy/debug/?src=x"
+
+
+def test_a_review_s_state_is_written_while_its_page_reads_it(tmp_path):
+    """The review page reads state.json while the review writes it.  On Windows a replace fails
+    while another thread has the file open: the write must wait for the reader, not fail the
+    review, and a read must not take the busy file for a missing one."""
+    import threading
+    from qccd.workspace.reviews import _read_json, _write_json
+    p = tmp_path / "state.json"
+    _write_json(p, {"n": 0})
+    stop, seen = threading.Event(), []
+
+    def reader():
+        while not stop.is_set():
+            seen.append(_read_json(p) is not None)
+    readers = [threading.Thread(target=reader, daemon=True) for _ in range(2)]
+    for t in readers:
+        t.start()
+    try:
+        for n in range(300):
+            _write_json(p, {"n": n, "progress": ["x" * 200] * 20})
+    finally:
+        stop.set()
+        for t in readers:
+            t.join(5)
+    assert _read_json(p)["n"] == 299 and seen and all(seen)
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_a_code_sent_to_a_sign_in_that_has_gone_fails_it_at_once():
+    """The CLI exited (its container stopped) before the code arrived: the sign-in fails now, with
+    a reason, rather than sitting on "checking the code" until its 15 minutes run out."""
+    class Gone:
+        def write(self, b):
+            raise BrokenPipeError(32, "Broken pipe")
+
+        def flush(self):
+            pass
+
+    class Proc:
+        stdin = Gone()
+
+        def poll(self):
+            return 1
+    s = agents.SigninSession("claude")
+    s.proc, s.state = Proc(), "waiting"
+    s._remove = lambda: None
+    with pytest.raises(RuntimeError, match="stopped before it took the code"):
+        s.send("some-code#state")
+    v = s.view()
+    assert v["state"] == "failed" and "start it again" in v["error"]
