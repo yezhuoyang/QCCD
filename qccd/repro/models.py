@@ -26,6 +26,7 @@ __all__ = [
     "TISCC",
     "JONES",
     "JONES_WISE",
+    "JONES_WISE_ARTIFACT",
     "QCCDSimParams",
     "qccdsim_gate_us",
     "qccdsim_duration",
@@ -294,11 +295,15 @@ JONES_WISE = replace(
     broadcast=("split", "merge", "transit", "j_enter", "j_exit", "swap"),
 )
 
+# This profile permits replay of opaque global permutations, not broadcast primitives.
+JONES_WISE_ARTIFACT = replace(JONES, name="jones-wise-artifact", allow_reconfigure=True)
+
 JONES_US = {"gate": 40.0, "gate1": 5.0, "measure": 400.0, "reset": 50.0, "split": 80.0,
             "merge": 80.0, "transit": 5.0, "j_enter": 50.0, "j_exit": 50.0, "swap": 120.0}
 
 
 def jones_duration(e: Event, ctx: Context) -> float | None:
+    # Global reconfiguration's operationTime is an observation, not a clock law.
     return JONES_US.get(e.kind)
 
 

@@ -72,7 +72,8 @@ def schedule_hardware(dev) -> Hardware:
 def schedule_execution(sched, *, chain_order: str | None = None,
                        duration: Callable | None = None, strict_clock: bool = False,
                        circuit: Sequence[tuple[str, str]] | None = None,
-                       tol: float = 1e-6, name: str = "") -> Execution:
+                       tol: float = 1e-6, name: str = "",
+                       allow_reconfigure: bool = False) -> Execution:
     """Replay a `TimedSchedule`.
 
     ``chain_order``  how the chain is tracked through a reorder: "qccdsim" (the moving ion
@@ -189,11 +190,42 @@ def schedule_execution(sched, *, chain_order: str | None = None,
             malformed(f"names unknown ion {unknown[0]}")
             continue
         chain = chains.get(e.at) if e.at in chains else None
-        if duration is not None:
+        if duration is not None and e.kind != "reconfigure":
             want = duration(e, Context(dev, list(chain) if chain is not None else None,
                                        len(chain) if chain is not None else None))
             if want is not None or strict_clock:
                 o.facts["clock"] = want
+
+        if e.kind == "reconfigure":
+            # A hold is distinct from residency: no fictitious ions are added to
+            # capacity timelines. Unobserved internal paths are not invented.
+            o.facts["held_device"] = frozenset(hw.nodes + hw.rails)
+            o.facts["duration_status"] = "recorded, not checked"
+            if not allow_reconfigure:
+                malformed("this rule set does not allow reconfigure")
+                continue
+            if not math.isfinite(e.duration) or e.duration <= 0:
+                malformed("reconfigure duration must be finite and positive")
+            before, after = e.meta.get("chains_before", {}), e.meta.get("chains_after", {})
+            old = [i for ch in before.values() for i in ch]
+            new = [i for ch in after.values() for i in ch]
+            if (not before or set(before) != set(after) or
+                    any(t not in dev.sites for t in before) or
+                    len(e.ions) != len(set(e.ions)) or len(old) != len(set(old)) or
+                    len(new) != len(set(new)) or set(old) != set(new) or set(old) != set(e.ions)):
+                malformed("reconfiguration must preserve its ions and traps")
+                continue
+            if any(chains[t] != list(ch) or any(loc[i] != ("site", t) for i in ch)
+                   for t, ch in before.items()):
+                misplaced("observed input chains disagree with replay")
+                continue
+            for i in e.ions:
+                leave(i, e.t1)
+            for t, ch in after.items():
+                chains[t] = list(ch)
+                for i in ch:
+                    arrive(i, "site", t, e.t1, n)
+            continue
 
         if e.kind in ("gate", "gate1", "measure", "reset", "prepare", "swap", "cool"):
             where = [loc[i] for i in e.ions]
@@ -384,6 +416,10 @@ def schedule_execution(sched, *, chain_order: str | None = None,
     exe.facts["has_clock"] = duration is not None
     exe.facts["malformed_start"] = malformed_start
     exe.facts["ends_off_site"] = ends_on
+    if any(e.kind == "reconfigure" for e in events):
+        exe.facts["recorded_checks"] = {
+            "reconfigure_durations": "recorded, not checked; R29 checks ordinary operations only",
+            "reconfigure_paths": "not checked: global permutations contain no internal routes"}
 
     if circuit is not None:
         ion_of = dict(sched.qubits or {})

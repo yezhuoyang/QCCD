@@ -52,7 +52,7 @@ __all__ = [
 ]
 
 #: Events that change where an ion is.
-MOVE_KINDS = ("split", "merge", "move", "transit", "j_enter", "j_exit", "hop")
+MOVE_KINDS = ("split", "merge", "move", "transit", "j_enter", "j_exit", "hop", "reconfigure")
 #: Events that act on ions where they stand.
 PLACE_KINDS = ("gate", "gate1", "measure", "reset", "prepare", "swap", "cool")
 
@@ -194,6 +194,8 @@ class Profile:
     declared_locks: bool = False
     op_zones: tuple[tuple[str, tuple[str, ...]], ...] = ()
     tol: float = 1e-6
+    # Opaque recorded global permutations are only part of an explicit artifact model.
+    allow_reconfigure: bool = False
 
     def to_json(self) -> dict:
         d = asdict(self)
@@ -418,7 +420,9 @@ def check(
                       len(chain) if chain is not None else None)
         for obs in observers:
             obs(e, ctx)
-        if duration is not None:
+        if e.kind == "reconfigure" and (not math.isfinite(e.duration) or e.duration <= 0):
+            v("structure", f"reconfigure {e.id}: duration must be finite and positive", e.id)
+        if duration is not None and e.kind != "reconfigure":
             want = duration(e, ctx)
             if want is None and strict:
                 dur_bad += 1
@@ -430,6 +434,37 @@ def check(
                   f"{want:g}", e.id)
 
         # -- in-place events ------------------------------------------------------
+        if e.kind == "reconfigure":
+            if not profile.allow_reconfigure:
+                v("structure", f"reconfigure {e.id}: profile {profile.name} does not allow reconfigure", e.id)
+                continue
+            # An observed, opaque global move. Check the full state transition
+            # and hold every ion/trap, without inventing internal shuttle paths.
+            before = e.meta.get("chains_before", {})
+            after = e.meta.get("chains_after", {})
+            old_ions = [i for ch in before.values() for i in ch]
+            new_ions = [i for ch in after.values() for i in ch]
+            if (not before or set(before) != set(after) or
+                    any(t not in dev.sites for t in before) or
+                    len(e.ions) != len(set(e.ions)) or len(old_ions) != len(set(old_ions)) or
+                    len(new_ions) != len(set(new_ions)) or
+                    set(old_ions) != set(new_ions) or set(old_ions) != set(e.ions)):
+                v("structure", f"reconfigure {e.id}: state transition must preserve its ions and traps", e.id)
+                continue
+            if any(chains[t] != list(ch) or any(loc[i] != ("site", t) for i in ch)
+                   for t, ch in before.items()):
+                v("positions", f"reconfigure {e.id}: observed input chains disagree with replay", e.id)
+                continue
+            for t in dev.sites:
+                if profile.trap_serial:
+                    trap_ops.add(t, e.t0, e.t1, e.id)
+            for i in e.ions:
+                leave(i, e.t1)
+            for t, ch in after.items():
+                chains[t] = list(ch)
+                for i in ch:
+                    arrive(i, "site", t, e.t1)
+            continue
         if e.kind in PLACE_KINDS:
             where = [loc[i] for i in e.ions]
             if e.kind == "gate" and len(e.ions) == 2:
@@ -560,6 +595,16 @@ def check(
         else:
             v("structure", f"event {e.id}: unknown kind {e.kind!r}", e.id)
 
+    # A global hold excludes every operation, including moves on untouched ions
+    # and empty components. It is not extra ion occupancy (which would falsify capacity).
+    if profile.allow_reconfigure:
+        for a in events:
+            if a.kind == "reconfigure":
+                for b in events:
+                    if a.id != b.id and a.t0 < b.t1 - tol and b.t0 < a.t1 - tol:
+                        v("global_hold", f"reconfigure {a.id} holds the whole device while event {b.id} runs",
+                          a.id, b.id)
+
     # -- close open residencies at +inf --------------------------------------------
     for ion, (kind, where) in loc.items():
         if kind == "site":
@@ -629,6 +674,8 @@ def check(
 
     # -- verdicts ------------------------------------------------------------------------
     names = ["structure", "positions", "capacity", "ion_serial"]
+    if counts["reconfigure"] and profile.allow_reconfigure:
+        names.append("global_hold")
     for name, on, why in (("segment_mutex", profile.segment_mutex, "the profile allows sharing"),
                           ("junction_mutex", profile.junction_mutex, "the profile allows sharing"),
                           ("trap_serial", bool(profile.trap_serial), "the profile lets a trap overlap"),
@@ -644,6 +691,10 @@ def check(
     by = Counter(x.check for x in bad)
     for name in names:
         rep.checks[name] = "failed" if by.get(name) else "passed"
+    if counts["reconfigure"]:
+        if duration is not None and not by.get("durations"):
+            rep.checks["durations"] = "not checked: reconfigure durations are recorded, not checked; other events checked"
+        rep.checks["reconfigure_paths"] = "not checked: global permutations contain no internal routes"
 
     rep.metrics = {
         "makespan_us": max((e.t1 for e in sched.events), default=0.0),

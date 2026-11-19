@@ -22,6 +22,7 @@ from .timed import TimedSchedule, check
 ROOT = Path(__file__).resolve().parents[2] / "Reproduce"
 
 PROFILES = {"QCCDSIM": models.QCCDSIM, "QCCDSIM_PHYSICAL": models.QCCDSIM_PHYSICAL,
+            "JONES_WISE_ARTIFACT": models.JONES_WISE_ARTIFACT,
             "QCCDSIM_GATESET": models.QCCDSIM_GATESET,
             "TISCC": models.TISCC, "JONES": models.JONES, "JONES_WISE": models.JONES_WISE, "CYCLONE": models.CYCLONE}
 
@@ -30,6 +31,7 @@ PROFILES = {"QCCDSIM": models.QCCDSIM, "QCCDSIM_PHYSICAL": models.QCCDSIM_PHYSIC
 #: rules.  The timed checker's profile and the rule set say the same thing; the rule set is
 #: what the pages print, rule by rule.
 RULESETS = {"QCCDSIM": "qccdsim", "QCCDSIM_PHYSICAL": "qccdsim-physical",
+            "JONES_WISE_ARTIFACT": "jones-wise-artifact",
             "QCCDSIM_GATESET": "qccdsim-gateset", "TISCC": "tiscc", "JONES": "jones", "JONES_WISE": "jones-wise",
             "CYCLONE": "cyclone"}
 
@@ -62,10 +64,13 @@ def judge_by_rules(set_name: str, sched: TimedSchedule, *, law, circ, strict: bo
         rs = keeping_order(rs)
     chain = rs.params.get("chain_order")
     exe = schedule_execution(sched, chain_order=getattr(chain, "value", None), duration=law,
-                             strict_clock=strict, circuit=circ)
+                             strict_clock=strict, circuit=circ,
+                             allow_reconfigure=getattr(rs.params.get("allow_reconfigure"), "value", False))
     rep = rcheck(rs, exe)
     return {"ruleset": rs.name, "title": rs.title, "ok": rep.ok,
-            "results": [r.to_json() for r in rep.results]}
+            "results": [r.to_json() for r in rep.results],
+            **({"recorded_checks": exe.facts["recorded_checks"]}
+               if "recorded_checks" in exe.facts else {})}
 
 
 CACHE = ROOT.parent / "out" / "repro_cache"
