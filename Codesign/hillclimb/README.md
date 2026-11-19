@@ -1,6 +1,6 @@
-# Hillclimb · agent-designed devices for five architecture boards
+# Hillclimb · agent-designed machines for five architecture boards
 
-Teams of Claude Code agents searched for trapped-ion QCCD **devices** with the lowest `T_jones` on
+Teams of Claude Code agents searched for trapped-ion QCCD **machines** with the lowest `T_jones` on
 qccd.academy's architecture boards. A first campaign (v1, 2026-10-18 to 2026-10-19) searched the platform as
 it was then. Its agents found six gaps in the platform, which became issues #15-#20. Their fixes, with #21,
 landed on `compiler` on 2026-10-21 and changed the physics, and the v1 numbers no longer hold
@@ -12,7 +12,7 @@ Every v2 number here was graded with QCCD `compiler` at `84e8c5d`, the published
 `c774b87b677f` and the published Linux qcheck `e8acd6640fd3`. Production grades these boards with the same
 compiler ([toolchain](#the-toolchain)). Nothing has been submitted to the official leaderboard.
 
-| board | v2 best | worst labeling | best id-independent | best live design, graded here | faster by | the device |
+| board | v2 best | worst labeling | best id-independent | best live design, graded here | faster by | the machine |
 |---|---:|---:|---:|---:|---:|---|
 | [`surface17@1`](surface17/) | **3.49 ms** | 6.085 ms | 3.585 ms | 11.665 ms (`stationary_chain`) | 3.34× | 6 traps on a path, 15 ions in one of them, shared control, 33 DACs |
 | [`steane@1`](steane/) | **2.100 ms** | 2.100 ms | 2.100 ms | 9.785 ms (`stationary_chain`) | 4.66× | one trap holding all 13 ions, 24 DACs: the seed, not beaten |
@@ -20,14 +20,14 @@ compiler ([toolchain](#the-toolchain)). Nothing has been submitted to the offici
 | [`rep9@1`](rep9/) | **2.445 ms** | 5.13 ms | none | 2.91 ms (`stationary_chain`) | 1.19× | 4 traps on a path, 14 ions start in one, 96 DACs; ties the 3-trap seed (worst labeling 5.4 ms) |
 | [`bb144@1`](bb144/) | not re-run | | | | | v1's 168-trap cycle: 96.74 ms under the old physics, 2,313.66 ms under the fixes |
 
-- **v2 best** is the best `T_jones` a verifier reproduced, for the device file as the search logged it:
+- **v2 best** is the best `T_jones` a verifier reproduced, for the machine file as the search logged it:
   eligible under all ten reference stages, and passed this climb's audit.
-- **worst labeling** is the same device with its trap ids permuted or its positions mirrored: the worst grade
+- **worst labeling** is the same machine with its trap ids permuted or its positions mirrored: the worst grade
   its verifier found. The compiler breaks placement ties by trap id ([Caveats](#caveats)). Only on `rep9` is
   the worst labeling slower than the best live design (5.13 against 2.91 ms).
-- **best id-independent** is the best device that kept its score under every labeling its verifier tried.
+- **best id-independent** is the best machine that kept its score under every labeling its verifier tried.
   On `surface17` that is a01's 10-trap path, 3.585 ms in 4 graded variants and 17 `hc-fast` relabelings. On
-  `rep9` every graded device has a labeling that scores worse.
+  `rep9` every graded machine has a labeling that scores worse.
 - **best live design** is the fastest design on the board's qccd.academy page (fetched 2026-10-21 21:15 UTC),
   rebuilt and graded here. On all four boards it is `stationary_chain`, and the page's number reproduces
   exactly.
@@ -35,20 +35,20 @@ compiler ([toolchain](#the-toolchain)). Nothing has been submitted to the offici
 All four v2 bests win mainly through one long chain, which `T_jones` does not charge
 ([Caveats](#caveats)): 15 ions in one trap on `surface17`, all 13 on `steane`, all 9 on `five_qubit`, 14 on
 `rep9`. On `steane` and `five_qubit` the best is the brief's single-trap seed, unchanged. One agent-hour each
-found nothing faster, and the verifiers could not refute the agents' arguments that no device is faster under
+found nothing faster, and the verifiers could not refute the agents' arguments that no machine is faster under
 qccdc + `insert_cooling`. On `rep9` the best ties the brief's low-motion seed. On `surface17` the agents went
-from 4.375 ms, the best device measured before the run (a 2-trap path), to 3.49 ms.
+from 4.375 ms, the best machine measured before the run (a 2-trap path), to 3.49 ms.
 
 ### bb144
 
-`bb144` was not re-run. [`bb144/`](bb144/) is the first campaign's folder: devices found and graded under the
-old physics (96.74 ms then). Under the fixes its ten design files are one device written in ten orders,
+`bb144` was not re-run. [`bb144/`](bb144/) is the first campaign's folder: machines found and graded under the
+old physics (96.74 ms then). Under the fixes its ten design files are one machine written in ten orders,
 compile to one program (#20) and grade 2,313.66 ms, eligible, 2,271 ms of it transport. The board's live top
 rows, 24.93 ms (marked not buildable) and 55.62 ms, were compiled with a code-aware placement, on circuits of
 their own (216 and 180 qubits; the board's has 168). A submission cannot carry a placement: at `84e8c5d`,
-`submit_design` compiles with `auto`, `compile` or `rotate` and takes no placement. The page's device-only
+`submit_design` compiles with `auto`, `compile` or `rotate` and takes no placement. The page's machine-only
 rows are `grid13x13_broadcast` at 866.1 ms and `baseline_stride` at 1,419.13 ms (fetched 2026-10-21); the v1
-device is 2.67× and 1.63× slower than these. Whether a submission can carry a placement was asked on #10 on
+machine is 2.67× and 1.63× slower than these. Whether a submission can carry a placement was asked on #10 on
 2026-10-21 and is not answered yet. `bb144` waits for that answer.
 
 ---
@@ -100,7 +100,7 @@ python Codesign/hillclimb/grade.py rep9@1 Codesign/hillclimb/rep9/designs/*.arch
 The evaluator takes `QCCD_QCCDC` and `QCCD_QCHECK` if they are set, then a build in the checkout, then what
 `qccd toolchain install` installed. `grade.py` prints the paths it resolved and their sha256, and the commit
 and digests of the QCCD source it imported (commit "unknown" when that is not a git checkout), then one line
-per device: the board's ranked metric, eligibility, and the DACs, traps and junctions as the grader counts
+per machine: the board's ranked metric, eligibility, and the DACs, traps and junctions as the grader counts
 them (DACs with the physics' wiring floors). Without qcheck the required `lean_certificate` stage is
 `unsupported`, so every design comes out not eligible. On macOS `qccd toolchain install` fetches the macOS
 build of `c774b87b677f`, a different binary (it gives the Linux build's `T_jones` on the 19 v2 design files
@@ -121,13 +121,13 @@ The agents were Claude Code (Opus 5.5) subagents of one workflow. Every command 
 wrapper to a VM, where it ran as a sandboxed user: firewalled from qccd.academy, with no publishing
 credentials, and unable to write the grader or the compiler. Each agent got a brief: the board's circuit, the
 physics as `84e8c5d` prices it, the live designs rebuilt and graded on the VM, seeds graded before the run
-(the low-motion devices, v1 designs and the live designs), the floor arguments known so far, this climb's
+(the low-motion machines, v1 designs and the live designs), the floor arguments known so far, this climb's
 rules, and one strategy. On `surface17` the strategies were a lower bound, 2-trap partitions, 3- and 4-trap
 batches, measurement layout, a search engine, designs with no long-chain splits, cross-pollination, and
 junctions and conveyors. On the other boards the one agent was to prove the seed is the floor or beat it (on
 `rep9`, also to find a design with no long-chain splits).
 
-A design counted only through `hc-grade`. It compiles the board's circuit onto the device with the reference
+A design counted only through `hc-grade`. It compiles the board's circuit onto the machine with the reference
 compiler (qccdc + `insert_cooling`, compiler `auto`, no placement), then freezes and grades it with the
 reference evaluator (all ten stages, the Lean certificate included). It then runs this climb's audit and logs
 the result on the run's shared board. Probes used `hc-fast` (the same compile, cooling, rules stage and
@@ -143,7 +143,7 @@ trap-id tie-breaks implicitly, which is why each id-dependent number is reported
 ## Rules of this climb
 
 **What the platform now does itself.** It prices split and merge from what each move does (#16, #17) and
-reads a device in canonical order (#20). It judges the budget in the device stage, counted with the physics'
+reads a machine in canonical order (#20). It judges the budget in the machine stage, counted with the physics'
 wiring floors (at most 128 DACs and 200 junctions, #15), R22 with the new labels (#18, #19), the geometry rules
 R19-R21 (#21) and, as before, the other rules on the cooled program, the physics lock, the correspondence of
 the program with the certified one, the certificate binding, the Lean certificate and the semantics. A design
@@ -152,11 +152,11 @@ that fails any of these is not eligible.
 **What this climb adds.** `hc-grade` rejects a design that breaks a rule marked [audit], even if it is eligible.
 The other rules were on each agent's word, and the verifiers checked them:
 
-1. **Devices only.** The program always comes from the reference compiler; no edited programs and no placement
+1. **Machines only.** The program always comes from the reference compiler; no edited programs and no placement
    passed in.
 2. **Declared splits kept (#22).** [audit] R14 judges only splits that a class declares. So a class keeps the
    `split` its reference class id declares (dock, undock, sort_split, eject, reinsert), and any class with orbit
-   `spurs` declares split and merge. On the agents' word, not audited: no device deletes its dock classes to
+   `spurs` declares split and merge. On the agents' word, not audited: no machine deletes its dock classes to
    make the compiler fall back to `shuttle` (no counted design has a dock).
 3. **Closed loops tagged.** [audit] Every rail between consecutive nodes of a closed loop carries the loop's id,
    and no other rail does. An untagged ring rail or a tagged spur would hide a dock from the path price (#17).
@@ -171,19 +171,19 @@ The other rules were on each agent's word, and the verifiers checked them:
 7. **No closed loops through junctions to trigger `rotate`** (#23).
 8. **Physics unchanged** (`--adopt-physics`).
 
-Anything that lowered `T_jones` by exploiting the grader rather than improving the device was to be written up
+Anything that lowered `T_jones` by exploiting the grader rather than improving the machine was to be written up
 under "Possible exploits" and not counted. Each board's README lists what its agents and verifier found.
 
 ## What the platform fixes changed
 
 | issue | the gap | under the fix |
 |---|---|---|
-| #15 | the evaluator enforced neither the DAC budget nor the real cost of wiring | the device stage judges the release's budget and counts the wiring at no less than the physics' floors |
+| #15 | the evaluator enforced neither the DAC budget nor the real cost of wiring | the machine stage judges the release's budget and counts the wiring at no less than the physics' floors |
 | #16 | a `shuttle` joining or leaving a chain paid no split or merge | a move pays a split (80 µs, +6 quanta) when it leaves ions behind and a merge (80 µs, +6 quanta) when it joins others, whatever its class |
 | #17 | deleting `dock`/`undock` dodged split and merge | a hop between a closed loop and a dead-end dock or an exit pays split and merge, whatever its class |
 | #18 | a loop declared through junctions gave spur labels that let opposite moves share a waveform | open-path hops and chords take lab-frame direction labels |
 | #19 | R22's sign labels let hops at different angles share one waveform | an off-axis hop's label carries its angle in whole degrees (`+x+y@30`) |
-| #20 | the order of nodes and segments in the file changed the compiled schedule | the compiler reads a device in canonical order; ids still break ties |
+| #20 | the order of nodes and segments in the file changed the compiled schedule | the compiler reads a machine in canonical order; ids still break ties |
 | #21 | the grader did not run the geometry rules | it runs R19-R21: degree at most 4, rails at a node at least 60° apart, no rail through a node or across another |
 
 The first campaign's agents found the gaps of #15-#20. The fixes landed on `compiler` at `dfdf77b` with
@@ -199,7 +199,7 @@ compiler `e799ecf5a5cd`. `c774b87b677f` produces the same program, byte for byte
 | bb144 | 96.74 ms | 2,313.66 ms (all ten files) | not re-run |
 
 Under the fixes, five_qubit `01`-`04`, steane `05`-`08` and surface17 `04` also fail R20 or R21. The v1
-devices moved ions often, and most of their moves paid no split or merge. Now a move that leaves ions behind
+machines moved ions often, and most of their moves paid no split or merge. Now a move that leaves ions behind
 and joins others costs 165 µs (a 5 µs hop, an 80 µs split and an 80 µs merge), and the 12 quanta of its split
 and merge exceed R7's limit of 1 quantum at an MS gate, so `insert_cooling` puts a 300 µs cool before every
 later MS instruction that holds the moved ion. R12 runs one gate per trap per instruction, so one trap
@@ -211,15 +211,15 @@ gate.
 ## Caveats
 
 - **Long chains are not charged.** `T_jones` prices an MS instruction at 25 µs for any chain length, and R13
-  allows 15 ions at a gate, so few-trap long-chain devices win. Whether such devices should count as
+  allows 15 ions at a gate, so few-trap long-chain machines win. Whether such machines should count as
   `T_jones` results, or a chain-length cost will be added, was asked on #10 on 2026-10-21 and is not
   answered yet.
-- **Trap ids break ties (#20 residue).** The compiler reads a device in canonical order, but its placer still
-  breaks ties by trap id, so one physical device can grade differently under another labeling. The agents
+- **Trap ids break ties (#20 residue).** The compiler reads a machine in canonical order, but its placer still
+  breaks ties by trap id, so one physical machine can grade differently under another labeling. The agents
   used one fixed id scheme and did not search ids, but a search over capacities and zones covers both
   orientations of a path and every origin of a ring, so it can pick a lucky labeling without trying to. The
-  verifiers graded permuted and mirrored copies. `surface17`'s 3.49 ms device grades 6.085 ms with its trap
-  ids reversed, and `rep9`'s 2.445 ms device ranges from 2.445 to 5.13 ms over its 24 labelings. On those two
+  verifiers graded permuted and mirrored copies. `surface17`'s 3.49 ms machine grades 6.085 ms with its trap
+  ids reversed, and `rep9`'s 2.445 ms machine ranges from 2.445 to 5.13 ms over its 24 labelings. On those two
   boards, mirroring positions with the ids unchanged never changed a program.
 - **#22 exposure.** R14 judges a split only when the move's class declares one. The general router's moves are
   all class `shuttle`, so a move that leaves ions behind at a site that held more than 2 ions is charged a

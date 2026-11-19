@@ -58,20 +58,20 @@ Source: `cost_breakdown.qccdsim_jones.us_by_type` in the graded report.
 - **Read-out.** The 6 measurements fall in 5 ASAP layers (7, 8, 9, 9, 10, 11), and the general
   router reads out once per layer: 5 × 120 = 600 µs.
 
-The device itself is not clever. Every device the search tried that moved an ion paid more for
+The machine itself is not clever. Every machine the search tried that moved an ion paid more for
 motion and cooling than it saved in gate time.
 
 ## The floor
 
 **Measured.** Nothing went below 2.100 ms on any of these:
 
-- the pre-run sweep: 5,153 distinct devices on 2-5 trap paths and cycles
+- the pre-run sweep: 5,153 distinct machines on 2-5 trap paths and cycles
 - a01's sweep files: 1,913 rows
 - the 2 board grades
 
-The sweep directories hold 1,831 device files, as a01's REPORT says (its NOTES say 1,422). The 1,913
-rows add the 25 ring and race-track devices run again under two more compiler modes and a chain-split
-rerun of the 32 read-out-detour devices. Every device that moved an ion scored at least 2.780 ms.
+The sweep directories hold 1,831 machine files, as a01's REPORT says (its NOTES say 1,422). The 1,913
+rows add the 25 ring and race-track machines run again under two more compiler modes and a chain-split
+rerun of the 32 read-out-detour machines. Every machine that moved an ion scored at least 2.780 ms.
 
 **The cooling rule** (code reading, and measured on the 2.870 ms seed). `insert_cooling`
 (`qccd/compile/cooling.py`) replays the program as compiled, without its own cools. It then puts a
@@ -109,7 +109,7 @@ instructions were measured on every graded design.
   Measured:
   - 55 dock rings compiled with `rotate`: 29 scored (24 broke R21, 2 could not be placed), all with
     6 measure instructions (720 µs) and 19-23 inserted cools. The best scored 18.67 ms.
-  - `Machine.racetrack` devices are compiled by the general router before the race-track pass is
+  - `Machine.racetrack` machines are compiled by the general router before the race-track pass is
     reached. The best, `racetrack(8)`, scored 13.56 ms with 9 cools.
 
 **Gaps.** The sketch is not a proof. These parts rest on code reading or were not re-derived:
@@ -133,7 +133,7 @@ which does not rely on the replay, still gives ≥ 2.135 ms.
 ## Trap labels change the score
 
 The compiler breaks placement ties by trap id. #20 fixed the file order, not the ids, so renaming
-traps can change the program. This is the compiler's tie-break, not a property of the device.
+traps can change the program. This is the compiler's tie-break, not a property of the machine.
 Neither shipped design depends on it:
 
 - **Single trap:** renamed `Z7`, renamed `A` and shifted, and mirrored and shifted, it scored
@@ -168,7 +168,7 @@ compiled would fail.
 13-ion chain for the whole circuit, so every gate runs in a 13-ion chain. The probe's gate trap
 holds up to 13. The model has no cost for a long chain: no slower gates and no heating that grows
 with chain length. A chain-length cost would raise the single trap's score; whether it would change
-this board's ranking was not measured. Whether such devices should count as `T_jones` results is
+this board's ranking was not measured. Whether such machines should count as `T_jones` results is
 the open question on #10.
 
 ## What did not work
@@ -182,7 +182,7 @@ with `hc-grade`.
   shuttle. Best of 32: 2.780 ms (graded). Junction stars (80): the 20 that never move score
   2.100 ms; the best that moves scores 3.53 ms, with 0 cools and 1430 µs of shuttle.
 - **One meeting to buy parallel gates** (gap 3): 2-3 trap paths (845 built, 754 scored). Every one
-  moved an ion and paid at least 2 inserted cools. Six devices tie for best at 2.870 ms, all with
+  moved an ion and paid at least 2 inserted cools. Six machines tie for best at 2.870 ms, all with
   the low-motion seed's layout (a capacity-1 trap beside one of capacity 13-15), and their gates
   still take 1200 µs.
 - **Side traps beside the big trap** (360): the 108 that never move score 2.100 ms. The 252 that
@@ -190,7 +190,7 @@ with `hc-grade`.
   sides: the router runs the opening H gates in parallel by splitting q7 and q8 out, they merge
   back, and every later MS of theirs is cooled (14 cools, 9.525 ms).
 - **Many traps, broadcast wiring** (200 paths of 6-10 traps, 192 scored): gates fell to 470 µs,
-  but every device paid at least 8 inserted cools. Best 5.150 ms (9 cools).
+  but every machine paid at least 8 inserted cools. Best 5.150 ms (9 cools).
 - **Closed cycles of 3-12 traps** (234, 228 scored): the 3 that never move score 2.100 ms. The
   best that moves scores 5.98 ms (6 cools).
 - **Gate parallelism** in general: over all of a01's sweeps, gate time drops below 915 µs only
@@ -213,9 +213,9 @@ The verifier graded with `--no-log` and ran at most one grading process at a tim
 - The board's `import_fidelity = false` on the probe comes only from `length: 10.0` against `10` in
   a01's source file. A fresh re-grade gives `true`.
 - Two corrections to a01's notes, neither of which changes the result:
-  - REPORT says nothing moves in sweep A. In fact only 108 of the 360 devices do not move; the
+  - REPORT says nothing moves in sweep A. In fact only 108 of the 360 machines do not move; the
     other 252 move.
-  - NOTES says 1,422 devices were compiled; the sweep directories hold 1,831, as REPORT says.
+  - NOTES says 1,422 machines were compiled; the sweep directories hold 1,831, as REPORT says.
 
 ## Live designs graded here
 

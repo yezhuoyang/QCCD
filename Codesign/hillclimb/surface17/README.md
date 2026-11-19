@@ -1,7 +1,7 @@
 # surface17@1 · Surface code, distance 3 — 3.49 ms (v2)
 
 **Best: 3.49 ms** in its graded orientation ([`01-a07-ccb4e9ed`](designs/01-a07-ccb4e9ed.arch.json)). The same
-device with its trap ids reversed grades 6.085 ms. The best result whose score did not change under any labeling
+machine with its trap ids reversed grades 6.085 ms. The best result whose score did not change under any labeling
 tried is **3.585 ms** ([`08-a01-cbd1eaa8`](designs/08-a01-cbd1eaa8.arch.json)): 4 hc-grade variants and 17 hc-fast
 relabelings all gave 3.585.
 The best design with `long_chain_splits` = 0 is a 19-trap ring at **11.30 ms**
@@ -12,31 +12,31 @@ The best live design, `stationary_chain`, grades 11.665 ms.
 The search beat the low-motion seed it started from. That seed is a 2-trap path with capacities 3 and 15,
 measured before the run: 4.375 ms, or 5.215 ms with its two trap ids swapped. Every path design here is below 4.375
 in its graded orientation. In the worst labeling tried, three designs also stay below the seed's 5.215: a01's 3.585
-and 3.66 ms devices, and the 15/2/1 path (worst 4.68). The 3.49 leader's worst labeling (6.085) does not. Every
+and 3.66 ms machines, and the 15/2/1 path (worst 4.68). The 3.49 leader's worst labeling (6.085) does not. Every
 design below 4 ms wins through a 15-ion chain, which `T_jones` does not charge for (see [Long chains](#long-chains)).
 
-3.49 ms is one device logged twice: by a07 (`1792703579-a07-ccb4e9ed`) and, 4 s later, by a05
+3.49 ms is one machine logged twice: by a07 (`1792703579-a07-ccb4e9ed`) and, 4 s later, by a05
 (`1792703583-a05-4c250a11`). The two files differ only in name, description and a note string, and compile to
 the same program (`07f4a2b30d38d74a`). Only a07's is in `designs/`.
 
 Eight agents searched for 2 hours (2026-10-22 20:45-22:45 UTC) and logged 15 designs. A separate verifier agent
 then re-graded every design with a fresh hc-grade (all 10 stages). It also graded copies with mirrored positions
 and reversed trap ids, and checked permuted trap ids with hc-fast, re-grading the extremes. Every logged score,
-device digest and program digest reproduced, and all 15 designs are eligible and pass the audit. The toolchain is
+machine digest and program digest reproduced, and all 15 designs are eligible and pass the audit. The toolchain is
 QCCD's `compiler` branch at `84e8c5d`, qccdc `c774b87b677f` and qcheck `e8acd6640fd3`.
 [`../README.md`](../README.md) gives the setup and the rules.
 
 ![surface17: every design ranked](chart.png)
 
 The chart shows the 15 designs logged in this run (coloured dots, by agent, each in its graded orientation; the
-3.49 ms device is two dots) and the 8 live designs at their published numbers (dark diamonds), so `ring144_24v` and
+3.49 ms machine is two dots) and the 8 live designs at their published numbers (dark diamonds), so `ring144_24v` and
 `ring24_8` sit at 27.26 and 27.325 ms, not at their grades here (see
 [Live designs graded here](#live-designs-graded-here)). A diamond is hollow where the page marks the design not
 buildable.
 
 ## The designs
 
-`designs/` holds 10 of the 14 physically distinct devices. The other four are only in [`results.csv`](results.csv):
+`designs/` holds 10 of the 14 physically distinct machines. The other four are only in [`results.csv`](results.csv):
 
 - a08's and a07's 3.565 ms paths, which run the same program as `03`;
 - a07's 3.97 ms path, which is `10` with rails of capacity 2;
@@ -62,7 +62,7 @@ id permutations and every cyclic id shift. The highest of these were confirmed w
 ties broken by board time.
 
 The design files are the board's graded documents with two keys changed. `name` is `hillclimb_surface17_<file
-stem>`, and `description` is one sentence about the device. A script checked that every other key has the same JSON
+stem>`, and `description` is one sentence about the machine. A script checked that every other key has the same JSON
 value as in the graded file, and a text diff against it shows only the `name` and `description` lines. No file
 had a `provenance` key.
 
@@ -72,12 +72,12 @@ score). The v1 rows were graded once, with their files' ids; that re-grade repor
 and the worst labeling are blank, and `long_chain_splits` is filled only for the four v1 seeds measured before the
 run. The `note` column holds the agents' own words. Where a note and a column disagree, the column is the graded value:
 
-- the note of `1792703869-a06-c8fa3b49` says 18 traps, and the device has 19;
+- the note of `1792703869-a06-c8fa3b49` says 18 traps, and the machine has 19;
 - the note of `1792706343-a06-3c5a38e7` says "id-robust", which holds only for id schemes along the loop.
 
 ## Why the best is fast
 
-The 3.49 ms device is a straight path of six traps, T0..T5, with capacities 1/1/1/15/1/2 and rails of capacity 2.
+The 3.49 ms machine is a straight path of six traps, T0..T5, with capacities 1/1/1/15/1/2 and rails of capacity 2.
 
 - T0-T3 are gate traps (zone G), T4 is readout-only (Mo) and T5 is storage (S).
 - It uses shared control (`simd_classes`, a broadcast channel map, `broadcast_groups` wiring) at 33 DACs. Under
@@ -107,7 +107,7 @@ before the run):
 | 4.375 ms seed, µs | 1500 (state-prep + 4 inserted) | 1165 | 720 | 990 (6 moves at 165 µs) | 4375 |
 
 - **Transport.** The six transport instructions take 85 + 5 + 85 + 85 + 85 + 5 µs. The last two are q8's walk
-  home: 90 µs that a05, a03 and a07 found no device to remove.
+  home: 90 µs that a05, a03 and a07 found no machine to remove.
 - **Gates.** All 24 CX (45 µs each) and 8 H (20 µs each) run serially in T3, because R12 allows one gate per trap
   per instruction. The exception is q12's first H, which runs in T2 at the same time. That gives 1240 - 20 = 1220 µs.
 
@@ -130,18 +130,18 @@ Why q8 and q12 end up outside (from a01's, a05's and a07's reading of `place.ml`
   - The state-prep cool is 300 µs. qccdc emits exactly one in every program (40 programs checked).
   - Measurement is at least 720 µs: 6 instructions. a04 read `compile.ml`: the router emits one measure instruction
     per ASAP layer that holds measurements, and the circuit has 6 such layers.
-  - a04 compiled 45,356 eligible devices: 36,260 had 6 measure instructions, 8,451 had 7, 645 had 8, and none had
+  - a04 compiled 45,356 eligible machines: 36,260 had 6 measure instructions, 8,451 had 7, 645 had 8, and none had
     fewer.
 - **Three inserted cools for this family (sketch by a01, a03, a05 and a07; measured below).**
   - With q8 and q12 outside the 15-ion trap, the MS gates 12-7, 12-8 and 8-14 each hold a moved ion.
   - They are chained through shared qubits (12-7 then 12-8 on q12, 12-8 then 8-14 on q8), so they run in three
     different layers, and no two of them can be in one MS instruction. That is 900 µs.
-  - Measured: a01 found no program with fewer than 3 inserted cools in about 42,000 devices.
+  - Measured: a01 found no program with fewer than 3 inserted cools in about 42,000 machines.
   - a03's best per cool count, over about 40,000 hc-fast evaluations: 3.49 with 3 cools, 3.97 with 4, 4.33 with 5.
 - **Floor of the family (sketch).** 300 + 900 + about 1220 + 720 + about 170-260 µs of transport gives about
   3.31-3.40 ms (a01, a03, a04, a05, a07). The 3.49 design is about 90 µs above it, which is q8's walk home.
 - **Two cools (sketch, not reachable).**
-  - a01 argues that every device needs at least 2 MS instructions with a hot ion.
+  - a01 argues that every machine needs at least 2 MS instructions with a hot ion.
   - Two cools need other ions than {q8, q12} outside the big trap. The agents name {q6, q16} (a01, a02, a03,
     a07, a08), {q0, q11} (a02, a03, a04, a05, a07), or q15 and q16 in separate traps (a05). a01's relaxation rules
     out {q0, q11}, and a02 measured 5 cools for it: both of its meetings fall in layer 2, before any ion in the
@@ -153,19 +153,19 @@ Why q8 and q12 end up outside (from a01's, a05's and a07's reading of `place.ml`
   - It isolates only the ends of the Fiedler order: {q8, q12} or {q0, q11}.
   - The four 2-ion minimum cuts, {q0, q11}, {q8, q12}, {q2, q15} and {q6, q16}, tie in its objective, and ties go
     by qubit index (a02, a07, a08).
-  - a08 checked this with a Python port of `place.ml`, which reproduces the compiler on 5 devices. Over all paths of
+  - a08 checked this with a Python port of `place.ml`, which reproduces the compiler on 5 machines. Over all paths of
     3-6 traps, cycles, trees and 30k junction stars, it never isolates {q6, q16} with 14 or more ions in one trap.
-- **Loose bound for any device (brief).** About 1.89 ms = 300 + 720 + 485 + 85 + 300 µs: the smallest of each term
-  at once. No device has shown all of them together.
+- **Loose bound for any machine (brief).** About 1.89 ms = 300 + 720 + 485 + 85 + 300 µs: the smallest of each term
+  at once. No machine has shown all of them together.
 
 ## Trap labels change the score
 
 The compiler breaks ties by trap id: the placer's breadth-first fill, its choice of the most central trap, and
-`meet()`, which gives a crossing CX to the lowest-id trap with room. So one physical device can grade differently
-when its traps are renamed. This is a property of the compiler, not of the device. The verifier found that
+`meet()`, which gives a crossing CX to the lowest-id trap with room. So one physical machine can grade differently
+when its traps are renamed. This is a property of the compiler, not of the machine. The verifier found that
 mirroring positions (x → -x, ids kept) never changes the program: the ids cause the whole effect.
 
-Take the 3.49 device. With the graded ids, T2 and T3 tie for most central, and T2 wins by id, so q12 and q8 go
+Take the 3.49 machine. With the graded ids, T2 and T3 tie for most central, and T2 wins by id, so q12 and q8 go
 outside. With the ids reversed, the 15-slot trap wins the tie, and q0 and q11 go outside instead. They must enter
 at layers 1-2, before any ion has finished. That copy grades 6.085 ms: 2700 µs of cools, 1445 µs of transport, and
 7 / 22 long-chain splits.
@@ -218,10 +218,10 @@ at layers 1-2, before any ion has finished. That copy grades 6.085 ms: 2700 µs 
 - **No 15-ion-trap design can reach 0 (proof sketch by a05 and a07).**
   - 17 ions do not fit in one 15-slot trap, and the CX graph is connected, so some ion must cross into the full trap.
   - The free slot it needs opens only when an ion leaves the 15-ion chain, and that is a long-chain split.
-- **Searches for lcs 0 among small devices found none.**
+- **Searches for lcs 0 among small machines found none.**
   - a06: 1,250 random and mutated paths of 2-7 traps.
-  - a02: none of the 9,679 devices it re-checked with T < 14.2 ms.
-  - a03: in 3,100 devices, the lowest was 2.
+  - a02: none of the 9,679 machines it re-checked with T < 14.2 ms.
+  - a03: in 3,100 machines, the lowest was 2.
 - **The lcs 0 designs logged here are rings.** a06 argues (sketch) that any lcs 0 design under this router keeps at most 2
   ions at each site an ion leaves. That needs at least 9 traps, so shared or wise control, with R22 on.
 - **If #22 is fixed** as hc-chainsplits assumes, every design here below 11 ms has 2-3 long-chain splits, and
@@ -242,14 +242,14 @@ trap at a gate, which is also the most slots qccdc offers per trap. All the lead
   for it in motion: 59-122 transport instructions, and a cool before each of their 9 MS instructions.
 
 Every agent whose best is a path design says in its REPORT that it wins through the long chain. Whether such
-devices should count as `T_jones` results, or whether a chain-length cost will come, was asked on #10 on
+machines should count as `T_jones` results, or whether a chain-length cost will come, was asked on #10 on
 2026-10-21.
 
 ## What did not work
 
 hc-fast, unless graded; the numbers are the best in each family.
 
-- **2-trap paths** (exhaustive over capacity, zone type and rail capacity; a02 2,835 devices, a05 3,780): nothing
+- **2-trap paths** (exhaustive over capacity, zone type and rail capacity; a02 2,835 machines, a05 3,780): nothing
   beats the 4.375 seed.
 - **3- and 4-trap paths.**
   - 3-trap paths: 3.97 (15/2/1; a03's sweep of 2,815, a05's of 7,100).
@@ -259,7 +259,7 @@ hc-fast, unless graded; the numbers are the best in each family.
   meetings, and those ions then pay cools: 15/3 5.215, 2/15/1 5.745, 15/4 7.435, 15/5 and up about 10.5 (a02, a05,
   a07).
 - **Two gate traps in parallel.**
-  - Two medium or large gate traps: 5.23 (a04, 5,000 devices).
+  - Two medium or large gate traps: 5.23 (a04, 5,000 machines).
   - Two big traps summing to 17-19: 3.97 (a03).
   - Far meeting rooms (15/1/1/1/5/3): 5.155 (a05). Gates drop to 1075 µs, but transport rises to 2040 µs and
     measurement to 840 µs.
@@ -276,7 +276,7 @@ hc-fast, unless graded; the numbers are the best in each family.
   - Docked conveyors `ring(w,2,v)`: 21.39, the starter itself (a08).
   - Grids: 14.3 (4x4) and 14.445 (3x4), both lcs 0 (a06).
   - Multi-loop rings: 11.52-11.555 at their search ids, but 18.355-29.575 with the ids reversed (a06). Not logged.
-- **Removing q8's walk home** (90 µs): no agent found a device that does it. Every way a03 found to block the
+- **Removing q8's walk home** (90 µs): no agent found a machine that does it. Every way a03 found to block the
   walk also blocked q8's way in; a07's variants failed to compile or still walked home (a03, a05, a07).
 
 ## Exploit review
@@ -293,7 +293,7 @@ The verifier found no scoring exploit:
 - **The empty end trap T0 in the 3.49/3.565 family (flagged by a05; a04 describes the same effect).**
   - It only moves the placer's most central seed.
   - It is a real extra trap (no DAC cost under shared control, 24 DACs under direct) and changes no grader rule,
-    so it counts as a device change.
+    so it counts as a machine change.
   - It is still a placer steer that depends on ids.
 - **Eviction of the lowest-index idle ion** (q0, q1). This is luck in the circuit's qubit numbering, not a grader
   exploit. Counted.
@@ -331,7 +331,7 @@ hc-grade's programs have 236 each. On the other six rows the page counts one ins
 
 ## The first round (v1)
 
-v1 reported 1.585 ms against 2.045 ms for `stationary_chain`, from nine 5-trap devices whose moves paid no split
+v1 reported 1.585 ms against 2.045 ms for `stationary_chain`, from nine 5-trap machines whose moves paid no split
 or merge at the time. Since upstream #15-#21, a move that leaves or joins a chain pays its split or merge (80 µs
 each) and makes the moved ion pay a 300 µs cool before each later MS instruction it is in, so the 16 v1 files now
 grade 6.545-12.31 ms or fail R20/R21 (`04-a02`), and `stationary_chain` itself grades 11.665 ms. Their v2 grades

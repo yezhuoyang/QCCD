@@ -3,16 +3,16 @@
 **Best: 1.980 ms**, against 9.155 ms for the best live design (`stationary_chain`), 4.62× faster.
 [`01-a01-c671484c`](designs/01-a01-c671484c.arch.json) is one trap holding all 9 ions: zone `G`
 (gates and readout), capacity 9, direct control, 24 DACs, no rails. It is the single-trap seed the
-climb started from, unchanged (same device and program digests). **The search found nothing below
-the seed.** The same device is also the best result that does not depend on trap ids (every
+climb started from, unchanged (same machine and program digests). **The search found nothing below
+the seed.** The same machine is also the best result that does not depend on trap ids (every
 labeling the verifier tried scores 1.980 ms) and the best with `long_chain_splits` = 0 (it never
 moves an ion). It wins through one 9-ion chain, which `T_jones` does not charge for.
 
 One agent (`a01`) worked this board for one hour, with the brief to prove the seed optimal or beat
-it. It logged 3 grades (3 distinct devices, all eligible and audited) and wrote a hand proof (not
-machine-checked, [below](#the-floor)) that no device scores below 1.980 ms under the platform's
+it. It logged 3 grades (3 distinct machines, all eligible and audited) and wrote a hand proof (not
+machine-checked, [below](#the-floor)) that no machine scores below 1.980 ms under the platform's
 compiler (qccdc `c774b87b677f` + `insert_cooling`). A separate verifier (`a90`) re-graded every design
-fresh, tried relabelled and mirrored copies, and probed 56 more devices with `hc-fast` to refute the
+fresh, tried relabelled and mirrored copies, and probed 56 more machines with `hc-fast` to refute the
 proof. Nothing scored below 1.980 ms.
 
 ![five_qubit: every design ranked](chart.png)
@@ -44,10 +44,10 @@ The program has 134 instructions: init, the state-prep cool, 128 gates and 4 mea
 16 MS (25 µs each), 88 R (5 µs) and 24 VZ (15 µs): 400 + 440 + 360 = 1200 µs, all serial, because
 R12 allows one gate per trap per instruction. There is no transport and no inserted cool.
 
-Every device pays the 300 µs state-prep cool and 480 µs of measures. The compiler emits one measure
+Every machine pays the 300 µs state-prep cool and 480 µs of measures. The compiler emits one measure
 instruction per circuit layer that holds one, and the 4 measures fall in 4 different layers. So
 `T = 780 µs + G + S + 300 µs × C`, with G the gate instructions, S the transport and C the inserted
-cools. A device with more gate traps can run gates in parallel (the general router's floor is
+cools. A machine with more gate traps can run gates in parallel (the general router's floor is
 725 µs), but only by moving ions. A move out of a shared trap pays an 80 µs split, a move into an
 occupied trap an 80 µs merge (both, if both), on top of the hops, and each puts 6 quanta on the
 moving ion. From then on `insert_cooling` puts a 300 µs cool before every MS instruction that holds
@@ -56,9 +56,9 @@ parallel gates save.
 
 ## The floor
 
-- **Measured.** Every device graded or swept here pays the 300 µs state-prep cool and 480 µs of
+- **Measured.** Every machine graded or swept here pays the 300 µs state-prep cool and 480 µs of
   measures. In an `hc-fast` sweep before the climb (4,294 distinct 1-5 trap paths and cycles, zones
-  `G` and `Go`), every multi-trap device that compiled moved ions and got at least 5 inserted cools;
+  `G` and `Go`), every multi-trap machine that compiled moved ions and got at least 5 inserted cools;
   the best scored 4.460 ms. The verifier's 56 `hc-fast` probes scored 1.980 ms or more (below).
 - **The cooling rule (read in the source by `a01` and the verifier).** `insert_cooling`
   (`qccd/compile/cooling.py`) replays the compiled program without the cools it inserts, and puts a
@@ -66,7 +66,7 @@ parallel gates save.
   (6 quanta), an ion pays a cool before **every** later MS instruction it is in, not only the next.
 - **Proved for this compiler (`a01`'s proof; premises read in the source, numbers checked by its
   scripts `floor_check.py`, `c1_bound.py` and `c2_bound2.py`; not machine-checked; the verifier could
-  not refute it): no device scores below 1.980 ms.** Beating it needs `G + S + 300 C < 1200 µs`.
+  not refute it): no machine scores below 1.980 ms.** Beating it needs `G + S + 300 C < 1200 µs`.
   - C ≥ 2: the general router emits per circuit layer and per pulse round, so G ≥ 725 µs, and
     725 + 600 > 1200. The race-track pass merges before every MS (C ≥ 4, T ≥ 2.43 ms). The rotate
     pass can never compile this circuit (every qubit has an H, only docked ions can gate, and a CX
@@ -89,7 +89,7 @@ parallel gates save.
     about 35 µs (`a01`'s estimate, not a bound).
   - Reading out all 4 ancillas in one instruction would give 300 + 120 + 1200 = 1.62 ms in one trap
     (arithmetic, not graded), but qccdc emits one measure instruction per circuit layer.
-  - Neither can be reached by changing the device.
+  - Neither can be reached by changing the machine.
 - **What-if (`a01`'s `smartcool.py`, not graded).** If `insert_cooling` counted the cools it has
   already inserted, qccdc's own programs would score: #3 3.845 ms (from 5.045), the v1 frontier
   seed (a 5-trap path) 8.335 (from 8.635), `stationary_chain` 8.555 (from 9.155), v1 PR 05 8.71
@@ -104,7 +104,7 @@ measure 480 µs. With its two trap ids swapped, positions unchanged, it scores *
 `T0` → `Z2`, `T1` → `Z1` (the same reversed id order) also gives 4.680. The mirror image keeps the
 logged program (same program digest `2f86cd8a406da9cd`), and the mirror with swapped ids gives the
 swapped one (`52bc957a07a0ff58`). So the score follows the ids, not the geometry: the compiler breaks
-placement ties by trap id (#20 fixed file order, not ids). It is not a property of the device. #3 is
+placement ties by trap id (#20 fixed file order, not ids). It is not a property of the machine. #3 is
 a probe, far above #1 either way.
 
 ## #22 exposure
@@ -121,11 +121,11 @@ class declares.
 
 ## Long chains
 
-The best device holds all 9 ions in one 9-ion chain for the whole program. R13 allows up to 15 ions
+The best machine holds all 9 ions in one 9-ion chain for the whole program. R13 allows up to 15 ions
 at a gate, an MS instruction costs 25 µs for any chain length, and `T_jones` does not charge chain
 length, so the long chain costs nothing here. #2 has the same chain, and #3 starts with all 9 ions in
 its large trap. The live best `stationary_chain` also starts with 9 ions in one trap. Whether the
-maintainer wants such long-chain, low-motion devices counted as `T_jones` results, or will add a
+maintainer wants such long-chain, low-motion machines counted as `T_jones` results, or will add a
 chain-length cost, was asked on #10 (2026-10-21) and is not yet answered.
 
 ## What did not work
