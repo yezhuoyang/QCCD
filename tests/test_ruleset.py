@@ -9,6 +9,9 @@ rule by rule.  A paper's rule set is held to the timed checker the same way
 from __future__ import annotations
 
 import json
+import gzip
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -22,6 +25,95 @@ from qccd.ruleset.syntax import parse, parse_formula, show
 from qccd.verify import verify
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _wise_schedule(d=3, kind="wise"):
+    from qccd.repro.timed import TimedSchedule
+    from qccd.repro.sched_jones import stim_program
+    base = ROOT / "Reproduce/jones2025"
+    with gzip.open(base / f"ours/grid_rot_d{d}_c2_{kind}.schedule.json.gz", "rt") as f:
+        sched = TimedSchedule.from_json(json.load(f))
+    return sched, stim_program(base / f"circuits/rotated_memory_z_d{d}_r1.stim")[0]
+
+
+def _wise_rules(sched, circuit):
+    from qccd.repro.models import jones_duration
+    from qccd.ruleset import keeping_order
+    from qccd.ruleset.schedule import schedule_execution
+    exe = schedule_execution(sched, chain_order="physical", duration=jones_duration,
+                             strict_clock=True, circuit=circuit)
+    return {r.id: r for r in check(keeping_order(load("jones-wise")), exe).results}, exe
+
+
+@pytest.mark.parametrize("d", [2, 3, 6, 12])
+def test_jones_wise_rules_and_timed_applicability(d):
+    res, _ = _wise_rules(*_wise_schedule(d))
+    assert res["R4b"].verdict == res["R4d"].verdict == NOT_APPLICABLE
+    assert "steps" in res["R4d"].reason
+    assert all(r.verdict == HOLDS for key, r in res.items() if key not in ("R4b", "R4d"))
+    assert res["R2"].verdict == res["R22"].verdict == HOLDS
+
+
+def test_jones_wise_rejects_direct_wiring_schedule():
+    res, exe = _wise_rules(*_wise_schedule(kind="ours"))
+    assert res["W1"].verdict == FAILS
+    assert not any("idle_sites" in o.facts for o in exe.ops)
+    assert res["W3"].verdict == FAILS
+
+
+def test_jones_wise_rejects_five_us_delayed_move():
+    sched, circuit = _wise_schedule()
+    move = next(e for e in sched.events if e.kind == "transit")
+    bad = replace(move, t0=move.t0 + 5, t1=move.t1 + 5)
+    sched = replace(sched, events=[bad if e.id == bad.id else e for e in sched.events])
+    res, _ = _wise_rules(sched, circuit)
+    assert res["W1"].verdict == FAILS
+
+
+def test_jones_wise_geometry_rejects_uniform_false_cycle_without_changing_motion():
+    sched, circuit = _wise_schedule()
+    cycle = next(e for e in sched.events if e.kind == "split").t0
+    sched = replace(sched, events=[replace(e, meta={**e.meta, "class": "split:S"})
+                                   if e.kind == "split" and e.t0 == cycle else e for e in sched.events])
+    res, exe = _wise_rules(sched, circuit)
+    split = next(o for o in exe.ops if o.kind == "split")
+    assert split.facts["motion"] == "split:S"  # John's existing input is preserved.
+    assert split.facts["displacement"] == "split:N"
+    assert res["R22"].verdict == HOLDS  # uniform strings alone do not detect this.
+    assert res["W1"].verdict == FAILS
+
+
+def test_jones_wise_opt_out_requires_each_idle_site_switch():
+    sched, circuit = _wise_schedule()
+    dev = deepcopy(sched.device)
+    idle = next(t for t, ch in sched.chains.items() if not ch)
+    dev.sites[idle].pop("broadcast_switch")
+    res, _ = _wise_rules(replace(sched, device=dev), circuit)
+    assert res["W3"].verdict == FAILS
+    assert res["W1"].verdict == HOLDS
+
+
+def test_jones_wise_transport_excludes_gates_on_idle_traps():
+    from qccd.repro.timed import Event
+    sched, circuit = _wise_schedule()
+    ion = sched.qubits["1"]  # idle data qubit during the first layer
+    trap = next(t for t, ch in sched.chains.items() if ion in ch)
+    gate = Event(100000, "gate1", 60, 65, (ion,), at=trap,
+                 meta={"op": "XRotation", "locks": [f"ion:{ion}", f"trap:{trap[1:]}"]})
+    res, _ = _wise_rules(replace(sched, events=sched.events + [gate]), circuit)
+    assert res["W2"].verdict == FAILS
+
+
+def test_jones_wise_r2_still_rejects_two_ions_in_a_junction():
+    sched, circuit = _wise_schedule()
+    ion = next(e.ions[0] for e in sched.events if e.kind == "split")
+    chains = deepcopy(sched.chains)
+    next(ch for ch in chains.values() if ion in ch).append("probe")
+    duplicated = [replace(e, id=e.id + 100000, ions=("probe",)) for e in sched.events
+                  if e.kind in ("split", "transit", "j_enter", "j_exit", "merge")
+                  and e.ions == (ion,) and e.meta["step"] == 1 and not e.meta["returning"]]
+    res, _ = _wise_rules(replace(sched, chains=chains, events=sched.events + duplicated), circuit)
+    assert res["R2"].verdict == FAILS
 
 
 def judge(rs, m, prog, **kw):

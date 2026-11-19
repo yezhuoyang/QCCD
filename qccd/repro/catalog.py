@@ -669,6 +669,20 @@ OURS: dict[str, dict] = {
                  "other kind alternates ends (8 trips); those tours set the round's length, about the "
                  "same at every distance. The table gives the start of the last operation, the time "
                  "the paper reports; for every schedule here it is a final reset, 50 µs before the end.",
+        "boxes": [{
+            "id": "wise",
+            "title": "Ours, WISE control",
+            "how": "Broadcast control on Jones's junction grid: the same geometry, mapping and native "
+                   "operations, exact per-qubit Stim order, one geometric transport class per cycle. "
+                   "Every idle trap declares a per-site switch; intra/inter transport and gates do not overlap.",
+            "found": "All four split schedules retain full searched distance in both memory bases. "
+                     "Last start is 4070 µs (makespan 4120 µs); John's current Ours is faster. "
+                     "No waveform switching cost is charged. This is broadcast control on Jones's junction grid.",
+            "runs": [{"id": f"grid_rot_d{d}_c2_wise", "file": f"ours/grid_rot_d{d}_c2_wise.schedule.json.gz",
+                      "against": f"grid_rot_d{d}_c2", "same_ops": "counts", "profiles": ("JONES_WISE",),
+                      "label": f"rotated surface code d={d}, broadcast control on Jones's junction grid"}
+                     for d in (2, 3, 6, 12)],
+        }],
     },
     "leblond2023": {
         "tool": ("qccd/repro/sched_tiscc.py", "a scheduler we wrote for TISCC's surface-code round"),

@@ -1,0 +1,28 @@
+# Jones et al. 2025's rules under WISE broadcast control (arXiv:2305.12773).
+
+ruleset "jones-wise"
+title "Broadcast control on Jones's junction grid"
+about "Jones's rules, plus WISE control: one waveform drives every transport move of a cycle, so moves that overlap in time start and end together and make the same motion (primitive and direction); a site may sit a cycle out, never do something else."
+
+include "jones"
+use R4d, R4b, R22
+
+rule W1 "Broadcast transport moves in lockstep"
+  about "One waveform drives every transport move of a cycle: every move names its motion, and moves that overlap start and end together with the same motion."
+  source "arXiv:2305.12773; arXiv:2510.23519"
+  control() = "broadcast"
+  and (for all a in transport: displacement(a) != none and motion(a) = displacement(a))
+  and (for all a, b in transport where a != b and simultaneous(a, b):
+       start(a) = start(b) and end(a) = end(b) and displacement(a) = displacement(b))
+
+# R4b/R4d quantify programme steps and do not apply to timed schedules.
+# These explicit schedule equivalents retain the same constraints.
+rule W2 "Transport control modes and gates never overlap"
+  about "Timed counterpart of R4b: intra- and inter-trap transport never overlap, and neither overlaps gates, preparation, measurement or cooling."
+  for all a, b in operations where a != b and simultaneous(a, b) and movement_mode(a) != none:
+    (movement_mode(b) != none implies movement_mode(a) = movement_mode(b))
+    and kind(b) not in {"gate1", "gate2", "measure", "reset", "cool"}
+
+rule W3 "Idle traps have their own switches"
+  about "Timed counterpart of R4d opt-out: every trap outside the simultaneous transport's legs declares a broadcast switch; W1 enforces the shared waveform."
+  for all a in transport: opt_out_ready(a)
