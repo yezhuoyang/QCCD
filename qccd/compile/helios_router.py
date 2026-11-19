@@ -127,15 +127,24 @@ class _Helios:
         d = (-self.home[q]) % k
         return min(d, k - d)
 
-    def _rotate_to_r0(self, q: int, ops: Sequence[int]) -> None:
-        """Turn the ring until qubit q's home is R0, next to the junction, the shorter way round."""
-        k = len(self.slots)
-        delta = (-self.home[q]) % k
-        if delta > k // 2:
-            delta -= k
-        step = 1 if delta > 0 else -1
-        for _ in range(abs(delta)):
+    def _ring(self) -> set[int]:
+        return {self.home[p] for p in self.ion if p not in self.zone_of}
+
+    def _turn(self, forward: tuple[int, int], back: tuple[int, int], ops: Sequence[int]) -> None:
+        """Turn the ring the way that carries fewer ions across the junction (each crossing is a step
+        of its own, through X0), and on a tie the shorter way: each way is (crossings, steps)."""
+        step, n = (1, forward[1]) if forward <= back else (-1, back[1])
+        for _ in range(n):
             self._step(step, ops)
+
+    def _rotate_to_r0(self, q: int, ops: Sequence[int]) -> None:
+        """Turn the ring until qubit q's home is R0, next to the junction.  Forward, q and every ion past
+        it cross X0 on the way; back, every ion before it does."""
+        k, h = len(self.slots), self.home[q]
+        if h == 0:
+            return
+        on = self._ring()
+        self._turn((sum(1 for i in on if i >= h), k - h), (sum(1 for i in on if i < h), h), ops)
 
     def _step(self, step: int, ops: Sequence[int]) -> None:
         """The ring turns one storage site.  Every step is one waveform: its ions all move one site
@@ -199,14 +208,14 @@ class _Helios:
     def _free_r0(self, ops: Sequence[int]) -> None:
         """Turn the ring, the shorter way, until R0 is free: the nearest free site comes to it."""
         k = len(self.slots)
-        on = {self.home[p] for p in self.ion if p not in self.zone_of}
+        on = self._ring()
         if 0 not in on:
             return
-        ahead = next(d for d in range(1, k) if (k - d) % k not in on)      # a free site d steps before R0
-        behind = next(d for d in range(1, k) if d % k not in on)           # a free site d steps after R0
-        step, n = (1, ahead) if ahead <= behind else (-1, behind)
-        for _ in range(n):
-            self._step(step, ops)
+        # forward d steps brings the free site k-d to R0, and the ions at k-d .. k-1 cross; back d steps
+        # brings the free site d, and the ions at 0 .. d-1 cross
+        best_f = min(((sum(1 for i in on if i >= k - d), d) for d in range(1, k) if (k - d) not in on))
+        best_b = min(((sum(1 for i in on if i < d), d) for d in range(1, k) if d not in on))
+        self._turn(best_f, best_b, ops)
 
     def unload(self, ops: Sequence[int]) -> None:
         """Every qubit in a zone goes back to the ring: the near zones first, in a zone the last one in
