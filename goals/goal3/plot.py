@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 
@@ -31,12 +32,22 @@ INK, INK2 = "#0b0b0b", "#52514e"
 GRID = "#e4e3df"
 
 
+def wrap(notes: list[str], width: int) -> list[str]:
+    """Long notes over several lines (a figure clips text at its edge)."""
+    return [ln for n in notes for ln in textwrap.wrap(n, width, subsequent_indent="   ")]
+
+
 def size_key(r: dict) -> float:
     p = r["params"]
     if r["generator"] == "grid":
         return p["a"] * p["b"]
     if r["generator"] == "wise":
         return p["h"] * p["cx"] * p["cy"]
+    if r["generator"] == "ring":
+        # a loop's slots (a junction-corner loop has none in its four corners) and its docks
+        return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
+    if r["generator"] == "helios":
+        return 8                       # the fixed floorplan's eight operation zones
     return p["x"]
 
 
@@ -155,6 +166,7 @@ def main() -> int:
         if any(c["tried"] > len(pts.get(f, [])) for f, c in counts.items()):
             notes.append("failed: the compiler refused the size, or its program broke a rule "
                          "(results/<code>.jsonl says which)")
+        notes = wrap(notes, 185)
         fig.tight_layout(rect=(0, 0.035 * len(notes), 1, 1))
         for i, n in enumerate(notes):
             fig.text(0.01, 0.035 * (len(notes) - i) - 0.025, n, fontsize=7.5, color=INK2, ha="left")
@@ -184,6 +196,7 @@ def main() -> int:
             panel(row[1], pts, counts, "ler", "LER per round", err=True)
             row[0].set_title(code_title(code), fontsize=9.5, loc="left", color=INK)
         notes = [f"* {f}: {CAVEATS[f]}" for f in FAMILIES if f in CAVEATS]
+        notes = wrap(notes, 190)
         h = fig.get_figheight()
         fig.tight_layout(rect=(0, 0.11 * len(notes) / h, 1, 1))
         for i, n in enumerate(notes):

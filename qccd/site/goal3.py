@@ -48,6 +48,11 @@ def _size(r: dict) -> float:
         return p["h"] * p["cx"] * p["cy"]
     if gen == "cyclone":
         return p["x"]
+    if gen == "ring":
+        # a loop's slots (a junction-corner loop has none in its four corners) and its docks
+        return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
+    if gen == "helios":
+        return 8                           # the fixed floorplan's eight operation zones
     return 0
 
 
