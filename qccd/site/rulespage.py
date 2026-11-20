@@ -43,6 +43,9 @@ SETS = (
     ("cyclone-deck", "Cyclone, as the transport deck writes it"),
     ("conveyor", "Conveyor-belt transport"),
     ("helios", "Quantinuum Helios: ring, cache and operation zones"),
+    # Goal 3's two submitted families (2026-11-19): their own sets and the deck's one chain position a laser step
+    ("helios-deck", "Quantinuum Helios, as Goal 3 judges it"),
+    ("conveyor-deck", "Conveyor-belt transport, as Goal 3 judges it"),
 )
 
 #: The Reproduce papers that are not replays of an artifact's runs, and their rule sets.
