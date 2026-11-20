@@ -33,29 +33,33 @@ see "open".
 
 ## The architectures
 
-Three, as the team's transport deck ("QCCD Transport Architectures", Ke, 2026-11-06) defines them:
+Five. Three as the team's transport deck ("QCCD Transport Architectures", Ke, 2026-11-06) defines them:
 their shuttling rules, hardware, parameters and cost models, with Ke's feedback on the first sweep
 ("QCCD Studio Feedback", 2026-11-07). [DECK.md](DECK.md) maps every item of both to what happens to it
 here, and lists the readings taken where the documents leave a gap, each open or answered. The
 definitions and the sizes tried are data in [families.py](families.py). The Goal 3 page's cost table
-(feedback F1) lists every term each family pays.
+(feedback F1) lists every term each family pays. Two more came in as submitted architectures on the Rules
+page (2026-11-19): Quantinuum's Helios floorplan and the general conveyor loop.
 
 | family | machine | swept, per the deck | rule set | compiler |
 |---|---|---|---|---|
 | C2LR | Cx x Cy cells, an X-junction and two legs each, one crystal per leg, moved by swap-or-stay steps (Yb-Ba, the demonstrated diagonals) | Cx, Cy | `c2lr-deck` | the baseline C2LR router |
 | WISE | Cx x Cy cells, a junction zone and h gate zones each, sorted by parallel switched swaps (a pair exchanges in one step), one kind of operation across the chip in a step | h, Cx, Cy | `wise` | the baseline WISE router |
 | Cyclone | one ring of x traps of up to n ions, L-shaped junctions at its corners; data still, ancillas rotating in lockstep, each swapping its way to its trap's edge to leave | x, n <= 30 | `cyclone-deck` | the baseline Cyclone router |
+| Helios | Quantinuum Helios's published floorplan (arXiv:2511.05465): an 82-site storage ring that turns, one X junction, two caches and eight two-ion operation zones on two legs | fixed (one point; codes over its qubits get none) | `helios-deck` | the baseline Helios batch router |
+| Conveyor | a loop of rail slots with junction corners and dock spurs, turned rigidly, ions docked to gate | loop length, docks | `conveyor-deck` | qccdc (the released compiler), rotation first, its laser steps split by chain position |
 
 Every family heats and cools by the same rule (R7) and time (3 ms), and in every family a laser step
 reaches one chain position (R34).
 
-All three compilers keep the circuit's gate order. For Cyclone that departs from the deck's S6, which
+All five compilers keep the circuit's gate order. For Cyclone that departs from the deck's S6, which
 assigns all X checks to one rotation and all Z checks to the next: Goal 3 runs one circuit per code on
 every architecture (the project owner's decision, 2026-11-06). So Cyclone takes as many rotations a
 round as the circuit's order needs, about 3 on surface d=3, and judges order by R25, not R26.
 
-The earlier families, a plain Grid, a WISE that was the same grid with broadcast wiring, and a
-Conveyor, are retired. Their rows are in `results/pre_deck/`. The first sweep on the deck, before the
+The earlier families, a plain Grid and a WISE that was the same grid with broadcast wiring, are
+retired; the Conveyor of that time is back, now with the deck's physics and R34. Their rows are in
+`results/pre_deck/`. The first sweep on the deck, before the
 feedback (Cyclone cooling free, its gate swap time only, WISE's swap in two halves, no R34), is in
 `results/deck_r1/`.
 
@@ -141,11 +145,11 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
 - **The compilers are baselines.** WISE's router is greedy over the deck's step types and takes real steps rather
   than the paper's worst case. Cyclone's placement is annealed over one round. Neither is tuned, and C2LR's router
   still gives the same time on several sizes.
-- **41 of the 189 pages animate only part of their program.** A page holds 20,000 frames, and most of WISE's
+- **30 of the 215 pages animate only part of their program.** A page holds 20,000 frames, and most of WISE's
   programs on the larger codes are longer (BB72's reach 195,000 instructions). Such a page says "truncated", and its
   self-check covers the frames it animates. Its numbers are always the whole program's.
 - **Certificates:** the sweep skips the Lean step. `Compiler/bridge/check_cert.py` accepts the certificates of all
-  189 points for transport and for each qubit's gate order (run by hand on 2026-11-06; `tests/test_goal3_deck.py`
+  215 compiled points for transport and for each qubit's gate order (run by hand on 2026-11-19; `tests/test_goal3_deck.py`
   keeps one point of each family). A family's best point should go through the full grader before the paper quotes it.
 - **The HGP code is ours, not Alex's.** Alex had no explicit HGP construction yet, so Goal 3 took the textbook one
   on 2026-10-30, with the published coloration schedule ([hgp_code.py](hgp_code.py), [CODES.md](CODES.md)). Alex may
