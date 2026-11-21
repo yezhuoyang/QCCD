@@ -145,11 +145,11 @@ python goals/goal3/pages.py --out <dir> --work goals/goal3/work [<other trees' w
 - **The compilers are baselines.** WISE's router is greedy over the deck's step types and takes real steps rather
   than the paper's worst case. Cyclone's placement is annealed over one round. Neither is tuned, and C2LR's router
   still gives the same time on several sizes.
-- **30 of the 215 pages animate only part of their program.** A page holds 20,000 frames, and most of WISE's
+- **31 of the 216 pages animate only part of their program.** A page holds 20,000 frames, and most of WISE's
   programs on the larger codes are longer (BB72's reach 195,000 instructions). Such a page says "truncated", and its
   self-check covers the frames it animates. Its numbers are always the whole program's.
 - **Certificates:** the sweep skips the Lean step. `Compiler/bridge/check_cert.py` accepts the certificates of all
-  215 compiled points for transport and for each qubit's gate order (run by hand on 2026-11-19; `tests/test_goal3_deck.py`
+  216 compiled points for transport and for each qubit's gate order (run by hand on 2026-11-19 and 11-20; `tests/test_goal3_deck.py`
   keeps one point of each family). A family's best point should go through the full grader before the paper quotes it.
 - **The HGP code is ours, not Alex's.** Alex had no explicit HGP construction yet, so Goal 3 took the textbook one
   on 2026-10-30, with the published coloration schedule ([hgp_code.py](hgp_code.py), [CODES.md](CODES.md)). Alex may

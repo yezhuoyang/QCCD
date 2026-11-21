@@ -170,6 +170,16 @@
    "rules_failed": [],
    "status": "ok"
   },
+  "cyclone44_n4": {
+   "bytes": 71229578,
+   "code": "bb72",
+   "family": "Cyclone",
+   "instructions": 34443,
+   "page": "bb72/cyclone44_n4.html",
+   "point": "cyclone44_n4",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "cyclone6_n24": {
    "bytes": 26794218,
    "code": "bb72",
