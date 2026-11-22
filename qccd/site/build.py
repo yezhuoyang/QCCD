@@ -38,6 +38,7 @@ from pathlib import Path
 from .compile_examples import OUT as COMPILED
 from . import learn
 from . import machinepage
+from ..ir.target_text import KEYWORD_OF
 from .examples import (GRAMMAR, IR_TABLE, RULES, VERBS, build_example, cards_phrase, core_form, judge, machine,
                        rule_meta, text_of)
 from .md import Renderer, hints, slug
@@ -1072,10 +1073,14 @@ def language_page(built: dict) -> str:
             learn.section("the whole grammar fits on one screen. Read it once, then read the two sentences under it; "
                           "every example below is written in exactly this form."),
             f"<pre class=\"grammar\"><code>{html.escape(GRAMMAR)}</code></pre>",
-            "<p class=\"sub\">A statement is a call on a programme <code>p</code>, such as "
-            "<code>p.move(\"d0\", \"C1\", \"C2\")</code>: names in quotes, numbers as written, lists in square "
-            "brackets. A statement may span lines while a bracket is open, and that is the only "
-            "line-joining rule there is. Positional arguments come first, keywords after.</p>",
+            "<p class=\"sub\">A programme is written as <a href=\"../compilation/\">QCCDCert</a> writes its target "
+            "code: one statement a line, ended by <code>;</code>, such as <code>transport d0:C1-&gt;C2[shuttle];</code>. "
+            "QCCDCert&rsquo;s own statements (<code>init</code>, <code>transport</code>, <code>readout</code>, "
+            "<code>pump</code>, <code>barrier</code>) mean what they mean there; the others are this site&rsquo;s "
+            "extensions in the same syntax. A route names the sites it passes, as a QCCDCert path does; the bracket "
+            "names the movement class where QCCDCert names the declared path. <code>//</code> starts a comment. "
+            "The older call form <code>p.move(\"d0\", \"C1\", \"C2\")</code> is still read, and printed in this "
+            "syntax.</p>",
             "<h2 id=\"semantics\">Semantics</h2>",
             learn.section("what a programme <i>means</i>: a machine state and the step each statement takes on it. "
                           "Hold on to the three-part state; everything on the Rules and Evaluation pages reads it."),
@@ -1100,7 +1105,7 @@ def language_page(built: dict) -> str:
                          "each with what it does to the state, what it costs, which rules watch it, and a small "
                          "programme you can play. Read the core statements in order: <code>init</code> places the "
                          "ions, the transport statements move them, <code>gate</code> uses them, <code>cool</code> "
-                         "pays the heat back, <code>measure</code> and <code>reset</code> read and prepare.")]
+                         "pays the heat back, <code>readout</code> and <code>pump</code> read and prepare.")]
     groups = (("core", "statements", "Core statements",
                "the seven statements every programme is made of. Each card is one statement: its signature, "
                "its effect on the state, its cost, the rules that judge it, the IR it becomes, and a programme "
@@ -1113,7 +1118,8 @@ def language_page(built: dict) -> str:
                "one statement that does nothing to the machine: it records what the author claims the totals "
                "are, and the replay checks the claim (R9)."))
     body.append("<ul class=\"toc2\">" + "".join(
-        f'<li><a href="#{v["verb"]}"><code>p.{v["verb"]}</code></a></li>' for v in VERBS) + "</ul>")
+        f'<li><a href="#{v["verb"]}"><code>{KEYWORD_OF[v["verb"]]}</code>'
+        f'{" (one move)" if v["verb"] == "move" else ""}</a></li>' for v in VERBS) + "</ul>")
     for kind, anchor, title, lead in groups:
         body.append(f'<h2 id="{anchor}">{title}</h2>' + learn.section(lead))
         for v in VERBS:
@@ -1210,7 +1216,7 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
         m = machine(v["device"])
         rel = f"language/ex/{v['verb']}.html"
         r = build_example({"program": v["example"]}, m, "corrected", out / rel, kicker="THE LANGUAGE",
-                          headline=f'p.{v["verb"]}', lede=v["what"], check_metrics=v.get("check_metrics", False))
+                          headline=f'{KEYWORD_OF[v["verb"]]}', lede=v["what"], check_metrics=v.get("check_metrics", False))
         put(rel, (out / rel).read_text(encoding="utf-8"), 2, "language", app=True)
         lang[v["verb"]] = {**r, "page": f"ex/{v['verb']}.html", "poster": poster(m, r.get("init"), fit=(640, 380))}
         if v.get("kind") == "shorthand":
@@ -1221,7 +1227,7 @@ def build_examples(out: Path, put) -> tuple[dict, dict]:
             def differ(a, b):
                 return abs(a - b) > 1e-9 * max(1.0, abs(a)) if isinstance(a, float) else a != b
             if any(differ(same[k], r["verdict"][k]) for k in keys):
-                raise RuntimeError(f"p.{v['verb']}: the example and its core form are judged differently: "
+                raise RuntimeError(f"{KEYWORD_OF[v['verb']]}: the example and its core form are judged differently: "
                                    f"{ {k: r['verdict'][k] for k in keys} } vs { {k: same[k] for k in keys} }")
             lang[v["verb"]].update(core_text=text_of(core), core_same={k: same[k] for k in keys})
     rules: dict[str, dict] = {}
@@ -1836,7 +1842,8 @@ def build(out: Path) -> int:
         for lvl, sid, text in docs[name]["headings"]:
             index.append({"t": html.unescape(re.sub(r"<[^>]+>", "", text)),
                           "d": f"{docs[name]['title']} · docs", "u": f"docs/{name}/#{sid}", "k": "doc"})
-    index += [{"t": f"p.{v['verb']}", "d": v["what"][:90], "u": f"language/#{v['verb']}", "k": "syntax"} for v in VERBS]
+    index += [{"t": KEYWORD_OF[v["verb"]] + (" (one move)" if v["verb"] == "move" else ""), "d": v["what"][:90],
+               "u": f"language/#{v['verb']}", "k": "syntax"} for v in VERBS]
     index += [{"t": f"{R['id']} · {rule_meta(R['id'])['statement'][:70]}", "d": cards_phrase(R),
                "u": f"rules/#{R['id']}", "k": "rule"} for R in RULES]
     from . import certpage

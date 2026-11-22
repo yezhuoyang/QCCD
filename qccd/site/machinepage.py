@@ -519,7 +519,7 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
     ], lead="The <a href=\"../physics/\">Physics</a> page said what a trapped-ion machine can do and named the "
             "five words its map is drawn in: site, segment, junction, loop, zone type. This page makes those words "
             "formal, so that the next three pages can speak about one well-defined object."))
-    w(learn.ask("A programme says <code>p.move(\"d0\", \"S0\", \"A0\")</code>. What has to exist before that line means anything?",
+    w(learn.ask("A programme says <code>transport d0:S0-&gt;A0[dock];</code>. What has to exist before that line means anything?",
                 "A machine: a text that says S0 and A0 are sites, that one rail joins them, how many ions each "
                 "holds, what crossing that rail costs in time and heat, and which movement class may carry an ion "
                 "along it. A programme is written in the names a machine declares, a rule quantifies over the sets "
@@ -778,7 +778,7 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
          "Three things: where, how hot, what time. The machine supplies the set of places and the limits; the "
          "programme supplies the moves."))
     w(fig_state(chain))
-    w('<p class="notecap">The state after <code>p.init({"d0": "C1", "d1": "C2"})</code> and one hop on the register: '
+    w('<p class="notecap">The state after <code>init d0@C1, d1@C2;</code> and one hop on the register: '
       'a position for each ion, a heat for each, a clock. Every statement of the hardware language is a step '
       'Σ<sub><var>M</var></sub> → Σ<sub><var>M</var></sub>; the <a href="../language/#semantics">Language</a> page gives '
       'the step of each.</p>')
@@ -792,10 +792,10 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
          "itself, with the name it could not find.",
          "Typing is the machine's part of the bargain, rules are the physics' part. “No rail between S0 and S3” is "
          "a type error, “two ions on a rail of capacity one” is a rule failing (R3)."))
-    w(eg("On <code>ring6d</code>, <code>p.move(\"d0\", \"S0\", \"S1\")</code> is well-typed: S0 and S1 are sites and "
-         "one rail joins them. <code>p.move(\"d0\", \"S0\", \"S3\")</code> is not: no rail joins them, and the replay "
+    w(eg("On <code>ring6d</code>, <code>transport d0:S0-&gt;S1[shuttle];</code> is well-typed: S0 and S1 are sites and "
+         "one rail joins them. <code>transport d0:S0-&gt;S3[shuttle];</code> is not: no rail joins them, and the replay "
          "stops with <i>no segment between 'S0' and 'S3'</i> before any rule is asked. "
-         "<code>p.gate(\"CX\", [[\"d0\", \"d1\"]], sites=[\"S1\"])</code> is well-typed (S1 is a site) and illegal "
+         "<code>gate CX d0,d1 @S1;</code> is well-typed (S1 is a site) and illegal "
          "(can(S1, gate) is false), which rule R6 reports with the site's name."))
     w("<p>What the replay reads from <var>M</var>, step by step: for a transport cycle, the rails crossed give the "
       "primitives used (a shuttle per rail, a junction_cross at the degree of every junction transited, a split and a "

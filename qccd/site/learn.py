@@ -228,7 +228,7 @@ GLOSSARY: dict[str, dict] = {
     "instruction": {"t": "Instruction (cycle)", "u": "language/#semantics", "a": ["instruction", "machine cycle", "cycle"],
                     "d": "One step of a programme, and one cycle of the machine: everything in it happens together, and the next starts when it ends. The clock, the heat and the rules are all read per cycle."},
     "statement": {"t": "Statement", "u": "language/#syntax", "a": ["statement"],
-                  "d": "One line of the hardware language, a call such as p.move(\"d0\", \"C1\", \"C2\"). The seven core statements each become one instruction; the shorthands stand for lists of them."},
+                  "d": "One line of the hardware language, written as QCCDCert writes target code, such as transport d0:C1->C2[shuttle];. The seven core statements each become one instruction; the shorthands stand for lists of them."},
     "ir": {"t": "The control IR", "u": "language/#ir", "a": ["control IR", "IR"],
            "d": "The JSON the compiler emits and the verifier replays: one record per instruction. The language's text and the compiler's output meet there."},
     "move": {"t": "p.move", "u": "language/#move", "a": ["p.move"],

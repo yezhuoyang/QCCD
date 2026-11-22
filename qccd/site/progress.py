@@ -211,8 +211,8 @@ def _diagrams() -> dict[str, str]:
     d["B1"] = (rail(20, 24, 100, 24) + site(20, 24) + site(60, 24) + site(100, 24)
                + ion(20, 24, D0, ghost=True) + ion(100, 24, D0) + arrow("M26 14Q60 2 92 14")
                + '<rect x="6" y="38" width="108" height="34" rx="5" fill="#fff" stroke="#d0d5dd" stroke-width="1.2"/>'
-               + text(12, 52, 'p.init({"d0": "S0"})', 7, "#182230", "start", 500, True)
-               + text(12, 64, 'p.shuttle("d0", […])', 7, "#182230", "start", 500, True))
+               + text(12, 52, 'init d0@S0;', 7, "#182230", "start", 500, True)
+               + text(12, 64, 'shuttle d0:S0->…;', 7, "#182230", "start", 500, True))
     d["B2"] = (rail(18, 36, 102, 36) + site(18, 36, n=2) + site(60, 36, n=2) + site(102, 36, n=2)
                + ion(13.5, 36, D0) + ion(22.5, 36, D1) + ion(102, 36, D1, ghost=True)
                + arrow("M98 47Q60 72 27 47") + beam(18, 6, 28) + text(28, 13, "CX", 8, GATE, "start", 700))

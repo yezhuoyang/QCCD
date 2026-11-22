@@ -1638,6 +1638,10 @@ font:12px/22px ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",mono
   .ln{grid-template-columns:28px 44px minmax(80px,1fr) 44px 22px}
   .ln .cl{display:none}
 }
+/* the hardware program: the keyword (transport, broadcast, ...) and then the statement as
+   QCCDCert writes it; the class is inside the statement ([shuttle]), so its cell is empty */
+.ln.pln{grid-template-columns:28px 66px minmax(80px,1fr) 44px 22px}
+.ln.pln .cl{display:none}
 .al{grid-template-columns:30px 1fr}
 .ln>i,.al>i{font-style:normal;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .ln:hover,.al:hover{background:var(--soft)}
@@ -3566,8 +3570,7 @@ function draw(){
          : authored ? `<b>no frames</b> &mdash; this programme moves nothing yet; write more in the <b>Write</b> pane, or press`
          : `<b>no programme yet</b> &mdash; write one in the <b>Write</b> pane, or press`)
       : (document.body.removeAttribute('data-noprog'),
-         `<b>Step ${frame+1}</b> / ${P.frames.length} &mdash; <code>${f.type}</code>`)) +
-    (f.cls?` <code>${f.cls}</code>`:'') +
+         `<b>Step ${frame+1}</b> / ${P.frames.length} &mdash; <code>${esc(opText(f))} ${argsHTML(f)};</code>`)) +
     (f.hops?` &middot; ${f.hops} hop${f.hops>1?'s':''}`:'') +
     (f.check?` &middot; <b>${f.check}</b>`:'') +
     (f.batch!==undefined?` &middot; batch ${f.batch+1}`:'') +
@@ -4469,61 +4472,87 @@ function opColour(f){
   if(f.type==='simd') return classColour[f.cls] || C.anc;
   return C[TYPECOL[f.type]] || C.neutral;
 }
+// THE HARDWARE VIEW SPEAKS QCCDCERT.  Every row is the instruction as QCCDCert writes its
+// target code, extended for the studio (qccd/ir/target_text.py::instruction_text is the
+// Python twin): `transport q1:T0_0v->J0_1->T0_1h[shuttle]`, `rotate L0 +13`,
+// `pulse MS(pi/2) q0,q1 @G`, `broadcast R(-pi/2,0) q0@G, q1@H`, `gate CX d0,a0 @S0`,
+// `readout a0`, `pump a0`, `cool`.  The keyword is the op column; the rest is the row.
 function opText(f){
-  const li=listingRow(f);
-  if(li!=null) return LST.ops[LST.op[li]];
-  return (f.type||'').toUpperCase().slice(0,6);
+  if(!f) return '';
+  if(f.shift) return 'rotate';
+  if(f.moves || f.type==='simd') return 'transport';
+  if(f.type==='gate'){
+    const g=f.gate||'', n=gateOps(f).length;
+    if((g==='R'||g==='MS') && f.params && f.params.length) return n>1?'broadcast':'pulse';
+    return 'gate';
+  }
+  return {measure:'readout', reset:'pump', cool:'cool', init:'init', barrier:'barrier',
+          decode:'decode'}[f.type] || (f.type||'');
 }
-// a gate's angles, as multiples of pi/4 where they are, from its FIRST operand; a
-// trailing `…` when the operands of one instruction do not all turn alike
-function angles(f){
-  const P=f.params; if(!P||!P.length) return '';
-  const a=x=>{const k=Math.round(x/(Math.PI/4));
-    if(Math.abs(x-k*Math.PI/4)>1e-6) return Number(x).toPrecision(3);
-    const n={0:'0',1:'π/4',2:'π/2',3:'3π/4',4:'π',[-1]:'−π/4',[-2]:'−π/2',[-3]:'−3π/4',[-4]:'−π'}[k];
-    return n===undefined?k+'π/4':n;};
-  const one=JSON.stringify(P[0]), same=P.every(p=>JSON.stringify(p)===one);
-  return '('+P[0].map(a).join(', ')+')'+(same?'':'…');
+// a gate's operands, one list per instance: `acts` as the page model carries them, else
+// `pairs`, else one single-ion operand per entry of `ions`
+function gateOps(f){
+  if(f.acts && f.acts.length) return f.acts;
+  if(f.pairs && f.pairs.length) return f.pairs;
+  return (f.ions||[]).map(q=>[q]);
+}
+// an angle as QCCDCert prints it: an exact multiple of pi where it is one, else the decimal
+function piText(x){
+  for(const d of [1,2,3,4,6,8]){
+    const k=x*d/Math.PI, n=Math.round(k);
+    if(Math.abs(k-n)<1e-9){
+      if(n===0) return '0';
+      const num=(Math.abs(n)===1?'pi':Math.abs(n)+'*pi');
+      return (n<0?'-':'')+(d===1?num:num+'/'+d);
+    }
+  }
+  return String(Math.round(x*1e6)/1e6);
+}
+function waveText(f, i){
+  const P=f.params||[], p=P[i]||P[0];
+  return esc(f.gate||'')+(p&&p.length?'('+p.map(piText).join(',')+')':'');
 }
 function argsHTML(f){
   if(f.shift){
     const loop=f.shift[0], d=f.shift[1];
-    return ref('loop',loop)+' &times; '+(d>=0?'+':'')+d
-      +' <i class="mut">'+Math.abs(d)+' hop'+(Math.abs(d)===1?'':'s')+'</i>';
+    return ref('loop',loop)+' '+(d>=0?'+':'&minus;')+Math.abs(d);
   }
   if(f.moves){
-    const n=f.moves.length, out=[];
+    const n=f.moves.length, out=[], cls=f.cls?'['+esc(f.cls)+']':'';
     for(let j=0;j<Math.min(2,n);j++){
       const ion=f.moves[j][0], pa=f.moves[j][1];
-      out.push(ref('ion',ion)+' '+ref('site',pa[0])+'&rarr;'+ref('site',pa[pa.length-1]));
+      out.push(ref('ion',ion)+':'+pa.map(x=>ref('site',x)).join('-&gt;')+cls);
     }
-    return out.join(', ')+(n>2?' <i class="mut">+'+(n-2)+'</i>':'')
-      +((f.entails&&f.entails.length)
-          ? ' <i class="mut">['+f.entails.map(esc).join('+')+']</i>' : '');
+    return out.join(', ')+(n>2?' <i class="mut">+'+(n-2)+'</i>':'');
   }
-  if(f.pairs){
-    const n=f.pairs.length, out=[];
-    for(let j=0;j<Math.min(2,n);j++)
-      out.push(ref('ion',f.pairs[j][0])+'&middot;'+ref('ion',f.pairs[j][1]));
-    return (f.gate?esc(f.gate)+angles(f)+' ':'')+out.join(', ')
-      +(n>2?' <i class="mut">+'+(n-2)+'</i>':'')
-      +((f.sites&&f.sites.length)?' @'+ref('site',f.sites[0]):'');
+  if(f.type==='gate'){
+    const kw=opText(f), S=f.sites||[], at=i=>(S[i]||S[0]);
+    const ops=gateOps(f).map((xs,i)=>[xs.map(q=>ref('ion',q)).join(','), at(i)]);
+    if(!ops.length) return waveText(f,0);
+    const n=ops.length, show=ops.slice(0,2);
+    let txt;
+    if(kw==='pulse') txt=waveText(f,0)+' '+show[0][0]+(show[0][1]?' @'+ref('site',show[0][1]):'');
+    else if(kw==='broadcast') txt=show.map((o,i)=>waveText(f,i)+' '+o[0]+(o[1]?'@'+ref('site',o[1]):'')).join(', ');
+    else txt=waveText(f,0)+' '+show.map(o=>o[0]+(o[1]?' @'+ref('site',o[1]):'')).join(' / ');
+    return txt+(n>2?' <i class="mut">+'+(n-2)+'</i>':'');
   }
   if(f.type==='cool')
-    return (f.broadcast?'<i class="mut">broadcast, every ion</i>'
-                       :(f.ions||[]).slice(0,2).map(i=>ref('ion',i)).join(', '))
-      +(f.trigger?' <i class="mut">trigger='+esc(f.trigger)+'</i>':'');
+    return (f.broadcast?'':(f.ions||[]).slice(0,2).map(i=>ref('ion',i)).join(','))
+      +(f.trigger?' <i class="mut">// '+esc(f.trigger)+'</i>':'');
   if(f.ions && f.ions.length){
     const n=f.ions.length;
-    return f.ions.slice(0,2).map(i=>ref('ion',i)).join(', ')
+    return f.ions.slice(0,2).map(i=>ref('ion',i)).join(',')
       +(n>2?' <i class="mut">+'+(n-2)+'</i>':'');
   }
-  if(f.place) return '<i class="mut">place '+Object.keys(f.place).length+' ions</i>';
-  const li=listingRow(f);
-  return li!=null ? '<i class="mut">'+esc(LST.detail[li])+'</i>' : '';
+  if(f.place){
+    const ks=Object.keys(f.place);
+    return ks.slice(0,3).map(k=>ref('ion',k)+'@'+ref('site',f.place[k])).join(', ')
+      +(ks.length>3?' <i class="mut">+'+(ks.length-3)+'</i>':'');
+  }
+  return '';
 }
 const stripTags = h => h.replace(/<[^>]*>/g,' ')
-                        .replace(/&rarr;/g,'->').replace(/&middot;/g,'.')
+                        .replace(/&rarr;/g,'->').replace(/-&gt;/g,'->').replace(/&minus;/g,'-').replace(/&middot;/g,'.')
                         .replace(/&times;/g,'x').replace(/&amp;/g,'&');
 function rowText(f){        // what the filter matches against
   // BOTH renderings. The page draws `argsHTML` and Python computes `LST.detail`, and
@@ -4561,7 +4590,7 @@ function renderProgRow(r, row){
   k[0].textContent = String(i);
   k[1].textContent = opText(f);
   k[1].style.background = opColour(f);
-  k[2].textContent = f.cls || f.gate || (f.mode||'');
+  k[2].textContent = '';
   k[3].innerHTML = argsHTML(f)
     + (li!=null && LST.rule_sets[LST.rules[li]]
         ? ' <b class="bad">'+esc(LST.rule_sets[LST.rules[li]])+'</b>' : '');
@@ -4656,10 +4685,9 @@ function nowHTML(f){
   if(f.group!==undefined) where.push('group '+f.group);
   if(f.batch!==undefined) where.push('batch '+f.batch);
   if(f.check) where.push('check <b>'+esc(f.check)+'</b>');
-  let h = '<b>#'+f.id+'</b> &nbsp;'+esc(f.type)+(f.cls?' &middot; '+esc(f.cls):'')
-    +(f.mode?' &middot; '+esc(f.mode):'')
+  // the statement as QCCDCert writes it (opText + argsHTML), then where it sits
+  let h = '<b>#'+f.id+'</b> &nbsp;<code>'+esc(opText(f))+' '+argsHTML(f)+';</code>'
     +(where.length?' <span class="mut">&nbsp;&nbsp;'+where.join(' &middot; ')+'</span>':'');
-  h += '<br>' + argsHTML(f);
   if(li!=null){
     const u=LST.us[li], q=LST.dnbar[li], pt=LST.pts[LST.point[li]];
     h += ' <span class="mut">&nbsp;x'+LST.width[li]
@@ -5140,7 +5168,7 @@ function sizeLists(){
 }
 
 // ---------- build ----------
-PLIST = makeList('pScroll','pPad','pWin', {render:renderProgRow, onPick:pickProg,
+PLIST = makeList('pScroll','pPad','pWin', {render:renderProgRow, onPick:pickProg, cls:'ln pln',
   onFollow:v=>{ const b=document.getElementById('pFollow');
                 b.className='tgl'+(v?' on':''); b.setAttribute('aria-pressed', v?'true':'false'); }});
 ALIST = makeList('aScroll','aPad','aWin', {render:renderArchRow, onPick:pickArch,
@@ -5563,26 +5591,27 @@ function paintQLabels(){
 })();
 
 // ---------- what every hardware instruction means: hover a listing row or the stage card ----------
-// The definitions are the compiler's own: the instruction types and fields are `docs/tsir.md`,
+// The definitions are the compiler's own, each written as QCCDCert writes target code
+// (qccd/ir/target_text.py); the instruction types and fields are `docs/tsir.md`,
 // the native pulses R / VZ / MS and their decompositions are proved in Lean (Compiler/lean),
 // the SIMD classes are what this machine declares (`A.classes`), and the costs are the physics
 // package this page was priced with (`PH`).
 const OPS = {
-  INIT:  { name: 'init — place every ion', what: 'The first instruction of every programme: it declares which trap each ion starts in, with zero motional quanta. Nothing moves and nothing costs.', formal: '{ "type": "init", "id": 0, "placement": { "<ion>": "<site>", ... }, "quanta": { "<ion>": 0.0, ... } }', costk: '' },
-  SHUT:  { name: 'shuttle — move ions one trap to the next', what: 'A transport cycle in which each listed ion travels its own path: from its trap, through the named segments (and any junction on the way), to the next trap. Every participant moves in the same machine cycle; the instruction is charged at its slowest rider.', formal: '{ "type": "simd", "class": "shuttle", "mode": "inter",\n  "participants": [ { "ion": "q45", "from": "S242", "to": "A242", "via": ["S242.a", "A242.b"] }, ... ] }', costk: 'shuttle' },
-  'ROT.CW': { name: 'rotate_cw — rigid rotation of the whole loop', what: 'One movement template turns EVERY ion on the loop by the same number of slots with one broadcast waveform (± hops in the listing). The riders keep their cyclic order, so a rotation never brings two of them together — that is what the docks are for. A shift by k is the unit hop driven k times.', formal: '{ "type": "simd", "class": "rotate_cw", "mode": "inter",\n  "template": { "kind": "loop_shift", "loop": "L0", "delta": 13 },\n  "holds": ["L0", ...], "meta": { "batch": 7, "kind": "rotate", "hops": 13 } }', costk: 'shuttle' },
-  'ROT.CCW': { name: 'rotate_ccw — rigid rotation, the other way', what: 'The same template with a negative delta.', formal: '{ "type": "simd", "class": "rotate_ccw", "template": { "kind": "loop_shift", "loop": "L0", "delta": -1 } }', costk: 'shuttle' },
-  DOCK:  { name: 'dock — riders pull into their spurs', what: 'Each listed ion leaves the rail into the dock trap beside it, where a gate can happen. It entails a split at the source and a merge at the destination, and the rail node it leaves through is degree 3, so it is charged as a junction crossing too.', formal: '{ "type": "simd", "class": "dock", "mode": "inter",\n  "participants": [ { "ion": "q18", "from": "S74", "to": "A74", "via": ["V74"] }, ... ] }', costk: 'splitmerge' },
-  UNDOCK:{ name: 'undock — riders return to the rail', what: 'The reverse of dock: the ions leave their dock traps and rejoin the loop, split + merge again, through the same degree-3 node.', formal: '{ "type": "simd", "class": "undock", "mode": "inter", "participants": [ ... ] }', costk: 'splitmerge' },
-  'SORT.M': { name: 'sort_merge — one step of an odd–even sort', what: 'One ion of a neighbouring pair joins the other’s chain (a merge); with sort_split it realises a transposition on a loop with no docks.', formal: '{ "type": "simd", "class": "sort_merge", ... }', costk: 'splitmerge' },
-  'SORT.S': { name: 'sort_split — the other half of the transposition', what: 'The partner splits back out.', formal: '{ "type": "simd", "class": "sort_split", ... }', costk: 'splitmerge' },
-  R:     { name: 'R(θ, φ) — one single-qubit laser pulse', what: 'A rotation by θ about an axis at angle φ in the equatorial plane of the Bloch sphere: the one physical single-qubit pulse this hardware has. Every single-qubit gate of the circuit (h, x, s, t, u3…) compiles to exactly one R plus one VZ — the identity u3(θ,φ,λ) = VZ(φ+λ)·R(θ, π/2−λ), proved in Lean. Many R pulses on different ions are driven together in one instruction.', formal: '{ "type": "gate", "gate": "R", "mode": "intra", "ions": ["q45", ...], "params": [[θ, φ], ...], "sites": ["A10", ...] }', costk: 'gate' },
-  VZ:    { name: 'VZ(λ) — a virtual Z: a frame update, not a pulse', what: 'Advances the phase reference of every later pulse on that ion by λ. No laser fires, so it takes no time and adds no heating; it is what makes a single-qubit gate cost one pulse rather than three.', formal: '{ "type": "gate", "gate": "VZ", "mode": "intra", "ions": ["q45", ...], "params": [[λ], ...] }', costk: '' },
-  MS:    { name: 'MS(θ) — the Mølmer–Sørensen entangling pulse', what: 'The only two-qubit primitive: a shared motional mode couples two ions that sit in the SAME trap, so the pair must already be co-located (R6b checks this). A circuit CX compiles to four R pulses around one MS(π/2), proved in Lean (cx_decomp). Every pair listed is driven in the same instruction, one pair per trap.', formal: '{ "type": "gate", "gate": "MS", "mode": "intra",\n  "pairs": [["q153", "q18"], ["q152", "q20"], ...], "sites": ["A10", ...] }', costk: 'gate' },
-  COOL:  { name: 'cool — remove motional quanta', what: 'Sympathetic cooling of the listed ions (or every ion, when broadcast). Transport heats an ion, so the cooling pass inserts one before the gates that need it. The first cool is the state preparation.', formal: '{ "type": "cool", "broadcast": true }   or   { "type": "cool", "ions": ["q18", ...] }', costk: 'gate' },
-  RESET: { name: 'reset — prepare ancillas in |0⟩', what: 'Re-initialises the listed ions, mid-circuit; an ancilla is reset before every check it serves.', formal: '{ "type": "reset", "ions": ["q153", ...] }', costk: 'gate' },
-  MEAS:  { name: 'measure — read the ancillas out', what: 'Projective readout of the listed ions into classical bits; the syndrome.', formal: '{ "type": "measure", "ions": ["q153", ...] }', costk: 'gate' },
-  BARRIER: { name: 'barrier — an explicit synchronisation', what: 'Costs nothing; marks a point everything before must finish by.', formal: '{ "type": "barrier" }', costk: '' }
+  INIT:  { name: 'init — place every ion', what: 'The first instruction of every programme: it declares which trap each ion starts in, with zero motional quanta. Nothing moves and nothing costs.', formal: 'init q0@S0, q1@S1;', costk: '' },
+  SHUT:  { name: 'transport — move ions one trap to the next', what: 'A transport cycle in which each listed ion travels its own path: from its trap, through the named segments (and any junction on the way), to the next trap. Every participant moves in the same machine cycle; the instruction is charged at its slowest rider.', formal: 'transport q0:S0->J0->S1[shuttle], q2:S2->S3[shuttle];', costk: 'shuttle' },
+  'ROT.CW': { name: 'rotate — turn the whole loop (QCCDCert: a mandatory broadcast channel)', what: 'One movement template turns EVERY ion on the loop by the same number of slots with one broadcast waveform (± hops in the listing). The riders keep their cyclic order, so a rotation never brings two of them together — that is what the docks are for. A shift by k is the unit hop driven k times.', formal: 'rotate L0 +1;', costk: 'shuttle' },
+  'ROT.CCW': { name: 'rotate — turn the whole loop, the other way', what: 'The same template with a negative delta.', formal: 'rotate L0 -1;', costk: 'shuttle' },
+  DOCK:  { name: 'transport [dock] — riders pull into their spurs', what: 'Each listed ion leaves the rail into the dock trap beside it, where a gate can happen. It entails a split at the source and a merge at the destination, and the rail node it leaves through is degree 3, so it is charged as a junction crossing too.', formal: 'transport d0:S0->A0[dock];', costk: 'splitmerge' },
+  UNDOCK:{ name: 'transport [undock] — riders return to the rail', what: 'The reverse of dock: the ions leave their dock traps and rejoin the loop, split + merge again, through the same degree-3 node.', formal: 'transport d0:A0->S0[undock];', costk: 'splitmerge' },
+  'SORT.M': { name: 'transport [sort_merge] — one step of an odd–even sort', what: 'One ion of a neighbouring pair joins the other’s chain (a merge); with sort_split it realises a transposition on a loop with no docks.', formal: 'transport d0:S1->S2[sort_merge];', costk: 'splitmerge' },
+  'SORT.S': { name: 'transport [sort_split] — the other half of the transposition', what: 'The partner splits back out.', formal: 'transport d0:S2->S1[sort_split];', costk: 'splitmerge' },
+  R:     { name: 'pulse R(θ,φ) — one single-qubit laser pulse', what: 'A rotation by θ about an axis at angle φ in the equatorial plane of the Bloch sphere: the one physical single-qubit pulse this hardware has. Every single-qubit gate of the circuit (h, x, s, t, u3…) compiles to exactly one R plus one VZ — the identity u3(θ,φ,λ) = VZ(φ+λ)·R(θ, π/2−λ), proved in Lean. Many R pulses on different ions are driven together in one instruction.', formal: 'pulse R(pi/2,0) q0 @S0;   broadcast R(pi/2,0) q0@S0, q1@S1;', costk: 'gate' },
+  VZ:    { name: 'gate VZ(λ) — a frame update this site\'s earlier compiler emits', what: 'Advances the phase reference of every later pulse on that ion by λ. No laser fires, so it takes no time and adds no heating; it is what makes a single-qubit gate cost one pulse rather than three.', formal: 'gate VZ(pi/4) q0;', costk: '' },
+  MS:    { name: 'pulse MS(θ) — the Mølmer–Sørensen entangling pulse', what: 'The only two-qubit primitive: a shared motional mode couples two ions that sit in the SAME trap, so the pair must already be co-located (R6b checks this). A circuit CX compiles to four R pulses around one MS(π/2), proved in Lean (cx_decomp). Every pair listed is driven in the same instruction, one pair per trap.', formal: 'pulse MS(pi/2) q0,q1 @S0;   gate CX q0,q1 @S0;', costk: 'gate' },
+  COOL:  { name: 'cool — remove motional quanta', what: 'Sympathetic cooling of the listed ions (or every ion, when broadcast). Transport heats an ion, so the cooling pass inserts one before the gates that need it. The first cool is the state preparation.', formal: 'cool;   cool q0,q1;', costk: 'gate' },
+  RESET: { name: 'pump — prepare ions in |0⟩ (reset)', what: 'Re-initialises the listed ions, mid-circuit; an ancilla is reset before every check it serves.', formal: 'pump q153;', costk: 'gate' },
+  MEAS:  { name: 'readout — read ions out (measure)', what: 'Projective readout of the listed ions into classical bits; the syndrome.', formal: 'readout q153 -> c0;', costk: 'gate' },
+  BARRIER: { name: 'barrier — an explicit synchronisation', what: 'Costs nothing; marks a point everything before must finish by.', formal: 'barrier;', costk: '' }
 };
 function opCost(kind){
   try {
@@ -5593,7 +5622,6 @@ function opCost(kind){
   return '';
 }
 function opKey(f){
-  try { const t = opText(f); if(OPS[t]) return t; } catch(e){}
   if(!f) return null;
   if(f.type === 'init') return 'INIT'; if(f.type === 'cool') return 'COOL'; if(f.type === 'reset') return 'RESET';
   if(f.type === 'measure') return 'MEAS'; if(f.type === 'barrier') return 'BARRIER';
@@ -5611,7 +5639,7 @@ function opTipHTML(f, withThis){
   const k = opKey(f); if(!k) return '';
   const o = OPS[k], cost = opCost(o.costk), cn = opClassNote(f);
   let col = '#52514e'; try { col = opColour(f); } catch(e){}
-  let h = '<span class="op" style="background:' + col + '">' + esc(k) + '</span><b class="n">' + esc(o.name) + '</b>'
+  let h = '<span class="op" style="background:' + col + '">' + esc(opText(f) || k) + '</span><b class="n">' + esc(o.name) + '</b>'
     + '<div class="what">' + esc(o.what) + '</div>'
     + (cn ? '<div class="what mut">' + esc(cn) + '</div>' : '')
     + '<code>' + esc(o.formal) + '</code>'

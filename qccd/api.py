@@ -284,14 +284,26 @@ class Program:
         return an un-entered context manager and emit NOTHING: a silently empty program
         that still prices.
 
-        Each move is `(ion, src, dst)` or `(ion, src, dst, via)`.
+        Each move is `(ion, src, dst)` or `(ion, src, dst, via)` with `via` the rails, or
+        `(ion, [src, ..., dst])` -- the route by its sites, as QCCDCert writes it
+        (`transport ion:src->...->dst[cls];`, qccd/ir/target_text.py).
         """
+        moves = [self._route_move(mv) for mv in moves]
         for mv in moves:
             self._route(str(mv[0]), str(mv[1]), str(mv[2]),
                         mv[3] if len(mv) > 3 else ())
         with self.cycle(cls, mode, **meta) as c:
             c.moves(moves)
         return self
+
+    def _route_move(self, mv: Sequence) -> tuple:
+        """`(ion, [src, ..., dst])` -> `(ion, src, dst, rails)` on this machine."""
+        if len(mv) == 2 and isinstance(mv[1], (list, tuple)):
+            dev = self._m.arch.device
+            path = [str(n) for n in mv[1]]
+            via = [dev.segment_between(u, v).id for u, v in zip(path, path[1:])]
+            return (str(mv[0]), path[0], path[-1], via)
+        return tuple(mv)
 
     @_traced
     def move(self, ion: str, src: str, dst: str, via: Sequence[str] | None = None,

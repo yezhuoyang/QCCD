@@ -87,11 +87,13 @@ T0_0h ... T1_1v between junctions J0_0 ... J1_2), `race8` (a closed loop S0..S7,
 gates), `ring6d` (loop L0 = S0..S5 that cannot gate, docks A0 off S0 and A3 off S3 that can).
 Their documents: `qccd/site/compiled/<name>.arch.json`.
 
-The studio's programme language (`qccd/api.py`, class `Program`): `p.init({"q0": "C1", ...})`,
-`p.shuttle("q0", ["C1", "C0"])` (a path of adjacent nodes), `p.gate("CX", [["q0", "q1"]])` (a
-pair in one trap), `p.gate("H", [], ["C1"])` (a one-qubit gate at a site), `p.cool()`,
-`p.measure(["q0"])`, `p.reset([...])`, `p.rotate(delta, loop="L0")`, `p.barrier()`; one statement
-per line.
+The studio's programme language is QCCDCert's target-code syntax, extended for the studio
+(printer and parser: `qccd/ir/target_text.py`; the call records it denotes: `qccd/api.py`, class
+`Program`): `init q0@C1, q1@C0;`, `shuttle q0:C1->C0;` (a route of adjacent nodes),
+`transport q0:C1->C0[shuttle], q2:C3->C2[shuttle];` (one event), `gate CX q0,q1;` (a pair in one
+trap), `gate H @C1;` (a one-qubit gate at a site), `cool;`, `readout q0;`, `pump q0;`,
+`rotate L0 +1;`, `barrier;`; one statement per line, each ending in `;`. The old `p.init(...)`
+call form is still read by the studio but never printed or taught.
 
 ## Two Leans
 

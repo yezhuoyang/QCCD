@@ -211,7 +211,8 @@ def _plan() -> list[dict]:
         assert stages, f"{lid}: no stage answers, and none in ANSWERS"
         answer = spec["answer"]
         if answer is None:                       # C4: the lesson's own, cooling only a0
-            answer = stages[0].replace("p.cool()\n", 'p.cool(["a0"])\n')
+            # the lesson's solution is printed in QCCDCert's target syntax (`cool;`)
+            answer = stages[0].replace("cool;\n", "cool a0;\n")
         plan.append({"lesson": lid, "kind": kind, "stages": stages, "answer": answer})
     return plan
 

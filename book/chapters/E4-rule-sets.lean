@@ -70,23 +70,21 @@ inductive Instr where
   | shuttle (ion : String) (path : List String)
   | gate (name : String) (ions : List String) (site : String)
   | cool
-  | measure (ions : List String)
+  | readout (ions : List String)
   deriving Repr
 structure Programme where
   arch : String
   init : List (String × String)
   body : List Instr
   deriving Repr
-def quote (s : String) : String := "\"" ++ s ++ "\""
-def strs (xs : List String) : String := "[" ++ ", ".intercalate (xs.map quote) ++ "]"
 def stmt : Instr → String
-  | .shuttle ion path => "p.shuttle(" ++ quote ion ++ ", " ++ strs path ++ ")"
-  | .gate name [_] site => "p.gate(" ++ quote name ++ ", [], [" ++ quote site ++ "])"
-  | .gate name ions site => "p.gate(" ++ quote name ++ ", [" ++ strs ions ++ "], [" ++ quote site ++ "])"
-  | .cool => "p.cool()"
-  | .measure ions => "p.measure(" ++ strs ions ++ ")"
+  | .shuttle ion path => "shuttle " ++ ion ++ ":" ++ "->".intercalate path ++ ";"
+  | .gate name [_] site => "gate " ++ name ++ " @" ++ site ++ ";"
+  | .gate name ions site => "gate " ++ name ++ " " ++ ",".intercalate ions ++ " @" ++ site ++ ";"
+  | .cool => "cool;"
+  | .readout ions => "readout " ++ ",".intercalate ions ++ ";"
 def initStmt (init : List (String × String)) : String :=
-  "p.init({" ++ ", ".intercalate (init.map fun p => quote p.1 ++ ": " ++ quote p.2) ++ "})"
+  "init " ++ ", ".intercalate (init.map fun p => p.1 ++ "@" ++ p.2) ++ ";"
 def Programme.src (p : Programme) : String :=
   "\n".intercalate (initStmt p.init :: p.body.map stmt)
 abbrev Pos := List (String × String)
@@ -110,10 +108,10 @@ def bell : Programme :=
   { arch := "chain4",
     init := [("q0", "C1"), ("q1", "C0")],
     body := [.gate "H" ["q0"] "C1", .shuttle "q0" ["C1", "C0"], .cool,
-             .gate "CX" ["q0", "q1"] "C0", .measure ["q0", "q1"]] }
+             .gate "CX" ["q0", "q1"] "C0", .readout ["q0", "q1"]] }
 def early : Programme :=
   { bell with body := [.gate "H" ["q0"] "C1", .cool, .gate "CX" ["q0", "q1"] "C0",
-                       .shuttle "q0" ["C1", "C0"], .measure ["q0", "q1"]] }
+                       .shuttle "q0" ["C1", "C0"], .readout ["q0", "q1"]] }
 def occupancy (pos : Pos) (n : String) : Nat :=
   (pos.filter fun p => p.2 == n).length
 structure GateAt where

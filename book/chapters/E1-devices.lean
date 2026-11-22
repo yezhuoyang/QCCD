@@ -146,23 +146,22 @@ def sites (d : Device) : List String :=
 /-!
 The page draws any value with two fields, `arch` (a machine of the site) and `src` (a programme
 in the studio's language), in the studio. Lesson E2 is about programmes; here a programme only
-places ions, with one `p.init` statement. `ionsAt k ns` names one ion per node, `q0`, `q1`, ...;
-`initSrc` writes the statement. (`"\""` is a string holding one double quote; `++` joins
-strings and lists.)
+places ions, with one `init` statement: `init q0@C0, q1@C1;` puts `q0` in `C0` and `q1` in
+`C1`. `ionsAt k ns` names one ion per node, `q0`, `q1`, ...; `initSrc` writes the statement.
+(`++` joins strings and lists; `sep.intercalate xs` joins the strings `xs` with `sep` between
+them.)
 -/
 
 structure Studio where
   arch : String
   src : String
 
-def quote (s : String) : String := "\"" ++ s ++ "\""
-
 def ionsAt : Nat → List String → List (String × String)
   | _, [] => []
   | k, n :: ns => ("q" ++ toString k, n) :: ionsAt (k + 1) ns
 
 def initSrc (ions : List (String × String)) : String :=
-  "p.init({" ++ ", ".intercalate (ions.map fun p => quote p.1 ++ ": " ++ quote p.2) ++ "})"
+  "init " ++ ", ".intercalate (ions.map fun p => p.1 ++ "@" ++ p.2) ++ ";"
 
 def chain4Sites : Studio := { arch := chain4.name, src := initSrc (ionsAt 0 (sites chain4)) }
 

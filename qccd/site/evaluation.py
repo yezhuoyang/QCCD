@@ -245,25 +245,15 @@ def _small_programmes() -> list[dict]:
 
 
 def _step_text(st) -> str:
+    """One step, as QCCDCert writes target code (qccd/ir/target_text.py)."""
     ins = st.instr
     if ins is None:
         return st.label()
-    if st.kind == "init":
-        return "init " + ", ".join(f"{i}@{s}" for i, s in ins.placement.items())
-    if st.kind == "simd":
-        parts = []
-        for o in st.ops:
-            parts.append(f"{o.ions[0]} {'→'.join(o.path)}")
-        return f"move ({st.cls}) " + "; ".join(parts)
-    if st.kind == "gate":
-        sites = {o.site for o in st.ops}
-        return f"gate {ins.gate} " + "; ".join(",".join(o.ions) for o in st.ops) + (
-            f" @ {st.ops[0].site}" if len(sites) == 1 and st.ops[0].site else "")
-    if st.kind in ("measure", "reset"):
-        return f"{st.kind} " + ",".join(ins.ions)
-    if st.kind == "cool":
-        return "cool " + ("all" if not ins.ions else ",".join(ins.ions))
-    return st.kind
+    if st.kind == "simd" and getattr(st, "ops", None):
+        cls = st.cls
+        return "transport " + ", ".join(f"{o.ions[0]}:{'->'.join(o.path)}[{cls}]" for o in st.ops) + ";"
+    from ..ir.target_text import instruction_text
+    return instruction_text(ins)
 
 
 def _state_table(ex: dict) -> str:

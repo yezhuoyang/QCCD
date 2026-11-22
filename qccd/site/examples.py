@@ -181,57 +181,61 @@ GRID3_COLUMN = ["T1_0v.b", "T1_1v.a"]
 
 # ------------------------------------------------------------------- the language
 
-GRAMMAR = """programme  ::=  { statement NEWLINE }
-statement  ::=  "p." verb "(" [ arguments ] ")"
-verb       ::=  core | shorthand | "claim"
-core       ::=  "init" | "simd" | "swap_or_stay" | "reorder_or_not" | "gate" | "cool"
-             |  "measure" | "reset" | "barrier"
-shorthand  ::=  "move" | "shuttle" | "rotate" | "fill"
-arguments  ::=  argument { "," argument }
-argument   ::=  literal | name "=" literal            (keywords after positionals)
-literal    ::=  string | number | "True" | "False" | "None"
-             |  "[" [ literal { "," literal } ] "]"
-             |  "{" [ string ":" literal { "," string ":" literal } ] "}"
+GRAMMAR = """programme  ::=  { statement ";" }                      QCCDCert target code, extended
+statement  ::=  "init" place { "," place } [ "|" quanta ]          QCCDCert
+             |  "transport" move { "," move } [ "intra" ]        QCCDCert: one event, one class
+             |  "gate" name operands { "/" operands }           a named gate (CX = five pulses)
+             |  "readout" ions  |  "pump" ions                   QCCDCert (measure, reset)
+             |  "barrier"                                        QCCDCert
+             |  "cool" [ ions ]  |  "decode" [ ions ]            extension
+             |  "shuttle" move  |  "rotate" [ loop ] delta       extension: shorthands
+             |  "fill" [ loop ] [ "prefix" name ]                extension: shorthand
+             |  "swap_or_stay" ... | "reorder_or_not" ions       extension: C2LR steps
+             |  "claim" name "=" literal { "," name "=" literal }
+place      ::=  ion "@" site
+move       ::=  ion ":" site "->" site { "->" site } [ "[" class "]" ] [ "along" rails ]
+operands   ::=  ion "," ion [ "@" site ]
+delta      ::=  ("+" | "-") number
 """
 
 #: One entry per statement: the signature, what it means as a transition of the machine
 #: state, what it costs, the rules that judge it, the IR it becomes, and one example.
 VERBS: list[dict] = [
-    {"verb": "init", "sig": 'p.init({ion: site, ...}, quanta=None)',
+    {"verb": "init", "sig": 'init ion@site, ...;',
      "what": "Places the named ions on the named sites. The first statement of every programme: a machine starts empty.",
      "state": "position := placement; n̄(ion) := 0, or the quanta given. Nothing moves.",
      "cost": "0 hops, 0 µs.", "rules": ["R1", "R2"], "ir": "init",
      "device": CHAIN, "example": [rec("init", {"d0": "C1", "d1": "C0"})]},
-    {"verb": "fill", "sig": 'p.fill(loop=None, prefix="d")', "kind": "shorthand",
-     "means": 'one <code>p.init</code> that puts an ion on every site of the loop, in the loop&rsquo;s order: '
-              '<code>{"d0": its first site, "d1": its second, ...}</code>.',
+    {"verb": "fill", "sig": 'fill [loop] [prefix d];', "kind": "shorthand",
+     "means": 'one <code>init</code> that puts an ion on every site of the loop, in the loop&rsquo;s order: '
+              '<code>init d0@first site, d1@second, ...;</code>.',
      "what": "Places one ion on every slot of a loop, d0 on its first site and so on: the packed ring in one line.",
      "state": "position := every site of the loop, in order. Nothing moves.",
      "cost": "0 hops, 0 µs.", "rules": ["R1"], "ir": "init",
      "device": RACE, "example": [rec("fill")]},
-    {"verb": "move", "sig": 'p.move(ion, src, dst, via=None, cls="shuttle")', "kind": "shorthand",
-     "means": '<code>p.simd(cls, [[ion, src, dst]])</code>, or <code>[[ion, src, dst, via]]</code> when a via is given: '
-              'a cycle with one participant.',
+    {"verb": "move", "sig": 'transport ion:site->...->site[class];', "kind": "shorthand",
+     "means": 'a <code>transport</code> with one move: one ion, one event. The route names the sites it passes '
+              '(<code>a0:S0-&gt;J0-&gt;S1</code>), as QCCDCert names a path.',
      "what": "One ion, one hop, in its own cycle: the shortest form of a transport instruction.",
      "state": "position(ion) := dst; the segment between src and dst, or the segments in via, is crossed once; n̄ grows by the primitives crossed.",
      "cost": "the segment's hop, plus a junction_cross priced by the degree of any junction transited; duration from the machine's curves.",
      "rules": ["R1", "R2", "R3", "R4", "R8"], "ir": "simd with one participant",
      "device": CHAIN, "example": [rec("init", {"d0": "C1"}), rec("move", "d0", "C1", "C2")]},
-    {"verb": "shuttle", "sig": 'p.shuttle(ion, [site, site, ...], cls="shuttle")', "kind": "shorthand",
-     "means": 'one <code>p.simd(cls, [[ion, a, b, via]])</code> for each trap-to-trap step a &rarr; b of the path, '
-              'its via the rails through any junction between them.',
+    {"verb": "shuttle", "sig": 'shuttle ion:site->...->site[class];', "kind": "shorthand",
+     "means": 'one <code>transport ion:a-&gt;...-&gt;b[class];</code> for each trap-to-trap leg a &rarr; b of the '
+              'route, through any junction between them.',
      "what": "Walks one ion along a path of site ids, one trap-to-trap step per cycle. Junctions on the way are transited, never rested on.",
      "state": "one cycle per step of the path; after each, position(ion) is the next site.",
      "cost": "the sum of the hops; here the walk from T0_0v to T0_1h transits the T-junction J0_1, and the crossing is charged at degree 3.",
      "rules": ["R1", "R2", "R3", "R4", "R8", "R18"], "ir": "one simd per step",
      "device": GRID, "example": [rec("init", {"d0": "T0_0v"}), rec("shuttle", "d0", GRID_WALK)]},
-    {"verb": "simd", "sig": 'p.simd(cls, [[ion, from, to], [ion, from, to, via], ...], mode="inter")',
+    {"verb": "simd", "sig": 'transport ion:site->...->site[class], ...;',
      "what": "Several ions in one cycle, driven together under one movement class. The rules judge the cycle as a whole: one waveform, one direction per loop, no exchanges.",
      "state": "every listed ion moves at once; position := the listed destinations.",
      "cost": "cost sums over the participants; depth and duration take the maximum, because the cycle waits for its slowest ion.",
      "rules": ["R1", "R2", "R3", "R4", "R4d", "R5", "R8", "R11"], "ir": "simd",
      "device": RACE, "example": [rec("init", {"d0": "S1", "d1": "S4"}), rec("simd", "shuttle", [["d0", "S1", "S2"], ["d1", "S4", "S5"]])]},
-    {"verb": "swap_or_stay", "sig": 'p.swap_or_stay(diagonal, [ion, ...], checkerboard=None)',
+    {"verb": "swap_or_stay", "sig": 'swap_or_stay diagonal toward ion,...;',
      "what": "One C2LR swap-or-stay step (arXiv:2403.00756): every junction plays the same shared waveform for one "
              "diagonal (W-S, W-N, E-S or E-N), and each crystal's only choice is its direction bit: shifted toward its "
              "pair's junction (the listed ones) or away. The pairs are the machine's; the programme names no route. "
@@ -247,15 +251,15 @@ VERBS: list[dict] = [
      "rules": ["C1", "C2", "C5", "C6", "C7", "C9", "R4"], "ir": "simd with a swap_or_stay template",
      "device": C2LR3, "example": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("swap_or_stay", "WS", ["d0"]),
                                   rec("cool"), rec("gate", "CX", [["d0", "d1"]]), rec("swap_or_stay", "WS", ["d0"])]},
-    {"verb": "reorder_or_not", "sig": 'p.reorder_or_not([ion, ...])',
+    {"verb": "reorder_or_not", "sig": 'reorder_or_not ion,...;',
      "what": "One C2LR reorder-or-not step: the listed crystals' two wells turn 180 degrees in place, every other "
              "crystal holds. Priced only where the paper measures it (Yb-Ba, Fig. 5).",
      "state": "positions unchanged; the listed crystals' ion order is reversed.",
      "cost": "93 µs for Yb-Ba, and its heat to every crystal (C9).",
      "rules": ["C9", "R4"], "ir": "simd with a reorder_or_not template",
      "device": C2LR3_YB, "example": [rec("init", {"d0": "T0_1h", "d1": "T1_1v"}), rec("reorder_or_not", ["d0"])]},
-    {"verb": "rotate", "sig": 'p.rotate(delta, loop=None)', "kind": "shorthand",
-     "means": '|delta| <code>p.simd</code> cycles, each moving every ion on the loop one slot forward (back when '
+    {"verb": "rotate", "sig": 'rotate [loop] +k;', "kind": "shorthand",
+     "means": '|delta| <code>transport</code> events, each moving every ion on the loop one slot forward (back when '
               'delta is negative), in the loop&rsquo;s class <code>rotate_cw</code> (<code>rotate_ccw</code>). '
               'What it adds is brevity, not meaning: a compiled programme turns a loop of 144 ions in one line, '
               'and the IR keeps the turn as one instruction, so the number of movement templates a programme '
@@ -265,31 +269,31 @@ VERBS: list[dict] = [
      "cost": "|delta| unit cycles, each the hops of every ion on the loop summed and the deepest edge as its depth.",
      "rules": ["R4", "R11"], "ir": "simd with a loop_shift template",
      "device": RACE, "example": [rec("init", {"d0": "S0", "d1": "S2", "d2": "S5"}), rec("rotate", 2)]},
-    {"verb": "gate", "sig": 'p.gate(name, [[control, target], ...], sites=None)',
+    {"verb": "gate", "sig": 'gate name control,target [@site] / ...;',
      "what": "A gate cycle. Two-qubit: every pair sits in one site whose zone allows gates, control first. Single-qubit: an empty pair list and the site named.",
      "state": "positions unchanged; the gate's error is evaluated from each ion's n̄ at gate time.",
      "cost": "0 hops; the gate's duration from the primitive table.",
      "rules": ["R6", "R6b", "R7", "R7c", "R12", "R13", "R16"], "ir": "gate",
      "device": CHAIN, "example": [rec("init", {"d0": "C0", "d1": "C0"}), rec("cool"), rec("gate", "CX", [["d0", "d1"]])]},
-    {"verb": "cool", "sig": 'p.cool(ions=None)',
+    {"verb": "cool", "sig": 'cool [ion,...];',
      "what": "Cools ions back toward the motional ground state: all of them when no list is given (a broadcast), else the listed ones.",
      "state": "n̄(ion) := what the cooling primitive leaves, for the cooled ions.",
      "cost": "the cooling primitive's duration; one op for every ion under broadcast.",
      "rules": ["R6", "R7", "R7c"], "ir": "cool",
      "device": GRID, "example": [rec("init", {"d0": "T0_0v"}), rec("shuttle", "d0", GRID_WALK), rec("cool")]},
-    {"verb": "measure", "sig": 'p.measure([ion, ...])',
+    {"verb": "measure", "sig": 'readout ion,...;',
      "what": "Reads the listed ions out. Each must sit in a zone with SPAM (state preparation and measurement).",
      "state": "positions unchanged.", "cost": "the measure primitive's duration.", "rules": ["R6"], "ir": "measure",
      "device": RACE, "example": [rec("init", {"d0": "S3"}), rec("measure", ["d0"])]},
-    {"verb": "reset", "sig": 'p.reset([ion, ...])',
+    {"verb": "reset", "sig": 'pump ion,...;',
      "what": "Puts the listed ions back to |0>. The same zone requirement as measuring.",
      "state": "positions unchanged.", "cost": "the reset primitive's duration.", "rules": ["R6"], "ir": "reset",
      "device": CHAIN, "example": [rec("init", {"d0": "C2"}), rec("reset", ["d0"])]},
-    {"verb": "barrier", "sig": 'p.barrier()',
+    {"verb": "barrier", "sig": 'barrier;',
      "what": "A cycle in which nothing happens: an explicit synchronisation point, a marker between phases of a programme.",
      "state": "unchanged.", "cost": "0 hops, 0 µs.", "rules": [], "ir": "barrier",
      "device": RACE, "example": [rec("init", {"d0": "S0"}), rec("move", "d0", "S0", "S1"), rec("barrier"), rec("move", "d0", "S1", "S2")]},
-    {"verb": "claim", "sig": 'p.claim(total_cost=..., total_steps=..., ...)', "kind": "annotation",
+    {"verb": "claim", "sig": 'claim total_cost=..., total_steps=...;', "kind": "annotation",
      "what": "Annotates the programme with the totals its author claims. Claims are not content: the replay recomputes everything and R9 rejects any claim it cannot reproduce.",
      "state": "unchanged; the claim is recorded on the programme.", "cost": "none.", "rules": ["R9"], "ir": "the programme's metrics",
      "device": CHAIN, "check_metrics": True,
@@ -486,7 +490,7 @@ RULES: list[dict] = [
      "pass": {"program": [rec("init", {f"d{i}": "C0" for i in range(15)}), rec("cool"), rec("gate", "CX", [["d0", "d1"]])],
               "why": "fifteen."}},
     {"id": "R14", "checks": "an ion splits out of a trap only from its edge; leaving a chain of more than two needs an accounted gate_swap.",
-     "note": "The verifier does not track the order of the ions inside a chain: <code>p.init</code> puts ions in a site as a set, with no first or last. So R14 is conservative. A split from a chain of more than two ions is refused unless the instruction carries an accounted <code>gate_swap</code> (the 3 CX that bring the ion to the edge), even when that ion may already have been at an edge; from a chain of one or two, every ion is at an edge and nothing is charged. The language has no statement that accounts a swap today (it is an IR annotation), so a hand-written programme satisfies R14 by splitting only from chains of at most two.",
+     "note": "The verifier does not track the order of the ions inside a chain: <code>init</code> puts ions in a site as a set, with no first or last. So R14 is conservative. A split from a chain of more than two ions is refused unless the instruction carries an accounted <code>gate_swap</code> (the 3 CX that bring the ion to the edge), even when that ion may already have been at an edge; from a chain of one or two, every ion is at an edge and nothing is charged. The language has no statement that accounts a swap today (it is an IR annotation), so a hand-written programme satisfies R14 by splitting only from chains of at most two.",
      "device": RING_LOAD,
      "fail": {"program": [rec("init", {"d0": "A0", "d1": "A0", "d2": "A0"}), rec("move", "d0", "A0", "S0", cls="dock")],
               "why": "d0 splits from a chain of three with no swap accounted."},
@@ -623,29 +627,16 @@ RULES: list[dict] = [
 # ------------------------------------------------------------------- building
 
 def text_of(records: list[dict]) -> str:
-    """The programme as the Write pane would show it: `p.method(args, key=value)`."""
-    def lit(v: Any) -> str:
-        if v is True:
-            return "True"
-        if v is False:
-            return "False"
-        if v is None:
-            return "None"
-        return json.dumps(v)
-    lines = []
-    for r in records:
-        parts = [lit(a) for a in r["args"]] + [f"{k}={lit(v)}" for k, v in r["kwargs"].items()]
-        lines.append(f'p.{r["method"]}({", ".join(parts)})')
-    return "\n".join(lines)
+    """The programme as the Write pane shows it: QCCDCert target code, extended
+    (`qccd.ir.target_text.call_text`)."""
+    from ..ir.target_text import call_text
+    return "\n".join(call_text(r["method"], r["args"], r["kwargs"]) for r in records)
 
 
 def ir_text(prog: TSIR) -> str:
-    out = []
-    for ins in prog.instructions:
-        d = {k: v for k, v in dataclasses.asdict(ins).items() if v not in (None, (), [], {}, "", 0.0) or k in ("id", "type")}
-        d.pop("meta", None)
-        out.append(json.dumps(d, default=list))
-    return "\n".join(out)
+    """A compiled programme's instructions, as QCCDCert writes target code."""
+    from ..ir.target_text import instruction_text
+    return "\n".join(instruction_text(ins) for ins in prog.instructions)
 
 
 def _state(summary: dict, rule: str) -> str:

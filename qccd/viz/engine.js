@@ -4368,7 +4368,7 @@ function parse(src) {
   var rows = logicalLines(src);
   for (var r = 0; r < rows.length; r++) {
     var row = rows[r];
-    if (!row.text.trim() || /^\s*#/.test(row.text)) continue;
+    if (!row.text.trim() || /^\s*(#|\/\/)/.test(row.text)) continue;
     try {
       var st = _parseStatement(row.text, row.line);
       stmts.push(st);
@@ -4387,6 +4387,10 @@ function parse(src) {
 }
 
 function _parseStatement(text, line) {
+  // QCCDCert's target-code syntax (`transport a0:S0->S1[shuttle];` ...), the form every
+  // programme is printed in; the `p.verb(...)` call form below is still accepted
+  var tw = /^\s*([A-Za-z_]+)(\s|;|$)/.exec(text);
+  if (tw && own(TT_KEYWORDS, tw[1])) return parseTargetStatement(text, line);
   var toks = tokenize(text, line), p = { toks: toks, i: 0 };
   var method = null, seed = false;
   // TWO NEW PRODUCTIONS AND NO NEW VALUE FORM.  Every literal shape a programme statement
@@ -5311,7 +5315,23 @@ function _pSimd(ctx, args, kw) {
   var cls = args[0] === undefined ? kw.cls : args[0];
   var moves = args[1] === undefined ? (kw.moves || []) : args[1];
   var mode = args[2] === undefined ? (kw.mode === undefined ? 'inter' : kw.mode) : args[2];
-  _cycleFrame(ctx, cls, String(mode), moves);
+  _cycleFrame(ctx, cls, String(mode), moves.map(function (mv) { return _routeMove(ctx, mv); }));
+}
+
+// A move written by its sites -- `[ion, [src, ..., dst]]`, QCCDCert's route `src->...->dst`
+// (qccd/ir/target_text.py) -- becomes `[ion, src, dst, rails]` for the machine at hand.
+function _routeMove(ctx, mv) {
+  if (!Array.isArray(mv) || !Array.isArray(mv[1])) return mv;
+  var path = mv[1].map(String), via = [];
+  for (var h = 0; h + 1 < path.length; h++) {
+    var sid = ctx.pair[path[h] + '>' + path[h + 1]];
+    if (sid === undefined) {
+      throw ProgError('no segment between ' + pyRepr(path[h]) + ' and ' +
+                      pyRepr(path[h + 1]), 'KeyError');
+    }
+    via.push(sid);
+  }
+  return [mv[0], path[0], path[path.length - 1], via];
 }
 
 function _pMove(ctx, args, kw) {
@@ -5617,12 +5637,200 @@ function framesToTsir(frames, dev, classes, name, archSpec) {
 // `p.NAME(args)`, built on the SAME `lit()` / `kwd()` the architecture lane uses, so
 // `renderProgramSource(parse(x).prog) === x` byte for byte holds by construction rather
 // than by a second emitter that happens to agree.
+// A programme statement is printed in QCCDCert's target-code syntax, extended for the
+// studio (`init d0@S0;`, `transport a0:S0->J0->S1[shuttle];`, `rotate L0 +1;`,
+// `gate CX d0,a0 @S0;`, `readout a0;`, `pump a0;`, `cool;` ...).  This is the mirror of
+// `qccd/ir/target_text.py::call_text`, and tests/test_target_text.py holds the two to the
+// same text.  The old `p.verb(...)` form still parses (`_parseStatement`); it is no longer
+// printed.
+function _ttLit(v) {
+  if (typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_.†'\-]*$/.test(v)) return v;
+  return JSON.stringify(v);
+}
+function _ttIons(xs) { return (xs || []).map(String).join(','); }
+function _ttMeta(kw, skip) {
+  var out = [], k;
+  for (k in kw) if (own(kw, k) && (skip || []).indexOf(k) < 0) out.push(k + '=' + _ttLit(kw[k]));
+  return out.length ? ' with ' + out.join(', ') : '';
+}
+function _ttArg(args, kw, i, name, dflt) {
+  if (args.length > i && args[i] !== undefined) return args[i];
+  if (own(kw, name)) { var v = kw[name]; delete kw[name]; return v; }
+  return dflt;
+}
+function _ttMove(mv, cls) {
+  var c = cls ? '[' + cls + ']' : '';
+  if (mv.length === 2 && Array.isArray(mv[1])) return mv[0] + ':' + mv[1].map(String).join('->') + c;
+  var via = mv.length > 3 ? mv[3] : null;
+  return mv[0] + ':' + mv[1] + '->' + mv[2] + c + (via && via.length ? ' along (' + via.join(',') + ')' : '');
+}
 function renderProgramStmt(s) {
+  var a = (s.args || []).slice(), kw = {}, k;
+  for (k in (s.kwargs || {})) if (own(s.kwargs, k)) kw[k] = s.kwargs[k];
+  var m = s.method, t;
+  if (m === 'init') {
+    var place = _ttArg(a, kw, 0, 'placement', {}), quanta = _ttArg(a, kw, 1, 'quanta', null), ps = [];
+    for (k in place) if (own(place, k)) ps.push(k + '@' + place[k]);
+    t = 'init ' + ps.join(', ');
+    if (quanta) { var qs = []; for (k in quanta) if (own(quanta, k)) qs.push(k + '=' + _ttLit(quanta[k])); t += ' | ' + qs.join(', '); }
+    return t + _ttMeta(kw) + ';';
+  }
+  if (m === 'move' || m === 'simd') {
+    var cls, moves, mode;
+    if (m === 'move') {
+      var ion = _ttArg(a, kw, 0, 'ion'), src = _ttArg(a, kw, 1, 'src'), dst = _ttArg(a, kw, 2, 'dst');
+      var via = _ttArg(a, kw, 3, 'via', null);
+      cls = _ttArg(a, kw, 4, 'cls', 'shuttle'); mode = _ttArg([], kw, 9, 'mode', 'inter');
+      moves = [[ion, src, dst, via]];
+    } else {
+      cls = _ttArg(a, kw, 0, 'cls'); moves = _ttArg(a, kw, 1, 'moves', []); mode = _ttArg(a, kw, 2, 'mode', 'inter');
+    }
+    t = 'transport ' + moves.map(function (mv) { return _ttMove(mv, cls); }).join(', ');
+    if (mode !== 'inter') t += ' mode ' + mode;
+    return t + _ttMeta(kw) + ';';
+  }
+  if (m === 'shuttle') {
+    var sion = _ttArg(a, kw, 0, 'ion'), path = _ttArg(a, kw, 1, 'path', []), scls = _ttArg(a, kw, 2, 'cls', 'shuttle');
+    return 'shuttle ' + sion + ':' + path.map(String).join('->') + (scls !== 'shuttle' ? '[' + scls + ']' : '') + _ttMeta(kw) + ';';
+  }
+  if (m === 'rotate') {
+    var d = _ttArg(a, kw, 0, 'delta'), loop = _ttArg(a, kw, 1, 'loop', null), rcls = _ttArg(a, kw, 2, 'cls', null);
+    return 'rotate ' + (loop ? loop + ' ' : '') + (d >= 0 ? '+' : '-') + Math.abs(d) + (rcls ? ' [' + rcls + ']' : '') + _ttMeta(kw) + ';';
+  }
+  if (m === 'gate') {
+    var name = _ttArg(a, kw, 0, 'name'), pairs = _ttArg(a, kw, 1, 'pairs', []), sites = _ttArg(a, kw, 2, 'sites', null);
+    var gops = [], gn = Math.max(pairs.length, sites ? sites.length : 0);
+    for (var gi = 0; gi < gn; gi++) {
+      var who = gi < pairs.length ? _ttIons(pairs[gi]) : '', at = sites && sites[gi] ? '@' + sites[gi] : '';
+      gops.push([who, at].filter(function (x) { return x; }).join(' '));
+    }
+    return 'gate ' + name + ' ' + gops.join(' / ') + _ttMeta(kw) + ';';
+  }
+  if (m === 'measure' || m === 'reset' || m === 'decode' || m === 'cool') {
+    var word = { measure: 'readout', reset: 'pump', decode: 'decode', cool: 'cool' }[m];
+    var ions = _ttArg(a, kw, 0, 'ions', null);
+    return word + (ions && ions.length ? ' ' + _ttIons(ions) : '') + _ttMeta(kw) + ';';
+  }
+  if (m === 'barrier') return 'barrier' + _ttMeta(kw) + ';';
+  if (m === 'fill') {
+    var floop = _ttArg(a, kw, 0, 'loop', null), prefix = _ttArg(a, kw, 1, 'prefix', 'd');
+    return 'fill' + (floop ? ' ' + floop : '') + (prefix !== 'd' ? ' prefix ' + prefix : '') + _ttMeta(kw) + ';';
+  }
+  if (m === 'claim') {
+    var cs = []; for (k in kw) if (own(kw, k)) cs.push(k + '=' + _ttLit(kw[k]));
+    return 'claim ' + cs.join(', ') + ';';
+  }
+  if (m === 'swap_or_stay') {
+    var diag = _ttArg(a, kw, 0, 'diagonal', null), toward = _ttArg(a, kw, 1, 'toward', []);
+    var cb = own(kw, 'checkerboard') ? kw.checkerboard : undefined; delete kw.checkerboard;
+    return 'swap_or_stay' + (diag ? ' ' + diag : '') + (toward && toward.length ? ' toward ' + _ttIons(toward) : '')
+      + (cb !== undefined && cb !== null ? ' checkerboard ' + JSON.stringify(cb) : '') + _ttMeta(kw) + ';';
+  }
+  if (m === 'reorder_or_not') {
+    var rev = _ttArg(a, kw, 0, 'reverse', []);
+    return 'reorder_or_not' + (rev && rev.length ? ' ' + _ttIons(rev) : '') + _ttMeta(kw) + ';';
+  }
+  // a verb the target syntax has no word for keeps the call form
   var parts = [], i;
   for (i = 0; i < (s.args || []).length; i++) parts.push(lit(s.args[i]));
-  var kw = kwd(s.kwargs || {});
-  if (kw) parts.push(kw);
+  var kws = kwd(s.kwargs || {});
+  if (kws) parts.push(kws);
   return 'p.' + s.method + '(' + parts.join(', ') + ')';
+}
+
+// ---- the parser of the target syntax: the mirror of target_text.py::parse_call
+var TT_KEYWORDS = { init: 'init', transport: 'simd', shuttle: 'shuttle', rotate: 'rotate',
+  gate: 'gate', readout: 'measure', pump: 'reset', cool: 'cool', barrier: 'barrier',
+  decode: 'decode', fill: 'fill', claim: 'claim', swap_or_stay: 'swap_or_stay',
+  reorder_or_not: 'reorder_or_not' };
+function _ttSplit(s, sep) {
+  var out = [], depth = 0, cur = '', i, ch;
+  for (i = 0; i < s.length; i++) {
+    ch = s.charAt(i);
+    if ('([{'.indexOf(ch) >= 0) depth++;
+    else if (')]}'.indexOf(ch) >= 0) depth--;
+    if (ch === sep && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out.map(function (x) { return x.trim(); }).filter(function (x) { return x.length; });
+}
+function _ttUnlit(s) { s = s.trim(); try { return JSON.parse(s); } catch (e) { return s; } }
+function _ttPerr(line, msg) { var e = new Error(msg); e.line = line; e.col = 1; return e; }
+function _ttMoveParse(text, line) {
+  var mm = /^\s*([^:\s]+)\s*:\s*([^\[\s]+?)\s*(?:\[\s*([^\]]+?)\s*\])?\s*(?:along\s+\(?([^)\s]+)\)?)?\s*$/.exec(text);
+  if (!mm) throw _ttPerr(line, 'a move is `ion:site->site[class]`, not ' + JSON.stringify(text));
+  var nodes = mm[2].split('->').map(function (x) { return x.trim(); });
+  if (nodes.length < 2) throw _ttPerr(line, 'a route names at least two sites');
+  if (mm[4]) {
+    if (nodes.length !== 2) throw _ttPerr(line, 'a move `along` rails names only its two ends');
+    return { mv: [mm[1], nodes[0], nodes[1], mm[4].split(',')], cls: mm[3] || null };
+  }
+  return { mv: [mm[1], nodes], cls: mm[3] || null };
+}
+function parseTargetStatement(text, line) {
+  var s = text.replace(/\/\/.*$/, '').trim();
+  if (s.charAt(s.length - 1) === ';') s = s.slice(0, -1).trim();
+  var sp = s.indexOf(' '), word = sp < 0 ? s : s.slice(0, sp), rest = sp < 0 ? '' : s.slice(sp + 1);
+  if (!own(TT_KEYWORDS, word)) throw _ttPerr(line, JSON.stringify(word) + ' is not a statement');
+  var meta = {}, wm = /\swith\s+(.*)$/.exec(' ' + rest);
+  if (wm) {
+    rest = (' ' + rest).slice(0, wm.index).trim();
+    _ttSplit(wm[1], ',').forEach(function (it) { var j = it.indexOf('='); meta[it.slice(0, j).trim()] = _ttUnlit(it.slice(j + 1)); });
+  }
+  rest = rest.trim();
+  var method = TT_KEYWORDS[word], args = [], kw = meta, m2;
+  if (word === 'init') {
+    var bar = rest.indexOf('|'), placeTxt = bar < 0 ? rest : rest.slice(0, bar), place = {};
+    _ttSplit(placeTxt, ',').forEach(function (it) { var j = it.indexOf('@'); place[it.slice(0, j).trim()] = it.slice(j + 1).trim(); });
+    args = [place];
+    if (bar >= 0) {
+      var q = {}; _ttSplit(rest.slice(bar + 1), ',').forEach(function (it) { var j = it.indexOf('='); q[it.slice(0, j).trim()] = _ttUnlit(it.slice(j + 1)); });
+      args.push(q);
+    }
+  } else if (word === 'transport') {
+    var mode = 'inter'; m2 = /\s+mode\s+(\S+)$/.exec(rest);
+    if (m2) { mode = m2[1]; rest = rest.slice(0, m2.index); }
+    var parsed = _ttSplit(rest, ',').map(function (x) { return _ttMoveParse(x, line); });
+    var classes = {}; parsed.forEach(function (p) { classes[String(p.cls)] = 1; });
+    if (Object.keys(classes).length > 1) throw _ttPerr(line, 'one transport, one movement class (R4)');
+    args = [parsed[0].cls || 'shuttle', parsed.map(function (p) { return p.mv; })];
+    if (mode !== 'inter') kw.mode = mode;
+  } else if (word === 'shuttle') {
+    var pm = _ttMoveParse(rest, line);
+    if (pm.mv.length !== 2) throw _ttPerr(line, 'a shuttle names its route by sites');
+    args = [pm.mv[0], pm.mv[1]];
+    if (pm.cls && pm.cls !== 'shuttle') kw.cls = pm.cls;
+  } else if (word === 'rotate') {
+    m2 = /^(?:(\S+)\s+)?([+-]\d+)(?:\s*\[\s*(\S+?)\s*\])?$/.exec(rest);
+    if (!m2) throw _ttPerr(line, '`rotate [loop] +k` turns a loop k slots');
+    args = [parseInt(m2[2], 10)];
+    if (m2[1] || m2[3]) args.push(m2[1] || null);
+    if (m2[3]) args.push(m2[3]);
+  } else if (word === 'gate') {
+    var gsp = rest.indexOf(' '), name = gsp < 0 ? rest : rest.slice(0, gsp), ops = gsp < 0 ? '' : rest.slice(gsp + 1);
+    var pairs = [], sites = [], any = false;
+    ops.split('/').map(function (x) { return x.trim(); }).filter(function (x) { return x; }).forEach(function (op) {
+      var at = op.indexOf('@'), who = at < 0 ? op : op.slice(0, at), site = at < 0 ? '' : op.slice(at + 1).trim();
+      var gions = who.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+      if (gions.length) pairs.push(gions);
+      sites.push(site || null); if (site) any = true;
+    });
+    args = [name, pairs]; if (any) args.push(sites);
+  } else if (word === 'readout' || word === 'pump' || word === 'decode' || word === 'cool' || word === 'reorder_or_not') {
+    var ions = rest.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+    args = ions.length ? [ions] : [];
+  } else if (word === 'fill') {
+    m2 = /^(?:(?!prefix\b)(\S+))?\s*(?:prefix\s+(\S+))?$/.exec(rest) || [];
+    args = m2[1] ? [m2[1]] : [];
+    if (m2[2]) args = [m2[1] || null, m2[2]];
+  } else if (word === 'claim') {
+    _ttSplit(rest, ',').forEach(function (it) { var j = it.indexOf('='); kw[it.slice(0, j).trim()] = _ttUnlit(it.slice(j + 1)); });
+  } else if (word === 'swap_or_stay') {
+    m2 = /^(?:(?!toward\b|checkerboard\b)(\S+))?\s*(?:toward\s+(\S+))?\s*(?:checkerboard\s+(.+))?$/.exec(rest) || [];
+    args = [m2[1] || null]; if (m2[2]) args.push(m2[2].split(','));
+    if (m2[3]) kw.checkerboard = _ttUnlit(m2[3]);
+  }
+  return { method: method, args: args, kwargs: kw, lane: 'prog', text: text, line: line, syntax: 'qccdcert' };
 }
 
 function renderProgramSource(stmts) {

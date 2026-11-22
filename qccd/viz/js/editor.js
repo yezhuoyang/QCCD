@@ -4773,18 +4773,18 @@ var HINTS = {
   'learn:solution': { t: 'Solution', d: 'Show one way to do it, applied to the canvas so you can read it back.' },
   'learn:next': { t: 'Next', d: 'On to the next lesson.' },
   'learn:verdict': { t: 'The checker\u2019s verdict', d: 'Some rules are not checked in the browser. For these lessons the page carries the verdict the checker computed on this exact programme when the page was built \u2014 the rule, its state, and the verifier\u2019s own sentences.' },
-  'p:init': { t: 'p.init', d: 'Puts named ions on named sites: p.init({"d0": "S0"}). The first line of every programme; a machine starts empty.' },
-  'p:shuttle': { t: 'p.shuttle', d: 'Pushes one ion along a path of site ids, one rail per step: p.shuttle("d0", ["S0", "S1", "S2"]). A third argument names the movement class (default: shuttle).' },
-  'p:move': { t: 'p.move', d: 'One ion, one hop: p.move("d0", "S0", "S1"). The same thing p.shuttle does for one rail.' },
-  'p:simd': { t: 'p.simd', d: 'Several ions in one step: p.simd("shuttle", [["d0", "S0", "S1"], ["d1", "S2", "S3"]]). The class first, then a list of [ion, from, to]. One instruction, one step, judged as a whole by the rules.' },
-  'p:gate': { t: 'p.gate', d: 'A gate. Two-qubit: p.gate("CX", [["d0", "d1"]]) -- both ions in one site, control first. Single-qubit: p.gate("H", [], ["S0"]) names the site.' },
-  'p:cool': { t: 'p.cool', d: 'Cools the ions back toward the ground state: p.cool() for all of them, p.cool(["d0"]) for some. Transport heats; a gate on a hot ion is refused (R7, R7c).' },
-  'p:measure': { t: 'p.measure', d: 'Reads ions out: p.measure(["d0", "d1"]). Needs a site whose zone has spam (state preparation and measurement).' },
-  'p:reset': { t: 'p.reset', d: 'Puts ions back to |0>: p.reset(["d0"]). Same zone requirement as measuring.' },
-  'p:fill': { t: 'p.fill', d: 'Puts one ion on every site of a loop, d0 on its first site and so on: p.fill() for the only loop, p.fill("L0") to name it.' },
-  'p:rotate': { t: 'p.rotate', d: 'Turns a closed loop: p.rotate(2) moves every ion on it two sites forward, p.rotate(-1) one site back. One instruction, every ion.' },
-  'p:barrier': { t: 'p.barrier', d: 'A step in which nothing happens; a marker between phases of a programme.' },
-  'p:decode': { t: 'p.decode', d: 'Calls the decoder: p.decode() sends the outcomes of every ion measured since the last decode down the wires to the decoder, and its correction on to the classical memory. p.decode(["a0"]) names them. It moves no ion and takes no machine time -- the decoder works alongside the ions -- and the wires light while it runs.' },
+  'p:init': { t: 'init', d: 'Puts named ions on named sites: init d0@S0, d1@S2;. The first line of every programme; a machine starts empty. QCCDCert target code begins the same way.' },
+  'p:shuttle': { t: 'shuttle', d: 'Walks one ion along a route of sites, one transport per trap-to-trap leg: shuttle d0:S0->S1->S2;. A class in brackets names the movement class (default: shuttle).' },
+  'p:move': { t: 'transport', d: 'One ion, one event: transport d0:S0->S1[shuttle];. The route names the sites it passes, as a QCCDCert path does.' },
+  'p:simd': { t: 'transport', d: 'Several ions in one event: transport d0:S0->S1[shuttle], d1:S2->S3[shuttle];. One class for every move (R4), one waveform per channel (R22) -- QCCDCert\'s broadcast transport.' },
+  'p:gate': { t: 'gate', d: 'A named gate: gate CX d0,d1; -- both ions in one site, control first; a CX is the five pulses QCCDCert\'s stage 4 emits for it. Single-qubit: gate H @S0; names the site.' },
+  'p:cool': { t: 'cool', d: 'Cools ions back toward the ground state: cool; for all of them, cool d0; for some. Transport heats; a gate on a hot ion is refused (R7, R7c).' },
+  'p:measure': { t: 'readout', d: 'Reads ions out: readout d0,d1; (QCCDCert\'s readout). Needs a site whose zone has spam (state preparation and measurement).' },
+  'p:reset': { t: 'pump', d: 'Puts ions back to |0>: pump d0; (QCCDCert\'s optical pumping). Same zone requirement as readout.' },
+  'p:fill': { t: 'fill', d: 'Puts one ion on every site of a loop, d0 on its first site and so on: fill; for the only loop, fill L0; to name it.' },
+  'p:rotate': { t: 'rotate', d: 'Turns a closed loop: rotate +2; moves every ion on it two sites forward, rotate -1; one site back -- in QCCDCert, transports on the loop\'s mandatory broadcast channel.' },
+  'p:barrier': { t: 'barrier', d: 'A step in which nothing happens; a marker between phases of a programme.' },
+  'p:decode': { t: 'decode', d: 'Calls the decoder: decode; sends the outcomes of every ion measured since the last decode down the wires to the decoder, and its correction on to the classical memory. decode a0; names them. It moves no ion and takes no machine time -- the decoder works alongside the ions -- and the wires light while it runs.' },
   'tab:R': { t: 'Report', d: 'The verdict: every cost figure with its provenance, and each hardware rule \u2014 passed, failed, partly checked, or not checked on this page.' },
   'follow': { t: 'Follow', d: 'Keep the executing instruction scrolled into view.', k: 'F' },
   'filter': { t: 'Filter', d: 'Show only the rows containing this text.', k: '/' },
@@ -7356,8 +7356,8 @@ function applyProgramSource(src) {
 function humanMessage(e) {
   var m = String((e && e.message) || '');
   if (/must start with/.test(m)) {
-    return 'a programme statement must start with `p.` (have: ' +
-           Q.PROGRAM_METHODS.map(function (v) { return 'p.' + v; }).join(', ') + ')';
+    return 'a programme statement starts with one of: init, transport, shuttle, rotate, gate, ' +
+           'readout, pump, cool, barrier, decode, fill, claim (QCCDCert target code, extended)';
   }
   // a bare `'T9'` is Python's KeyError for a lookup that found nothing; a KeyError that
   // already carries a sentence ("no segment between ...") says where by itself
@@ -11214,7 +11214,7 @@ function renderWrite() {
       var first = plan.ok ? plan.from : firstSiteId();
       ta.setAttribute('placeholder',
         (plan.ok ? Q.renderProgramSource(plan.statements) + '\n' : '') +
-        '# no programme yet \u2014 press Test drive or type p.init({"d0": "' + first + '"})');
+        '// no programme yet \u2014 press Test drive or type init d0@' + first + ';');
     }
   }
   var f = $('pwFoot');
@@ -11225,10 +11225,10 @@ function renderWrite() {
         ((PRICE && PRICE.frameChecked) || 0) + '. Download the pair and run ' +
         '<code>python -m qccd run &lt;name&gt;.arch.json --tsir &lt;name&gt;.tsir.json</code>.'
       : P.frames.length
-      ? 'the shipped programme. Type <code>p.init({...})</code> and the stage re-renders ' +
+      ? 'the shipped programme. Type <code>init d0@...;</code> and the stage re-renders ' +
         'from what you wrote; <b>Evaluate</b> re-prices and re-checks.'
-      : 'no programme yet \u2014 press <b>Test drive</b> or type <code>p.init({"d0": "' +
-        esc2(first) + '"})</code> and press <b>Evaluate</b>.';
+      : 'no programme yet \u2014 press <b>Test drive</b> or type <code>init d0@' +
+        esc2(first) + ';</code> and press <b>Evaluate</b>.';
   }
 }
 function firstSiteId() {

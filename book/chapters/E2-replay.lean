@@ -5,9 +5,12 @@ import QCCDC.Cert.Sound
 
 *Part E, lesson E2. You need lesson E1.*
 
-In the studio a programme is a list of statements: `p.init` places the ions,
-`p.shuttle` carries one along a path of nodes, `p.gate` fires a gate, `p.cool` cools every ion,
-`p.measure` reads ions out. This lesson writes that language as a Lean type, writes the Bell
+In the studio a programme is a list of statements, one per line, each ending in `;`: `init`
+places the ions, `shuttle` carries one along a path of nodes, `gate` fires a gate, `cool` cools
+every ion, `readout` reads ions out. The language is written as QCCDCert, the site's verified
+compiler, writes its target code, extended for the studio: `shuttle`, `gate` and `cool` are the
+extensions; `init`, `transport`, `readout`, `pump` and `barrier` are QCCDCert's own. This
+lesson writes that language as a Lean type, writes the Bell
 pair in it, computes the studio's text from it (so the figure below is drawn from your Lean),
 and writes the **replay**: where every ion is after every statement. Then it proves things
 about the replay, first for the Bell pair and then for every programme.
@@ -23,18 +26,18 @@ the four, with its fields.
 * `shuttle ion path`: carry `ion` along `path`, a list of nodes, to the last one.
 * `gate name ions site`: fire the gate `name` on `ions` (one ion or two), which stand in `site`.
 * `cool`: cool every ion.
-* `measure ions`: read those ions out.
+* `readout ions`: read those ions out.
 -/
 
 inductive Instr where
   | shuttle (ion : String) (path : List String)
   | gate (name : String) (ions : List String) (site : String)
   | cool
-  | measure (ions : List String)
+  | readout (ions : List String)
   deriving Repr
 
 /-!
-A programme names its machine, places its ions (the `p.init` statement, kept as a list of
+A programme names its machine, places its ions (the `init` statement, kept as a list of
 pairs ion, node), and lists its statements.
 -/
 
@@ -49,7 +52,7 @@ The Bell pair on `chain4`, with its ions where the compiler placed them for the 
 page and its statements in the order lesson F1's figure plays its certificate: `q0` starts in
 `C1` and `q1` in `C0`; the Hadamard fires on
 `q0` where it stands, `q0` moves next door, every ion is cooled, the CX fires in `C0`, and both
-ions are measured. `.gate` is short for `Instr.gate`.
+ions are read out. `.gate` is short for `Instr.gate`.
 -/
 
 def bell : Programme :=
@@ -59,11 +62,11 @@ def bell : Programme :=
              .shuttle "q0" ["C1", "C0"],
              .cool,
              .gate "CX" ["q0", "q1"] "C0",
-             .measure ["q0", "q1"]] }
+             .readout ["q0", "q1"]] }
 
 /-!
 #### Exercise 1 (★) `bell_has_five`
-Prove that the Bell programme has five statements after `p.init`.
+Prove that the Bell programme has five statements after `init`.
 -/
 
 theorem bell_has_five : bell.body.length = 5 := rfl
@@ -74,23 +77,21 @@ theorem bell_has_five : bell.body.length = 5 := rfl
 A function on an inductive type is written by pattern matching, one line per kind of
 statement. A pattern can look inside the fields: `.gate name [_] site` matches a gate whose
 list of ions has exactly one element (`_` is "anything"), and the line after it catches every
-other gate. The studio names a one-ion gate by its site, `p.gate("H", [], ["C1"])`; a two-ion
-gate by its pair and, here, the site it is said to fire in, which the studio checks.
+other gate. The studio names a one-ion gate by its site, `gate H @C1;`; a two-ion gate by its
+pair and, here, the site it is said to fire in, which the studio checks: `gate CX q0,q1 @C0;`.
+A shuttle names its ion and its path, `shuttle q0:C1->C0;`; `cool;` cools every ion;
+`readout q0,q1;` reads two ions out; `init q0@C1, q1@C0;` places them.
 -/
 
-def quote (s : String) : String := "\"" ++ s ++ "\""
-
-def strs (xs : List String) : String := "[" ++ ", ".intercalate (xs.map quote) ++ "]"
-
 def stmt : Instr → String
-  | .shuttle ion path => "p.shuttle(" ++ quote ion ++ ", " ++ strs path ++ ")"
-  | .gate name [_] site => "p.gate(" ++ quote name ++ ", [], [" ++ quote site ++ "])"
-  | .gate name ions site => "p.gate(" ++ quote name ++ ", [" ++ strs ions ++ "], [" ++ quote site ++ "])"
-  | .cool => "p.cool()"
-  | .measure ions => "p.measure(" ++ strs ions ++ ")"
+  | .shuttle ion path => "shuttle " ++ ion ++ ":" ++ "->".intercalate path ++ ";"
+  | .gate name [_] site => "gate " ++ name ++ " @" ++ site ++ ";"
+  | .gate name ions site => "gate " ++ name ++ " " ++ ",".intercalate ions ++ " @" ++ site ++ ";"
+  | .cool => "cool;"
+  | .readout ions => "readout " ++ ",".intercalate ions ++ ";"
 
 def initStmt (init : List (String × String)) : String :=
-  "p.init({" ++ ", ".intercalate (init.map fun p => quote p.1 ++ ": " ++ quote p.2) ++ "})"
+  "init " ++ ", ".intercalate (init.map fun p => p.1 ++ "@" ++ p.2) ++ ";"
 
 /-!
 `Programme.src` is a function of a programme, and Lean lets you call it as `bell.src`, as if
@@ -170,7 +171,7 @@ def final (p : Programme) : Pos := p.body.foldl step p.init
 
 /-!
 The studio is finer than this replay: it carries an ion one trap per machine cycle (a
-`p.shuttle` along three traps is two cycles), and the platform's rules also look at the
+`shuttle` along three traps is two cycles), and the platform's rules also look at the
 instant during each move. Our replay keeps one state per statement, which is enough for every
 programme in this part; lesson E3 says where the difference would show.
 
@@ -193,7 +194,7 @@ def bellThere : Programme :=
                        .shuttle "q1" ["C0", "C1"],
                        .cool,
                        .gate "CX" ["q0", "q1"] "C1",
-                       .measure ["q0", "q1"]] }
+                       .readout ["q0", "q1"]] }
 
 /-!
 {{studio bellThere}}
