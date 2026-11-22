@@ -1,396 +1,1018 @@
 import QCCDC.Cert.Sound
 
 /-!
-# Any language, checked
+# Meaning: nine stages, one equation each
 
-*Part I, lesson I3. You need lessons F1 and I1.*
+*Part I, lesson I3. You need lessons I1 and I2 (restated, unseen, at the top of this page) and
+lesson G4, where the five pulses of a CNOT are proved.*
 
-Lesson I2's proof works because the compiler is a Lean function. Our own compiler, `qccdc`, is
-written in OCaml, and yours may be Python, Rust or C++. No Lean theorem can be about those. What
-they can do is write a certificate, as a file, and hand it to the proved checker. If the checker
-accepts it, `check_sound` says the certificate satisfies `Implements`, and it says so whatever
-wrote the file: the proof is about the checker, never about the compiler. That is **translation
-validation**: every output checked, by a checker proved once.
+The **Meaning** clause of `verified_compilation` says the target code computes what the source
+computes:
 
-This lesson follows a certificate from a file to a verdict: what the checker reads, how it reads
-it, what it does with a field that is missing, and which steps are proved and which are only
-computed.
+```
+erase(e₁..eₘ) = K,    proj(K) = native(P),
+∀ η σ. ∃ σ'.  ⟨P, obs σ⟩ ⇓η σ'  ∧  obs ⟦Kᵀ⟧(H,η) σ ≃ σ'
+```
+
+`native(P)` is the ordered native program that the source passes fix; `proj` deletes transports
+and waits from the target code and unpacks shared pulses; `erase` deletes the chain exchanges
+of the timeline (lesson I4). The third line is the semantic statement: for every assignment `η`
+of the symbolic angles and every initial state `σ`, running `K` in the order of the timeline
+gives the observable result of the source, up to the order in which measurement branches are
+listed.
+
+QCCDCert has the shape of CompCert: a chain of programs with one proved pass between
+neighbours ([Compilation page](../compilation/#stages)). This lesson follows Example 1 through
+all nine stages, and states for each pass the equation that relates its input to its output
+([Compilation page](../compilation/#meaning)). As before, the Lean is a faithful miniature of
+the QCCDCert declarations it names (`selectInstruction`, `Binding`, `Rules.Routes`,
+`Rules.Packs`, `Rules.Times`, `hardwareProject`, `CoreExecution.prefix_invariant`,
+`Binding.stage_correct` ... `Timed.stage_correct`).
 -/
 
-open QCCDC.Cert Lean
+-- setup
+inductive Expr where
+  | pi
+  | rat (num : Int) (den : Nat)
+  | neg (a : Expr)
+  | add (a b : Expr)
+  | sub (a b : Expr)
+  | div (a b : Expr)
+  deriving DecidableEq, Repr
+def e0 : Expr := .rat 0 1
+def half : Expr := .div .pi (.rat 2 1)
+def mhalf : Expr := .neg half
+inductive Wave where
+  | r (theta phi : Expr)
+  | ms (theta : Expr)
+  deriving DecidableEq, Repr
+structure Site where
+  name : String
+  capacity : Nat
+  deriving Repr
+structure Path where
+  src : Nat
+  via : List Nat
+  dst : Nat
+  channel : Nat
+  waveform : Nat
+  duration : Nat
+  deriving Repr
+structure Calibration where
+  wave : Wave
+  site : Nat
+  channel : Nat
+  duration : Nat
+  deriving Repr
+structure BroadcastProfile where
+  wave : Wave
+  sites : List Nat
+  channel : Nat
+  duration : Nat
+  limit : Nat
+  deriving Repr
+structure AcquisitionCalibration where
+  site : Nat
+  channel : Nat
+  duration : Nat
+  deriving Repr
+abbrev PumpCalibration := AcquisitionCalibration
+structure Device where
+  name : String
+  sites : List Site
+  paths : List Path
+  shared : List (Nat × Bool)
+  calibrations : List Calibration
+  broadcasts : List BroadcastProfile
+  readouts : List AcquisitionCalibration
+  pumps : List PumpCalibration
+  controller : Option Nat
+  deriving Repr
+def primer : Device where
+  name := "Primer"
+  sites := [⟨"S", 1⟩, ⟨"J", 1⟩, ⟨"G", 2⟩]
+  paths := [⟨0, [1], 2, 0, 0, 2⟩]
+  shared := []
+  calibrations :=
+    [⟨.r (.div .pi (.rat 7 1)) (.sub half e0), 2, 7, 2⟩,
+     ⟨.r .pi e0, 2, 7, 2⟩,
+     ⟨.r .pi (.div (.add e0 e0) (.rat 2 1)), 2, 7, 2⟩,
+     ⟨.r half half, 2, 7, 2⟩,
+     ⟨.ms half, 2, 7, 4⟩,
+     ⟨.r mhalf e0, 2, 7, 2⟩,
+     ⟨.r mhalf half, 2, 7, 2⟩]
+  broadcasts := [⟨.r mhalf e0, [2], 7, 2, 2⟩]
+  readouts := [⟨2, 7, 3⟩]
+  pumps := [⟨2, 7, 4⟩]
+  controller := some 1
+structure Move where
+  ion : Nat
+  path : Nat
+  deriving DecidableEq, Repr
+inductive HardwareInstruction where
+  | transport (moves : List Move)
+  | pulse (wave : Wave) (ions : List Nat) (guarded : Bool) (calibration : Nat)
+  | broadcast (profile : Nat) (members : List (Wave × Nat)) (guarded : Bool)
+      (calibrations : List Nat)
+  | readout (ion bit : Nat) (guarded : Bool) (acquisition : Nat)
+  | pump (ion : Nat) (guarded : Bool) (pump : Nat)
+  | latch (bits : List Nat) (value : Nat)
+  | idle (duration : Nat)
+  | barrier (ions : List Nat) (guarded : Bool)
+  deriving DecidableEq, Repr
+abbrev Placement := List Nat
+structure Execution where
+  initial : Placement
+  instructions : List HardwareInstruction
+  deriving Repr
+def ex1 : Execution where
+  initial := [0, 2]
+  instructions :=
+    [.transport [⟨0, 0⟩],
+     .idle 1, .idle 1, .idle 1,
+     .pulse (.r half half) [0] false 3,
+     .pulse (.ms half) [0, 1] false 4,
+     .broadcast 0 [(.r mhalf e0, 0), (.r mhalf e0, 1)] false [5, 5],
+     .pulse (.r mhalf half) [0] false 6,
+     .readout 1 0 false 0]
+def destination (d : Device) (moves : List Move) (ion here : Nat) : Nat :=
+  match moves.find? (fun m => m.ion == ion) with
+  | some m => ((d.paths[m.path]?).map Path.dst).getD here
+  | none => here
+def relocate (d : Device) (moves : List Move) : Nat → Placement → Placement
+  | _, [] => []
+  | ion, here :: rest => destination d moves ion here :: relocate d moves (ion + 1) rest
+def nextPlacement (d : Device) (pos : Placement) : HardwareInstruction → Placement
+  | .transport moves => relocate d moves 0 pos
+  | _ => pos
+def maxOf : List Nat → Nat
+  | [] => 0
+  | x :: xs => max x (maxOf xs)
+def instructionDuration (d : Device) : HardwareInstruction → Nat
+  | .transport moves => maxOf (moves.map fun m => ((d.paths[m.path]?).map Path.duration).getD 0)
+  | .pulse _ _ _ k => ((d.calibrations[k]?).map Calibration.duration).getD 0
+  | .broadcast b _ _ _ => ((d.broadcasts[b]?).map BroadcastProfile.duration).getD 0
+  | .readout _ _ _ a => ((d.readouts[a]?).map AcquisitionCalibration.duration).getD 0
+  | .pump _ _ p => ((d.pumps[p]?).map AcquisitionCalibration.duration).getD 0
+  | .latch _ _ => d.controller.getD 0
+  | .idle n => n
+  | .barrier _ _ => 0
+structure Frame where
+  device : Device
+  before : Placement
+  after : Placement
+  instruction : Option HardwareInstruction
+  start : Nat
+  duration : Nat
+def initialFrame (d : Device) (pos : Placement) : Frame := ⟨d, pos, pos, none, 0, 0⟩
+def stepFrame (d : Device) (pos : Placement) (h : HardwareInstruction) (t : Nat) : Frame :=
+  ⟨d, pos, nextPlacement d pos h, some h, t, instructionDuration d h⟩
+def frames (d : Device) : Placement → Nat → List HardwareInstruction → List Frame
+  | _, _, [] => []
+  | pos, t, h :: rest =>
+      stepFrame d pos h t :: frames d (nextPlacement d pos h) (t + instructionDuration d h) rest
+def occupancy : Placement → Nat → Nat
+  | [], _ => 0
+  | x :: xs, s => (if x == s then 1 else 0) + occupancy xs s
+def residentCount (s : Nat) : List Nat → List Nat → Nat
+  | [], after => occupancy after s
+  | b :: bs, [] => (if b == s then 1 else 0) + residentCount s bs []
+  | b :: bs, a :: as => (if b == s || a == s then 1 else 0) + residentCount s bs as
+def HardwareInstruction.moves : HardwareInstruction → List Move
+  | .transport moves => moves
+  | _ => []
+def passesThrough (d : Device) (s : Nat) (m : Move) : Bool :=
+  ((d.paths[m.path]?).map fun p => p.via.contains s).getD false
+def transitOccupancy (d : Device) (before after : Placement) (moves : List Move) (s : Nat) : Nat :=
+  residentCount s before after + (moves.filter (passesThrough d s)).length
+def HardwareInstruction.pulseCount : HardwareInstruction → Nat
+  | .pulse .. | .readout .. | .pump .. => 1
+  | .broadcast _ members _ _ => members.length
+  | _ => 0
+def HardwareInstruction.rCount : HardwareInstruction → Nat
+  | .pulse (.r ..) .. => 1
+  | .broadcast _ members _ _ => members.length
+  | _ => 0
+def HardwareInstruction.msCount : HardwareInstruction → Nat
+  | .pulse (.ms ..) .. => 1
+  | _ => 0
+def HardwareInstruction.pulseSites (d : Device) : HardwareInstruction → List Nat
+  | .pulse _ _ _ k => ((d.calibrations[k]?).map Calibration.site).toList
+  | .broadcast _ _ _ ks => ks.filterMap fun k => (d.calibrations[k]?).map Calibration.site
+  | .readout _ _ _ a => ((d.readouts[a]?).map AcquisitionCalibration.site).toList
+  | .pump _ _ p => ((d.pumps[p]?).map AcquisitionCalibration.site).toList
+  | _ => []
+def HardwareInstruction.isReadout : HardwareInstruction → Nat | .readout .. => 1 | _ => 0
+def HardwareInstruction.isPump : HardwareInstruction → Nat | .pump .. => 1 | _ => 0
+def HardwareInstruction.isLatch : HardwareInstruction → Nat | .latch .. => 1 | _ => 0
+def Frame.moves (F : Frame) : List Move := (F.instruction.map HardwareInstruction.moves).getD []
+def Frame.count (F : Frame) (f : HardwareInstruction → Nat) : Nat := (F.instruction.map f).getD 0
+def Frame.pathUse (F : Frame) (p : Nat) : Nat := F.moves.countP fun m => m.path == p
+def Frame.channelWaveforms (F : Frame) (c : Nat) : List Nat :=
+  F.moves.filterMap fun m =>
+    match F.device.paths[m.path]? with
+    | some p => if p.channel == c then some p.waveform else none
+    | none => none
+inductive Phase where
+  | before | during | after
+  deriving DecidableEq, Repr
+inductive NatExpr where
+  | const (n : Nat)
+  | start | finish | duration
+  | occupancy (phase : Phase) (site : Nat)
+  | moveCount | pulseCount | rCount | msCount
+  | pulsesAt (site : Nat)
+  | readoutCount | pumpCount | latchCount
+  | pathUse (path : Nat)
+  | channelUse (channel : Nat)
+  | channelWaves (channel : Nat)
+  | add (a b : NatExpr)
+  | sub (a b : NatExpr)
+  deriving DecidableEq, Repr
+def evalNat (F : Frame) : NatExpr → Nat
+  | .const n => n
+  | .start => F.start
+  | .finish => F.start + F.duration
+  | .duration => F.duration
+  | .occupancy .before s => occupancy F.before s
+  | .occupancy .after s => occupancy F.after s
+  | .occupancy .during s => transitOccupancy F.device F.before F.after F.moves s
+  | .moveCount => F.moves.length
+  | .pulseCount => F.count HardwareInstruction.pulseCount
+  | .rCount => F.count HardwareInstruction.rCount
+  | .msCount => F.count HardwareInstruction.msCount
+  | .pulsesAt s => F.count fun h => (h.pulseSites F.device).count s
+  | .readoutCount => F.count HardwareInstruction.isReadout
+  | .pumpCount => F.count HardwareInstruction.isPump
+  | .latchCount => F.count HardwareInstruction.isLatch
+  | .pathUse p => F.pathUse p
+  | .channelUse c => (F.channelWaveforms c).length
+  | .channelWaves c => (F.channelWaveforms c).eraseDups.length
+  | .add a b => evalNat F a + evalNat F b
+  | .sub a b => evalNat F a - evalNat F b
+def F1 : Frame := stepFrame primer [0, 2] (.transport [⟨0, 0⟩]) 0
+def capacityOf (d : Device) (s : Nat) : Nat := ((d.sites[s]?).map Site.capacity).getD 0
+def placementValid (d : Device) (qubits : Nat) (pos : Placement) : Bool :=
+  pos.length == qubits && pos.all (fun s => decide (s < d.sites.length)) &&
+    (List.range d.sites.length).all fun s => decide (occupancy pos s ≤ capacityOf d s)
+def distinct : List Nat → Bool
+  | [] => true
+  | x :: xs => !xs.contains x && distinct xs
+def pairwiseB (p : Move → Move → Bool) : List Move → Bool
+  | [] => true
+  | m :: ms => ms.all (p m) && pairwiseB p ms
+def Path.stops (p : Path) : List Nat := p.src :: p.via ++ [p.dst]
+def links : List Nat → List (Nat × Nat)
+  | a :: b :: rest => (a, b) :: links (b :: rest)
+  | _ => []
+def isShared (d : Device) (c : Nat) : Bool := d.shared.any fun e => e.1 == c
+def isMandatory (d : Device) (c : Nat) : Bool := d.shared.any fun e => e.1 == c && e.2
+def compat (d : Device) (m m' : Move) : Bool :=
+  match d.paths[m.path]?, d.paths[m'.path]? with
+  | some p, some p' =>
+      !((links p.stops).any fun l => (links p'.stops).contains (l.2, l.1)) &&
+      !(p.via.any fun s => p'.via.contains s) &&
+      (!(p.channel == p'.channel && isShared d p.channel) || p.waveform == p'.waveform)
+  | _, _ => false
+def complete (d : Device) (pos : Placement) (moves : List Move) : Bool :=
+  moves.all fun m =>
+    match d.paths[m.path]? with
+    | none => false
+    | some p =>
+        !isMandatory d p.channel ||
+          (List.range d.paths.length).all fun j =>
+            match d.paths[j]? with
+            | none => true
+            | some p' =>
+                !(p'.channel == p.channel && p'.waveform == p.waveform) ||
+                  (List.range pos.length).all fun q =>
+                    !(pos[q]? == some p'.src) || moves.contains ⟨q, j⟩
+def transportLegal (d : Device) (qubits : Nat) (pos : Placement) (moves : List Move) : Bool :=
+  let next := relocate d moves 0 pos
+  !moves.isEmpty && distinct (moves.map Move.ion) &&
+  moves.all (fun m => decide (m.ion < qubits) &&
+    match d.paths[m.path]? with
+    | some p => pos[m.ion]? == some p.src
+    | none => false) &&
+  pairwiseB (compat d) moves && complete d pos moves &&
+  placementValid d qubits next &&
+  (List.range d.sites.length).all (fun s =>
+    decide (transitOccupancy d pos next moves s ≤ capacityOf d s)) &&
+  decide (0 < instructionDuration d (.transport moves))
+def pulseOK (qubits : Nat) : Wave → List Nat → Bool
+  | .r .., [q] => decide (q < qubits)
+  | .ms .., [a, b] => decide (a < qubits) && decide (b < qubits) && a != b
+  | _, _ => false
+def pulseLegal (d : Device) (qubits : Nat) (pos : Placement) (w : Wave) (ions : List Nat)
+    (k : Nat) : Bool :=
+  pulseOK qubits w ions &&
+  match d.calibrations[k]? with
+  | some c => c.wave == w && ions.all fun q => pos[q]? == some c.site
+  | none => false
+def broadcastLegal (d : Device) (qubits : Nat) (pos : Placement) (b : Nat)
+    (members : List (Wave × Nat)) (ks : List Nat) : Bool :=
+  match d.broadcasts[b]? with
+  | none => false
+  | some prof =>
+      decide (2 ≤ members.length) && members.length == ks.length &&
+      distinct (members.map Prod.snd) &&
+      (members.zip ks).all (fun (wq, k) =>
+        pulseLegal d qubits pos wq.1 [wq.2] k && wq.1 == prof.wave &&
+        match d.calibrations[k]? with
+        | some c => c.channel == prof.channel && c.duration == prof.duration &&
+            prof.sites.contains c.site
+        | none => false) &&
+      prof.sites.all fun s =>
+        decide ((ks.filter fun k =>
+          ((d.calibrations[k]?).map Calibration.site) == some s).length ≤ prof.limit)
+def activeCoreLegal (d : Device) (qubits bits : Nat) (pos : Placement) :
+    HardwareInstruction → Bool
+  | .transport moves => transportLegal d qubits pos moves
+  | .pulse w ions _ k => pulseLegal d qubits pos w ions k
+  | .broadcast b members _ ks => broadcastLegal d qubits pos b members ks
+  | .readout q c _ a => decide (q < qubits) && decide (c < bits) &&
+      match d.readouts[a]? with
+      | some r => pos[q]? == some r.site
+      | none => false
+  | .pump q _ p => decide (q < qubits) &&
+      match d.pumps[p]? with
+      | some r => pos[q]? == some r.site
+      | none => false
+  | .latch cs _ => cs.all (fun c => decide (c < bits)) && d.controller.isSome
+  | .idle n => decide (0 < n)
+  | .barrier qs _ => qs.all fun q => decide (q < qubits)
+def HardwareInstruction.isGuarded : HardwareInstruction → Bool
+  | .pulse _ _ g _ | .broadcast _ _ g _ | .readout _ _ g _ | .pump _ g _ => g
+  | _ => false
+def realize (d : Device) (saved : Bool) (h : HardwareInstruction) : HardwareInstruction :=
+  if h.isGuarded && !saved then .idle (instructionDuration d h) else h
+def coreLegal (d : Device) (qubits bits : Nat) (pos : Placement) (h : HardwareInstruction) : Bool :=
+  activeCoreLegal d qubits bits pos h && activeCoreLegal d qubits bits pos (realize d false h)
+def CoreLegal (d : Device) (qubits bits : Nat) (pos : Placement) (h : HardwareInstruction) : Prop :=
+  coreLegal d qubits bits pos h = true
+def coreRun (d : Device) (qubits bits : Nat) : Placement → List HardwareInstruction → Bool
+  | _, [] => true
+  | pos, h :: rest => coreLegal d qubits bits pos h && coreRun d qubits bits (nextPlacement d pos h) rest
+def tee : Device where
+  name := "Tee"
+  sites := [⟨"S", 2⟩, ⟨"J", 1⟩, ⟨"G", 2⟩, ⟨"P", 1⟩]
+  paths := [⟨0, [1], 2, 0, 0, 2⟩, ⟨2, [1], 0, 1, 0, 2⟩, ⟨2, [1], 3, 2, 0, 2⟩, ⟨3, [1], 2, 3, 0, 2⟩]
+  shared := []
+  calibrations := [⟨.r half half, 2, 7, 2⟩, ⟨.ms half, 2, 7, 4⟩, ⟨.r mhalf e0, 2, 7, 2⟩,
+    ⟨.r mhalf half, 2, 7, 2⟩]
+  broadcasts := [⟨.r mhalf e0, [2], 7, 2, 2⟩]
+  readouts := [⟨2, 7, 3⟩]
+  pumps := [⟨2, 7, 4⟩]
+  controller := some 1
+inductive Rule where
+  | le (lhs rhs : NatExpr)
+  | eq (lhs rhs : NatExpr)
+  | and (lhs rhs : Rule)
+  | or (lhs rhs : Rule)
+  | not (rule : Rule)
+  | implies (premise conclusion : Rule)
+  deriving DecidableEq, Repr
+abbrev RuleSet := List Rule
+def evalRule (F : Frame) : Rule → Bool
+  | .le a b => decide (evalNat F a ≤ evalNat F b)
+  | .eq a b => evalNat F a == evalNat F b
+  | .and p q => evalRule F p && evalRule F q
+  | .or p q => evalRule F p || evalRule F q
+  | .not p => !evalRule F p
+  | .implies p q => !evalRule F p || evalRule F q
+def RuleHolds (F : Frame) : Rule → Prop
+  | .le a b => evalNat F a ≤ evalNat F b
+  | .eq a b => evalNat F a = evalNat F b
+  | .and p q => RuleHolds F p ∧ RuleHolds F q
+  | .or p q => RuleHolds F p ∨ RuleHolds F q
+  | .not p => ¬ RuleHolds F p
+  | .implies p q => RuleHolds F p → RuleHolds F q
+theorem evalRule_correct (F : Frame) (rule : Rule) :
+    evalRule F rule = true ↔ RuleHolds F rule := by
+  induction rule with
+  | le a b => simp [evalRule, RuleHolds]
+  | eq a b => simp [evalRule, RuleHolds]
+  | and p q hp hq => simp [evalRule, RuleHolds, hp, hq]
+  | or p q hp hq => simp [evalRule, RuleHolds, hp, hq]
+  | not p hp => simp [evalRule, RuleHolds, ← hp]
+  | implies p q hp hq =>
+      simp only [evalRule, RuleHolds, ← hp, ← hq]
+      cases evalRule F p <;> simp
+def RulesHold (rules : RuleSet) (F : Frame) : Prop := ∀ r ∈ rules, RuleHolds F r
+def rulesOK (rules : RuleSet) (F : Frame) : Bool := rules.all (evalRule F)
+theorem rulesOK_correct (rules : RuleSet) (F : Frame) :
+    rulesOK rules F = true ↔ RulesHold rules F := by
+  simp [rulesOK, RulesHold, evalRule_correct]
+def Legal (d : Device) (rules : RuleSet) (qubits bits : Nat) (pos : Placement) (t : Nat)
+    (h : HardwareInstruction) : Prop :=
+  CoreLegal d qubits bits pos h ∧
+  RulesHold rules (stepFrame d pos h t) ∧
+  RulesHold rules (stepFrame d pos (realize d false h) t)
+inductive Run (d : Device) (rules : RuleSet) (qubits bits : Nat) :
+    Placement → Nat → List HardwareInstruction → Placement → Nat → Prop where
+  | nil (pos : Placement) (t : Nat) : Run d rules qubits bits pos t [] pos t
+  | cons {pos final : Placement} {t finish : Nat} {h : HardwareInstruction}
+      {rest : List HardwareInstruction}
+      (head : Legal d rules qubits bits pos t h)
+      (tail : Run d rules qubits bits (nextPlacement d pos h) (t + instructionDuration d h)
+        rest final finish) :
+      Run d rules qubits bits pos t (h :: rest) final finish
+def InitialLegal (d : Device) (rules : RuleSet) (qubits : Nat) (pos : Placement) : Prop :=
+  placementValid d qubits pos = true ∧ RulesHold rules (initialFrame d pos)
+def legal (d : Device) (rules : RuleSet) (qubits bits : Nat) (pos : Placement) (t : Nat)
+    (h : HardwareInstruction) : Bool :=
+  coreLegal d qubits bits pos h && rulesOK rules (stepFrame d pos h t) &&
+    rulesOK rules (stepFrame d pos (realize d false h) t)
+theorem legal_correct {d : Device} {rules : RuleSet} {qubits bits : Nat} {pos : Placement}
+    {t : Nat} {h : HardwareInstruction} :
+    legal d rules qubits bits pos t h = true ↔ Legal d rules qubits bits pos t h := by
+  simp [legal, Legal, CoreLegal, rulesOK_correct, Bool.and_eq_true, and_assoc]
+def finalPlacement (d : Device) : Placement → List HardwareInstruction → Placement
+  | pos, [] => pos
+  | pos, h :: rest => finalPlacement d (nextPlacement d pos h) rest
+def finalTime (d : Device) : Nat → List HardwareInstruction → Nat
+  | t, [] => t
+  | t, h :: rest => finalTime d (t + instructionDuration d h) rest
+def runB (d : Device) (rules : RuleSet) (qubits bits : Nat) :
+    Placement → Nat → List HardwareInstruction → Bool
+  | _, _, [] => true
+  | pos, t, h :: rest => legal d rules qubits bits pos t h &&
+      runB d rules qubits bits (nextPlacement d pos h) (t + instructionDuration d h) rest
+theorem runB_sound {d : Device} {rules : RuleSet} {qubits bits : Nat} :
+    ∀ {pos : Placement} {t : Nat} {code : List HardwareInstruction},
+      runB d rules qubits bits pos t code = true →
+      Run d rules qubits bits pos t code (finalPlacement d pos code) (finalTime d t code) := by
+  intro pos t code
+  induction code generalizing pos t with
+  | nil => intro _; exact .nil pos t
+  | cons h rest ih =>
+      intro ok
+      simp only [runB, Bool.and_eq_true] at ok
+      exact .cons (legal_correct.mp ok.1) (ih ok.2)
+theorem run_of_check {d : Device} {rules : RuleSet} {qubits bits : Nat} {pos final : Placement}
+    {t finish : Nat} {code : List HardwareInstruction}
+    (ok : runB d rules qubits bits pos t code = true)
+    (place : finalPlacement d pos code = final) (time : finalTime d t code = finish) :
+    Run d rules qubits bits pos t code final finish :=
+  place ▸ time ▸ runB_sound ok
 
 /-!
-## 1. The checker as a program
+## 1. The programs of one compilation
 
-The command-line checker `qcheck` is about fifty lines of Lean. It reads one file, parses it as
-JSON (`Json.parse`, Lean's own parser), turns the JSON into an `Input` (`Input.parse`, in the
-module `QCCDC.Cert.Syntax`), and runs `check`, the function `check_sound` is
-proved about. It prints `ACCEPTED`, or `REJECTED` with `diagnose`'s list of failed conditions, or
-`REJECTED -- the input is malformed` naming a field that is missing or an entry it cannot read;
-it exits with 0 when it accepts, 1 when it refuses, 2 when the file is not JSON.
+| stage | program | what the stage adds | Example 1 |
+|---|---|---|---|
+| 1-3 | effects `P_E` | gates expanded, conditions saved | `CX q0,q1;` |
+| 4 | pulses `P_P` | U and CX become R and MS pulses | `R; MS; R; R; R;` |
+| 5 | bound | candidate controls | `R q0 {c3};` |
+| 6 | placed | initial sites | `init q0@S,q1@G;` |
+| 7 | routed | transports, chosen controls | `transport q0:S->G;` |
+| 8 | packed | shared pulses | `broadcast R q0,q1;` |
+| 9 | timed: target code `K` | durations and waits | `idle 1;` (t = 2..4) |
+| + | timeline `T` | overlap, exchanges | starts 0, 2, 3, ... |
 
-From a compiler in any language to a verdict is three steps. The compiler writes its
-certificate, `prog.qcert.json` (lesson I4 gives its format). The machine facts' builder
-(`mk_qcheck_input`) adds the machine's facts, read from the machine's own document, and writes the
-checker's input, `prog.qcheck.json`. Then `qcheck` decides:
+Stages 1 to 4 fix **what** is computed and never look at the device. Stages 5 to 9 decide
+**how**: which control plays each pulse, where ions start, how they travel, which pulses share
+a laser shot, and when everything happens. Stages 1 to 5 are functions. Stages 6 to 9 search,
+so QCCDCert states each as a judgment that relates its input to its output, and the proof
+depends only on the judgment, never on how the search found the output.
+
+## 2. Stages 1 to 3: the effect program
+
+Include resolution and domain analysis change no operation (domain analysis proves every angle
+expression defined, without floating point). Effect expansion inlines gate definitions and
+registers into flat effects: `U`, `CX`, `measure`, `reset`, `barrier`, and, for a condition
+`if(c==n) O;`, a **latch** that samples the comparison once followed by `O` marked
+`when saved`. Example 2's last two lines become
 
 ```
-qcheck prog.qcheck.json
+measure q2 -> c0;
+latch saved <- (c0) == 1;
+when saved reset q2;
 ```
 
-The platform's grader takes exactly these steps for every design it grades (`qccd submit
---local` runs it on your machine). `qccd toolchain install` fetches a prebuilt `qcheck` where one
-is published; elsewhere `lake build`, in the checker's own Lean package, builds it from Lean core
-alone.
+Expansion keeps every operation, its order, and the moment a condition is read.
+-/
 
-## 2. The document
+inductive EffectInstruction where
+  | u (theta phi lam : Expr) (q : Nat) (guarded : Bool)
+  | cx (q q' : Nat) (guarded : Bool)
+  | measure (q c : Nat) (guarded : Bool)
+  | reset (q : Nat) (guarded : Bool)
+  | latch (bits : List Nat) (value : Nat)
+  | barrier (qs : List Nat) (guarded : Bool)
+  deriving DecidableEq, Repr
 
-The file `qcheck` reads is one JSON object, with these keys and no others. `qcheck`'s reader,
-`Input.parse`, refuses a file that leaves one out or writes an entry it cannot read; this page
-runs the module's other reader, `Input.ofJson`, which gives the same `Input` from a well-formed
-file and, from a malformed one, drops what it cannot read:
+def ex1Effects : List EffectInstruction := [.cx 0 1 false, .measure 1 0 false]
 
-| key | `Input` field | what it is |
+/-!
+## 3. Stage 4: pulse selection
+
+`selectInstruction` rewrites each unitary into native pulses with exact angles and keeps every
+other instruction. A `U(θ,φ,λ)` becomes three rotations, a `CX` one MS pulse and four
+rotations, in time order:
+
+```
+sel(U(θ,φ,λ) q) = R(θ, π/2-λ) q;  R(π, 0) q;  R(π, (φ+λ)/2) q
+sel(CX q,q')    = R(π/2,π/2) q;  MS(π/2) q,q';  R(-π/2,0) q;  R(-π/2,0) q';  R(-π/2,π/2) q
+```
+-/
+
+inductive PulseInstruction where
+  | pulse (wave : Wave) (ions : List Nat) (guarded : Bool)
+  | measure (q c : Nat) (guarded : Bool)
+  | reset (q : Nat) (guarded : Bool)
+  | latch (bits : List Nat) (value : Nat)
+  | barrier (qs : List Nat) (guarded : Bool)
+  deriving DecidableEq, Repr
+
+def selectInstruction : EffectInstruction → List PulseInstruction
+  | .u θ φ lam q g =>
+      [.pulse (.r θ (.sub half lam)) [q] g, .pulse (.r .pi e0) [q] g,
+       .pulse (.r .pi (.div (.add φ lam) (.rat 2 1))) [q] g]
+  | .cx q q' g =>
+      [.pulse (.r half half) [q] g, .pulse (.ms half) [q, q'] g, .pulse (.r mhalf e0) [q] g,
+       .pulse (.r mhalf e0) [q'] g, .pulse (.r mhalf half) [q] g]
+  | .measure q c g => [.measure q c g]
+  | .reset q g => [.reset q g]
+  | .latch cs v => [.latch cs v]
+  | .barrier qs g => [.barrier qs g]
+
+def selectProgram (code : List EffectInstruction) : List PulseInstruction :=
+  code.flatMap selectInstruction
+
+def ex1Pulses : List PulseInstruction :=
+  [.pulse (.r half half) [0] false, .pulse (.ms half) [0, 1] false, .pulse (.r mhalf e0) [0] false,
+   .pulse (.r mhalf e0) [1] false, .pulse (.r mhalf half) [0] false, .measure 1 0 false]
+
+/-!
+#### Exercise 1 (★) `ex1_select`
+Stage 4 turns Example 1's effects into the six instructions the compiler printed.
+-/
+
+theorem ex1_select : selectProgram ex1Effects = ex1Pulses := by
+  decide +kernel
+
+/-!
+Why is that correct? Because of operator identities, proved once in QCCDCert for the operators,
+so they hold when the two ions are entangled with others. For the CNOT (matrix order: the
+rightmost factor is the first pulse in time):
+
+```
+CX  ≃  R(-π/2,π/2)₀ · (R(-π/2,0)₀ ⊗ R(-π/2,0)₁) · MS(π/2) · R(π/2,π/2)₀
+```
+
+where `≃` is equality up to a global phase, which no measurement observes. Lesson G4 proves
+exactly this identity over exact numbers (`cx_decomp_exact`, `cx_up_to_phase`). The `U` rule
+is the identity `U(θ,φ,λ) ≃ R(π,(φ+λ)/2) · R(π,0) · R(θ,π/2-λ)`.
+
+The primer's calibrations `c0` to `c2` are exactly the pulses of a `U(π/7,0,0)`: they serve
+the U gate of the paper's running example, and Example 1, which has none, leaves them unused.
+
+#### Exercise 2 (★) `u_pulses_are_c0_c1_c2`
+-/
+
+theorem u_pulses_are_c0_c1_c2 :
+    (selectInstruction (.u (.div .pi (.rat 7 1)) e0 e0 0 false)).map
+        (fun i => match i with | .pulse w _ _ => some w | _ => none) =
+      (primer.calibrations.take 3).map fun c => some c.wave := by
+  decide +kernel
+
+/-!
+## 4. Stage 5: capability binding
+
+Binding annotates every instruction with **all** the declarations that can play it: the
+calibrations with the same waveform tree for a pulse, every acquisition for a measurement,
+every pump for a reset. It fails if a list is empty (a control is missing). It changes no
+instruction (`Binding.stage_correct`: erasing the annotations gives the pulse program back).
+-/
+
+def eligible (d : Device) : PulseInstruction → List Nat
+  | .pulse w _ _ => (List.range d.calibrations.length).filter fun k =>
+      ((d.calibrations[k]?).map Calibration.wave) == some w
+  | .measure .. => List.range d.readouts.length
+  | .reset .. => List.range d.pumps.length
+  | _ => []
+
+/-!
+#### Exercise 3 (★) `ex1_bound`
+The bound program of Example 1 is `R q0 {c3}; MS q0,q1 {c4}; R q0 {c5}; R q1 {c5}; R q0 {c6};
+measure q1 -> c0 {a0}`.
+-/
+
+theorem ex1_bound : ex1Pulses.map (eligible primer) = [[3], [4], [5], [5], [6], [0]] := by
+  decide +kernel
+
+/-!
+## 5. Stage 6: initial placement
+
+Placement outputs any placement `pos₀` with `InitialLegal` (lesson I2) and leaves the program
+unchanged (`Placed.stage_correct`). For Example 1 it is `q0@S, q1@G`.
+
+## 6. Stage 7: transport routing
+
+Routing inserts transports and picks one declaration for each instruction. QCCDCert states it
+as three inference rules (`Rules.Routes`):
+
+* **R-Done**: the empty program routes to the empty program;
+* **R-Move**: a transport that is core legal here may come first, and the rest is routed from
+  the placement it reaches;
+* **R-Emit**: the next instruction `i` may be emitted as any `h` that realizes it (`Real h i`:
+  a pulse via some calibration, a readout or pump via some declaration, or the latch or barrier
+  itself) and is core legal here.
+
+Every proposal is checked: where the bounded search fails, QCCDCert accepts a complete
+proposal from an external router and admits each proposed transport only with the legality
+proof that the search requires.
+-/
+
+instance (d : Device) (qubits bits : Nat) (pos : Placement) (h : HardwareInstruction) :
+    Decidable (CoreLegal d qubits bits pos h) :=
+  inferInstanceAs (Decidable (coreLegal d qubits bits pos h = true))
+
+def HardwareInstruction.project : HardwareInstruction → List PulseInstruction
+  | .pulse w ions g _ => [.pulse w ions g]
+  | .broadcast _ members g _ => members.map fun m => .pulse m.1 [m.2] g
+  | .readout q c g _ => [.measure q c g]
+  | .pump q g _ => [.reset q g]
+  | .latch cs v => [.latch cs v]
+  | .barrier qs g => [.barrier qs g]
+  | .transport _ | .idle _ => []
+
+/-- `proj`: delete transports and waits, unpack broadcasts. -/
+def hardwareProject (code : List HardwareInstruction) : List PulseInstruction :=
+  code.flatMap HardwareInstruction.project
+
+abbrev Real (h : HardwareInstruction) (i : PulseInstruction) : Prop :=
+  (h matches .pulse .. ∨ h matches .readout .. ∨ h matches .pump .. ∨ h matches .latch .. ∨
+    h matches .barrier ..) ∧ h.project = [i]
+
+inductive Routes (d : Device) (qubits bits : Nat) :
+    Placement → List PulseInstruction → List HardwareInstruction → Prop where
+  | done (pos : Placement) : Routes d qubits bits pos [] []
+  | move {pos : Placement} {is : List PulseInstruction} {A : List HardwareInstruction}
+      (moves : List Move) (legal : CoreLegal d qubits bits pos (.transport moves))
+      (rest : Routes d qubits bits (nextPlacement d pos (.transport moves)) is A) :
+      Routes d qubits bits pos is (.transport moves :: A)
+  | emit {pos : Placement} {i : PulseInstruction} {is : List PulseInstruction}
+      {A : List HardwareInstruction} (h : HardwareInstruction) (real : Real h i)
+      (legal : CoreLegal d qubits bits pos h) (rest : Routes d qubits bits pos is A) :
+      Routes d qubits bits pos (i :: is) (h :: A)
+
+def ex1Routed : List HardwareInstruction :=
+  [.transport [⟨0, 0⟩],
+   .pulse (.r half half) [0] false 3, .pulse (.ms half) [0, 1] false 4,
+   .pulse (.r mhalf e0) [0] false 5, .pulse (.r mhalf e0) [1] false 5,
+   .pulse (.r mhalf half) [0] false 6, .readout 1 0 false 0]
+
+/-!
+Example 1's routed program has a derivation: one R-Move, then six R-Emit, then R-Done. Each
+side condition is a computation.
+-/
+
+theorem ex1_routes : Routes primer 2 1 [0, 2] ex1Pulses ex1Routed :=
+  .move _ (by decide +kernel) <|
+  .emit _ ⟨by decide, rfl⟩ (by decide +kernel) <|
+  .emit _ ⟨by decide, rfl⟩ (by decide +kernel) <|
+  .emit _ ⟨by decide, rfl⟩ (by decide +kernel) <|
+  .emit _ ⟨by decide, rfl⟩ (by decide +kernel) <|
+  .emit _ ⟨by decide, rfl⟩ (by decide +kernel) <|
+  .emit _ ⟨by decide, rfl⟩ (by decide +kernel) <|
+  .done _
+
+/-!
+The equation of stage 7 is `proj(A) = P_P`: nothing is dropped, merged or reordered. A
+transport projects to nothing, and an emitted `h` projects to the `i` it realizes.
+
+#### Exercise 4 (★★★) `routes_project`
+Prove it for every derivation, by induction on it. In the `emit` case, `simp only
+[hardwareProject, List.flatMap_cons] at ih ⊢`, then rewrite with `real.2` and `ih`.
+-/
+
+theorem routes_project {d : Device} {qubits bits : Nat} {pos : Placement}
+    {is : List PulseInstruction} {A : List HardwareInstruction}
+    (routes : Routes d qubits bits pos is A) : hardwareProject A = is := by
+  induction routes with
+  | done => rfl
+  | move moves _ _ ih => simpa [hardwareProject, HardwareInstruction.project] using ih
+  | emit h real _ _ ih =>
+      simp only [hardwareProject, List.flatMap_cons] at ih ⊢
+      rw [real.2, ih]; rfl
+
+/-!
+**The routing invariant.** Throughout routing, every physical prefix reaches a legal placement
+and has the same effect as its native prefix. For Example 1:
+
+| prefix of the routed program | placement | pulses done |
 |---|---|---|
-| `circuit`, `arch` | `circuit`, `arch` | names, for the report |
-| `n_qubits` | `nQubits` | the circuit's qubit count |
-| `map` | `qmap` | qubit to ion; the keys are qubit numbers written as strings (`"0"`) |
-| `init` | `init` | ion to its first trap |
-| `circuit_ops` | `ops` | the circuit, as `{"i", "name", "qubits"}` |
-| `moves` | `moves` | `{"t", "ion", "from", "to"}` |
-| `rotations` | `rots` | `{"t", "loop", "delta"}` |
-| `gates` | `gates` | the witnesses, `{"dag", "t", "site", "ions"}` |
-| `unrealised` | `unrealised` | op indices the compiler gave up on |
-| `gate_sites`, `hops`, `loops` | `gateSites`, `hops`, `loops` | the machine's facts, which the builder adds |
+| (empty) | `q0@S, q1@G` | none |
+| transport | `q0@G, q1@G` | none |
+| transport; R | `q0@G, q1@G` | R |
+| transport; R; MS | `q0@G, q1@G` | R; MS |
 
-Every other key is ignored: a certificate's `params`, `line`, `via`, `instr` and `pulses` travel
-in the same file for the other checks (lesson I4), and `qcheck` never reads them. A key that is
-missing, or a value of the wrong shape, becomes an empty list, or `0` for `n_qubits`. The parser's
-own comment: *silence is never taken for assent*. An empty field does not pass quietly; the
-conditions then fail on it (section 5).
-
-Here is the published GHZ chain's input, exactly as the Compilation page ships it
-([algo_ghz.qcheck.json](data/algo_ghz.qcheck.json)), written in Lean with `json%`, Lean's notation
-for a JSON value.
+The next step is either a transport that is legal here, or the next pulse with its ions already
+at a site that has the control. In QCCDCert the invariant is `CoreExecution.prefix_invariant`,
+about a **core run** (`CoreExecution`: every instruction core legal where the ones before it
+left the ions). Its semantic half needs the meaning of programs. The miniature gives programs
+a meaning for **any** action of a native instruction on any state type `σ`, so whatever it
+proves holds for every model of the pulses, including the quantum one; a transport and a wait
+do nothing to the logical state. (In QCCDCert, `σ` is an ensemble of quantum and classical
+branches; a broadcast acts as one simultaneous operator, proved equal to its members in order
+because they act on distinct ions, so there the per-instruction lemma
+`hardwareInstruction_refines` takes the legality of the instruction as a premise.)
 -/
 
-def ghzJ : Json := json% {"circuit": "circuit", "arch": "chain4", "n_qubits": 4,
-  "map": {"0": "q0", "1": "q1", "2": "q2", "3": "q3"},
-  "init": {"q0": "C3", "q1": "C2", "q2": "C1", "q3": "C0"},
-  "circuit_ops": [{"i": 0, "name": "h", "qubits": [0], "params": [], "line": 5},
-                  {"i": 1, "name": "cx", "qubits": [0, 1], "params": [], "line": 6},
-                  {"i": 2, "name": "cx", "qubits": [1, 2], "params": [], "line": 7},
-                  {"i": 3, "name": "cx", "qubits": [2, 3], "params": [], "line": 8},
-                  {"i": 4, "name": "measure", "qubits": [0], "params": [], "line": 9},
-                  {"i": 5, "name": "measure", "qubits": [1], "params": [], "line": 9},
-                  {"i": 6, "name": "measure", "qubits": [2], "params": [], "line": 9},
-                  {"i": 7, "name": "measure", "qubits": [3], "params": [], "line": 9}],
-  "moves": [{"t": 3, "ion": "q0", "from": "C3", "to": "C2", "via": ["E2"]},
-            {"t": 9, "ion": "q1", "from": "C2", "to": "C1", "via": ["E1"]},
-            {"t": 16, "ion": "q2", "from": "C1", "to": "C0", "via": ["E0"]}],
-  "rotations": [],
-  "gates": [{"dag": 0, "instr": 3, "t": 2, "site": "C3", "ions": ["q0"],
-             "pulses": ["R(1.5708,-1.5708)@q0", "VZ(3.14159)@q0"]},
-            {"dag": 1, "instr": 9, "t": 8, "site": "C2", "ions": ["q0", "q1"],
-             "pulses": ["R(1.5708,1.5708)@q0", "MS(1.5708)@q0,q1", "R(-1.5708,0)@q0",
-                        "R(-1.5708,0)@q1", "R(-1.5708,1.5708)@q0"]},
-            {"dag": 2, "instr": 15, "t": 14, "site": "C1", "ions": ["q1", "q2"],
-             "pulses": ["R(1.5708,1.5708)@q1", "MS(1.5708)@q1,q2", "R(-1.5708,0)@q1",
-                        "R(-1.5708,0)@q2", "R(-1.5708,1.5708)@q1"]},
-            {"dag": 3, "instr": 22, "t": 21, "site": "C0", "ions": ["q2", "q3"],
-             "pulses": ["R(1.5708,1.5708)@q2", "MS(1.5708)@q2,q3", "R(-1.5708,0)@q2",
-                        "R(-1.5708,0)@q3", "R(-1.5708,1.5708)@q2"]}],
-  "unrealised": [],
-  "gate_sites": ["C0", "C1", "C2", "C3"],
-  "hops": [{"from": "C0", "to": "C1"}, {"from": "C1", "to": "C0"}, {"from": "C1", "to": "C2"},
-           {"from": "C2", "to": "C1"}, {"from": "C2", "to": "C3"}, {"from": "C3", "to": "C2"}],
-  "loops": {}}
+def interpretPulseCode {σ : Type} (act : PulseInstruction → σ → σ) :
+    List PulseInstruction → σ → σ
+  | [], s => s
+  | i :: rest, s => interpretPulseCode act rest (act i s)
+
+def interpretHardwareCode {σ : Type} (act : PulseInstruction → σ → σ) :
+    List HardwareInstruction → σ → σ
+  | [], s => s
+  | h :: rest, s => interpretHardwareCode act rest (interpretPulseCode act h.project s)
+
+theorem interpretPulseCode_append {σ : Type} (act : PulseInstruction → σ → σ)
+    (xs ys : List PulseInstruction) (s : σ) :
+    interpretPulseCode act (xs ++ ys) s =
+      interpretPulseCode act ys (interpretPulseCode act xs s) := by
+  induction xs generalizing s with
+  | nil => rfl
+  | cons x xs ih => exact ih _
 
 /-!
-`qcheck`'s two steps, run here:
+#### Exercise 5 (★★) `quantum_refines`
+Running hardware code is running its projection. Induction on the code, generalizing the state;
+in the step, unfold one instruction on each side and use `interpretPulseCode_append`.
 -/
 
-#eval check (Input.ofJson ghzJ)
-#eval (Input.ofJson ghzJ).moves
+theorem quantum_refines {σ : Type} (act : PulseInstruction → σ → σ)
+    (code : List HardwareInstruction) (s : σ) :
+    interpretHardwareCode act code s = interpretPulseCode act (hardwareProject code) s := by
+  induction code generalizing s with
+  | nil => rfl
+  | cons h rest ih =>
+      simp only [interpretHardwareCode, hardwareProject, List.flatMap_cons] at ih ⊢
+      rw [ih, interpretPulseCode_append]
+
+inductive CoreExecution (d : Device) (qubits bits : Nat) :
+    Placement → List HardwareInstruction → Prop where
+  | nil (pos : Placement) : CoreExecution d qubits bits pos []
+  | cons {pos : Placement} {h : HardwareInstruction} {rest : List HardwareInstruction}
+      (head : CoreLegal d qubits bits pos h)
+      (tail : CoreExecution d qubits bits (nextPlacement d pos h) rest) :
+      CoreExecution d qubits bits pos (h :: rest)
+
+theorem CoreExecution.split {d : Device} {qubits bits : Nat} {pos : Placement}
+    {first second : List HardwareInstruction}
+    (exec : CoreExecution d qubits bits pos (first ++ second)) :
+    CoreExecution d qubits bits pos first ∧
+      CoreExecution d qubits bits (finalPlacement d pos first) second := by
+  induction first generalizing pos with
+  | nil => exact ⟨.nil pos, exec⟩
+  | cons h rest ih =>
+      cases exec with
+      | cons head tail =>
+          obtain ⟨a, b⟩ := ih tail
+          exact ⟨.cons head a, b⟩
+
+/-- A core-legal step from a valid placement reaches a valid placement: for a transport this is
+the premise `H ⊢ next(pos) : n_q` of `C-Transport`; every other instruction stays put. -/
+theorem next_valid {d : Device} {qubits bits : Nat} {pos : Placement} {h : HardwareInstruction}
+    (valid : placementValid d qubits pos = true) (legal : CoreLegal d qubits bits pos h) :
+    placementValid d qubits (nextPlacement d pos h) = true := by
+  cases h with
+  | transport moves =>
+      simp only [CoreLegal, coreLegal, activeCoreLegal, transportLegal, Bool.and_eq_true] at legal
+      exact legal.1.1.1.2
+  | _ => exact valid
 
 /-!
-## 3. Computed, then proved
-
-Which of those two steps is proved? `check` is: `check_sound` is about it. The reading is not:
-`Input.parse` and `Input.ofJson` are run, never proved, and so is `Json.parse` before them. In this page Lean cannot even look
-inside `Input.ofJson` during a proof: the page's Lean builds every file as a module, and a module
-shares a definition's body only when its file exposes it, which the module `QCCDC.Cert.Syntax`,
-with its `private` helpers, does not. Natively the kernel can unfold all of it except the
-qubit map, whose keys it reads with `String.toNat?`, which the kernel cannot compute. Either way,
-`qcheck`'s verdict trusts the parser as code that runs, and the trusted base of the verdict says
-so (Part F).
-
-So we split the work as `qcheck` does. Write down the `Input` the parse gives; check, by running
-both, that the parse gives exactly it; and prove that value holds, in the kernel. `sameInput`
-compares two `Input`s field by field (`==` is equality as a computation, `&&` is "and").
+#### Exercise 6 (★★★) `final_valid`
+A core run from a valid placement ends in a valid placement. Induction on the run, with
+`next_valid` in the step.
 -/
 
-def chain4Sites : List String := ["C0", "C1", "C2", "C3"]
-def chain4Hops : List (String × String) :=
-  [("C0", "C1"), ("C1", "C0"), ("C1", "C2"), ("C2", "C1"), ("C2", "C3"), ("C3", "C2")]
+theorem final_valid {d : Device} {qubits bits : Nat} {pos : Placement}
+    {code : List HardwareInstruction} (exec : CoreExecution d qubits bits pos code)
+    (valid : placementValid d qubits pos = true) :
+    placementValid d qubits (finalPlacement d pos code) = true := by
+  induction exec with
+  | nil => exact valid
+  | cons head _ ih => exact ih (next_valid valid head)
 
-def ghzIn : Input :=
-  { circuit := "circuit", arch := "chain4", nQubits := 4,
-    qmap := [(0, "q0"), (1, "q1"), (2, "q2"), (3, "q3")],
-    init := [("q0", "C3"), ("q1", "C2"), ("q2", "C1"), ("q3", "C0")],
-    ops := [⟨0, "h", [0]⟩, ⟨1, "cx", [0, 1]⟩, ⟨2, "cx", [1, 2]⟩, ⟨3, "cx", [2, 3]⟩,
-            ⟨4, "measure", [0]⟩, ⟨5, "measure", [1]⟩, ⟨6, "measure", [2]⟩, ⟨7, "measure", [3]⟩],
-    moves := [⟨3, "q0", "C3", "C2"⟩, ⟨9, "q1", "C2", "C1"⟩, ⟨16, "q2", "C1", "C0"⟩],
-    rots := [],
-    gates := [⟨0, 2, "C3", ["q0"]⟩, ⟨1, 8, "C2", ["q0", "q1"]⟩, ⟨2, 14, "C1", ["q1", "q2"]⟩,
-              ⟨3, 21, "C0", ["q2", "q3"]⟩],
-    unrealised := [], gateSites := chain4Sites, hops := chain4Hops, loops := [] }
-
-def sameInput (a b : Input) : Bool :=
-  a.circuit == b.circuit && a.arch == b.arch && a.nQubits == b.nQubits && a.qmap == b.qmap &&
-  a.init == b.init && a.ops == b.ops && a.moves == b.moves && a.rots == b.rots &&
-  a.gates == b.gates && a.unrealised == b.unrealised && a.gateSites == b.gateSites &&
-  a.hops == b.hops && a.loops == b.loops
-
-#eval sameInput (Input.ofJson ghzJ) ghzIn
+/-- **The routing invariant** (`CoreExecution.prefix_invariant`): after every prefix of a core
+run, the placement reached is valid, and the prefix has the effect of its native prefix. -/
+theorem CoreExecution.prefix_invariant {d : Device} {qubits bits : Nat} {pos : Placement}
+    {first second : List HardwareInstruction}
+    (exec : CoreExecution d qubits bits pos (first ++ second))
+    (initial : placementValid d qubits pos = true) {σ : Type} (act : PulseInstruction → σ → σ)
+    (s : σ) :
+    placementValid d qubits (finalPlacement d pos first) = true ∧
+      interpretHardwareCode act first s = interpretPulseCode act (hardwareProject first) s :=
+  ⟨final_valid exec.split.1 initial, quantum_refines act first s⟩
 
 /-!
-The parse gives exactly `ghzIn`. It is the certificate `qccdc` wrote for GHZ-4: unlike I1's
-compiler, it lays the chain along the register and never sends an ion home, so each control
-moves once and stays.
-
-{{figure ghzIn}}
-
-#### Exercise 1 (★) `ghz_input_holds`
-Prove that the published GHZ input, as the parser reads it, holds.
+A routed program is a core run:
 -/
 
-theorem ghz_input_holds : Implements ghzIn :=
-  check_sound (by decide +kernel)
+theorem routes_core {d : Device} {qubits bits : Nat} {pos : Placement}
+    {is : List PulseInstruction} {A : List HardwareInstruction}
+    (routes : Routes d qubits bits pos is A) : CoreExecution d qubits bits pos A := by
+  induction routes with
+  | done pos => exact .nil pos
+  | move moves legal _ ih => exact .cons legal ih
+  | @emit pos i is A h real legal _ ih =>
+      have keep : nextPlacement d pos h = pos := by
+        rcases real with ⟨kind, _⟩
+        cases h <;> simp_all [nextPlacement]
+      exact .cons legal (by rw [keep]; exact ih)
 
 /-!
-## 4. A file is text
+## 7. Stage 8: broadcast formation
 
-`Json.parse` turns text into JSON, or says why it cannot. `qcheckText` runs `qcheck`'s whole path
-on a string and says what `qcheck` would print, in one line.
+Stage 8 replaces a run of adjacent pulses by one declared broadcast when they have the same
+waveform and guard on distinct ions and the broadcast is core legal (`Rules.Packs`): **P-Keep**
+keeps a plain instruction, **P-Join** joins pulses into a broadcast. Keeping everything is
+always allowed, and the compiler falls back to it when stage 9 finds no timing for the packed
+program. Under Example 2's rule `one` no broadcast frame is legal, so the pulses stay apart.
 -/
 
-def qcheckText (text : String) : String :=
-  match Json.parse text with
-  | .error e => "not JSON: " ++ e
-  | .ok j =>
-    let inp := Input.ofJson j
-    if check inp then "ACCEPTED" else "REJECTED: " ++ "; ".intercalate (diagnose inp)
+def HardwareInstruction.plain : HardwareInstruction → Bool
+  | .idle _ | .broadcast .. => false
+  | _ => true
+
+def membersAsPulses (g : Bool) : List (Wave × Nat) → List Nat → List HardwareInstruction
+  | m :: ms, k :: ks => .pulse m.1 [m.2] g k :: membersAsPulses g ms ks
+  | _, _ => []
+
+inductive Packs (d : Device) (qubits bits : Nat) :
+    Placement → List HardwareInstruction → List HardwareInstruction → Prop where
+  | done (pos : Placement) : Packs d qubits bits pos [] []
+  | keep {pos : Placement} {A A' : List HardwareInstruction} (h : HardwareInstruction)
+      (plain : h.plain = true) (legal : CoreLegal d qubits bits pos h)
+      (rest : Packs d qubits bits (nextPlacement d pos h) A A') :
+      Packs d qubits bits pos (h :: A) (h :: A')
+  | join {pos : Placement} {A A' : List HardwareInstruction} (b : Nat)
+      (members : List (Wave × Nat)) (g : Bool) (ks : List Nat)
+      (legal : CoreLegal d qubits bits pos (.broadcast b members g ks))
+      (rest : Packs d qubits bits pos A A') :
+      Packs d qubits bits pos (membersAsPulses g members ks ++ A) (.broadcast b members g ks :: A')
+
+def ex1Packed : List HardwareInstruction :=
+  [.transport [⟨0, 0⟩],
+   .pulse (.r half half) [0] false 3, .pulse (.ms half) [0, 1] false 4,
+   .broadcast 0 [(.r mhalf e0, 0), (.r mhalf e0, 1)] false [5, 5],
+   .pulse (.r mhalf half) [0] false 6, .readout 1 0 false 0]
 
 /-!
-Here is a file from a compiler with the most common bug between two languages: it copies the
-circuit's ops numbered from 0, as its QASM parser gave them, and numbers its own witnesses from 1.
-Everything else is the published Bell certificate of F1.
+#### Exercise 7 (★★) `ex1_packs`
+Give the derivation: three P-Keep, one P-Join for the two `R(-π/2,0)` pulses via `b0`, two
+P-Keep, done. Every legality premise is `by decide +kernel`; P-Keep's `plain` is `rfl`.
 -/
 
-def offByOneText : String := "\n".intercalate [
-  "{\"circuit\": \"bell\", \"arch\": \"chain4\", \"n_qubits\": 2,",
-  " \"map\": {\"0\": \"q0\", \"1\": \"q1\"}, \"init\": {\"q0\": \"C1\", \"q1\": \"C0\"},",
-  " \"circuit_ops\": [{\"i\": 0, \"name\": \"h\", \"qubits\": [0]},",
-  "                 {\"i\": 1, \"name\": \"cx\", \"qubits\": [0, 1]},",
-  "                 {\"i\": 2, \"name\": \"measure\", \"qubits\": [0]},",
-  "                 {\"i\": 3, \"name\": \"measure\", \"qubits\": [1]}],",
-  " \"moves\": [{\"t\": 3, \"ion\": \"q0\", \"from\": \"C1\", \"to\": \"C0\"}], \"rotations\": [],",
-  " \"gates\": [{\"dag\": 1, \"t\": 2, \"site\": \"C1\", \"ions\": [\"q0\"]},",
-  "           {\"dag\": 2, \"t\": 8, \"site\": \"C0\", \"ions\": [\"q0\", \"q1\"]}],",
-  " \"unrealised\": [], \"gate_sites\": [\"C0\", \"C1\", \"C2\", \"C3\"],",
-  " \"hops\": [{\"from\": \"C0\", \"to\": \"C1\"}, {\"from\": \"C1\", \"to\": \"C0\"},",
-  "          {\"from\": \"C1\", \"to\": \"C2\"}, {\"from\": \"C2\", \"to\": \"C1\"},",
-  "          {\"from\": \"C2\", \"to\": \"C3\"}, {\"from\": \"C3\", \"to\": \"C2\"}],",
-  " \"loops\": {}}"]
-
-#eval qcheckText offByOneText
+theorem ex1_packs : Packs primer 2 1 [0, 2] ex1Routed ex1Packed :=
+  .keep _ rfl (by decide +kernel) <|
+  .keep _ rfl (by decide +kernel) <|
+  .keep _ rfl (by decide +kernel) <|
+  .join 0 [(.r mhalf e0, 0), (.r mhalf e0, 1)] false [5, 5] (by decide +kernel) <|
+  .keep _ rfl (by decide +kernel) <|
+  .keep _ rfl (by decide +kernel) <|
+  .done _
 
 /-!
-Two conditions fail. The witness for op 1 names one ion, and op 1 is the CNOT, on two
-(`OwnIons`); and the Hadamard, op 0, has no witness at all (`Covered`). The parse, as a value:
+A broadcast acts as the pulses it replaces, so stage 8 keeps the projection. A legal broadcast
+lists one calibration per member (a premise of `C-Broadcast`), which is what the unpacking needs.
 -/
 
-def offByOne : Input :=
-  { circuit := "bell", arch := "chain4", nQubits := 2,
-    qmap := [(0, "q0"), (1, "q1")], init := [("q0", "C1"), ("q1", "C0")],
-    ops := [⟨0, "h", [0]⟩, ⟨1, "cx", [0, 1]⟩, ⟨2, "measure", [0]⟩, ⟨3, "measure", [1]⟩],
-    moves := [⟨3, "q0", "C1", "C0"⟩], rots := [],
-    gates := [⟨1, 2, "C1", ["q0"]⟩, ⟨2, 8, "C0", ["q0", "q1"]⟩],
-    unrealised := [], gateSites := chain4Sites, hops := chain4Hops, loops := [] }
+theorem broadcast_lengths {d : Device} {qubits bits : Nat} {pos : Placement} {b : Nat}
+    {members : List (Wave × Nat)} {g : Bool} {ks : List Nat}
+    (legal : CoreLegal d qubits bits pos (.broadcast b members g ks)) :
+    members.length = ks.length := by
+  simp only [CoreLegal, coreLegal, activeCoreLegal, broadcastLegal, Bool.and_eq_true] at legal
+  split at legal
+  · simp at legal
+  · simp only [Bool.and_eq_true, beq_iff_eq] at legal
+    exact legal.1.1.1.1.2
 
-#eval match Json.parse offByOneText with
-  | .ok j => sameInput (Input.ofJson j) offByOne
-  | .error _ => false
+theorem project_members (g : Bool) :
+    ∀ (members : List (Wave × Nat)) (ks : List Nat), members.length = ks.length →
+      hardwareProject (membersAsPulses g members ks) = members.map fun m => .pulse m.1 [m.2] g
+  | [], [], _ => rfl
+  | m :: ms, k :: ks, h => by
+      simp only [membersAsPulses, hardwareProject, List.flatMap_cons, List.map_cons,
+        HardwareInstruction.project, List.singleton_append]
+      rw [← project_members g ms ks (by simpa using h)]; rfl
+
+theorem packs_project {d : Device} {qubits bits : Nat} {pos : Placement}
+    {A A' : List HardwareInstruction} (packs : Packs d qubits bits pos A A') :
+    hardwareProject A' = hardwareProject A := by
+  induction packs with
+  | done => rfl
+  | keep h _ _ _ ih => simp only [hardwareProject, List.flatMap_cons] at ih ⊢; rw [ih]
+  | join b members g ks legal _ ih =>
+      have hm := project_members g members ks (broadcast_lengths legal)
+      simp only [hardwareProject] at hm ih ⊢
+      simp only [List.flatMap_cons, List.flatMap_append, hm, ih, HardwareInstruction.project]
 
 /-!
-The studio plays every move and gate where the file says; under it, Lean's rows show the
-witnesses that are not their op's.
+## 8. Stage 9: time assignment
 
-{{figure offByOne}}
-
-#### Exercise 2 (★★) `off_by_one_refused`
-Prove the file refused, with `rejects_dropped_gate`: an op that needs a witness and has not
-exactly one. The op is the Hadamard, `⟨0, "h", [0]⟩`. Its membership in the literal op list is
-`by simp [offByOne]`; the other two side conditions are computations.
+Stage 9 gives every event its start time and inserts waits (`Rules.Times`): **T-Emit** emits
+the next instruction if it is `Legal` (lesson I2) at the current placement and clock; **T-Wait**
+inserts `idle n` if that is legal. This is where the rules are checked, for both realizations
+of a guarded event. A wait changes only the time.
 -/
 
-#check @rejects_dropped_gate
-
-theorem off_by_one_refused : check offByOne = false :=
-  rejects_dropped_gate (o := ⟨0, "h", [0]⟩) (by simp [offByOne]) (by decide) (by decide +kernel)
+inductive Times (d : Device) (rules : RuleSet) (qubits bits : Nat) :
+    Placement → Nat → List HardwareInstruction → List HardwareInstruction → Prop where
+  | done (pos : Placement) (t : Nat) : Times d rules qubits bits pos t [] []
+  | emit {pos : Placement} {t : Nat} {A K : List HardwareInstruction} (h : HardwareInstruction)
+      (notWait : (h matches .idle _) = false) (legal : Legal d rules qubits bits pos t h)
+      (rest : Times d rules qubits bits (nextPlacement d pos h) (t + instructionDuration d h) A K) :
+      Times d rules qubits bits pos t (h :: A) (h :: K)
+  | wait {pos : Placement} {t : Nat} {A K : List HardwareInstruction} (n : Nat)
+      (legal : Legal d rules qubits bits pos t (.idle n))
+      (rest : Times d rules qubits bits pos (t + n) A K) :
+      Times d rules qubits bits pos t A (.idle n :: K)
 
 /-!
-## 5. What a missing field does
-
-A compiler that writes the qubit map with the ion names as keys (`{"q0": "q0"}`) instead of the
-qubit numbers has written nothing a reader can take as a qubit. `qcheck` says so at once:
-`REJECTED -- the input is malformed: map["q0"] is malformed`. The lenient reader this page runs
-drops the entries instead, and the map comes out empty:
+#### Exercise 8 (★★) `times_run`
+Timed code is a legal run (lesson I2's `Run`), ending at its final placement and time.
+Induction on the derivation; each case is one constructor of `Run`.
 -/
 
-#eval (Input.ofJson (json% {"n_qubits": 2, "map": {"q0": "q0", "q1": "q1"}})).qmap
+theorem times_run {d : Device} {rules : RuleSet} {qubits bits : Nat} {pos : Placement} {t : Nat}
+    {A K : List HardwareInstruction} (times : Times d rules qubits bits pos t A K) :
+    Run d rules qubits bits pos t K (finalPlacement d pos K) (finalTime d t K) := by
+  induction times with
+  | done pos t => exact .nil pos t
+  | emit h _ legal _ ih => exact .cons legal ih
+  | wait n legal _ ih => exact .cons legal ih
+
+theorem times_project {d : Device} {rules : RuleSet} {qubits bits : Nat} {pos : Placement}
+    {t : Nat} {A K : List HardwareInstruction} (times : Times d rules qubits bits pos t A K) :
+    hardwareProject K = hardwareProject A := by
+  induction times with
+  | done => rfl
+  | emit h _ _ _ ih => simp only [hardwareProject, List.flatMap_cons] at ih ⊢; rw [ih]
+  | wait n _ _ ih => simpa [hardwareProject, HardwareInstruction.project] using ih
 
 /-!
-Even then an empty map is never mistaken for a good one: the checker refuses it, for every
-certificate of a circuit with any qubit at all.
+Example 1's timed program is lesson I1's `ex1`: the packed program with three waits after the
+transport.
 
-#### Exercise 3 (★★) `no_map_refused`
-Prove it, for every `inp`. Condition 3, `MapTotal`, is `inp.qmap.length = inp.nQubits`; it is
-`h.2.2.1` of a proof `h` of `Implements inp`. Rewrite with `hq`, and the length of `[]` is `0`.
+## 9. The chain of equations
+
+Each pass has its own equation; chained, they give `proj(K) = native(P)`, for every device,
+rule program and search result:
+
+| pass | equation |
+|---|---|
+| 4 | `selectProgram P_E = P_P` (with the operator identities: same meaning up to phase) |
+| 5, 6 | the program is unchanged |
+| 7 | `hardwareProject A = P_P` (`routes_project`) |
+| 8 | `hardwareProject A' = hardwareProject A` (`packs_project`) |
+| 9 | `hardwareProject K = hardwareProject A'` (`times_project`) |
 -/
 
-theorem no_map_refused (inp : Input) (hq : inp.qmap = []) (hn : inp.nQubits ≠ 0) :
-    check inp = false :=
-  decide_eq_false fun h => hn (by
-    have h3 : inp.qmap.length = inp.nQubits := h.2.2.1
-    rw [hq] at h3
-    exact h3.symm)
+theorem meaning_chain {d : Device} {rules : RuleSet} {qubits bits : Nat} {pos : Placement}
+    {effects : List EffectInstruction} {A A' K : List HardwareInstruction}
+    (routes : Routes d qubits bits pos (selectProgram effects) A)
+    (packs : Packs d qubits bits pos A A') (times : Times d rules qubits bits pos 0 A' K) :
+    hardwareProject K = selectProgram effects := by
+  rw [times_project times, packs_project packs, routes_project routes]
 
 /-!
-The same holds of the machine's facts. A file without `gate_sites` (a compiler that wrote its own
-qcheck input and forgot them) has no trap that can gate, so every certificate with a gate is
-refused.
-
-#### Exercise 4 (★★) `no_sites_refused`
-Prove it with `rejects_ungateable_site` (`simp` knows nothing is a member of `[]`).
+#### Exercise 9 (★) `ex1_meaning`
+On Example 1 the chain can also be computed: the target code projects to stage 4's output.
 -/
 
-theorem no_sites_refused (inp : Input) (g : GateW) (hg : g ∈ inp.gates)
-    (hs : inp.gateSites = []) : check inp = false :=
-  rejects_ungateable_site hg (by rw [hs]; simp)
+theorem ex1_meaning : hardwareProject ex1.instructions = selectProgram ex1Effects := by
+  decide +kernel
 
 /-!
-## 6. What the file's labels and order mean
-
-The `circuit` and `arch` fields are names for the report. The specification never reads them, so
-a certificate holds or fails the same under any names. That is why the semantic check
-(`check_cert`), which runs `qcheck` for the platform, first rebuilds the input from the certificate and the machine it was
-given and refuses a file that differs from it (lesson I4): the names alone bind nothing.
-
-#### Exercise 5 (★★) `names_are_labels`
-Prove that renaming the circuit and the machine does not change the verdict. The two
-specifications are the same proposition by definition (`Iff.rfl`); turn that into equal verdicts
-with `Bool.eq_iff_iff` (two Booleans are equal when they are `true` together) and `check_iff` (F1:
-`check inp = true ↔ Implements inp`).
+#### Exercise 10 (★★) `same_result`
+And so the target code has the effect of the native program, for every model of the pulses:
+combine `meaning_chain` with `quantum_refines`.
 -/
 
-theorem names_are_labels (inp : Input) (s a : String) :
-    check { inp with circuit := s, arch := a } = check inp := by
-  apply Bool.eq_iff_iff.2
-  rw [check_iff, check_iff]
-  exact Iff.rfl
+theorem same_result {d : Device} {rules : RuleSet} {qubits bits : Nat} {pos : Placement}
+    {effects : List EffectInstruction} {A A' K : List HardwareInstruction}
+    (routes : Routes d qubits bits pos (selectProgram effects) A)
+    (packs : Packs d qubits bits pos A A') (times : Times d rules qubits bits pos 0 A' K)
+    {σ : Type} (act : PulseInstruction → σ → σ) (s : σ) :
+    interpretHardwareCode act K s = interpretPulseCode act (selectProgram effects) s := by
+  rw [quantum_refines, meaning_chain routes packs times]
 
 /-!
-Order is different. The checker replays the moves in the order the file lists them, and condition
-4, `EventsSorted`, requires that order to be by cycle. A compiler that writes its moves in the
-order a hash table returns them, every move correct, is refused.
+In QCCDCert the last step is the source semantics itself: expansion simulates the source
+(`compileFrontend_source_correct`), and the operator identities of stage 4 turn the native
+program's meaning into the source's (`selectProgram_correct`), for every angle assignment and
+input ensemble. Only the observable
+part is compared: `obs` hides the compiler's saved bit.
 
-#### Exercise 6 (★★★) `unsorted_refused`
-Prove that a certificate without rotations whose second move is at an earlier cycle than its first
-is refused, for every such certificate. `h.2.2.2.1` is `EventsSorted`, a statement about
-`sortedByT (events inp)`; rewrite `events` with your hypotheses, let `simp` unfold `merge` and
-`sortedByT`, and `omega` finds the contradiction.
--/
-
-theorem unsorted_refused (inp : Input) (m₁ m₂ : Move) (rest : List Move)
-    (hr : inp.rots = []) (hm : inp.moves = m₁ :: m₂ :: rest) (ht : m₂.t < m₁.t) :
-    check inp = false := by
-  apply decide_eq_false
-  intro h
-  have hs : sortedByT (events inp) = true := h.2.2.2.1
-  simp only [events, hr, hm] at hs
-  simp [merge, sortedByT, Ev.cyc] at hs
-  omega
-
-/-!
-And one witness per operation. A compiler that writes a witness for every pulse it emits, rather
-than one for every op of the circuit, gives a CNOT several, and condition 9 (`Covered`) asks for
-exactly one.
-
-#### Exercise 7 (★★★) `duplicate_refused`
-Prove that if the first two witnesses of a certificate name the same op, an op that needs a
-witness, the certificate is refused. Use `rejects_dropped_gate`; after rewriting the witness list,
-`simp` computes the filter and its length.
--/
-
-theorem duplicate_refused (inp : Input) (o : Op) (g₁ g₂ : GateW) (rest : List GateW)
-    (ho : o ∈ inp.ops) (hn : needsWitness o = true)
-    (hg : inp.gates = g₁ :: g₂ :: rest) (h₁ : g₁.dag = o.idx) (h₂ : g₂.dag = o.idx) :
-    check inp = false := by
-  apply rejects_dropped_gate ho hn
-  rw [hg]
-  simp [List.filter, h₁, h₂]
-
-/-!
-## 7. Your own certificate
-
-Now be the compiler. The circuit is `h q[0]; cx q[0],q[2]; measure q[0]; measure q[2];` on three
-qubits (qubit 1 is declared and idle), on `chain4`. Its ops are fixed, and so are the machine's
-facts; the map, the placement, the moves and the witnesses are yours. Write the `Input` that your
-compiler's file would parse to, inside the proof: the statement only says that one exists.
-
-A certificate in the shape of `ghzIn` above works, with your own fields. If the kernel refuses,
-`#eval diagnose` on your value (in a `def` of your own) says which condition failed.
-
-#### Exercise 8 (★★) `hand_written`
-Prove that a certificate exists for this circuit on `chain4`: give it, then prove the six
-conjuncts (five are `rfl`; the last is `check_sound (by decide +kernel)`).
--/
-
-def handOps : List Op :=
-  [⟨0, "h", [0]⟩, ⟨1, "cx", [0, 2]⟩, ⟨2, "measure", [0]⟩, ⟨3, "measure", [2]⟩]
-
-theorem hand_written : ∃ inp : Input,
-    inp.nQubits = 3 ∧ inp.ops = handOps ∧ inp.gateSites = chain4Sites ∧
-      inp.hops = chain4Hops ∧ inp.loops = [] ∧ Implements inp :=
-  ⟨{ circuit := "hand", arch := "chain4", nQubits := 3,
-     qmap := [(0, "q0"), (1, "q1"), (2, "q2")],
-     init := [("q0", "C0"), ("q1", "C1"), ("q2", "C2")],
-     ops := handOps,
-     moves := [⟨1, "q0", "C0", "C1"⟩, ⟨2, "q0", "C1", "C2"⟩],
-     rots := [],
-     gates := [⟨0, 0, "C0", ["q0"]⟩, ⟨1, 3, "C2", ["q0", "q2"]⟩],
-     unrealised := [], gateSites := chain4Sites, hops := chain4Hops, loops := [] },
-   rfl, rfl, rfl, rfl, rfl, check_sound (by decide +kernel)⟩
-
-/-!
-As the file your compiler would write, that is a `.qcheck.json` like section 2's: the same keys,
-your values.
-
-## 8. What the verdict covers
-
-When `qcheck` accepts a file, `check_sound` gives `Implements` of the `Input` the parser made from
-it, whoever wrote the file and in whatever language. That is the whole of what is proved. Three
-things are around it, and none is part of the proof:
-
-* **the parse**: `Json.parse` and `qcheck`'s reader `Input.parse` are run, not proved (section 3);
-* **the binding**: that the file is this certificate's, on this machine, for this circuit (the
-  names bind nothing, Exercise 5). The semantic check (`check_cert`) checks it, by computation;
-* **the programme**: that the hardware programme does what the certificate says, gate by gate
-  and move by move. The certificate's `instr`, `pulses` and `via`, which `qcheck` ignores, are
-  what that check reads.
-
-Lesson I4 is the format those other checks require: the full contract for a compiler that wants
-its programmes judged the way the platform judges its own.
+What is left of Meaning is the timeline: the target code runs in the order of its start times,
+not in program order, and the timeline inserts exchanges. Lesson I4 shows why that changes
+nothing: events that overlap share no resource, and such events act in either order with the
+same result.
 -/

@@ -201,11 +201,11 @@
     {
       "part": "I",
       "title": "Build your own verified compiler",
-      "about": "A compiler for a chain of traps written in Lean and proved correct by construction; then a compiler in any language, validated by the checker; then the Compiler board.",
+      "about": "QCCDCert, the verified compiler, exactly: its three inputs and the event frame; Legality, rules as assertions over one frame and their elaboration; Meaning, nine stages with one equation each; Time, durations, the parallel schedule and chain order; and the whole theorem verified_compilation, with what an extension of the compiler must keep.",
       "lessons": [
         {
           "id": "I1",
-          "title": "A compiler in Lean",
+          "title": "The inputs, the event frame and the core checks",
           "status": "live",
           "slug": "I1-compiler-in-lean",
           "source": "chapters/I1-compiler-in-lean.lean",
@@ -213,7 +213,7 @@
         },
         {
           "id": "I2",
-          "title": "Correct by construction",
+          "title": "Legality: rules are assertions over one frame",
           "status": "live",
           "slug": "I2-correct-by-construction",
           "source": "chapters/I2-correct-by-construction.lean",
@@ -221,7 +221,7 @@
         },
         {
           "id": "I3",
-          "title": "Any language, checked",
+          "title": "Meaning: nine stages, one equation each",
           "status": "live",
           "slug": "I3-any-language",
           "source": "chapters/I3-any-language.lean",
@@ -229,7 +229,7 @@
         },
         {
           "id": "I4",
-          "title": "The certificate format",
+          "title": "Time: durations, the parallel schedule, chain order",
           "status": "live",
           "slug": "I4-certificate-format",
           "source": "chapters/I4-certificate-format.lean",
@@ -237,7 +237,7 @@
         },
         {
           "id": "I5",
-          "title": "The Compiler board",
+          "title": "The whole theorem, and what an extension must keep",
           "status": "live",
           "slug": "I5-compiler-board",
           "source": "chapters/I5-compiler-board.lean",

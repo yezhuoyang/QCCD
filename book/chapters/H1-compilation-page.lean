@@ -8,24 +8,34 @@ gate the pulses make).*
 
 Part H turns the tutorial on the site itself. Every page of it that says "R10 holds" -- the
 compiled programme implements its circuit -- is making a claim, and the point of a proved
-checker is that you need not take the claim on trust. This lesson does it for the Compilation
-page; H2 for the leaderboards; H3 for the official grader; H4 reproduces a verdict from
+checker is that you need not take the claim on trust. This lesson does it for the cases the
+platform's compiler published; H2 for the leaderboards; H3 for the official grader; H4 reproduces a verdict from
 nothing but the repository.
 
 The rule of the part: a claim is checked **in this page** when its certificate is small enough
 for Lean's kernel to compute, and **with the command-line checker** `qcheck` otherwise. Both
 run the same `check`, proved sound by `check_sound` (lesson F1).
+
+The Compilation page itself now explains the verified compiler QCCDCert: its three inputs
+([the hardware program, the rule program and the source](../compilation/#inputs)), the
+[event frame](../compilation/#frame), the [rules](../compilation/#rules), the
+[nine stages](../compilation/#stages), the three clauses of its theorem
+([Meaning](../compilation/#meaning), [Legality](../compilation/#legality),
+[Time](../compilation/#time)), three worked examples ([1](../compilation/#ex1),
+[2](../compilation/#ex2), [3](../compilation/#ex3)) and [the proof](../compilation/#proof).
+Part I teaches that compiler in Lean, on the same three examples. This lesson checks something
+else: the certificates of the 19 cases the platform's compiler published.
 -/
 
 open QCCDC.Cert
 
 /-!
-## 1. What the page publishes
+## 1. What is published
 
-The Compilation page compiles 19 circuits and shows what became of each: the Bell pair it
-walks through stage by stage, fourteen basic gates (one each), and four short algorithms.
-They are spread over the four small machines of this tutorial, so that transport is seen on a
-line (`chain4`), a loop (`race8`), a lattice (`grid2x3`) and a loop with docks (`ring6d`).
+The platform's compiler compiled 19 circuits: the Bell pair, fourteen basic gates (one each),
+and four short algorithms. They are spread over the four small machines of this tutorial, so
+that transport is seen on a line (`chain4`), a loop (`race8`), a lattice (`grid2x3`) and a loop
+with docks (`ring6d`).
 
 For every one of them, two files are published beside this lesson, under `data/`:
 
@@ -88,7 +98,7 @@ nothing is sent home while the next gate still needs it. Play it:
 
 {{figure case_algo_ghz}}
 
-`circuit` is the circuit's name because the page's files were compiled from a file called
+`circuit` is the circuit's name because these files were compiled from a file called
 `circuit.qasm`. The checker prints that name; it checks nothing about it.
 -/
 
@@ -436,7 +446,7 @@ workspace uses.
 
 You have checked the O1 half of R10 for each published certificate: mapping, transport,
 co-location of each op's own ions, order. That is a theorem about the **checker input**. Three
-things tie it to the Compilation page's verdict, and none of them is in these two files:
+things tie it to the published verdict, and none of them is in these two files:
 
 * that the certificate describes the **source circuit** (the binding, `check_binding`, of the
   semantic check `check_cert`: its `circuit_ops` are the QASM op by op, its map covers the
@@ -445,8 +455,8 @@ things tie it to the Compilation page's verdict, and none of them is in these tw
   kind, and the programme's own transport equals the certificate's moves);
 * O2, which gates the pulses make (Part G).
 
-For those you need the circuit, the machine and the programme, and the page publishes the
-circuit as text but not the programme as a file. Lesson H4 compiles the GHZ chain again, in a
+For those you need the circuit, the machine and the programme, and the files published here
+hold neither the circuit nor the programme. Lesson H4 compiles the GHZ chain again, in a
 workspace of your own with the published compiler, has the whole of R10 checked on it, and shows
 that its certificate is the one above.
 -/
