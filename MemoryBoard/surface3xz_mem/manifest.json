@@ -83,7 +83,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2317469,
+  "bytes": 2338609,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -204,7 +204,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2322958,
+  "bytes": 2344097,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -323,7 +323,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2272678,
+  "bytes": 2293626,
   "over_budget": [],
   "sites": 40,
   "junctions": 21,
@@ -442,7 +442,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2372370,
+  "bytes": 2393364,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -561,7 +561,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2817375,
+  "bytes": 2838388,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -680,7 +680,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 3060203,
+  "bytes": 3081229,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -799,7 +799,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 3690082,
+  "bytes": 3710987,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -929,7 +929,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2293961,
+  "bytes": 2315099,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1050,7 +1050,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2346589,
+  "bytes": 2366007,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1108,7 +1108,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1743572,
+  "bytes": 1764842,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -1138,7 +1138,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1701781,
+  "bytes": 1723087,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -1166,7 +1166,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1800694,
+  "bytes": 1821916,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -1194,7 +1194,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1734835,
+  "bytes": 1755882,
   "r10": null,
   "over_budget": [],
   "sites": 32,

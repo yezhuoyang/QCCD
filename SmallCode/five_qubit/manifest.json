@@ -57,7 +57,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1750477,
+  "bytes": 1771733,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -129,7 +129,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1784065,
+  "bytes": 1805183,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -201,7 +201,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1808275,
+  "bytes": 1829361,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -273,7 +273,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1820138,
+  "bytes": 1841368,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -350,7 +350,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1829728,
+  "bytes": 1849501,
   "over_budget": [
    "dacs 1000 > max_dacs 128"
   ],
@@ -424,7 +424,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1914870,
+  "bytes": 1936042,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -507,7 +507,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1807323,
+  "bytes": 1828553,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -581,7 +581,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1884682,
+  "bytes": 1905914,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -655,7 +655,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1890177,
+  "bytes": 1911408,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -719,7 +719,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1850482,
+  "bytes": 1869776,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -793,7 +793,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1824689,
+  "bytes": 1845917,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -859,7 +859,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1943978,
+  "bytes": 1965083,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -931,7 +931,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1810108,
+  "bytes": 1831105,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -1003,7 +1003,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1939331,
+  "bytes": 1960328,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -1029,7 +1029,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1739957,
+  "bytes": 1761171,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
