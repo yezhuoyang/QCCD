@@ -134,32 +134,34 @@ Every rule the website knows is written once, in the rule language's **catalogue
 is R1 from it, exactly:
 
 ```
-rule R1 "A site holds at most its capacity" core
+assert R1 "A site holds at most its capacity" core
   about "An ion standing in a site, or passing through it, takes one of its places."
-  source "deck_v3; arXiv:2004.04706; arXiv:2511.15910"
-  for all s in sites, t in instants:
-    occupancy(s, t) <= capacity(s)
+  source "deck_v3; arXiv:2004.04706; arXiv:2511.15910":
+  forall s:sites, t:instants.
+    occupancy(s, t) <= capacity(s);
 ```
 
-A rule has an id, a title, a sentence about what it means, its sources, and one **formula**.
-The formula is logic over finite collections -- the sites of the machine, the instants of the
-execution, its operations -- built from `for all x in D where C: B`, `for some`, `and`, `or`,
-`not`, `implies`, comparisons, `count(...)`, `sum(...)` and a few more. Its words (`sites`,
+A rule is written as QCCDCert, the compiler, writes an assertion (`assert name: formula;`),
+with an id, a title, a sentence about what it means and its sources between the name and the
+colon. The **formula** is logic over finite collections -- the sites of the machine, the
+instants of the execution, its operations -- built from QCCDCert's `forall x:D. B`, `exists`,
+`and`, `or`, `not`, `=>` and comparisons, extended with `where C`, `count(...)`, `sum(...)` and
+a few more. Its words (`sites`,
 `instants`, `occupancy`, `capacity`) come from a fixed vocabulary ([the words](../rules/#words)),
 and every word has a definition in words and a reading for each kind of execution: a programme
 (the replay's instants are before each step, during each step that moves ions, and the end) or
-a paper's timed schedule. A formula may start with `when C:`, a precondition. `core` marks the
+a paper's timed schedule. An assertion may say `when C` before its colon, a precondition. `core` marks the
 four rules every rule set has (R0, R1, R8 and R24).
 
 R6b, from the same file:
 
 ```
-rule R6b "A two-ion gate acts on two ions standing in one site"
+assert R6b "A two-ion gate acts on two ions standing in one site"
   about "Both ions of a two-qubit gate are in the same trap when it starts, and in the trap the programme names for it, if it names one."
-  source "arXiv:2504.17886"
-  (for all g in two_qubit_gates, i in ions(g): position(i, start(g)) = site(g))
-  and (for all g in two_qubit_gates where size(declared_sites(g)) > 0:
-         site(g) in declared_sites(g))
+  source "arXiv:2504.17886":
+  (forall g:two_qubit_gates, i:ions(g). position(i, start(g)) = site(g))
+  and (forall g:two_qubit_gates where size(declared_sites(g)) > 0.
+         site(g) in declared_sites(g));
 ```
 
 Compare lesson E3's `R6b`: `∀ g ∈ gatesOf p, g.ions.length = 2 → ∀ i ∈ g.ions, whereIs g.pos i
@@ -204,7 +206,7 @@ def Verdict.fine : Verdict → Bool
 /-!
 ## 3. A rule in Lean
 
-A `for all` formula, evaluated on one programme, is a list of **cases**, one for each value of
+A `forall` formula, evaluated on one programme, is a list of **cases**, one for each value of
 its variables: a description of the case, and the value of the body there -- `some true`,
 `some false`, or `none` when a value the body needs is missing (`Option Bool` has those three
 values). A Lean `Rule` is its id, its title, whether it is core, when it applies (with the
@@ -266,8 +268,8 @@ def r1 : Rule :=
            some (decide (occupancy pos n.id ≤ n.capacity))) }
 
 /-!
-R2 is `for all j in junctions, t in instants: occupancy(j, t) <= 1`, and R6's gate clause
-`for all g in gates: can(site(g), "gate")`.
+R2 is `forall j:junctions, t:instants. occupancy(j, t) <= 1`, and R6's gate clause
+`forall g:gates. can(site(g), "gate")`.
 -/
 
 def r2 : Rule :=
@@ -298,9 +300,9 @@ def r6b : Rule :=
 Three more show the other verdicts. R7 reads each ion's heat when a two-ion gate starts:
 
 ```
-rule R7 "A two-ion gate starts with cool enough ions"
-  for all g in two_qubit_gates, i in ions(g):
-    heat(i, start(g)) <= heat_budget()
+assert R7 "A two-ion gate starts with cool enough ions":
+  forall g:two_qubit_gates, i:ions(g).
+    heat(i, start(g)) <= heat_budget();
 ```
 
 The platform's replay records that heat. E2's replay keeps no heat at all, so here the value is
@@ -318,14 +320,14 @@ def r7 : Rule :=
 R7c has a precondition:
 
 ```
-rule R7c "A programme with two-ion gates cools"
+assert R7c "A programme with two-ion gates cools"
   when models_heating():
-  count(two_qubit_gates) = 0 or count(coolings) > 0
+  count(two_qubit_gates) = 0 or count(coolings) > 0;
 ```
 
 `models_heating()` asks whether the clock tracks how hot each ion gets. The platform's default
 clock does, so there R7c applies to every programme; E2's replay has no clock, so here it never
-does. (Its formula has no `for all`: it is one case.)
+does. (Its formula has no `forall`: it is one case.)
 -/
 
 def r7c : Rule :=
@@ -392,12 +394,12 @@ and sets `max_chain = 15`. Each paper on the Reproduce pages has its own; here i
 exactly:
 
 ```
-ruleset "cyclone"
-title "Cyclone's rules"
-about "A trap does one gate, split or merge at a time; a rail and a junction hold one ion at a time; the compiler keeps a list of ions per trap, not a chain, so no chain order is tracked; every operation lasts what Cyclone's duration law says; each qubit's gates run in the circuit's order, except that consecutive CNOTs in which it plays the same role may run in any order."
+ruleset "cyclone";
+title "Cyclone's rules";
+about "A trap does one gate, split or merge at a time; a rail and a junction hold one ion at a time; the compiler keeps a list of ions per trap, not a chain, so no chain order is tracked; every operation lasts what Cyclone's duration law says; each qubit's gates run in the circuit's order, except that consecutive CNOTs in which it plays the same role may run in any order.";
 
-use R0, R1, R2, R3, R6b, R8, R24, R26, R27, R29
-param serial_kinds = {"gate2", "split", "merge"}
+use R0, R1, R2, R3, R6b, R8, R24, R26, R27, R29;
+param serial_kinds = {"gate2", "split", "merge"};
 ```
 
 `use` picks rules of the catalogue by id, `param` sets a parameter a rule reads, `include` starts

@@ -146,29 +146,33 @@ def open_files(arch: str | Path, program: str | Path, model: Any = None,
 def assertion_rules(text: str, prefix: str = "A") -> str:
     """Your own assertions as rule-language text.
 
-    Accepts a rule file (`rule A1 "..." ...`), or bare formulas one per paragraph (blank
-    line between them), each optionally led by `assert "<title>":` on its own line.  Bare
-    formulas are numbered A1, A2, ...  The result parses with `qccd.ruleset.syntax.parse`."""
+    Accepts a rule file (`assert A1 "...": formula;`, or the earlier `rule A1 "..." ...`), or
+    bare formulas one per paragraph (blank line between them), each optionally led by
+    `assert "<title>":`.  Bare formulas are numbered A1, A2, ...  The result parses with
+    `qccd.ruleset.syntax.parse`."""
     text = (text or "").replace("\r\n", "\n").strip("\n")
     if not text.strip():
         return ""
-    if re.search(r"^\s*rule\s", text, re.M):
+    if re.search(r"^\s*(?:rule|assert)\s+[A-Za-z_]", text, re.M):
         return text + "\n"
     out, n = [], 0
     for para in re.split(r"\n\s*\n", text):
-        lines = [ln for ln in para.split("\n") if ln.strip() and not ln.strip().startswith("#")]
+        lines = [ln for ln in para.split("\n")
+                 if ln.strip() and not ln.strip().startswith(("#", "//"))]
         if not lines:
             continue
         n += 1
         title = f"assertion {n}"
-        m = re.match(r'^\s*assert(?:\s+"((?:[^"\\]|\\.)*)")?\s*:?\s*$', lines[0])
+        m = re.match(r'^\s*assert(?:\s+"((?:[^"\\]|\\.)*)")?\s*:?\s*(.*)$', lines[0])
         if m:
             title = m.group(1) or title
-            lines = lines[1:]
+            lines = ([m.group(2)] if m.group(2).strip() else []) + lines[1:]
         if not lines:
             continue
-        body = "\n".join("  " + ln.strip() for ln in lines)
-        out.append(f'rule {prefix}{n} "{title}"\n{body}\n')
+        body = "\n".join("  " + ln.strip() for ln in lines).rstrip()
+        if body.endswith(";"):
+            body = body[:-1].rstrip()
+        out.append(f'assert {prefix}{n} "{title}":\n{body};\n')
     return "\n".join(out)
 
 

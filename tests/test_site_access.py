@@ -105,7 +105,7 @@ def test_the_rules_are_printed_in_their_planar_reading():
         assert not UNPUBLISHED.search(formula + " " + access.planar_about(r.about)), r.id
     # a formula that still says such a word is refused, not printed
     with pytest.raises(ValueError, match="still says"):
-        access.planar_formula("for all r in rails: upright(r) or lies_on(r, r)")
+        access.planar_formula("forall r:rails. upright(r) or lies_on(r, r)")
     for name, blob in rulespage.downloads():
         assert not UNPUBLISHED.search(blob.decode("utf-8")), name
 

@@ -1352,11 +1352,21 @@ class Machine:
         return architecture_listing(self.arch, **kw)
 
     def source(self, **kw) -> str:
-        """The Python that rebuilds this architecture."""
+        """This machine's specification in QCCDCert's hardware syntax
+        (`qccd.arch.hardware_text`); `Machine.read(text)` reads it back."""
         from .arch.listing import architecture_listing
 
         return architecture_listing(self.arch, mode=kw.pop("mode", "full"),
-                                    **kw).python()
+                                    **kw).source()
+
+    @classmethod
+    def read(cls, text: str) -> "Machine":
+        """The machine a specification declares: `Machine.source()`'s inverse.  Nothing
+        is executed; the declarations run through `edit.apply_program`'s whitelist."""
+        from .arch.edit import apply_program
+        from .arch.hardware_text import parse
+
+        return apply_program(parse(text))
 
     def save(self, path, *, expanded: bool = False) -> Path:
         p = _save_arch(self.arch, path, expanded=expanded)

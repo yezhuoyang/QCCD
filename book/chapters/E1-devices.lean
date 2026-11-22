@@ -31,6 +31,15 @@ Here is one node, one segment and one zone type of the machine `chain4`, from it
 "zone_types": { "trap": { "capacity": 2, "gate": true, "spam": true, "cool": true, ... } }
 ```
 
+The studio's Machine pane writes the same three facts as declarations, the way QCCDCert writes a
+machine (`hardware`, `site`, a keyword and its fields, then `;`):
+
+```
+site C1 at (1.0, 0.0) zone trap labels [trap];
+rail E0:C0--C1 loop P0 labels [rail];
+zone trap capacity 2 gate true spam true cool true;
+```
+
 A node's `kind` is `site` (a trap, where ions rest) or `junction`. Its `capacity` is how many
 ions it holds; a junction's entry gives none, which the platform reads as 0. Whether a site
 can gate is said by its zone type: `trap` has `"gate": true`. We keep four facts per node and

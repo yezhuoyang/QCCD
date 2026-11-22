@@ -549,7 +549,7 @@ for (const c of cases.classes || []) {
 // ALL THREE EDGES of the triangle, which is what makes this a round trip rather than two
 // independent checks that can agree on a wrong answer:
 //     Q.lit(s) === json.dumps(s)                    the writer IS json.dumps
-//     parse('m.describe(' + lit + ')') gives s      the reader undoes the writer
+//     parse('describe ' + lit + ';') gives s        the reader undoes the writer
 //     render(that stmt) === the same text           byte-exact re-emission
 // The reader and the writer used to name DIFFERENT escape sets, through two open ternary
 // chains neither of which said what it covered: `"A\bB"` was read as `AbB` and written as
@@ -560,7 +560,7 @@ for (const c of cases.strings || []) {
   let w;
   try { w = Q.lit(c.s); } catch (err) { note('strings', c.name, 'lit threw', c.lit, err.message); continue; }
   if (w !== c.lit) note('strings', c.name, 'lit', JSON.stringify(c.lit), JSON.stringify(w));
-  const text = 'm.describe(' + c.lit + ')';
+  const text = 'describe ' + c.lit + ';';
   compared++;
   const p = Q.parse(text);
   if (p.errors.length) {

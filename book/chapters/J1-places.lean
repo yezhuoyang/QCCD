@@ -78,17 +78,17 @@ The floorplan rule F1, as the site states it in the rule language (the floorplan
 `floorplan.rules` on the Rules page):
 
 ```
-rule F1 "A road or a wire joins two doors that agree" core
-  (for all r in roads, a in ends(r), b in ends(r) where a != b:
+assert F1 "A road or a wire joins two doors that agree" core:
+  (forall r:roads, a:ends(r), b:ends(r) where a != b.
      medium(a) = medium(b)
      and (role(a) = role(b) or role(a) = "any" or role(b) = "any")
      and (role(a) != "data" or role(b) != "data" or
           (width(a) = width(b) and (code(a) = none or code(b) = none or code(a) = code(b))))
      and (dir(a) != dir(b) or dir(a) = "inout"))
-  and (for all w in wires, a in ends(w), b in ends(w) where a != b:
+  and (forall w:wires, a:ends(w), b:ends(w) where a != b.
      medium(a) = medium(b)
      and (signal(a) = signal(b) or signal(a) = "any" or signal(b) = "any")
-     and (dir(a) != dir(b) or dir(a) = "inout"))
+     and (dir(a) != dir(b) or dir(a) = "inout"));
 ```
 
 Here is the same condition on one pair of doors, as a Lean function that computes a `Bool`.

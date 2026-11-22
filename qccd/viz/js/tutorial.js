@@ -117,15 +117,15 @@ var QCCD_TUTORIAL = {
         { exercise: 'Press the **load** chip under **Zone type**. Then click an empty spot on the canvas. A new `load` site appears there.',
           check: ['all', ['sites', 5], ['anyNodeZone', 'load']],
           guide: [['site', 3, 1, { zone: 'load', chip: true }], ['check']] },
-        { exercise: 'Now change the `load` zone. Open the **Machine** tab and press **Source**: the machine as text. No line sets the `load` capacity yet, so type a new last line: `m.set_zone("load", capacity=4)`. The chip now reads `load · 4`, and your new site gets shorter. Go back to **Learn** and press **Check**.',
+        { exercise: 'Now change the `load` zone. Open the **Machine** tab and press **Source**: the machine as text. No line sets the `load` capacity yet, so type a new last line: `zone load capacity 4;`. The chip now reads `load · 4`, and your new site gets shorter. Go back to **Learn** and press **Check**.',
           check: ['zoneCapacity', 'load', 4],
-          guide: [['tab', 'A'], ['view', 'src'], ['line', '#eSrc', 'm.set_zone("load", capacity=4)', 'Type this as a new last line.'],
+          guide: [['tab', 'A'], ['view', 'src'], ['line', '#eSrc', 'zone load capacity 4;', 'Type this as a new last line.'],
                   ['goal', ['zoneCapacity', 'load', 4]], ['check']] }
       ],
       nudges: {
         sites: ['No new site yet. Press the load chip, then click an empty spot on the canvas.', 'The click must land on empty canvas, away from the other sites.'],
         anyNodeZone: ['A site was placed, but not in the load zone. Press the load chip first, then place another site.'],
-        zoneCapacity: ['The load zone still holds {have}. Open Machine, press Source, and type the line m.set_zone("load", capacity=4) at the end.'],
+        zoneCapacity: ['The load zone still holds {have}. Open Machine, press Source, and type the line zone load capacity 4; at the end.'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
       praise: 'A load site that now holds {cap}. Capacity is the first rule of the machine, R1, and you just set it for a whole zone at once.',

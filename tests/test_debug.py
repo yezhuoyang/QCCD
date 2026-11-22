@@ -126,12 +126,15 @@ def test_breakpoints_and_expressions(bell):
 
 def test_assertion_text_forms():
     assert assertion_rules("") == ""
-    two = assertion_rules('for all t in instants: true\n\nassert "named":\nfor all s in sites: capacity(s) >= 1')
-    assert 'rule A1 "assertion 1"' in two and 'rule A2 "named"' in two
-    own = 'rule MINE "kept as written"\n  for all t in instants: true\n'
+    two = assertion_rules('forall t:instants. true;\n\nassert "named":\nforall s:sites. capacity(s) >= 1;')
+    assert 'assert A1 "assertion 1":' in two and 'assert A2 "named":' in two
+    own = 'assert MINE "kept as written":\n  forall t:instants. true;\n'
     assert assertion_rules(own) == own
+    earlier = 'rule MINE "kept as written"\n  for all t in instants: true\n'
+    assert assertion_rules(earlier) == earlier          # the earlier form is still read
     from qccd.ruleset.syntax import parse
     assert [r.id for r in parse(two).rules] == ["A1", "A2"]
+    assert [r.id for r in parse(assertion_rules('for all t in instants: true')).rules] == ["A1"]
 
 
 def test_bad_input_is_said_in_words(bell):

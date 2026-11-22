@@ -137,33 +137,8 @@ def listing_text(m, section: str | None = None, mode: str = "full", banners: boo
     for ln in lines:
         if not banners and ln.kind == "comment":
             continue
-        t = ln.text
-        if ln.kind == "call" and "#" in t:
-            # the emitter pads a statement and appends a note; the page quotes the statement
-            t = _strip_note(t)
-        out.append(t.rstrip())
+        out.append(ln.text.rstrip())
     return "\n".join(out).strip("\n")
-
-
-def _strip_note(t: str) -> str:
-    depth = 0
-    q = None
-    for i, c in enumerate(t):
-        if q:
-            if c == "\\":
-                continue
-            if c == q:
-                q = None
-            continue
-        if c in "\"'":
-            q = c
-        elif c in "([{":
-            depth += 1
-        elif c in ")]}":
-            depth -= 1
-        elif c == "#" and depth == 0:
-            return t[:i].rstrip()
-    return t
 
 
 def check_round_trips(ms: dict) -> None:
@@ -192,28 +167,28 @@ def broken_messages() -> list[tuple[str, str, str]]:
 
     segs = dict(dev.segments)
     segs["E3"] = Segment(id="E3", ends=("C3", "C4"))
-    rows.append(("every end of a rail is a node", 'd.segment("E3", "C3", "C4")  # there is no C4',
+    rows.append(("every end of a rail is a node", 'rail E3:C3--C4;  // there is no C4',
                  msg(dataclasses.replace(dev, segments=segs))))
     segs = dict(dev.segments)
     segs["E3"] = Segment(id="E3", ends=("C3", "C3"))
-    rows.append(("a rail joins two different nodes", 'd.segment("E3", "C3", "C3")',
+    rows.append(("a rail joins two different nodes", 'rail E3:C3--C3;',
                  msg(dataclasses.replace(dev, segments=segs))))
     segs = dict(dev.segments)
     segs["E9"] = Segment(id="E9", ends=("C1", "C0"))
-    rows.append(("one rail at most between two nodes", 'd.segment("E9", "C1", "C0")  # E0 already joins them',
+    rows.append(("one rail at most between two nodes", 'rail E9:C1--C0;  // E0 already joins them',
                  msg(dataclasses.replace(dev, segments=segs))))
     loops = {**dev.loops, "P1": Loop(id="P1", nodes=("C0",), closed=False, kind="path")}
-    rows.append(("a loop has at least two nodes", 'd.loop("P1", ["C0"], closed=False)',
+    rows.append(("a loop has at least two nodes", 'loop P1:C0 closed false;',
                  msg(dataclasses.replace(dev, loops=loops))))
     loops = {**dev.loops, "P1": Loop(id="P1", nodes=("C0", "C1", "C0", "C2"), closed=False, kind="path")}
-    rows.append(("a loop visits a node once", 'd.loop("P1", ["C0", "C1", "C0", "C2"], closed=False)',
+    rows.append(("a loop visits a node once", 'loop P1:C0,C1,C0,C2 closed false;',
                  msg(dataclasses.replace(dev, loops=loops))))
     loops = {**dev.loops, "P1": Loop(id="P1", nodes=("C0", "C2"), closed=False, kind="path")}
-    rows.append(("consecutive nodes of a loop are joined by a rail", 'd.loop("P1", ["C0", "C2"], closed=False)',
+    rows.append(("consecutive nodes of a loop are joined by a rail", 'loop P1:C0,C2 closed false;',
                  msg(dataclasses.replace(dev, loops=loops))))
     nodes = dict(dev.nodes)
     nodes["C0"] = dataclasses.replace(nodes["C0"], capacity=0)
-    rows.append(("a site holds at least one ion", 'a site C0 with capacity 0',
+    rows.append(("a site holds at least one ion", 'site C0[0] at (0.0, 0.0) zone trap;',
                  msg(dataclasses.replace(dev, nodes=nodes))))
     nodes = dict(dev.nodes)
     nodes["J"] = Node(id="J", pos=(4.0, 0.0), kind="junction", capacity=2)
@@ -225,9 +200,9 @@ def broken_messages() -> list[tuple[str, str, str]]:
     doc["geometry"]["nodes"][0]["zone_type"] = "storage"
     try:
         Architecture.from_json(doc)
-        rows.append(("every zone a site names is declared", 'd.site("C0", 0.0, 0.0, zone="storage")', "(accepted)"))
+        rows.append(("every zone a site names is declared", 'site C0 at (0.0, 0.0) zone storage;', "(accepted)"))
     except ExpansionError as exc:
-        rows.append(("every zone a site names is declared", 'd.site("C0", 0.0, 0.0, zone="storage")',
+        rows.append(("every zone a site names is declared", 'site C0 at (0.0, 0.0) zone storage;',
                      str(exc).splitlines()[-1].strip()))
     doc = m.arch.to_json(expanded=True)
     doc["geometry"]["nodes"][1]["degree"] = 10
@@ -363,14 +338,14 @@ def fig_two_readings() -> str:
 <text x="121" y="204" text-anchor="middle" fill="#555" font-size="11.5">data: what the file stores</text>
 <rect x="526" y="40" width="226" height="178" rx="10" fill="#faf9f5" stroke="#1c2a4a"/>
 <text x="639" y="62" text-anchor="middle" font-weight="700" fill="#1c2a4a">the listing</text>
-<text x="639" y="78" text-anchor="middle" fill="#555" font-size="11.5">the programme that rebuilds it</text>
-<text x="540" y="102" font-family="var(--mono)" font-size="10.5">m = Machine.blank("ring",</text>
-<text x="540" y="117" font-family="var(--mono)" font-size="10.5">      width=3, verticals=2, ...)</text>
-<text x="540" y="132" font-family="var(--mono)" font-size="10.5">m.set_zone("trap", ...)</text>
-<text x="540" y="147" font-family="var(--mono)" font-size="10.5">m.declare_class("rotate_cw", ...)</text>
-<text x="540" y="162" font-family="var(--mono)" font-size="10.5">m.set_curve("shuttle_segment",</text>
-<text x="540" y="177" font-family="var(--mono)" font-size="10.5">            [...])</text>
-<text x="639" y="204" text-anchor="middle" fill="#555" font-size="11.5">code: statements, run in order</text>
+<text x="639" y="78" text-anchor="middle" fill="#555" font-size="11.5">declarations, QCCDCert's syntax</text>
+<text x="540" y="102" font-family="var(--mono)" font-size="10.5">hardware ring6d from ring</text>
+<text x="540" y="117" font-family="var(--mono)" font-size="10.5">    width 3 verticals 2 ...;</text>
+<text x="540" y="132" font-family="var(--mono)" font-size="10.5">zone trap capacity 2 ...;</text>
+<text x="540" y="147" font-family="var(--mono)" font-size="10.5">class rotate_cw type shift ...;</text>
+<text x="540" y="162" font-family="var(--mono)" font-size="10.5">curve shuttle_segment [</text>
+<text x="540" y="177" font-family="var(--mono)" font-size="10.5">    {us: 5.0, quanta: 0.1}, ...];</text>
+<text x="639" y="204" text-anchor="middle" fill="#555" font-size="11.5">code: declarations, read in order</text>
 <rect x="278" y="74" width="204" height="110" rx="12" fill="#eef4fb" stroke="#1c2a4a" stroke-width="1.6"/>
 <text x="380" y="100" text-anchor="middle" font-weight="700" font-size="15" fill="#1c2a4a">the machine M</text>
 <text x="380" y="120" text-anchor="middle" fill="#333" font-size="11.5">the expanded graph (N, E, L)</text>
@@ -381,10 +356,10 @@ def fig_two_readings() -> str:
 <path d="M276,152 L234,152" stroke="#1c2a4a" stroke-width="1.4" marker-end="url(#arw)"/>
 <text x="255" y="168" text-anchor="middle" font-size="10.5" fill="#1c2a4a">to_json</text>
 <path d="M526,108 L484,108" stroke="#1c2a4a" stroke-width="1.4" marker-end="url(#arw)"/>
-<text x="505" y="100" text-anchor="middle" font-size="10.5" fill="#1c2a4a">exec</text>
+<text x="505" y="100" text-anchor="middle" font-size="10.5" fill="#1c2a4a">read</text>
 <path d="M484,152 L526,152" stroke="#1c2a4a" stroke-width="1.4" marker-end="url(#arw)"/>
 <text x="505" y="168" text-anchor="middle" font-size="10.5" fill="#1c2a4a">listing</text>
-<text x="380" y="246" text-anchor="middle" font-size="12" fill="#0b7a4b">round trip: listing(M) run again gives M, checked for every machine on this page when the site is built</text>
+<text x="380" y="246" text-anchor="middle" font-size="12" fill="#0b7a4b">round trip: listing(M) read again gives M, checked for every machine on this page when the site is built</text>
 </svg>"""
     return s
 
@@ -496,8 +471,8 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
       'assertion about one, the compiler plans on one, an evaluation prices one. This page defines that object. '
       'A machine is a <b>text</b>: a document with a fixed grammar, read by one loader into one graph with '
       'tables attached, and every other page reads that graph and nothing else. The same text is also a '
-      '<b>programme</b>, a list of statements that rebuilds the machine, which is how the Design page lets you '
-      'edit one.</p>')
+      '<b>listing</b>, declarations in QCCDCert\'s hardware syntax that rebuild the machine, which is how the '
+      'Design page lets you edit one.</p>')
     w(learn.strip("machine"))
     w(learn.summary([
         "<b>One text, two readings.</b> A machine is stored as a document and shown as the programme that "
@@ -535,26 +510,29 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
                     "everything downstream reads."))
     w(learn.ask("Is a machine a file, a picture, or a program?",
                 "All three name one thing. The file is the document; the picture is drawn from the graph the document "
-                "loads into; and that graph can be printed back as a programme whose statements, run in order, "
+                "loads into; and that graph can be printed back as a list of declarations which, read in order, "
                 "rebuild it. The graph is the machine. The other two are its syntax."))
     w(fig(fig_two_readings(), "A machine document is loaded into the expanded graph with its tables, which is the "
                               "machine <var>M</var> every reader consumes; the same <var>M</var> is printed as a "
-                              "listing, a programme in a grammar of a few method calls and no expressions (section 9), and running "
-                              "that listing gives <var>M</var> back. The two texts are interchangeable; the Studio's "
+                              "listing, a list of declarations in QCCDCert's hardware syntax with no expressions (section 9), and "
+                              "reading that listing gives <var>M</var> back. The two texts are interchangeable; the Studio's "
                               "Design page edits the listing, the files on disk are documents."))
     w("<p>One word first. Every page of this website, and the Studio, says <i>machine</i> for this object. The file "
       "format and the code keep an older spelling in their identifiers (a <code>.arch.json</code> document's "
       "<code>geometry</code>, the Python class that holds it), and the architecture description reference uses that "
       "spelling where it names those identifiers; it is the same object, the <var>M</var> of this page.</p>")
     w("<p>Why two forms? A document is what a file should be: data, with a schema, that a loader validates and "
-      "nobody has to execute. A listing is what an editor should show: statements a person can read top to bottom, "
-      "change one of, and run again, which is what the Design page's text lane does and what a Python session does. "
-      "A machine written in either form is the same machine, and the page holds itself to that: for every machine "
-      "shown here the listing is run again and the result compared with the original when the site is built.</p>")
+      "nobody has to execute. A listing is what an editor should show: declarations a person can read top to bottom, "
+      "change one of, and read again, which is what the Design page's text lane does. It is written the way "
+      "QCCDCert writes a machine (<code>hardware</code>, <code>site S[2]</code>, a keyword and its fields, then "
+      "<code>;</code>), so the machine a programme is checked on and the machine the compiler's proof is about "
+      "are written in one language. A machine written in either form is the same machine, and the page holds itself "
+      "to that: for every machine shown here the listing is read again and the result compared with the original "
+      "when the site is built.</p>")
     w(eg(f"The ring with two docks, <code>ring6d</code>, as a document and as a listing. The document's geometry is "
          f"compact, a generator and its parameters; loading it expands the generator into "
          f"{s_ring['n_nodes']} nodes, {s_ring['n_segments']} rails and {s_ring['n_loops']} loop. The listing's first "
-         f"statement is the same generator call; the statements after it declare the zones, the movement classes and "
+         f"declaration names the same generator; the declarations after it state the zones, the movement classes and "
          f"the prices, in that order, because a zone must exist before a site is placed in it and a class must exist "
          f"before a cycle uses it."
          f"<pre class=\"ex\"><code>{esc(listing_text(ring, 'geometry'))}\n\n{esc(listing_text(ring, 'zones'))}</code></pre>"
@@ -617,7 +595,7 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
          "when closed). A closed loop (kind <i>ring</i>) is the domain of one movement template, the rigid shift "
          "(M12); an open loop (kind <i>path</i>) is a register and has no shift.",
          "A loop is a named path. Keeping it in the geometry, instead of rediscovering cycles when compiling, is "
-         "what lets <code>p.rotate</code> be one statement and one movement class."))
+         "what lets <code>rotate</code> be one statement and one movement class."))
     w(eg("The register <code>chain4</code> written explicitly: four sites in a line, three rails, one open loop. "
          "The generator line writes exactly this when it is expanded; the fields <code>degree</code> and "
          "<code>corner</code> are cached derived values (M10, M11), re-checked on load."
@@ -772,7 +750,7 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
     w(df("Definition M14", "state space",
          "The <i>state space</i> of a machine is Σ<sub><var>M</var></sub> = (Ion ⇀ sites(<var>M</var>)) × "
          "(Ion → ℝ<sub>≥0</sub>) × ℝ<sub>≥0</sub>: a partial map from ions to sites (where every ion is), a heat "
-         "n̄ per ion in motional quanta, and the clock. The initial state is empty; <code>p.init</code> fills the map. "
+         "n̄ per ion in motional quanta, and the clock. The initial state is empty; <code>init</code> fills the map. "
          "A state is <i>admissible</i> when it respects <var>M</var>: |pos⁻¹(<var>n</var>)| ≤ cap(<var>n</var>) for "
          "every site, and no ion stands on a bare junction.",
          "Three things: where, how hot, what time. The machine supplies the set of places and the limits; the "
@@ -893,44 +871,54 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
 
     # ------------------------------------------------------------------ 9. writing
     w(f'<h2 id="writing">9. {HEADINGS[8][1]}</h2>')
-    w(learn.section("the listing as a language: its statements (twelve declarations, three edits, five builder verbs, "
-                    "four seeds) and the part of M each writes, the grammar's "
-                    "one deliberate absence (no expressions), a machine written by hand from three traps and a "
-                    "junction, and where to type one."))
-    w(learn.ask("Why is the editing language a list of method calls rather than a form or a JSON editor?",
-                "Because a list of statements can be read top to bottom, run, and diffed. What the Design page shows is "
-                "exactly what a Python session prints for the same machine and exactly what it executes; copy the "
-                "panel into a file and it runs. A form cannot say that, and a JSON editor shows data, not the "
-                "order in which a machine is made."))
+    w(learn.section("the listing as a language: QCCDCert's hardware declarations and the ones the studio adds, the "
+                    "part of M each writes, the grammar's one deliberate absence (no expressions), a machine written "
+                    "by hand from three traps and a junction, and where to type one."))
+    w(learn.ask("Why is the editing language a list of declarations rather than a form or a JSON editor?",
+                "Because a list of declarations can be read top to bottom, checked, and diffed, and because it is the "
+                "language the compiler's proof is about. QCCDCert writes a machine as declarations, a keyword and its "
+                "fields ended by a semicolon (<code>hardware Primer; site S[1]; path p0:S-&gt;J-&gt;G channel 0 "
+                "waveform 0 duration 2;</code>); the studio writes its machines the same way and adds the "
+                "declarations a drawn machine also needs. A form cannot be diffed, and a JSON editor shows data, not "
+                "the order in which a machine is made."))
     w(df("Definition M17", "listing",
-         "A <i>listing</i> of a machine <var>M</var> is a programme in the grammar below whose statements, run in order "
-         "from an empty machine, construct <var>M</var>: ⟦listing(<var>M</var>)⟧ = <var>M</var>. The grammar has no "
-         "expression production: a value is a literal, a list, a dictionary or <code>dict(…)</code>, never an "
-         "operator, an attribute or a call, and the method names are checked against the table below when the text "
-         "is parsed. A listing is <i>self-contained</i> when it names no template: every zone, curve and class is stated.",
-         "A listing is a programme whose output is a machine. The site treats the equation as a test: every listing "
-         "shown on this page was run again and compared with its machine."))
+         "A <i>listing</i> of a machine <var>M</var> is a list of declarations in the grammar below which, read in "
+         "order from an empty machine, construct <var>M</var>: ⟦listing(<var>M</var>)⟧ = <var>M</var>. "
+         "<code>hardware</code> and <code>site</code> <var>s</var>[<var>n</var>] are QCCDCert's own declarations, "
+         "extended with where a site is drawn and the zone it belongs to; the others are the studio's extensions, "
+         "written in the same form. The grammar has no expression production: a value is a number, a name, a quoted "
+         "string, a list or a record, never an operator or a call, and nothing is executed: each declaration is one "
+         "record that the loader applies through a fixed table of what a declaration may change. A listing is "
+         "<i>self-contained</i> when it names no template: every zone, curve and class is stated.",
+         "A listing is a text whose meaning is a machine. The site treats the equation as a test: every listing "
+         "shown on this page was read again and compared with its machine."))
     w(f'<pre class="grammar"><code>{esc(LISTING_GRAMMAR)}</code></pre>')
-    w(tbl(["statement", "writes", "which part of M"], [
-        ['<code>m = Machine.blank(gen, …, zones=[…])</code>', "the geometry from a generator, and the zone names it may use", "G (compact), dom Z"],
-        ['<code>d = DeviceBuilder(); d.site(id, x, y, zone=…, capacity=…)</code>', "one site", "N"],
-        ['<code>d.junction(id, x, y)</code>', "one bare junction", "N"],
-        ['<code>d.segment(id, a, b, loop=…, length=…, capacity=…)</code>', "one rail", "E"],
-        ['<code>d.loop(id, [nodes], closed=…, kind=…)</code>', "one loop", "L"],
-        ['<code>m = Machine.blank_device(d.build(), …)</code>', "seals an explicit geometry into a machine", "G (explicit)"],
-        ['<code>m.set_zone(zone, capacity=…, gate=…, spam=…, cool=…)</code>', "one zone type", "Z"],
-        ['<code>m.set_site_capacity(sites, n)</code>', "a capacity a site keeps when its zone is retuned", "cap"],
-        ['<code>m.set_curve(primitive, [dict(us=…, quanta=…, table=…), …])</code>', "a transport primitive's operating points", "Π"],
-        ['<code>m.set_degree_curve(primitive, degree, [...])</code>', "a junction crossing's curve at one degree", "Π"],
-        ['<code>m.set_primitive(primitive, us=…, fidelity=…, …)</code>', "a gate or readout primitive's scalars", "Π"],
-        ['<code>m.declare_class(id, type=…, orbit=…, delta=…, entails=[…])</code>', "one movement class", "C"],
-        ['<code>m.set_control(model=…, max_simd_classes_per_cycle=…, channels=…)</code>', "the control model and its bounds", "C"],
-        ['<code>m.set_wiring(scheme=…, dacs_dynamic=…, electrodes_per_trap=…)</code>', "the wiring block", "C"],
-        ['<code>m.set_heating(…)</code>, <code>m.set_species(…)</code>, <code>m.set_budget(…)</code>, <code>m.describe(…)</code>', "the three records and the description", "H, S, B, name"],
-        ['<code>m.move_site(site, x, y)</code>, <code>m.set_segment_length(…)</code>', "edits to a geometry already sealed", "N, E"],
+    w(tbl(["declaration", "writes", "which part of M"], [
+        ['<code>hardware <var>name</var> from <var>gen</var> width … zones […];</code>', "the geometry from a generator, and the zone names it may use (QCCDCert's <code>hardware</code>)", "G (compact), dom Z"],
+        ['<code>geometry explicit;</code> then <code>site <var>s</var>[<var>n</var>] at (<var>x</var>, <var>y</var>) zone …;</code>', "one site; [<var>n</var>] is its capacity when it has its own (QCCDCert's <code>site s[n]</code>)", "N"],
+        ['<code>junction <var>j</var> at (<var>x</var>, <var>y</var>);</code>', "one bare junction (a site of capacity 1 in QCCDCert's program)", "N"],
+        ['<code>rail <var>e</var>:<var>a</var>--<var>b</var> loop … length … capacity …;</code>', "one rail", "E"],
+        ['<code>loop <var>l</var>:<var>a</var>,<var>b</var>,… closed … kind …;</code>', "one loop", "L"],
+        ['<code>hardware <var>name</var> from geometry zones […];</code>', "seals the sites, junctions and rails above it into a machine", "G (explicit)"],
+        ['<code>zone <var>z</var> capacity … gate … spam … cool …;</code>', "one zone type", "Z"],
+        ['<code>capacity [<var>s</var>, …] <var>n</var>;</code>', "a capacity a site keeps when its zone is retuned", "cap"],
+        ['<code>curve <var>p</var> [{us: …, quanta: …, table: …}, …];</code>', "a transport primitive's operating points", "Π"],
+        ['<code>curve <var>p</var> degree <var>d</var> […];</code>', "a junction crossing's curve at one degree", "Π"],
+        ['<code>primitive <var>p</var> us … fidelity …;</code>', "a gate or readout primitive's scalars", "Π"],
+        ['<code>class <var>c</var> type … orbit … delta … entails […];</code>', "one movement class", "C"],
+        ['<code>control model … max_simd_classes_per_cycle … channels {…};</code>', "the control model and its bounds", "C"],
+        ['<code>wiring scheme … dacs_dynamic … electrodes_per_trap …;</code>', "the wiring block", "C"],
+        ['<code>heating …;</code>, <code>species …;</code>, <code>budget …;</code>, <code>describe "…";</code>', "the three records and the description", "H, S, B, name"],
+        ['<code>move <var>s</var> to (<var>x</var>, <var>y</var>);</code>, <code>length [<var>e</var>, …] <var>ℓ</var>;</code>', "edits to a geometry already sealed", "N, E"],
     ]))
+    w("<p>The rest of QCCDCert's hardware description (<code>path</code>, <code>share channel</code>, "
+      "<code>optical channel</code>, <code>calibration</code>, <code>acquire</code>, <code>pump</code>, "
+      "<code>broadcast</code>, <code>controller</code>) is not written by hand: the compiler derives it from these "
+      "declarations, a path for each route between traps through junctions, priced from the curves, and a "
+      "calibration for each gate a zone allows. The <a href=\"../compilation/#studio\">Compilation</a> page shows "
+      "that program for a studio machine.</p>")
     tee_card = built.get("tee", {})
-    w(eg("A machine written by hand: three traps A, B, C around one junction J, a T. Four builder statements place "
+    w(eg("A machine written by hand: three traps A, B, C around one junction J, a T. Four declarations place "
          "the nodes, three the rails, one seals the geometry; the zones, curves and control plane are then stated as "
          "on any other machine (here borrowed from the default template, so the machine can be played). The loader "
          "derives deg(J) = 3, so J is a junction and a hop from A to B crosses it at the degree-3 price."
@@ -946,10 +934,11 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
         w(f'<a class="open" href="{tee_card["page"]}#step=1">open the page, with its Report pane</a>')
     w("<p><b>Where to write one.</b> On the <a href=\"../design/\">Design</a> page: its Parts mode places sites, "
       "junctions and rails with the pointer, its Sketch mode turns a drawn shape into sites and rails, and its text "
-      "lane shows the listing and accepts edits to it, all three writing the same statements. In Python, the same "
-      "statements on a <code>Machine</code>, then <code>m.save(path)</code> writes the document and "
-      "<code>m.listing()</code> prints the programme. In a workspace, the agent edits machines through the same "
-      "statements. Whichever way, the result is a document that the loader checks (section 3) before any "
+      "lane shows the listing and accepts edits to it, all three writing the same declarations. In Python, "
+      "<code>Machine.read(text)</code> reads a listing, <code>m.source()</code> prints one and "
+      "<code>m.save(path)</code> writes the document; the methods <code>m.set_zone(…)</code>, "
+      "<code>m.declare_class(…)</code> and the rest make the same records the declarations do. In a workspace, the "
+      "agent edits machines through the same records. Whichever way, the result is a document that the loader checks (section 3) before any "
       "programme runs on it.</p>")
 
     # ------------------------------------------------------------------ conclusion
@@ -958,7 +947,8 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
       "a grammar (section 2) and a static semantics (section 3); it determines a graph and a set of derived facts "
       "(section 4); it fixes the state space, the alphabet and the price list of every programme written on it "
       "(section 5); and it is read by five readers as five projections of one thing (section 6). The same text can "
-      "be stored as data or shown as a programme, and the two are checked to agree (sections 1 and 9).</p>")
+      "be stored as data or shown as declarations in QCCDCert's hardware syntax, and the two are checked to agree "
+      "(sections 1 and 9).</p>")
     w("<p>Read the next pages with this in hand. On the <a href=\"../language/\">Language</a> page every statement "
       "is a step of Σ<sub><var>M</var></sub>, well-typed only in <var>M</var>'s names. On the "
       "<a href=\"../rules/\">Rules</a> page every rule quantifies over sets <var>M</var> defines (sites, rails, "
@@ -971,8 +961,8 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
     w("</div>")  # .algo
     w(learn.recap([
         "A machine is a text: a document with the grammar of section 2, loaded once into an expanded graph with "
-        "tables. The same text prints as a listing, a programme of method calls that rebuilds it, and the "
-        "two are checked to agree.",
+        "tables. The same text prints as a listing, declarations in QCCDCert's hardware syntax that rebuild "
+        "it, and the two are checked to agree.",
         "A document is a machine only if it passes ten structural checks (section 3); three more rules read the "
         "positions. A programme or a rule never sees a document that failed.",
         "Junctions, bends, corners, slots, the shift map and hops are derived from the geometry, never declared: a "
@@ -989,15 +979,25 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
     return PAGE.format(title="Machine - QCCD studio", style=STYLE, extra_css=css, body=learn.apply(body, "machine/", 1))
 
 
-LISTING_GRAMMAR = """listing   ::= (statement | comment | blank)*
-statement ::= "m" "=" "Machine" "." seed "(" args ")"            -- seed: blank | blank_device | from_device | from_template
-            | "m" "." method "(" args ")"                        -- one of the twelve setters, or an edit
-            | "d" "=" "DeviceBuilder" "(" args ")"               -- an explicit geometry begins
-            | "d" "." builder "(" args ")"                       -- site | junction | segment | loop
-args      ::= [ arg ("," arg)* [","] ]
-arg       ::= name "=" value | value
-value     ::= string | number | "True" | "False" | "None" | "[" values "]" | "{" pairs "}" | "dict" "(" args ")"
--- no operator, no attribute, no arithmetic, no control flow; a logical line continues while a bracket is open"""
+LISTING_GRAMMAR = """listing     ::= (declaration | comment | blank)*
+declaration ::= "hardware" name "from" generator field* ";"       -- QCCDCert's hardware: a geometry from a generator
+              | "hardware" name "from" "geometry" field* ";"      -- QCCDCert's hardware: the sites, junctions, rails above
+              | "geometry" name field* ";"                        -- an explicit geometry begins
+              | "site" name ["[" n "]"] "at" point field* ";"     -- QCCDCert's site s[n], with where it is drawn
+              | "junction" name "at" point field* ";"
+              | "rail" name ":" name "--" name field* ";"
+              | "loop" name ":" name ("," name)* field* ";"
+              | "move" name "to" point ";"
+              | ("zone" | "class" | "primitive") name field* ";"
+              | ("capacity" | "length") value value ";"
+              | "curve" name ["degree" n] "[" record ("," record)* "]" ";"
+              | ("control" | "wiring" | "heating" | "species" | "budget") field* ";"
+              | "describe" string field* ";"
+field       ::= name value
+value       ::= number | "true" | "false" | "none" | name | string | "[" values "]" | record
+record      ::= "{" name ":" value ("," name ":" value)* "}"          point ::= "(" number "," number ")"
+comment     ::= "//" text
+-- no operator, no arithmetic, no control flow; a declaration continues while a bracket is open"""
 
 
 def _ring(width: int, height: int, verticals: int):
@@ -1020,9 +1020,9 @@ def _curve_lines(m, primitive: str) -> str:
     from ..arch.listing import architecture_listing
     L = architecture_listing(m.arch, mode="full")
     for ln in L.lines:
-        if ln.kind == "call" and ln.text.startswith(f'm.set_curve("{primitive}"'):
-            return "\n".join(_strip_note(t).rstrip() for t in ln.text.split("\n"))
-    return f'm.set_curve("{primitive}", [...])'
+        if ln.kind == "call" and ln.call["method"] == "set_curve" and ln.call["args"][0] == primitive:
+            return ln.text
+    return f"curve {primitive} [...];"
 
 
 def _classes_lines(m) -> str:
@@ -1030,11 +1030,11 @@ def _classes_lines(m) -> str:
     L = architecture_listing(m.arch, mode="full")
     out = []
     for ln in L.lines:
-        if ln.kind == "call" and (ln.text.startswith("m.declare_class(") or "max_simd_classes_per_cycle" in ln.text):
-            t = _strip_note(ln.text)
+        if ln.kind == "call" and (ln.call["method"] == "declare_class"
+                                  or "max_simd_classes_per_cycle" in ln.call["kwargs"]):
             # the long notes inside a class declaration are documentation; keep the fields
             import re
-            t = re.sub(r', note="[^"]*"', "", t)
+            t = re.sub(r' note "(?:[^"\\]|\\.)*"', "", ln.text)
             out.append(t.rstrip())
     return "\n".join(out)
 

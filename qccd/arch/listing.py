@@ -49,9 +49,10 @@ from typing import Any, Mapping, Sequence
 from .curves import OperatingPointPolicy
 from .device import Architecture, Device
 from .generators import GENERATORS
+from .hardware_text import parse as parse_hardware, statement_text, value_text
 
 __all__ = [
-    "ArchLine", "ArchListing", "architecture_listing", "emit_python", "rebuild",
+    "ArchLine", "ArchListing", "architecture_listing", "emit_source", "rebuild",
     "architecture_diff", "round_trip_check", "class_participants",
     "template_records", "TEMPLATE_SKIP_SECTIONS",
 ]
@@ -133,8 +134,8 @@ class ArchListing:
     round_trip: bool | None = None
     round_trip_diff: tuple[str, ...] = ()
 
-    def python(self) -> str:
-        """Just the executable statements."""
+    def source(self) -> str:
+        """Just the declarations: the machine specification, without its comments."""
         return "\n".join(l.text for l in self.lines if l.kind == "call") + "\n"
 
     def text(self, *, notes: bool = True, numbers: bool = False,
@@ -146,9 +147,9 @@ class ArchListing:
             body = ln.text
             if notes and ln.note:
                 if "\n" in body:
-                    body = f"{body}\n{' ' * 4}# {ln.note}"
+                    body = f"{body}\n{' ' * 4}// {ln.note}"
                 else:
-                    body = f"{body}{' ' * max(1, width - len(body))}# {ln.note}"
+                    body = f"{body}{' ' * max(1, width - len(body))}// {ln.note}"
             for physline in body.split("\n"):
                 phys += 1
                 rows.append(f"{phys:4d} | {physline}" if numbers else physline)
@@ -230,6 +231,25 @@ def _kwd(d: Mapping) -> str:
     if any(not str(k).isidentifier() for k in d):
         return "**" + _lit({str(k): v for k, v in d.items()})
     return ", ".join(f"{k}={_lit(v)}" for k, v in d.items())
+
+
+def _call_form(call: Mapping) -> str:
+    """The call form `m.verb(args)` of a record the declarations do not write: still read
+    by the browser's parser (`engine.js::_parseStatement`), never by `hardware_text`."""
+    method = str(call["method"])
+    parts = [_lit(a) for a in call.get("args") or []]
+    if call.get("kwargs"):
+        parts.append(_kwd(call["kwargs"]))
+    sig = ", ".join(parts)
+    if method == "DeviceBuilder":
+        return f"d = DeviceBuilder({sig})"
+    if method.startswith("d."):
+        return f"{method}({sig})"
+    if method in ("blank_device", "from_device"):
+        return f"m = Machine.{method}(d.build()" + (f", {sig}" if sig else "") + ")"
+    if method in ("blank", "from_template"):
+        return f"m = Machine.{method}({sig})"
+    return f"m.{method}({sig})"
 
 
 def _wrap(text: str, width: int) -> list[str]:
@@ -360,27 +380,31 @@ class _B:
     def add(self, kind, section, text, *, target=None, call=None, refs=(), note=None,
             editable=False) -> None:
         n = len(self.lines) + 1
+        if kind == "call":
+            # the declaration QCCDCert's hardware syntax writes for this record; a record
+            # of a shape it does not write keeps the call form, which is still read
+            text = statement_text(call) or _call_form(call)
         refs = tuple(self._qualify(str(r)) for r in refs)
         self.lines.append(ArchLine(n, kind, section, text, target, call, refs, note,
                                    editable))
         for key in ((target,) if target else ()) + refs:
             self.index.setdefault(key, []).append(n)
 
-    def call(self, section, method, sig, *, target, args=(), kwargs=None, refs=(),
+    def call(self, section, method, *, target, args=(), kwargs=None, refs=(),
              note=None) -> None:
-        self.add("call", section, f"m.{method}({sig})", target=target,
+        self.add("call", section, None, target=target,
                  call={"method": method, "args": list(args),
                        "kwargs": dict(kwargs or {})},
                  refs=refs, note=note, editable=True)
 
     def note(self, section, text, *, target=None, refs=()) -> None:
-        self.add("note", section, f"# {text}", target=target, refs=refs)
+        self.add("note", section, f"// {text}", target=target, refs=refs)
 
     def blank(self, section="") -> None:
         self.add("blank", section, "")
 
     def rule(self, section, title) -> None:
-        self.add("comment", section, f"# -- {title} " + "-" * max(3, 76 - len(title)))
+        self.add("comment", section, f"// -- {title} " + "-" * max(3, 75 - len(title)))
 
 
 # ------------------------------------------------------------------------------ emit
@@ -424,17 +448,17 @@ def architecture_listing(
     s = dev.summary()
 
     # ---- header ----------------------------------------------------------
-    b.add("header", "header", f"# architecture {arch.name!r}", target="arch")
+    b.add("header", "header", f"// machine {value_text(arch.name)}", target="arch")
     for chunk in _wrap(arch.description or "", 92):
-        b.add("header", "header", f"#   {chunk}", target="arch")
+        b.add("header", "header", f"//   {chunk}", target="arch")
     b.add("header", "header",
-          f"#   {s['n_nodes']} nodes ({s['n_sites']} sites, capacity "
+          f"//   {s['n_nodes']} nodes ({s['n_sites']} sites, capacity "
           f"{s['total_capacity']}), {s['n_segments']} segments, {s['n_loops']} loop(s), "
           f"{s['n_junction_nodes']} junctions (deg>=3), {s['n_corners']} corners",
           target="arch")
     for k, v in (arch.provenance or {}).items():
         b.add("header", "header",
-              f"#   {k}: {v if isinstance(v, str) else _lit(v)}", target="arch")
+              f"//   {k}: {v if isinstance(v, str) else value_text(v)}", target="arch")
     b.blank()
 
     _emit_geometry(b, arch, dev, emit_mode, tmpl, s)
@@ -474,7 +498,6 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
     b.rule("geometry", "geometry")
     if mode in ("generator", "patch"):
         params = _nondefault_params(dev)
-        sig = _kwd(params)
         # EVERY zone type the architecture declares, in declaration order -- not only
         # the ones the generator's `*_zone` parameters name.  The seal carries NAMES and
         # `set_zone` retunes each one after it; a zone the seal did not name is one no
@@ -483,37 +506,28 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
         # page.  Same split as `engine.js::documentStatements`.
         zone_refs = list(arch.zone_types)
         if tmpl:
-            # `sig` is EMPTY when every generator parameter is at its default, and
-            # `f"({sig}, name=...)"` would then emit `Machine.ring(, name=...)`, which
-            # neither Python nor the browser's grammar can parse.  All nine shipped
-            # architectures set at least one non-default parameter, so it has never
-            # fired -- which is exactly why it needs a guard rather than a comment.
-            head = (f"m = Machine.{dev.generator}(" + (f"{sig}, " if sig else "")
-                    + f"name={_lit(arch.name)}, template={_lit(tmpl)})")
             kwargs = {**params, "name": arch.name, "template": tmpl}
             meth = "from_template"
         else:
-            head = (f"m = Machine.blank({_lit(dev.generator)}"
-                    + (f", {sig}" if sig else "")
-                    + f", name={_lit(arch.name)}, zones={_lit(zone_refs)})")
             kwargs = {**params, "name": arch.name, "zones": zone_refs}
             meth = "blank"
-        # `args=[dev.generator]`, NOT `args=[]`.  The rendered text says
-        # `Machine.blank("ring", ...)` but the STRUCTURED form used to carry an empty arg
+        # `args=[dev.generator]`, NOT `args=[]`.  The text says `hardware N from ring
+        # ...` but the STRUCTURED form used to carry an empty arg
         # list, so the generator name survived only in `target="gen:ring"` -- and replaying
         # the record an editor is built on raised `TypeError: Machine.blank() missing 1
         # required positional argument` on all nine shipped architectures.  Two
         # representations of one truth, in the exact record the editor reads.
         # `tests/test_engine_parity.py` replays from `call` ALONE, never reading `target`,
         # which is what keeps this honest.
-        b.add("call", "geometry", head, target=f"gen:{dev.generator}",
+        b.add("call", "geometry", None, target=f"gen:{dev.generator}",
               call={"method": meth, "args": [dev.generator], "kwargs": kwargs},
               note=f"{s['n_sites']} sites, {s['n_segments']} segments, "
                    f"{s['n_junction_nodes']} of degree>=3",
               editable=True)
         dropped = {k: v for k, v in dev.params.items() if k not in params}
         if dropped:
-            b.note("geometry", f"generator defaults left implicit: {_kwd(dropped)}",
+            b.note("geometry", "generator defaults left implicit:"
+                   + "".join(f" {k} {value_text(v)}" for k, v in dropped.items()),
                    target=f"gen:{dev.generator}")
         if mode == "patch":
             ref = _baseline(dev)
@@ -525,15 +539,12 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
                    target=f"gen:{dev.generator}")
             for nid in moved:
                 pos = [float(c) for c in dev.nodes[nid].pos]
-                b.call("sites", "move_site",
-                       f"{_lit(nid)}, " + ", ".join(_lit(c) for c in pos),
-                       target=f"site:{nid}", args=[nid, *pos], refs=(nid,),
+                b.call("sites", "move_site", target=f"site:{nid}", args=[nid, *pos], refs=(nid,),
                        note=f"was {tuple(ref.nodes[nid].pos)}; "
                             f"degree {dev.degree(nid)}; incident segment lengths "
                             f"are unchanged")
     else:
-        gsig = _lit(dev.generator) + ((", " + _kwd(dev.params)) if dev.params else "")
-        b.add("call", "geometry", f"d = DeviceBuilder({gsig})", target="device",
+        b.add("call", "geometry", None, target="device",
               call={"method": "DeviceBuilder", "args": [dev.generator],
                     "kwargs": dict(dev.params)})
         b.note("geometry",
@@ -551,9 +562,7 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
                 kw["capacity"] = node.capacity
             pos = [float(c) for c in node.pos]
             meth = "site" if node.is_site else "junction"
-            b.add("call", "sites",
-                  f"d.{meth}({_lit(nid)}, " + ", ".join(_lit(c) for c in pos)
-                  + (", " + _kwd(kw) if kw else "") + ")",
+            b.add("call", "sites", None,
                   target=f"site:{nid}",
                   call={"method": f"d.{meth}", "args": [nid, *pos], "kwargs": kw},
                   note=f"degree {dev.degree(nid)}"
@@ -570,22 +579,17 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
                 kw["length"] = seg.length
             if seg.capacity != 1:
                 kw["capacity"] = seg.capacity
-            b.add("call", "segments",
-                  f"d.segment({_lit(sid)}, {_lit(seg.ends[0])}, {_lit(seg.ends[1])}"
-                  + (", " + _kwd(kw) if kw else "") + ")",
+            b.add("call", "segments", None,
                   target=f"segment:{sid}",
                   call={"method": "d.segment", "args": [sid, *seg.ends], "kwargs": kw},
                   refs=seg.ends,
                   note=f"corner_endpoints {dev.corner_endpoints[sid]}", editable=True)
         for lid, loop in dev.loops.items():
-            b.add("call", "loops",
-                  f"d.loop({_lit(lid)}, {_lit(list(loop.nodes))}, "
-                  f"closed={_lit(loop.closed)}, kind={_lit(loop.kind)}"
-                  + (f", note={_lit(loop.note)}" if loop.note else "") + ")",
+            b.add("call", "loops", None,
                   target=f"loop:{lid}",
                   call={"method": "d.loop", "args": [lid, list(loop.nodes)],
                         "kwargs": {"closed": loop.closed, "kind": loop.kind,
-                                   "note": loop.note}},
+                                   **({"note": loop.note} if loop.note else {})}},
                   refs=loop.nodes, editable=True)
         # EVERY zone type, in declaration order -- not only the ones a node already uses.
         # `d.site(..., zone=...)` is a builder statement hoisted ABOVE the seal, so a zone
@@ -595,11 +599,7 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
         # zone that already exists.  Same split as `engine.js::documentStatements`, and
         # declaration order because `serialize` keeps it.
         zone_refs = list(arch.zone_types)
-        b.add("call", "geometry",
-              (f"m = Machine.from_device(d.build(), name={_lit(arch.name)}, "
-               f"template={_lit(tmpl)})") if tmpl else
-              (f"m = Machine.blank_device(d.build(), name={_lit(arch.name)}, "
-               f"zones={_lit(zone_refs)})"),
+        b.add("call", "geometry", None,
               target="device",
               # THE RECORD SAYS WHAT THE TEXT SAYS.  It used to carry `{name, template}`
               # for both seals, so the browser replayed `blank_device` with no `zones`
@@ -610,10 +610,7 @@ def _emit_geometry(b, arch, dev, mode, tmpl, s) -> None:
                     "kwargs": ({"name": arch.name, "template": tmpl} if tmpl
                                else {"name": arch.name, "zones": zone_refs})})
     if arch.description or arch.provenance:
-        prov = _kwd(arch.provenance) if arch.provenance else ""
-        b.call("geometry", "describe",
-               _lit(arch.description or "") + ((", " + prov) if prov else ""),
-               target="arch", args=[arch.description or ""],
+        b.call("geometry", "describe", target="arch", args=[arch.description or ""],
                kwargs=dict(arch.provenance),
                note="prose and provenance; carried through save()")
     b.blank()
@@ -628,8 +625,7 @@ def _emit_zones(b, arch, dev, mode) -> None:
     for zname, zspec in arch.zone_types.items():
         members = members_by_zone.get(zname, [])
         caps = [k for k in ("gate", "spam", "cool", "photoionization") if zspec.get(k)]
-        b.call("zones", "set_zone", f"{_lit(zname)}, {_kwd(zspec)}",
-               target=f"zone:{zname}", args=[zname], kwargs=dict(zspec), refs=members,
+        b.call("zones", "set_zone", target=f"zone:{zname}", args=[zname], kwargs=dict(zspec), refs=members,
                note=(f"{len(members)} site(s)" if members else "declared, unused")
                     + (f"; may {', '.join(caps)}" if caps else "; transport only"))
     overrides: dict[int, list[str]] = {}
@@ -638,8 +634,7 @@ def _emit_zones(b, arch, dev, mode) -> None:
             overrides.setdefault(node.capacity, []).append(nid)
     if mode != "explicit":
         for cap, ids in sorted(overrides.items()):
-            b.call("zones", "set_site_capacity", f"{_lit(ids)}, {cap}",
-                   target=f"capacity:{cap}", args=[ids, cap], refs=ids,
+            b.call("zones", "set_site_capacity", target=f"capacity:{cap}", args=[ids, cap], refs=ids,
                    note=f"{len(ids)} site(s) overriding their zone; survives set_zone")
     if not overrides:
         b.note("zones", "no per-site capacity overrides: every site inherits its zone")
@@ -653,8 +648,7 @@ def _emit_zones(b, arch, dev, mode) -> None:
             lengths.setdefault(seg.length, []).append(sid)
     if mode != "explicit":
         for length, ids in sorted(lengths.items()):
-            b.call("zones", "set_segment_length", f"{_lit(ids)}, {_lit(length)}",
-                   target=f"length:{length}", args=[ids, length], refs=ids,
+            b.call("zones", "set_segment_length", target=f"length:{length}", args=[ids, length], refs=ids,
                    note=f"{len(ids)} segment(s); read only by length_scaling models")
     b.blank()
 
@@ -665,7 +659,7 @@ def _emit_loops(b, arch, dev, s) -> None:
     for lid, loop in dev.loops.items():
         lc = sorted(set(loop.nodes) & corners)
         b.add("note", "loops",
-              f"#   {lid:<8} {loop.kind:<5} {'closed' if loop.closed else 'open':<6} "
+              f"//   {lid:<8} {loop.kind:<5} {'closed' if loop.closed else 'open':<6} "
               f"{len(loop.nodes):>4} nodes   corners: {', '.join(lc) if lc else '-'}",
               target=f"loop:{lid}", refs=loop.nodes)
     roles: dict[tuple, int] = {}
@@ -686,15 +680,13 @@ def _emit_classes(b, arch) -> None:
     if meta:
         # must precede declare_class: set_control merges one level deep, so `extra`
         # survives -- a wholesale `classes=` replacement afterwards would not
-        b.call("classes", "set_control", f"classes={_lit(meta)}",
-               target="classes.meta", kwargs={"classes": meta},
+        b.call("classes", "set_control", target="classes.meta", kwargs={"classes": meta},
                note="the class family this machine is drawn from; `extra` is declared "
                     "below, and this line must come first")
     for cid, spec in arch.simd_classes.items():
         fields = {k: v for k, v in spec.items() if k != "id"}
         part = class_participants(arch, cid)
-        b.call("classes", "declare_class", f"{_lit(cid)}, {_kwd(fields)}",
-               target=f"class:{cid}", args=[cid], kwargs=fields, refs=part,
+        b.call("classes", "declare_class", target=f"class:{cid}", args=[cid], kwargs=fields, refs=part,
                note=f"{len(part)} site(s) may participate"
                     + (f"; entails {'+'.join(spec['entails'])}"
                        if spec.get("entails") else ""))
@@ -708,16 +700,12 @@ def _emit_classes(b, arch) -> None:
     # gets its `max_simd_classes()` from the same default on reload, so saying nothing
     # here is faithful as well as necessary.
     if arch.control:
-        b.call("classes", "set_control",
-               f"max_simd_classes_per_cycle={arch.max_simd_classes()}",
-               target="control.max_simd",
+        b.call("classes", "set_control", target="control.max_simd",
                kwargs={"max_simd_classes_per_cycle": arch.max_simd_classes()},
                note="R4: a cycle carries this many classes, so participation is variadic "
                     "but the operation is not")
     if "intra_inter_exclusive" in arch.control:
-        b.call("classes", "set_control",
-               f"intra_inter_exclusive={_lit(arch.control['intra_inter_exclusive'])}",
-               target="control.intra_inter",
+        b.call("classes", "set_control", target="control.intra_inter",
                kwargs={"intra_inter_exclusive": arch.control["intra_inter_exclusive"]})
     b.blank()
 
@@ -726,29 +714,26 @@ def _emit_control(b, arch, dev, max_channel_lines) -> None:
     b.rule("control",
            "control plane: what shares a channel, and therefore moves together")
     if arch.control.get("model"):
-        b.call("control", "set_control", f"model={_lit(arch.control['model'])}",
-               target="control.model", kwargs={"model": arch.control["model"]})
+        b.call("control", "set_control", target="control.model", kwargs={"model": arch.control["model"]})
     # a C2LR device's offer and census (docs/c2lr.md): which variations it plays, which are
     # assumed, and the per-leg control C10 counts.  Without this line a replayed listing
     # offers no checkerboard and fails C10, so the browser and a reload judge another device
     c2lr = dict(arch.control.get("c2lr") or {})
     if c2lr:
-        b.call("control", "set_control", f"c2lr={_lit(c2lr)}", target="control.c2lr",
+        b.call("control", "set_control", target="control.c2lr",
                kwargs={"c2lr": c2lr},
                note="C2LR: the swap-or-stay variations offered and the per-leg control")
     wiring = dict(arch.control.get("wiring") or {})
     if wiring:
-        b.call("control", "set_wiring", _kwd(wiring), target="control.wiring",
+        b.call("control", "set_wiring", target="control.wiring",
                kwargs=wiring,
                note="electrodes per cell and the DAC scheme (deck p.19-20)")
     channels = dict(arch.control.get("channels") or {})
     if channels:
-        b.call("control", "set_control", f"channels={_lit(channels)}",
-               target="control.channels", kwargs={"channels": channels},
+        b.call("control", "set_control", target="control.channels", kwargs={"channels": channels},
                note="how those electrodes are grouped onto analog channels")
     if arch.control.get("optical"):
-        b.call("control", "set_control", f"optical={_lit(arch.control['optical'])}",
-               target="control.optical", kwargs={"optical": arch.control["optical"]})
+        b.call("control", "set_control", target="control.optical", kwargs={"optical": arch.control["optical"]})
     plane = arch.control_plane
     if not plane.declared:
         b.note("control", "no channel map declared: counts come from the aggregate "
@@ -772,7 +757,7 @@ def _emit_control(b, arch, dev, max_channel_lines) -> None:
         if len(keys) > max_channel_lines:
             sizes = sorted({len(k[1]) for k in keys})
             b.add("note", "control",
-                  f"#   role {role:<10} {len(ids_here):>5} channel(s) over {len(keys)} "
+                  f"//   role {role:<10} {len(ids_here):>5} channel(s) over {len(keys)} "
                   f"group(s), each driving "
                   f"{sizes[0] if len(sizes) == 1 else sizes} site(s)",
                   target=f"role:{role}", refs=tuple(ids_here[:1]))
@@ -781,7 +766,7 @@ def _emit_control(b, arch, dev, max_channel_lines) -> None:
             ids = buckets[k]
             head = ids[0] if len(ids) == 1 else f"{ids[0]} .. {ids[-1]}"
             b.add("note", "control",
-                  f"#   {head:<34} role {role:<10} drives {len(k[1]):>4} site(s)",
+                  f"//   {head:<34} role {role:<10} drives {len(k[1]):>4} site(s)",
                   target=f"channel:{ids[0]}", refs=tuple(ids) + tuple(sorted(k[1])))
     for nt in plane.notes:
         b.note("control", nt)
@@ -805,9 +790,7 @@ def _emit_primitives(b, arch, dev) -> None:
     b.rule("primitives",
            "primitive curves: every transport cost is a (us, quanta) curve")
     for pname, curve in arch.primitives.curves.items():
-        pts = ",\n".join(f"    dict({_kwd(p.to_json())})" for p in curve.points)
-        b.add("call", "primitives",
-              f"m.set_curve({_lit(pname)}, [\n{pts}\n])",
+        b.add("call", "primitives", None,
               target=f"curve:{pname}",
               call={"method": "set_curve",
                     "args": [pname, [p.to_json() for p in curve.points]], "kwargs": {}},
@@ -816,18 +799,15 @@ def _emit_primitives(b, arch, dev) -> None:
     for pname, dc in arch.primitives.degree_curves.items():
         for deg in dc.degrees():
             c = dc.get(deg)
-            pts = ",\n".join(f"    dict({_kwd(p.to_json())})" for p in c.points)
             here = sum(1 for n in dev.nodes if dev.degree(n) == deg)
-            b.add("call", "primitives",
-                  f"m.set_degree_curve({_lit(pname)}, {deg}, [\n{pts}\n])",
+            b.add("call", "primitives", None,
                   target=f"curve:{pname}#{deg}",
                   call={"method": "set_degree_curve",
                         "args": [pname, deg, [p.to_json() for p in c.points]],
                         "kwargs": {}},
                   note=f"charged at nodes of degree {deg} ({here} here)", editable=True)
     for pname, sc in arch.primitives.scalars.items():
-        b.call("primitives", "set_primitive", f"{_lit(pname)}, {_kwd(sc)}",
-               target=f"primitive:{pname}", args=[pname], kwargs=dict(sc))
+        b.call("primitives", "set_primitive", target=f"primitive:{pname}", args=[pname], kwargs=dict(sc))
     b.blank()
 
 
@@ -860,11 +840,11 @@ def _emit_policy(b, arch, policy) -> None:
 def _emit_physics(b, arch) -> None:
     b.rule("physics", "background physics")
     if arch.heating:
-        b.call("physics", "set_heating", _kwd(arch.heating), target="heating",
+        b.call("physics", "set_heating", target="heating",
                kwargs=dict(arch.heating),
                note="R17: quanta accrue with elapsed time whether or not an ion moves")
     if arch.species:
-        b.call("physics", "set_species", _kwd(arch.species), target="species",
+        b.call("physics", "set_species", target="species",
                kwargs=dict(arch.species))
     b.blank()
 
@@ -875,7 +855,7 @@ def _emit_budget(b, arch) -> None:
     b.rule("budget", "budget, and what it is measured against")
     hw = hardware_report(arch)
     if arch.budget:
-        b.call("budget", "set_budget", _kwd(arch.budget), target="budget",
+        b.call("budget", "set_budget", target="budget",
                kwargs=dict(arch.budget))
     measured = {
         "max_dacs": (hw.dacs, f"{hw.dacs_broadcast} broadcast + "
@@ -904,25 +884,21 @@ def _emit_budget(b, arch) -> None:
 # ------------------------------------------------------------------------ round trip
 
 
-def emit_python(arch: Architecture, **kw) -> str:
+def emit_source(arch: Architecture, **kw) -> str:
     kw.setdefault("mode", "full")
-    return architecture_listing(arch, **kw).python()
+    return architecture_listing(arch, **kw).source()
 
 
-def rebuild(python: str) -> Architecture:
-    """Execute an emitted listing and return the architecture it builds.
+def rebuild(text: str) -> Architecture:
+    """Read a machine specification and return the architecture it declares.
 
-    `exec` on generated text is fine; `exec` on *user-edited* text is arbitrary code
-    execution.  A design tool must apply `ArchLine.call` records through a method
-    whitelist instead of routing edits back through here.
+    Nothing is executed: each declaration is parsed to its call record
+    (`hardware_text.parse`) and the records run through `edit.apply_program`'s method
+    whitelist, the same path the studio's Write tab takes.
     """
-    from ..api import Machine
-    from . import Device, DeviceBuilder, Loop, Node, Segment
+    from .edit import apply_program
 
-    ns: dict = {"Machine": Machine, "Node": Node, "Segment": Segment, "Loop": Loop,
-                "Device": Device, "DeviceBuilder": DeviceBuilder}
-    exec(compile(python, "<arch-listing>", "exec"), ns)
-    return ns["m"].arch
+    return apply_program(parse_hardware(text)).arch
 
 
 def architecture_diff(a: Architecture, b: Architecture) -> list[str]:
@@ -958,10 +934,10 @@ def architecture_diff(a: Architecture, b: Architecture) -> list[str]:
 
 def round_trip_check(arch: Architecture, *, listing: ArchListing | None = None,
                      **kw) -> tuple[bool, list[str]]:
-    """Emit, `exec`, diff.  `(True, [])` means the listing rebuilds its own subject."""
+    """Emit, read back, diff.  `(True, [])` means the listing rebuilds its own subject."""
     listing = listing or architecture_listing(arch, mode=kw.pop("mode", "full"), **kw)
     try:
-        rebuilt = rebuild(listing.python())
+        rebuilt = rebuild(listing.source())
     except Exception as exc:
         return False, [f"{type(exc).__name__}: {exc}"]
     diff = architecture_diff(arch, rebuilt)

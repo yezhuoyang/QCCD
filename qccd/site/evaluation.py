@@ -105,7 +105,7 @@ def hl(text: str, names: dict[str, str] | None = None, base: str = "") -> str:
     names = names or {}
     out = []
     prev = ""                      # the last word: a name after `param`, `define` or `metric` is declared
-    for m in re.finditer(r'#[^\n]*|"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z0-9_@]*|\s+|.', text):
+    for m in re.finditer(r'#[^\n]*|//[^\n]*|"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z0-9_@]*|\s+|.', text):
         t = m.group()
         if not t.isspace():
             was, prev = prev, t
@@ -116,7 +116,7 @@ def hl(text: str, names: dict[str, str] | None = None, base: str = "") -> str:
                 out.append(f'<a href="{names[t]}">{t}</a>' if t in names else html.escape(t))
                 out.append("</span>")
                 continue
-        if t.startswith("#"):
+        if t.startswith(("#", "//")):
             out.append(f'<span class="c">{html.escape(t)}</span>')
         elif t.startswith('"'):
             out.append(f'<span class="s">{html.escape(t)}</span>')
@@ -619,8 +619,9 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'leaderboard can be recomputed from the files it came from, and traced to the line of text that '
       'defines it.</p>')
     w('<p class="sub">The language is the <a href="../rules/">Rules</a> page&rsquo;s, extended. A rule is a '
-      'formula that holds or fails; an evaluation adds named numbers (<code>metric</code>), the assertions a '
-      'design must meet to be ranked (<code>require</code>), and noise (<code>channel</code>): a clause that '
+      'formula that holds or fails, written as QCCDCert, the compiler, writes an assertion; an evaluation adds '
+      'named numbers (<code>metric</code>), the assertions a '
+      'design must meet to be ranked (<code>assert</code>), and noise (<code>channel</code>): a clause that '
       'says which Pauli error goes where in the circuit a run becomes. The noisy circuit the '
       '<a href="../board/goal1/">Goal 1</a> board samples is the programme&rsquo;s stabilizer translation with '
       'those clauses applied. The grader reads these texts: every number it publishes &mdash; the metrics, the '
@@ -643,7 +644,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
         'requirement\'s verdict and the noisy circuit come out. Nothing else is read, so every number on the '
         'leaderboard can be recomputed.',
         '<b>The evaluation language</b>, which is the rule language with three more kinds of item: a '
-        '<code>metric</code> (a named number), a <code>require</code> (what must hold to be ranked) and a '
+        '<code>metric</code> (a named number), an <code>assert</code> (what must hold to be ranked) and a '
         '<code>channel</code> (noise: which Pauli error goes where).',
         '<b>The four families of numbers</b> a design is judged by, each written out and explained: speed, heat, '
         'hardware, and the logical error rate.',
@@ -709,13 +710,14 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
     w(learn.bridge('If every number is a term of a text, the text\'s grammar is worth a look. It is short, and '
                    'you already know most of it from the Rules page.'))
     w('<h2 id="language">The evaluation language</h2>')
-    w(learn.section('the grammar, the five kinds of item (param, define, metric, require, channel), exactly '
+    w(learn.section('the grammar, the five kinds of item (param, define, metric, assert, channel), exactly '
                     'what a noise channel writes into the circuit, and Goal 1\'s evaluation printed whole.'))
     w('<p>An evaluation is a text file. Its terms and formulas are the rule language&rsquo;s, unchanged '
       '&mdash; quantifiers over finite sets, comparisons, arithmetic, <code>count</code>, <code>sum</code>, '
       '<code>max</code>, <code>min</code> and set builders &mdash; with one more term, '
-      '<code>if C then a else b</code>. What it adds are items:</p>')
-    grammar = SYNTAX_DOC.split("Grammar (EBNF, extending the rule language's; `#` starts a comment):", 1)[1]
+      '<code>if C then a else b</code>. Like QCCDCert&rsquo;s programs it is a list of items, each a keyword '
+      'and its fields ended by <code>;</code>. What it adds are items:</p>')
+    grammar = SYNTAX_DOC.split("Grammar (EBNF, extending the rule language's; `#` or `//` starts a comment):", 1)[1]
     grammar = grammar.split("A `define` names a term", 1)[0].strip("\n")
     w('<pre class="ev">' + hl("\n".join(ln[4:] if ln.startswith("    ") else ln for ln in grammar.splitlines())) + '</pre>')
     w('<div class="tw"><table class="t">'
@@ -724,8 +726,8 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       '<tr><td><code>define f(x, …) = term</code></td><td>a named term, with or without arguments; it may use earlier names, never itself</td></tr>'
       '<tr><td><code>metric n "title" … = term</code></td><td>a number every design gets, with its unit and which way is better; '
       'with <code>clock "table"</code>, on a replay at that table&rsquo;s operating points</td></tr>'
-      '<tr><td><code>require ID "title" formula</code></td><td>what must hold for a design to be ranked</td></tr>'
-      '<tr><td><code>channel n "title" after x in D where C: OP(p) on S</code></td><td>noise: for every binding of <i>x</i> '
+      '<tr><td><code>assert ID "title": formula;</code></td><td>what must hold for a design to be ranked</td></tr>'
+      '<tr><td><code>channel n "title" after x:D where C. OP(p) on S;</code></td><td>noise: for every binding of <i>x</i> '
       'that satisfies <i>C</i>, the Pauli channel OP with probability <i>p</i> on the ions <i>S</i>, just after '
       '(or <code>before</code>) what <i>x</i> names; <code>counted as k</code> books its expected faults under '
       'the budget line <i>k</i>, and <code>counted as k₁ = t₁, k₂ = t₂</code> shares them out in proportion to '
@@ -734,7 +736,7 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
       'evaluation&rsquo;s items; the operating-point table the replay prices at; the rule set the programme is '
       'judged by; the metric a board ranks by</td></tr></table></div>')
     w('<div class="df"><b>Definition 2</b>(What a channel writes.) For a channel '
-      '<code>after x₁ in D₁, …, xₙ in Dₙ where C: OP(p) on S</code> and every binding of '
+      '<code>after x₁:D₁, …, xₙ:Dₙ where C. OP(p) on S;</code> and every binding of '
       '<i>x</i>₁…<i>x</i>ₙ at which <i>C</i> holds, the circuit carries <code>OP(p) q₁ … qₘ</code>, the '
       '<i>q</i> being the qubits of the ions <i>S</i>, immediately after (for <code>before</code>, immediately '
       'before) the translation of what <i>x</i>₁ names; <i>x</i>₁ ranges over operations or over steps. A '
@@ -1203,15 +1205,15 @@ def page(PAGE: str, STYLE: str, device_svg=None) -> str:
 
     # ---------------------------------------------------------------- 15 yours
     w('<h2 id="yours">Writing your own evaluation</h2>')
-    custom = ('evaluation "mine"\n'
-              'title "Goal 1, with a price on every junction crossing"\n'
-              'include "goal1"\n'
-              'param junction_error = 1e-4      # per crossing: an assumption, not a measurement\n\n'
+    custom = ('evaluation "mine";\n'
+              'title "Goal 1, with a price on every junction crossing";\n'
+              'include "goal1";\n'
+              'param junction_error = 1e-4;     // per crossing: an assumption, not a measurement\n\n'
               'channel junction "A junction crossing dephases the ion"\n'
-              '  after o in moves where size(crossed(o)) > 0:\n'
-              '    Z_ERROR(1 - pow(1 - junction_error, size(crossed(o)))) on ions(o)\n\n'
+              '  after o:moves where size(crossed(o)) > 0.\n'
+              '    Z_ERROR(1 - pow(1 - junction_error, size(crossed(o)))) on ions(o);\n\n'
               'metric T_us "Execution time in microseconds" unit "us" better low\n'
-              '  = time(final())\n')
+              '  = time(final());\n')
     w('<p>An evaluation may start from another (<code>include</code>), change its numbers '
       '(<code>param</code>), and add metrics, requirements and channels of its own, in the language above and '
       'with the words above, and nothing else. A word the vocabulary does not have is refused with the line it '

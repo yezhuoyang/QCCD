@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 from ..ruleset import RuleSet, catalogue, load, names, rule_order
-from ..ruleset.syntax import KEYWORDS
+from ..ruleset.syntax import KEYWORDS, assertion_text
 from ..ruleset.vocabulary import TERMS
 from .access import UNPUBLISHED_WORDS, planar_about, planar_formula
 from . import learn
@@ -191,9 +191,9 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
          f'itself a text, defined on the <a href="../machine/">Machine</a> page: a rule&rsquo;s machine words '
          f'(sites, rails, capacity, degree) are read off that text, and its execution words (operations, '
          f'instants, occupancy) off the programme&rsquo;s replay. A rule is written in a small language you can '
-         f'read on this page: '
+         f'read on this page, the assertion language of QCCDCert, the compiler: '
          f'<i>for every site and every instant, the ions in the site number at most its capacity</i> is '
-         f'written <code>for all s in sites, t in instants: occupancy(s, t) &lt;= capacity(s)</code>. '
+         f'written <code>assert R1: forall s:sites, t:instants. occupancy(s, t) &lt;= capacity(s);</code>. '
          f'The checker evaluates exactly that text; nothing else decides a rule.</p>',
          f'<p class="sub">Rules are not fixed. A <b>rule set</b> chooses the rules a machine assumes and '
          f'sets their numbers, and the compiler takes one as input: it plans with the rules it knows how '
@@ -236,26 +236,29 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
 
     # -- the language
     b += ['<h2 id="language">Reading a rule</h2>',
-          learn.section('the ten shapes a rule can take. They are ordinary logic (for all, for some, and, or, '
+          learn.section('the ten shapes a rule can take. They are ordinary logic (forall, exists, and, or, '
                         'counts and sums) over four finite sets: the sites of the machine, the operations and the '
                         'instants of the run, and the circuit. '
                         'After this section every rule on the page reads as a sentence.'),
           '<p class="sub">A rule is a formula of first-order logic over finite sets: the sites of the '
           'machine (the text of the <a href="../machine/">Machine</a> page), the operations of the '
           'execution, the instants at which its state is judged, and the '
-          'operations of the input circuit.</p>',
+          'operations of the input circuit. It is written as QCCDCert writes an assertion '
+          '(<code>assert</code> <i>name</i><code>:</code> <i>formula</i><code>;</code>, with '
+          '<code>forall x:D.</code>, <code>exists</code> and <code>=&gt;</code>), extended with '
+          '<code>where</code>, counts, sums and sets, and with the words defined below.</p>',
           '<pre class="assert">' + highlight(
-              'for all x in D: P            P holds for every x in the set D\n'
-              'for all x in D where C: P    ... for every x in D for which C holds\n'
-              'for some x in D: P           P holds for at least one x in D\n'
-              'for all a, b in D: P         for every pair a, b in D (also a = b, unless excluded)\n'
-              'P and Q,  P or Q,  not P,  P implies Q\n'
+              'forall x:D. P                P holds for every x in the set D\n'
+              'forall x:D where C. P        ... for every x in D for which C holds\n'
+              'exists x:D. P                P holds for at least one x in D\n'
+              'forall a, b:D. P             for every pair a, b in D (also a = b, unless excluded)\n'
+              'P and Q,  P or Q,  not P,  P => Q\n'
               'x = y,  x != y,  x <= y,  x in S,  x not in S,  a + b,  a * b\n'
-              'count(x in D where C)        how many x in D satisfy C\n'
-              'sum(e for x in D where C)    the sum of e over them (also max, min)\n'
-              '{e for x in D where C}       the set of the values of e; size(S) counts it\n'
+              'count(x:D where C)           how many x in D satisfy C\n'
+              'sum(e for x:D where C)       the sum of e over them (also max, min)\n'
+              '{e for x:D where C}          the set of the values of e; size(S) counts it\n'
               '"C3"                         the site (or ion) named C3', all_params) + '</pre>',
-          '<p class="sub">A rule may begin with <code><b>when</b> C:</code>. When C is false the rule '
+          '<p class="sub">An assertion may say <code><b>when</b> C</code> before its colon. When C is false the rule '
           '<i>does not apply</i> to that execution, which is reported as such, never as holding. A word '
           'that an execution does not have (the steps of a paper&rsquo;s timed schedule, or the circuit when '
           'none was given) makes the rule not apply, and the page says which word.</p>']
@@ -345,7 +348,7 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     b.append('<ul class="toc2">' + "".join(f'<li><a href="#{r.id}">{r.id}</a></li>'
                                           for r in sorted(cat.rules, key=lambda r: rule_order(r.id))) + '</ul>')
     for r in sorted(cat.rules, key=lambda r: rule_order(r.id)):
-        text = planar_formula((f"when {r.when_text}:\n" if r.when is not None else "") + r.text)
+        text = planar_formula(assertion_text(r))
         sets_of = in_sets.get(r.id, [])
         chips = "".join(f'<a href="#set-{n}">{n}</a>' for n in sets_of) or "none of the shipped sets"
         cards = ""
@@ -368,15 +371,15 @@ def page(built: dict, examples_by_rule: dict, PAGE: str, STYLE: str, papers_by_s
     b += _machine_section(all_params)
 
     # -- your own
-    example = ('ruleset "my-machine"\n'
-               'title "A machine without broadcast control"\n'
-               'include "standard"\n'
-               'drop R22                       # every electrode has its own signal\n'
-               'param max_chain = 20           # R13 allows a longer chain\n'
+    example = ('ruleset "my-machine";\n'
+               'title "A machine without broadcast control";\n'
+               'include "standard";\n'
+               'drop R22;                      // every electrode has its own signal\n'
+               'param max_chain = 20;          // R13 allows a longer chain\n'
                '\n'
-               'rule X1 "No ion stands in the corner trap C3"\n'
-               '  about "C3 is under repair."\n'
-               '  for all i in ions, t in instants: position(i, t) != "C3"\n')
+               'assert X1 "No ion stands in the corner trap C3"\n'
+               '  about "C3 is under repair.":\n'
+               '  forall i:ions, t:instants. position(i, t) != "C3";\n')
     b += ['<h2 id="yours">Writing a rule</h2>',
           learn.section('a rule set is a text file you can write. One example: a machine without broadcast '
                         'control, with one rule of its own.'),
@@ -459,7 +462,7 @@ def _machine_section(all_params) -> list[str]:
                  f'<span class="st"><a href="sets/{n}.rules" download>{n}.rules</a></span></h3>'
                  f'<p class="sub">{html.escape(rs.about)}</p>')
         for r in sorted(rs.rules, key=lambda r: rule_order(r.id)):
-            text = planar_formula((f"when {r.when_text}:\n" if r.when is not None else "") + r.text)
+            text = planar_formula(assertion_text(r))
             b.append(f'<section class="rule" id="{r.id}"><h3>{r.id} <span class="st">'
                      f'{html.escape(r.title)}</span>{"<span class=core>core</span>" if r.core else ""}</h3>'
                      f'<pre class="assert">{highlight(text, all_params | set(rs.params))}</pre>'

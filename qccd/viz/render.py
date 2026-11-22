@@ -226,7 +226,7 @@ def build_view_model(
 
     * `listing` -- the hardware program, disassembled by `qccd.ir.listing` and
       compressed columnar (~119 KB for the 1,579-instruction deck program);
-    * `arch.listing` -- the architecture as the Python that rebuilds it, from
+    * `arch.listing` -- the machine as the declarations that rebuild it (QCCDCert's hardware syntax), from
       `qccd.arch.listing`, with the same `class:`/`loop:`/`site:` id namespace the
       program listing joins on;
     * `control` -- one deduplicated control-plane record per instruction from
@@ -2145,11 +2145,11 @@ textarea.src.out{min-height:120px;opacity:.85}
           </div>
           <div class="srcwrap off" id="aSrcWrap">
             <textarea class="src" id="eSrc" spellcheck="false"
-              aria-label="the architecture as Python; edit it and the stage re-renders"></textarea>
+              aria-label="the machine as hardware declarations; edit it and the stage re-renders"></textarea>
             <div class="srcerr" id="eSrcErr"></div>
             <!-- the export picker lives beside the text it formats, not on the toolbar -->
             <div class="ph exportrow"><span class="sub">export</span>
-              <select id="eWhich"><option value="py" selected>as Python</option>
+              <select id="eWhich"><option value="spec" selected>as specification</option>
                 <option value="json">as .arch.json</option>
                 <option value="tsir">as .tsir.json</option>
                 <option value="edits">as edit ops</option></select>

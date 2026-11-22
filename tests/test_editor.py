@@ -157,8 +157,7 @@ def _export_script(stem, script, page):
     if script and script[0].get("do") == "source" and script[0].get("src") is None:
         base = drive(page, [], TMP_FOR_SOURCE)["source"]
         script = [{"do": "source",
-                   "src": base + 'm.set_curve("shuttle_segment", '
-                                 '[dict(us=5.0, quanta=0.1, table="mytable")])\n'}]
+                   "src": base + 'curve shuttle_segment [{us: 5.0, quanta: 0.1, table: mytable}];\n'}]
     return script
 
 
@@ -758,14 +757,14 @@ def test_the_side_editor_round_trips_the_listing_byte_for_byte(tmp_path):
     """What the user types is exactly what `m.source()` prints.
 
     `EDITOR.source()` renders the shipped listing back out of the parsed command records,
-    and it must equal `ArchListing.python()` character for character.  One assertion, and
+    and it must equal `ArchListing.source()` character for character.  One assertion, and
     the editor's language can never drift from `_lit` / `_kwd`.
     """
     if not CORR_PAGE.exists():
         pytest.skip("run `python -m qccd demo`")
     from qccd.arch.listing import architecture_listing
     r = drive(CORR_PAGE, [], tmp_path)
-    want = architecture_listing(load(ARCH), verify=False).python()
+    want = architecture_listing(load(ARCH), verify=False).source()
     got = r["source"]
     if got != want:
         a, b = got.split("\n"), want.split("\n")
@@ -787,10 +786,10 @@ def test_typing_into_the_side_editor_changes_the_machine(tmp_path):
     if not CORR_PAGE.exists():
         pytest.skip("run `python -m qccd demo`")
     from qccd.arch.listing import architecture_listing
-    src = architecture_listing(load(ARCH), verify=False).python()
-    assert 'm.set_zone("trap"' in src, src[:400]
+    src = architecture_listing(load(ARCH), verify=False).source()
+    assert 'zone trap ' in src, src[:400]
     edited = "\n".join(
-        (l.replace("capacity=2", "capacity=5") if l.startswith('m.set_zone("trap"') else l)
+        (l.replace("capacity 2", "capacity 5") if l.startswith('zone trap ') else l)
         for l in src.split("\n"))
     assert edited != src, "the fixture no longer matches the emitted listing"
     r = drive(CORR_PAGE, [{"do": "mode", "mode": "edit"},
@@ -1052,16 +1051,13 @@ def test_an_edit_RE_DERIVES_the_rule_verdicts_and_names_what_it_cannot(tmp_path)
 
 
 @requires_node
-def test_the_exported_python_runs(tmp_path):
-    """The Python the browser hands over must EXECUTE and produce the same machine.
+def test_the_exported_specification_reads_back(tmp_path):
+    """The specification the browser hands over must READ BACK as the same machine.
 
-    Not "look plausible" -- run.  The whole point of the side editor speaking Python is
-    that you can copy the panel, paste it into a file and get the machine back; an export
-    that only reads like Python would be a demo of a text renderer.
-
-    The listing statements execute directly; the topology edits go through
-    `Machine.apply_edits`, which is the same method whitelist the browser used, so nothing
-    on this path is `exec` on user-edited structure.
+    Not "look plausible" -- read.  Copy the panel, give it to `Machine.read`, and get the
+    machine back; an export that only looked like declarations would be a demo of a text
+    renderer.  A topology edit lands as the sites and rails it made, and nothing on this
+    path is executed: each declaration is one record through `apply_program`'s whitelist.
     """
     if not CORR_PAGE.exists():
         pytest.skip("run `python -m qccd demo`")
@@ -1071,12 +1067,11 @@ def test_the_exported_python_runs(tmp_path):
         {"do": "addSegment", "a": "S10", "b": "S82"},
     ], tmp_path)
     assert r["ready"] is True, r.get("why")
-    src = r["python"]
-    assert "m.apply_edits(" in src, "the topology edit did not reach the export"
+    src = r["spec"]
+    assert "rail " in src and "S10" in src, "the topology edit did not reach the export"
 
-    ns: dict = {}
-    exec(compile(src, "<browser export>", "exec"), ns)   # the export, run for real
-    m = ns["m"]
+    from qccd.api import Machine
+    m = Machine.read(src)                                 # the export, read for real
     assert any(set(s.ends) == {"S10", "S82"} for s in m.arch.device.segments.values())
     assert m.arch.device.degree("S10") == 3
 
@@ -1094,7 +1089,7 @@ def test_the_exported_python_runs(tmp_path):
     assert set(js_nodes) == set(m.arch.device.nodes)
     for nid, n in m.arch.device.nodes.items():
         assert tuple(js_nodes[nid]["pos"]) == tuple(n.pos), (
-            f"{nid}: the exported Python built a different machine from the one on screen")
+            f"{nid}: the exported specification built a different machine from the one on screen")
 
 
 # ======================================================================================
@@ -1643,9 +1638,8 @@ def test_two_double_clicked_sites_can_be_joined_and_test_driven(tmp_path):
     assert log[4]["result"]["ok"] and log[4]["result"]["frames"] > 0, log[4]
     assert r["ready"] is True, r.get("why")
     # the export is one device, not a builder above the seal and a topology edit below it
-    ns: dict = {}
-    exec(compile(r["python"], "<browser export>", "exec"), ns)   # the export, run for real
-    m = ns["m"]
+    from qccd.api import Machine
+    m = Machine.read(r["spec"])                            # the export, read for real
     assert set(m.arch.device.nodes) == {"N0", "N1"}
     assert any(set(sg.ends) == {"N0", "N1"} for sg in m.arch.device.segments.values())
 
@@ -1908,7 +1902,7 @@ def test_applying_the_source_text_keeps_a_device_built_by_hand(tmp_path):
     nodes, segs = shape(r0)
     assert nodes == ["N0", "N1", "N2"] and len(segs) == 2, (nodes, segs)
     src = r0["source"]
-    assert 'd.site("N2"' in src, src[:600]
+    assert "site N2 at (" in src, src[:600]
 
     def applied(text):
         r = drive(page, build + [{"do": "source", "src": text}], tmp_path)
@@ -1918,19 +1912,19 @@ def test_applying_the_source_text_keeps_a_device_built_by_hand(tmp_path):
     assert res["ok"], res
     assert shape(r) == (nodes, segs), "applying the Source text unchanged lost the device"
 
-    r, res = applied(src + 'm.set_zone("data", capacity=3)\n')
+    r, res = applied(src + 'zone data capacity 3;\n')
     assert res["ok"], res
     assert shape(r) == (nodes, segs)
     assert doc(r)["zone_types"]["data"]["capacity"] == 3
 
-    typed = src.replace("\nm = Machine", '\nd.site("N9", 6.0, 0.0, zone="data")\n'
-                                          'd.segment("E9", "N2", "N9")\nm = Machine', 1)
+    typed = src.replace("\nhardware ", '\nsite N9 at (6.0, 0.0) zone data;\n'
+                                       'rail E9:N2--N9;\nhardware ', 1)
     assert typed != src
     r, res = applied(typed)
     assert res["ok"], res
     assert shape(r) == (nodes + ["N9"], sorted(segs + ["E9"]))
 
-    gone = re.sub(r'(?m)^d\.site\("N2".*\n', "", src, count=1)
+    gone = re.sub(r'(?m)^site N2 .*\n', "", src, count=1)
     assert gone != src
     r, res = applied(gone)
     assert not res["ok"], res

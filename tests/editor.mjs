@@ -584,8 +584,8 @@ out.source = ED.source();
 // throw escape would report "the page crashed" for the one case the refusal exists to
 // handle, so the refusal is recorded as data and the caller asserts on it.
 out.schema_errors = ED.schemaErrors ? ED.schemaErrors() : [];
-try { out.python = ED.exportPython(); }
-catch (e) { out.python = null; out.export_refused = String(e.message || e); }
+try { out.spec = ED.exportSpec(); }
+catch (e) { out.spec = null; out.export_refused = String(e.message || e); }
 try { out.arch_json = ED.exportJson(); }
 catch (e) { out.arch_json = null; out.export_refused = String(e.message || e); }
 out.json_ok = (() => { try { return JSON.parse(out.arch_json) !== null; } catch (e) { return false; } })();

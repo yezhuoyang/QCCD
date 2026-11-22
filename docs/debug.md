@@ -49,11 +49,11 @@ The rule language of the website's Rules page (docs/rule-language.md; grammar in
 optionally led by a title:
 
     assert "one ion per site":
-    for all s in sites, t in instants: occupancy(s, t) <= 1
+    forall s:sites, t:instants. occupancy(s, t) <= 1;
 
-    for all t in instants: position("q0", t) != "C3"
+    forall t:instants. position("q0", t) != "C3";
 
-or whole rules (`rule MINE "..."` and an indented formula).  A quoted name stands for the ion,
+or whole rules (`assert MINE "...": formula;`).  A quoted name stands for the ion,
 site or rail of that name, as an argument too (`occupancy("C3", t)`).  Unknown words are
 refused before anything runs.
 
@@ -128,7 +128,7 @@ qccd.academy itself, the button says how to open the page with a workspace.
 one object in `args`:
 
     {"action": "navigate", "path": "/web/debug/?src=board/surface3_mem/02_ring16.html"}
-    {"action": "debug", "verb": "check",  "args": [{"rules": "standard", "assertions": "for all s in sites, t in instants: occupancy(s, t) <= 1"}]}
+    {"action": "debug", "verb": "check",  "args": [{"rules": "standard", "assertions": "forall s:sites, t:instants. occupancy(s, t) <= 1;"}]}
     {"action": "debug", "verb": "failures", "args": [{"limit": 10}]}
     {"action": "debug", "verb": "goto",   "args": [{"step": 41}]}
     {"action": "debug", "verb": "watch",  "args": [{"add": ["q3", "J1"], "isolate": true}]}

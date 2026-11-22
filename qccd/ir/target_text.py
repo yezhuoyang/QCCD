@@ -137,7 +137,8 @@ def call_text(method: str, args: list | tuple = (), kwargs: dict | None = None) 
             cls = args[0] if args else kw.pop("cls")
             moves = args[1] if len(args) > 1 else kw.pop("moves")
             mode = args[2] if len(args) > 2 else kw.pop("mode", "inter")
-        text = "transport " + ", ".join(_move_text(mv, cls) for mv in moves)
+        # a cycle that moves no ion still names its class: `transport [shuttle];`
+        text = "transport " + (", ".join(_move_text(mv, cls) for mv in moves) if moves else f"[{cls}]")
         if mode != "inter":
             text += f" mode {mode}"
         return text + _meta(kw) + ";"
@@ -271,6 +272,12 @@ def parse_call(stmt: str) -> tuple[str, list, dict]:
         m = re.search(r"\s+mode\s+(\S+)$", rest)
         if m:
             mode, rest = m.group(1), rest[:m.start()]
+        empty = re.fullmatch(r"\[\s*(\S+?)\s*\]", rest.strip())
+        if empty:
+            kw = dict(meta)
+            if mode != "inter":
+                kw["mode"] = mode
+            return "simd", [empty.group(1), []], kw
         parsed = [_parse_move(x) for x in _split_top(rest, ",")]
         classes = {c for _, c in parsed}
         if len(classes) > 1:

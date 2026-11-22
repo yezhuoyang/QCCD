@@ -1051,7 +1051,7 @@ function renderRules() {
           '<details id="rText"><summary>show the rule set\'s text</summary><pre class="q-code">' + esc(rulesetText(S.rules.set)) + '</pre></details>' +
           '<label class="q-lab">Your assertions <select id="rEx" data-hint="debug:rules:example"><option value="">insert an example…</option>' +
           CFG.examples.map(function (x, j) { return '<option value="' + j + '">' + esc(x.t) + '</option>'; }).join('') + '</select></label>' +
-          '<textarea id="rAs" rows="5" spellcheck="false" data-hint="debug:rules:assertions" placeholder="for all s in sites, t in instants: occupancy(s, t) <= 1\n\nassert &quot;q0 stays out of C3&quot;:\nfor all t in instants: position(&quot;q0&quot;, t) != &quot;C3&quot;">' + esc(S.rules.assertions) + '</textarea>' +
+          '<textarea id="rAs" rows="5" spellcheck="false" data-hint="debug:rules:assertions" placeholder="forall s:sites, t:instants. occupancy(s, t) <= 1;\n\nassert &quot;q0 stays out of C3&quot;:\nforall t:instants. position(&quot;q0&quot;, t) != &quot;C3&quot;;">' + esc(S.rules.assertions) + '</textarea>' +
           '<div class="q-row"><button type="button" id="rCheck" class="q-p" data-hint="debug:rules:check"' + (S.rules.running ? ' disabled' : '') + '>' +
           (S.rules.running ? 'Checking…' : 'Check') + '</button><span id="pyState" class="q-mut"></span></div>' +
           '<div class="q-row"><button type="button" id="rAgent" class="q-tgl' + (S.agentHelp ? ' q-on' : '') + '" aria-pressed="' + S.agentHelp +

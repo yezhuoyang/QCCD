@@ -1,7 +1,7 @@
 """Rules as an input: rule sets written in an assertion language over hardware and execution.
 
-A *rule* is one assertion -- `for all s in sites, t in instants: occupancy(s, t) <=
-capacity(s)` -- in the language of `syntax.py`, over the words of `vocabulary.py`.  A *rule
+A *rule* is one assertion -- `assert R1: forall s:sites, t:instants. occupancy(s, t) <=
+capacity(s);`, as QCCDCert writes one -- in the language of `syntax.py`, over the words of `vocabulary.py`.  A *rule
 set* picks the rules a machine (or a paper) assumes and sets their parameters.  The same
 rule set is what the compiler is given and what its output is checked against; every
 paper on the Reproduce pages is judged by its own.

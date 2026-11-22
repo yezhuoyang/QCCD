@@ -2243,10 +2243,10 @@ function tryTopology(op) {
 
 // ------------------------------------------------------------------- the text lane
 //
-// The side editor's language is a strict subset of the Python `architecture_listing`
-// already emits, so what the user types is exactly what `m.source()` prints and exactly
-// what `rebuild()` execs.  Copy the panel, paste into a .py, run it: it works.  Neither a
-// form nor a JSON editor can say that.
+// The side editor's language is the machine declarations `architecture_listing` emits
+// (QCCDCert's hardware syntax, `qccd/arch/hardware_text.py`), so what the user types is
+// exactly what `m.source()` prints and what `Machine.read(text)` reads back -- through the
+// method whitelist, never executed.  Neither a form nor a JSON editor can say that.
 //
 // It writes into the SAME `EDITS` array through the same applier, so the mouse lane and
 // the text lane can never disagree -- there is only one applier.
@@ -2256,10 +2256,10 @@ function tryTopology(op) {
 // This is not laziness -- it is the only correct answer.  JSON has ONE number type, so a
 // `call` record that reached the browser as JSON cannot tell `us=5.0` (a float, which is
 // what `CurvePoint.us` is) from `us=5` (an int, which is what `capacity` is).  Re-rendering
-// from the record therefore emits `dict(us=5, ...)` where Python emits `dict(us=5.0, ...)`,
+// from the record therefore emits `{us: 5, ...}` where Python emits `{us: 5.0, ...}`,
 // and the round trip reports a phantom edit on a line nobody touched.
 //
-// `ArchLine.text` is the exact Python Python itself emitted, and it ships already, so an
+// `ArchLine.text` is the exact text Python itself emitted, and it ships already, so an
 // untouched statement is quoted rather than reconstructed.  Statements the user typed keep
 // their float-ness for free: the parser boxes any literal written with a `.` or an
 // exponent as a `PyFloat`, which is why `render(parse(x)) === x` holds byte for byte on
@@ -2289,7 +2289,7 @@ function applySource(src) {
     var first = p.prog[0] || p.progSeed;
     return { ok: false, errors: [{ line: first.line, col: 1, text: first.text,
       message: 'this is a programme statement; it belongs in the Write pane. The ' +
-               'architecture pane takes `m.` and `d.` verbs.' }] };
+               'machine pane takes hardware declarations (site, rail, zone, class, ...).' }] };
   }
   // Compare against the TEXT the editor showed, not against a re-rendering of the
   // record: `sourceText` quotes Python's own text for untouched statements, so anything
@@ -2364,54 +2364,21 @@ function applySource(src) {
 
 // ------------------------------------------------------------------- export
 //
-// Two artifacts, both produced from the same statement list, both accepted by the real
-// toolchain.  Neither is sent anywhere: the network primitives are on `render.py`'s
-// FORBIDDEN list and the self-containment test asserts on exactly that, so the temptation
-// to POST an edit to a local helper is already a build failure -- which is right, because
-// the user rejected a local server.  The text is handed over through the clipboard and
-// through a visible textarea, both of which work from a file:// page.
-function exportPython() {
+// Neither export is sent anywhere: the network primitives are on `render.py`'s FORBIDDEN
+// list and the self-containment test asserts on exactly that.
+//
+// THE MACHINE ON THE STAGE AS A SPECIFICATION: every declaration it needs, in QCCDCert's
+// hardware syntax, which Python reads back with `Machine.read(text)`.  Built from the
+// document itself (`documentStatements`), so a topology edit lands as the sites and rails it
+// made, not as an edit to replay, and nothing on the way back is executed: each declaration
+// is one record through `qccd.arch.edit.apply_program`'s whitelist.  Handed over through the
+// clipboard and a visible textarea, both of which work from a file:// page.
+function exportSpec() {
   var bad = refuseExport('this listing');
   if (bad) throw bad;
-  // `build` edits are hoisted into `baseTexts()` at their statement position already
-  var ops = EDITS.filter(function (o) { return !o.build; });
-  var anyTopo = ops.some(function (o) { return !!o.topology; });
-  // `DeviceBuilder` is not exported from the package root, and every explicit listing
-  // opens with `d = DeviceBuilder(...)` -- so the blank page's own export died on its
-  // first line with a NameError.  Imported whenever a builder statement will be printed.
-  var anyBuild = GEOM.length > 0 || EDITS.some(function (o) { return !!o.build; });
-  var head = '# edited in the browser, from ' + A.name + '\n' +
-             '# ' + EDITS.length + ' edit(s) on top of the shipped architecture\n' +
-             (anyBuild ? 'from qccd.api import Machine, DeviceBuilder\n'
-                       : 'from qccd import Machine\n') +
-             (anyTopo ? 'import json\n' : '') + '\n';
-  var rows = baseTexts();
-
-  // IN EDIT ORDER.  Partitioning -- every command edit, then every topology edit --
-  // wrote them in an order the user never chose, so a statement naming an object that a
-  // topology edit had CREATED ran before that object existed and the exported file
-  // raised.  Two clicks reached it: delete a node, then drag a neighbour and press L,
-  // which emits `set_segment_length` on the bridge `remove_node(mend='splice')` mints
-  // -> `ValueError: no such segment 'E4.E5'`, with the browser reporting no problem.
-  // `replay()` and `Machine.apply_edits` both honour EDITS order; now so does this.
-  //
-  // A topology edit is NOT a listing statement.  It routes through
-  // `qccd.arch.edit.apply_edit`, the method whitelist whose JS mirror the parity test
-  // diffs edit by edit.  Emitting these as text would need an emitter the browser has no
-  // oracle for, so it emits the DATA and lets Python's own whitelist execute it -- and
-  // consecutive ones batch into a single call.  Nothing here is exec'd.
-  var i = 0;
-  while (i < ops.length) {
-    if (ops[i].topology) {
-      var run = [];
-      while (i < ops.length && ops[i].topology) run.push(ops[i++]);
-      rows.push('# topology edit(s), replayed through the method whitelist (never exec)');
-      rows.push("m.apply_edits(json.loads(r'''" + JSON.stringify(run) + "'''))");
-    } else {
-      rows.push(Q.render(ops[i++]));
-    }
-  }
-  return head + rows.join('\n') + '\n';
+  var stmts = Q.documentStatements(Q.serialize(STATE));
+  return '// ' + A.name + ', edited in the browser: ' + EDITS.length + ' edit(s)\n' +
+         Q.renderProgram(stmts);
 }
 
 // The list of reasons the CURRENT state could not be written to an `.arch.json`, in the
@@ -2527,7 +2494,7 @@ function paint() {
   EL.price.textContent = priceHead();
   if (EL.src && document.activeElement !== EL.src) EL.src.value = sourceText();
   // ONLY WHEN THE BOX IS ON SCREEN.  Serialising the whole document to Python or JSON is
-  // 6-7 ms of every paint on the shipped grid and ring (measured: exportPython 2.7 ms +
+  // 6-7 ms of every paint on the shipped grid and ring (measured: the export 2.7 ms +
   // exportJson 4.6 ms), and the box lives in the Architecture pane's Source view, which
   // is closed almost always -- so a drag paid for a string nobody could read.  Opening
   // that view calls `setArchView('src')`, which makes the wrapper visible and then calls
@@ -2543,7 +2510,7 @@ function paint() {
       EL.out.value = EL.outWhich === 'json' ? exportJson()
                    : EL.outWhich === 'edits' ? exportEdits()
                    : EL.outWhich === 'tsir' ? JSON.stringify(framesAsTsir(STATE.name), null, 1)
-                   : exportPython();
+                   : exportSpec();
     } catch (err) {
       EL.out.value = String(err && err.message ? err.message : err);
     }
@@ -2876,7 +2843,7 @@ function wire() {
   EL.undo = $('eUndo'); EL.redo = $('eRedo'); EL.count = $('eCount');
   EL.prob = $('eProb'); EL.notes = $('eNotes');
   EL.price = $('ePrice'); EL.src = $('eSrc');
-  EL.out = $('eOut'); EL.outWhich = 'py';
+  EL.out = $('eOut'); EL.outWhich = 'spec';
 
   EL.snap.onclick = function () { setSnap(!SNAP); unfocus(this); };
   try { var sv = STORE.getItem(SNAP_KEY); if (sv !== null) SNAP = sv === '1'; } catch (err) { /* no store */ }
@@ -7334,9 +7301,9 @@ function applyProgramSource(src) {
   if (p.errors.length || wrong) {
     // the records stand; the pane shows the failure at its line until the next parse
     PARSE_ERRS = p.errors.length ? p.errors : [{ line: wrong.line, col: 1,
-      message: JSON.stringify(wrong.method) + ' is an architecture statement; the ' +
-               'programme pane takes `p.` verbs only (have: ' +
-               Q.PROGRAM_METHODS.join(', ') + ')', text: wrong.text }];
+      message: 'this is a machine declaration; the programme pane takes instructions ' +
+               '(init, transport, shuttle, rotate, gate, readout, pump, cool, barrier, ...)',
+      text: wrong.text }];
     renderWrite();
     return { ok: false, errors: PARSE_ERRS.slice() };
   }
@@ -7350,12 +7317,12 @@ function applyProgramSource(src) {
 }
 
 // THE ENGINE'S WORDS, said for THIS pane.  The parser is shared with the architecture
-// lane, so its "must start with `m = Machine.`..." names four prefixes of which none
-// is the one the programme pane takes; and a KeyError is Python's exact `repr(x)`,
+// lane, so its "must be a hardware declaration ..." names the machine pane's words, not
+// the ones the programme pane takes; and a KeyError is Python's exact `repr(x)`,
 // which says what was not found but not where.  Reworded here, never in engine.js.
 function humanMessage(e) {
   var m = String((e && e.message) || '');
-  if (/must start with/.test(m)) {
+  if (/must be a hardware declaration/.test(m)) {
     return 'a programme statement starts with one of: init, transport, shuttle, rotate, gate, ' +
            'readout, pump, cool, barrier, decode, fill, claim (QCCDCert target code, extended)';
   }
@@ -7764,7 +7731,7 @@ function palette() {
 // `tests/shim.mjs` deliberately does NOT stub `localStorage`, and adding a stub would let
 // the design tool's most important guarantee -- your work survives -- be asserted against
 // a fake.  So the SERIALIZATION is a pure function and the storage is a three-line
-// adapter, exactly as `exportPython`/`exportJson` already are: the harness asserts the
+// adapter, exactly as `exportSpec`/`exportJson` already are: the harness asserts the
 // round-trip identity through `digest()` and never touches storage at all.
 var STORE = (function () {
   try { if (globalThis.localStorage) return globalThis.localStorage; } catch (e) { /* none */ }
@@ -10307,13 +10274,13 @@ function menuState() {
 var MOD_SPEC = {
   site: [
     { name: 'capacity', schema: 'capacity', layer: 'mutate', type: 'integer',
-      note: 'ions this trap holds · set_site_capacity' },
+      note: 'ions this trap holds · capacity S n;' },
     { name: 'x', schema: 'pos', layer: 'mutate', type: 'number', one: true, note: 'move_site' },
     { name: 'y', schema: 'pos', layer: 'mutate', type: 'number', one: true, note: 'move_site' },
     { name: 'zone', schema: 'zone_type', layer: 'builder', type: 'string',
-      note: 'what may happen here · d.site(zone=)' },
+      note: 'what may happen here · site … zone z;' },
     { name: 'labels', schema: 'labels', layer: 'builder', type: 'list',
-      note: 'space separated · d.site(labels=)' }
+      note: 'space separated · site … labels [..];' }
   ],
   junction: [
     { name: 'x', schema: 'pos', layer: 'mutate', type: 'number', one: true, note: 'move_site' },
@@ -10321,13 +10288,13 @@ var MOD_SPEC = {
   ],
   segment: [
     { name: 'length', schema: 'length', layer: 'mutate', type: 'number',
-      note: 'lattice units · set_segment_length' },
+      note: 'lattice units · length E l;' },
     { name: 'capacity', schema: 'capacity', layer: 'builder', type: 'integer',
-      note: 'ions in flight · d.segment(capacity=)' },
+      note: 'ions in flight · rail … capacity n;' },
     { name: 'loop', schema: 'loop', layer: 'builder', type: 'string',
       note: 'the orbit this rail lies on · "none" clears it' },
     { name: 'labels', schema: 'labels', layer: 'builder', type: 'list',
-      note: 'space separated · d.segment(labels=)' }
+      note: 'space separated · rail … labels [..];' }
   ],
   loop: [
     { name: 'closed', schema: 'closed', layer: 'builder', type: 'boolean',
@@ -11635,7 +11602,7 @@ var API = {
     return { nodes: nodes, segments: segs };
   },
   // text
-  source: sourceText, applySource: applySource, exportPython: exportPython,
+  source: sourceText, applySource: applySource, exportSpec: exportSpec,
   schemaErrors: schemaErrors,
   exportJson: exportJson, exportEdits: exportEdits,
   // ---- the design tool ----------------------------------------------------------

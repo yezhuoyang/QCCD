@@ -4,7 +4,7 @@ agent's `qccd_debug` tool.
     from qccd.debug import open_files
     s = open_files("chain4.arch.json", "prog.tsir.json")
     s.state(4, watch=["q0", "C0"])                 # where everything is after step 4
-    s.check("standard", 'for all s in sites, t in instants: occupancy(s, t) <= 1')
+    s.check("standard", 'forall s:sites, t:instants. occupancy(s, t) <= 1;')
     s.find('occupancy("C0", t) > 1')              # a conditional breakpoint
     s.inspect("R7", 7)                             # R7 at step 7: every case, both sides compared
     s.closest("R13")                               # the case of R13 with the least room

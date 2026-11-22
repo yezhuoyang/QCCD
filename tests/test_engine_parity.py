@@ -585,7 +585,7 @@ def _source_cases() -> list[dict]:
         arch = load(f)
         stem = f.stem.replace(".arch", "")
         for label, listing in _listing_shapes(arch, stem):
-            out.append({"name": f"src:{arch.name}:{label}", "src": listing.python()})
+            out.append({"name": f"src:{arch.name}:{label}", "src": listing.source()})
     # every escape `_lit` can emit, through a real `describe()` on a real architecture, so
     # the COMPOSITION is covered and not only the two halves -- the writer and the reader
     # named different escape sets and `render(parse(x)) === x` was the assertion that
@@ -597,7 +597,7 @@ def _source_cases() -> list[dict]:
         m = Machine(load(ARCH_FILES[0]))
         m.describe(f"A{ch}B", note=f"x{ch}y")
         out.append({"name": f"src:esc:{tag}",
-                    "src": architecture_listing(m.arch, verify=False).python()})
+                    "src": architecture_listing(m.arch, verify=False).source()})
     return out
 
 
@@ -2353,12 +2353,18 @@ def _prog_text_cases() -> list[dict]:
     programme that renders back differently is a programme the user cannot round-trip
     through the text pane, and the text pane is the only authoring surface there is.
     """
-    from qccd.api import Machine
+    from qccd.ir.target_text import call_text, parse_call
+
+    def as_read(r: dict) -> dict:
+        # the record Python's own parser reads back from Python's own text: the text says
+        # `gate MS d0,d1 @S0;` whether the record held `sites=[...]` or a positional list
+        m, a, k = parse_call(call_text(r["method"], r["args"], r["kwargs"]))
+        return {"method": m, "args": a, "kwargs": k}
 
     out = []
     arch = load(ARCH_DIR / "ring144_24v.arch.json")
     for name, records in _prog_scripts(arch) + _prog_refusals(arch):
-        out.append({"name": f"progtext:{name}", "records": records})
+        out.append({"name": f"progtext:{name}", "records": [as_read(r) for r in records]})
     return out
 
 # ---------------------------------------------------------------------- C2LR cases

@@ -11,7 +11,7 @@
 //   * a belief snapshot, taken off EDITOR.state() -- the JS editor's own model;
 //   * an edit lane, one named edit per process so a loss can be attributed to ONE edit
 //     rather than to a cumulative script;
-//   * the exports (arch json, python listing, edit record) written out for Python.
+//   * the exports (arch json, the specification, edit record) written out for Python.
 // The overlap/snap census still runs, before and after, because an edit that silently
 // breaks the picture is also a round-trip failure.
 import fs from 'fs';
@@ -394,7 +394,7 @@ out.price_blocked = pr && pr.blocked ? pr.blocked.map(function (b) { return b.ki
 // the three exports, whole -- a harness that truncates cannot tell a valid tail from a
 // missing one
 out.arch_json = ED.exportJson();
-out.python = ED.exportPython();
+out.spec = ED.exportSpec();
 out.edits_record = ED.exportEdits();
 out.source = ED.source();
 dump();

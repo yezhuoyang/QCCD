@@ -4356,7 +4356,7 @@ function _depthDelta(text) {
     var c = text[i];
     if (q) { if (c === '\\') i++; else if (c === q) q = null; continue; }
     if (c === '"' || c === "'") { q = c; continue; }
-    if (c === '#') break;
+    if (c === '#' || (c === '/' && text[i + 1] === '/')) break;
     if (c === '(' || c === '[' || c === '{') d++;
     if (c === ')' || c === ']' || c === '}') d--;
   }
@@ -4391,6 +4391,8 @@ function _parseStatement(text, line) {
   // programme is printed in; the `p.verb(...)` call form below is still accepted
   var tw = /^\s*([A-Za-z_]+)(\s|;|$)/.exec(text);
   if (tw && own(TT_KEYWORDS, tw[1])) return parseTargetStatement(text, line);
+  // a machine is written in QCCDCert's hardware declarations (`site S0[2] at (0.0, 0.0);`)
+  if (tw && own(HW_KEYWORDS, tw[1])) return parseHardwareStatement(text, line);
   var toks = tokenize(text, line), p = { toks: toks, i: 0 };
   var method = null, seed = false;
   // TWO NEW PRODUCTIONS AND NO NEW VALUE FORM.  Every literal shape a programme statement
@@ -4446,7 +4448,8 @@ function _parseStatement(text, line) {
     method = 'd.' + _expectName(p);
   } else {
     throw _perr(toks.length ? toks[0].at : { line: line, col: 1 },
-                'a statement must start with `m = Machine.`, `m.`, `d = DeviceBuilder(` or `d.`');
+                'a line must be a hardware declaration (hardware, site, junction, rail, loop, ' +
+                'zone, class, curve, control, ...) or a programme instruction');
   }
   // `m = Machine.ring(width=72, ..., template="ring144_24v")` is the TEXT `listing.py`
   // emits for a template seed, while the record it emits beside it says
@@ -4622,6 +4625,10 @@ function renderStmt(s) {
     if (ptail) pp.push(ptail);
     return 'p = m.program(' + pp.join(', ') + ')';
   }
+  // every machine record is written as a QCCDCert hardware declaration; the call form
+  // below is kept only for a record of a shape the declarations do not write
+  var hw = hwStatementText(s);
+  if (hw !== null) return hw;
   if (method === 'set_curve' || method === 'set_degree_curve') {
     var head = method === 'set_curve'
       ? 'm.set_curve(' + lit(args[0]) + ', ['
@@ -4662,6 +4669,321 @@ function renderProgram(stmts) {
   var rows = [];
   for (var i = 0; i < stmts.length; i++) rows.push(renderStmt(stmts[i]));
   return rows.join('\n') + '\n';
+}
+
+// =====================================================================================
+// 8b. A MACHINE AS QCCDCert HARDWARE DECLARATIONS -- `qccd/arch/hardware_text.py`'s twin
+// =====================================================================================
+//
+// QCCDCert writes a machine as declarations: `hardware Primer; site S[1]; path p0:S->J->G
+// channel 0 waveform 0 duration 2;`.  A studio machine is written the same way, extended
+// with what it also states: `site S0[2] at (0.0, 0.0) zone trap;`, `junction J0 at (..);`,
+// `rail E0:S0--J0 length 0.5;`, `loop L0:S0,S1 closed true kind ring;`, `zone trap
+// capacity 2 gate true;`, `class dock type shift orbit spurs;`, `curve split [ {...} ];`.
+// Each declaration is one call record, the record `applyProgram` already runs, so nothing
+// here is a new verb.  `tests/test_hardware_text.py` holds this and the Python module to
+// the same text.  The old `m.verb(...)` form is still read (`_parseStatement`).
+var HW_KEYWORD_OF = {
+  blank: 'hardware', from_template: 'hardware', blank_device: 'hardware',
+  from_device: 'hardware', DeviceBuilder: 'geometry', 'd.site': 'site',
+  'd.junction': 'junction', 'd.segment': 'rail', 'd.loop': 'loop', move_site: 'move',
+  describe: 'describe', set_zone: 'zone', set_site_capacity: 'capacity',
+  set_segment_length: 'length', set_curve: 'curve', set_degree_curve: 'curve',
+  set_primitive: 'primitive', declare_class: 'class', set_control: 'control',
+  set_wiring: 'wiring', set_heating: 'heating', set_species: 'species', set_budget: 'budget'
+};
+var _HW_PLAIN = {
+  describe: ['describe', 1], zone: ['set_zone', 1], capacity: ['set_site_capacity', 2],
+  length: ['set_segment_length', 2], primitive: ['set_primitive', 1],
+  'class': ['declare_class', 1], control: ['set_control', 0], wiring: ['set_wiring', 0],
+  heating: ['set_heating', 0], species: ['set_species', 0], budget: ['set_budget', 0]
+};
+var _HW_PLAIN_OF = {};
+(function () { for (var k in _HW_PLAIN) if (own(_HW_PLAIN, k)) _HW_PLAIN_OF[_HW_PLAIN[k][0]] = [k, _HW_PLAIN[k][1]]; })();
+var HW_KEYWORDS = {};
+(function () { for (var k in HW_KEYWORD_OF) if (own(HW_KEYWORD_OF, k)) HW_KEYWORDS[HW_KEYWORD_OF[k]] = true; })();
+var _HW_IDENT = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
+var _HW_RESERVED = { 'true': true, 'false': true, 'none': true };
+
+function _hwName(s) {
+  s = String(s);
+  return _HW_IDENT.test(s) && !own(_HW_RESERVED, s) ? s : _pyStr(s);
+}
+function _isInt(v) { return typeof v === 'number' && Number.isInteger(v); }
+function hwValue(v) {
+  if (v instanceof PyFloat) return _pyFloatRepr(v.v);
+  if (v === null || v === undefined) return 'none';
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  if (typeof v === 'string') return _hwName(v);
+  if (typeof v === 'number') return pyRepr(v);
+  if (Array.isArray(v)) return '[' + v.map(hwValue).join(', ') + ']';
+  if (typeof v === 'object') {
+    var ps = [];
+    for (var k in v) if (own(v, k)) ps.push(_hwName(k) + ': ' + hwValue(v[k]));
+    return '{' + ps.join(', ') + '}';
+  }
+  return String(v);
+}
+function _hwFields(kw, skip) {
+  var out = '';
+  for (var k in kw) if (own(kw, k) && !(skip && skip.indexOf(k) >= 0)) out += ' ' + _hwName(k) + ' ' + hwValue(kw[k]);
+  return out;
+}
+function _hwPos(p) { return '(' + p.map(hwValue).join(', ') + ')'; }
+function _hwPoints(pts) {
+  if (!pts.length) return '[]';
+  return '[\n' + pts.map(function (p) { return '    ' + hwValue(p); }).join(',\n') + '\n]';
+}
+
+// One call record as a declaration, or null for a shape the declaration form does not
+// write (that record is then shown in the call form).  `statement_text`, term for term.
+function hwStatementText(s) {
+  var method = String(s.method || ''), args = s.args || [], kw = s.kwargs || {};
+  var head;
+  if (method === 'blank' || method === 'from_template') {
+    if (args.length !== 1 || (method === 'from_template') !== own(kw, 'template') ||
+        String(args[0]) === 'geometry') return null;
+    head = own(kw, 'name') ? 'hardware ' + _hwName(kw.name) + ' ' : 'hardware ';
+    return head + 'from ' + _hwName(args[0]) + _hwFields(kw, ['name']) + ';';
+  }
+  if (method === 'blank_device' || method === 'from_device') {
+    if (args.length || (method === 'from_device') !== own(kw, 'template')) return null;
+    head = own(kw, 'name') ? 'hardware ' + _hwName(kw.name) + ' ' : 'hardware ';
+    return head + 'from geometry' + _hwFields(kw, ['name']) + ';';
+  }
+  if (method === 'DeviceBuilder') {
+    if (args.length > 1) return null;
+    return 'geometry ' + _hwName(args.length ? args[0] : 'explicit') + _hwFields(kw) + ';';
+  }
+  if (method === 'd.site') {
+    if (args.length < 2 || (own(kw, 'capacity') && !_isInt(kw.capacity))) return null;
+    var cap = unbox(kw.capacity) ? '[' + kw.capacity + ']' : '';
+    var rest = {};
+    for (var k in kw) if (own(kw, k) && (k !== 'capacity' || !unbox(kw[k]))) rest[k] = kw[k];
+    return 'site ' + _hwName(args[0]) + cap + ' at ' + _hwPos(args.slice(1)) + _hwFields(rest) + ';';
+  }
+  if (method === 'd.junction') {
+    if (args.length < 2) return null;
+    return 'junction ' + _hwName(args[0]) + ' at ' + _hwPos(args.slice(1)) + _hwFields(kw) + ';';
+  }
+  if (method === 'd.segment') {
+    if (args.length !== 3) return null;
+    return 'rail ' + _hwName(args[0]) + ':' + _hwName(args[1]) + '--' + _hwName(args[2]) + _hwFields(kw) + ';';
+  }
+  if (method === 'd.loop') {
+    if (args.length !== 2 || !Array.isArray(args[1])) return null;
+    return 'loop ' + _hwName(args[0]) + ':' + args[1].map(_hwName).join(',') + _hwFields(kw) + ';';
+  }
+  if (method === 'move_site') {
+    if (args.length < 2 || _nonEmpty(kw)) return null;
+    return 'move ' + _hwName(args[0]) + ' to ' + _hwPos(args.slice(1)) + ';';
+  }
+  if (method === 'set_curve') {
+    if (args.length !== 2 || !Array.isArray(args[1])) return null;
+    return 'curve ' + _hwName(args[0]) + ' ' + _hwPoints(args[1]) + _hwFields(kw) + ';';
+  }
+  if (method === 'set_degree_curve') {
+    if (args.length !== 3 || !_isInt(args[1]) || !Array.isArray(args[2])) return null;
+    return 'curve ' + _hwName(args[0]) + ' degree ' + args[1] + ' ' + _hwPoints(args[2]) + _hwFields(kw) + ';';
+  }
+  if (own(_HW_PLAIN_OF, method)) {
+    var word = _HW_PLAIN_OF[method][0], n = _HW_PLAIN_OF[method][1];
+    if (args.length !== n) return null;
+    return word + args.map(function (a) { return ' ' + hwValue(a); }).join('') + _hwFields(kw) + ';';
+  }
+  return null;
+}
+
+var _HW_TOKEN = /\s+|\/\/[^\n]*|"(?:[^"\\]|\\.)*"|-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*|--|->|[()\[\]{},:;@]/y;
+
+function _hwTokens(text, line) {
+  var out = [], i = 0, ln = line, col = 1;
+  while (i < text.length) {
+    _HW_TOKEN.lastIndex = i;
+    var m = _HW_TOKEN.exec(text);
+    var at = { line: ln, col: col };
+    if (!m) throw _perr(at, 'unexpected character ' + JSON.stringify(text[i]));
+    var w = m[0], c = w[0];
+    if (/^\s/.test(w) || w.slice(0, 2) === '//') {
+      // whitespace and comments
+    } else if (c === '"') {
+      var v;
+      try { v = JSON.parse(w); } catch (e) { throw _perr(at, 'bad string ' + w); }
+      out.push({ t: 'str', v: v, at: at });
+    } else if (/^-?[0-9.]/.test(w) && w !== '--' && w !== '->') {
+      out.push({ t: 'num', v: /[.eE]/.test(w) ? new PyFloat(Number(w)) : Number(w), at: at });
+    } else if (/^[A-Za-z_]/.test(w)) {
+      out.push({ t: 'name', v: w, at: at });
+    } else {
+      out.push({ t: 'op', v: w, at: at });
+    }
+    for (var j = 0; j < w.length; j++) { if (w[j] === '\n') { ln++; col = 1; } else col++; }
+    i += w.length;
+  }
+  return out;
+}
+
+function _HwP(text, line) { this.t = _hwTokens(text, line); this.i = 0; this.line = line; }
+_HwP.prototype.peek = function (k) { return this.t[this.i + (k || 0)] || null; };
+_HwP.prototype.at = function () {
+  var t = this.peek();
+  return t ? t.at : (this.t.length ? this.t[this.t.length - 1].at : { line: this.line, col: 1 });
+};
+_HwP.prototype.isOp = function (v) { var t = this.peek(); return !!t && t.t === 'op' && t.v === v; };
+_HwP.prototype.isWord = function (v) { var t = this.peek(); return !!t && t.t === 'name' && t.v === v; };
+_HwP.prototype.op = function (v) {
+  if (!this.isOp(v)) throw _perr(this.at(), "expected '" + v + "'");
+  this.i++;
+};
+_HwP.prototype.word = function (v) {
+  if (!this.isWord(v)) throw _perr(this.at(), "expected '" + v + "'");
+  this.i++;
+};
+_HwP.prototype.name = function () {
+  var t = this.peek();
+  if (t && (t.t === 'str' || (t.t === 'name' && !own(_HW_RESERVED, t.v)))) { this.i++; return t.v; }
+  throw _perr(this.at(), 'expected a name');
+};
+_HwP.prototype.value = function () {
+  var t = this.peek();
+  if (t && (t.t === 'num' || t.t === 'str')) { this.i++; return t.v; }
+  if (t && t.t === 'name') {
+    this.i++;
+    return t.v === 'true' ? true : t.v === 'false' ? false : t.v === 'none' ? null : t.v;
+  }
+  if (this.isOp('[')) {
+    this.i++;
+    var arr = [];
+    while (!this.isOp(']')) {
+      arr.push(this.value());
+      if (!this.isOp(',')) break;
+      this.i++;
+    }
+    this.op(']');
+    return arr;
+  }
+  if (this.isOp('{')) {
+    this.i++;
+    var rec = {};
+    while (!this.isOp('}')) {
+      var k = this.name();
+      this.op(':');
+      rec[k] = this.value();
+      if (!this.isOp(',')) break;
+      this.i++;
+    }
+    this.op('}');
+    return rec;
+  }
+  throw _perr(this.at(), 'expected a value');
+};
+_HwP.prototype.pos = function () {
+  this.op('(');
+  var out = [this.value()];
+  while (this.isOp(',')) { this.i++; out.push(this.value()); }
+  this.op(')');
+  return out;
+};
+_HwP.prototype.fields = function () {
+  var kw = {};
+  while (!this.isOp(';') && this.peek()) {
+    var k = this.name();
+    if (own(kw, k)) throw _perr(this.at(), 'field ' + pyRepr(k) + ' given twice');
+    kw[k] = this.value();
+  }
+  return kw;
+};
+_HwP.prototype.end = function () {
+  this.op(';');
+  if (this.peek()) throw _perr(this.at(), "one declaration per line: trailing input after ';'");
+};
+
+// One declaration -> its call record, with the lane `_parseStatement` gives the call form.
+function parseHardwareStatement(text, line) {
+  var p = new _HwP(text, line), first = p.peek();
+  if (!first || first.t !== 'name' || !own(HW_KEYWORDS, first.v)) {
+    throw _perr(p.at(), JSON.stringify(first ? String(first.v) : '') + ' is not a hardware declaration');
+  }
+  p.i++;
+  var word = first.v, method, args = [], kw, k;
+  if (word === 'hardware') {
+    var name = p.isWord('from') ? null : p.name();
+    p.word('from');
+    var gen = p.name();
+    var f = p.fields();
+    kw = {};
+    if (gen === 'geometry') {
+      method = own(f, 'template') ? 'from_device' : 'blank_device';
+      if (name !== null) kw.name = name;
+      for (k in f) if (own(f, k)) kw[k] = f[k];
+    } else {
+      method = own(f, 'template') ? 'from_template' : 'blank';
+      args = [gen];
+      // the record keeps `name` after the generator parameters, then `zones` / `template`
+      var last = method === 'blank' ? 'zones' : 'template';
+      for (k in f) if (own(f, k) && (name === null || k !== last)) kw[k] = f[k];
+      if (name !== null) {
+        kw.name = name;
+        if (own(f, last)) kw[last] = f[last];
+      }
+    }
+  } else if (word === 'geometry') {
+    method = 'DeviceBuilder'; args = [p.name()]; kw = p.fields();
+  } else if (word === 'site' || word === 'junction') {
+    method = 'd.' + word;
+    var sid = p.name(), cap = null;
+    if (word === 'site' && p.isOp('[')) {
+      p.i++;
+      var c = p.value();
+      if (!_isInt(c)) throw _perr(p.at(), "a site's capacity is a whole number");
+      cap = c;
+      p.op(']');
+    }
+    p.word('at');
+    args = [sid].concat(p.pos());
+    kw = p.fields();
+    if (cap !== null) kw.capacity = cap;
+  } else if (word === 'rail') {
+    method = 'd.segment';
+    var rid = p.name();
+    p.op(':');
+    var a = p.name();
+    p.op('--');
+    args = [rid, a, p.name()];
+    kw = p.fields();
+  } else if (word === 'loop') {
+    method = 'd.loop';
+    var lid = p.name();
+    p.op(':');
+    var nodes = [p.name()];
+    while (p.isOp(',')) { p.i++; nodes.push(p.name()); }
+    args = [lid, nodes];
+    kw = p.fields();
+  } else if (word === 'move') {
+    method = 'move_site';
+    var mid = p.name();
+    p.word('to');
+    args = [mid].concat(p.pos());
+    kw = {};
+  } else if (word === 'curve') {
+    var prim = p.name();
+    if (p.isWord('degree')) {
+      p.i++;
+      var deg = p.value();
+      if (!_isInt(deg)) throw _perr(p.at(), 'a degree is a whole number');
+      method = 'set_degree_curve'; args = [prim, deg, p.value()];
+    } else {
+      method = 'set_curve'; args = [prim, p.value()];
+    }
+    kw = p.fields();
+  } else {
+    method = _HW_PLAIN[word][0];
+    for (var n = 0; n < _HW_PLAIN[word][1]; n++) args.push(p.value());
+    kw = p.fields();
+  }
+  p.end();
+  return { method: method, args: args, kwargs: kw,
+           lane: _kindOf(method) === 'build' ? 'build' : 'arch', text: text, line: line };
 }
 
 // =====================================================================================
@@ -5685,7 +6007,9 @@ function renderProgramStmt(s) {
     } else {
       cls = _ttArg(a, kw, 0, 'cls'); moves = _ttArg(a, kw, 1, 'moves', []); mode = _ttArg(a, kw, 2, 'mode', 'inter');
     }
-    t = 'transport ' + moves.map(function (mv) { return _ttMove(mv, cls); }).join(', ');
+    // a cycle that moves no ion still names its class: `transport [shuttle];`
+    t = 'transport ' + (moves.length ? moves.map(function (mv) { return _ttMove(mv, cls); }).join(', ')
+                                     : '[' + cls + ']');
     if (mode !== 'inter') t += ' mode ' + mode;
     return t + _ttMeta(kw) + ';';
   }
@@ -5790,10 +6114,15 @@ function parseTargetStatement(text, line) {
   } else if (word === 'transport') {
     var mode = 'inter'; m2 = /\s+mode\s+(\S+)$/.exec(rest);
     if (m2) { mode = m2[1]; rest = rest.slice(0, m2.index); }
-    var parsed = _ttSplit(rest, ',').map(function (x) { return _ttMoveParse(x, line); });
-    var classes = {}; parsed.forEach(function (p) { classes[String(p.cls)] = 1; });
-    if (Object.keys(classes).length > 1) throw _ttPerr(line, 'one transport, one movement class (R4)');
-    args = [parsed[0].cls || 'shuttle', parsed.map(function (p) { return p.mv; })];
+    var empty = /^\[\s*(\S+?)\s*\]$/.exec(rest.trim());
+    if (empty) {
+      args = [empty[1], []];
+    } else {
+      var parsed = _ttSplit(rest, ',').map(function (x) { return _ttMoveParse(x, line); });
+      var classes = {}; parsed.forEach(function (p) { classes[String(p.cls)] = 1; });
+      if (Object.keys(classes).length > 1) throw _ttPerr(line, 'one transport, one movement class (R4)');
+      args = [parsed[0].cls || 'shuttle', parsed.map(function (p) { return p.mv; })];
+    }
     if (mode !== 'inter') kw.mode = mode;
   } else if (word === 'shuttle') {
     var pm = _ttMoveParse(rest, line);
@@ -7062,6 +7391,8 @@ var API = {
   templateDefault: templateDefault,
   // text surface
   parse: parse, render: renderStmt, renderProgram: renderProgram, tokenize: tokenize,
+  hwStatementText: hwStatementText, parseHardwareStatement: parseHardwareStatement,
+  HW_KEYWORDS: HW_KEYWORDS,
   // the programme lane -- authoring, lowering, and the two projections of a record list
   get PROGRAM_METHODS() { return programMethods(); },
   lowerProgram: lowerProgram, programToTsir: programToTsir, framesToTsir: framesToTsir,

@@ -21,7 +21,7 @@ from qccd.cost.models import corrected_model
 from qccd.ruleset import (FAILS, HOLDS, NOT_APPLICABLE, UNCHECKED, RuleSyntaxError, TERMS, check, load,
                           names, problems)
 from qccd.ruleset.programme import programme_execution
-from qccd.ruleset.syntax import parse, parse_formula, show
+from qccd.ruleset.syntax import parse, parse_formula, rule_text, show
 from qccd.verify import verify
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -124,20 +124,45 @@ def judge(rs, m, prog, **kw):
 # ------------------------------------------------------------------------- the language
 
 def test_a_rule_reads_as_written_and_prints_back():
-    src = ('ruleset "t"\nparam k = 2\n'
-           'rule X1 "a site holds k" \n'
-           '  about "words"\n'
-           '  for all s in sites, t in instants:\n'
-           '    occupancy(s, t) <= k   # a comment\n')
+    """A rule is written as QCCDCert writes an assertion, extended with a title and prose."""
+    src = ('ruleset "t";\nparam k = 2;\n'
+           'assert X1 "a site holds k"\n'
+           '  about "words":\n'
+           '  forall s:sites, t:instants.\n'
+           '    occupancy(s, t) <= k;   // a comment\n')
     rs = parse(src)
     r = rs.rules[0]
     assert r.id == "X1" and r.about == "words"
-    assert r.text == "for all s in sites, t in instants:\n  occupancy(s, t) <= k"
-    assert show(r.formula) == "for all s in sites, t in instants: occupancy(s, t) <= k"
-    assert show(r.formula, math=True) == "∀ s ∈ sites, t ∈ instants: occupancy(s, t) ≤ k"
+    assert r.text == "forall s:sites, t:instants.\n  occupancy(s, t) <= k"
+    assert show(r.formula) == "forall s:sites, t:instants. occupancy(s, t) <= k"
+    assert show(r.formula, math=True) == "∀ s ∈ sites, t ∈ instants. occupancy(s, t) ≤ k"
+    assert rule_text(r) == ('assert X1 "a site holds k"\n  about "words":\n'
+                            '  forall s:sites, t:instants.\n    occupancy(s, t) <= k;')
+
+
+def test_the_earlier_form_is_still_read_and_means_the_same():
+    old = parse('ruleset "t"\nparam k = 2\nrule X1 "a site holds k"\n  about "words"\n'
+                '  for all s in sites, t in instants:\n    occupancy(s, t) <= k   # a comment\n'
+                'rule X2 "y"\n  when k > 1:\n  for some i in ions: i in ions implies true\n')
+    new = parse('ruleset "t";\nparam k = 2;\nassert X1 "a site holds k"\n  about "words":\n'
+                '  forall s:sites, t:instants. occupancy(s, t) <= k;\n'
+                'assert X2 "y"\n  when k > 1:\n  exists i:ions. i in ions => true;\n')
+    for a, b in zip(old.rules, new.rules):
+        assert (a.id, a.title, a.about) == (b.id, b.title, b.about)
+        assert show(a.formula) == show(b.formula)
+        assert (a.when is None) == (b.when is None)
+    assert show(new.rules[1].formula) == "exists i:ions. i in ions => true"
+
+
+def test_an_assertion_needs_its_colon_and_semicolon():
+    with pytest.raises(RuleSyntaxError, match="expected ':'"):
+        parse('assert X1 "t" forall s:sites. true;\n')
+    with pytest.raises(RuleSyntaxError, match="expected ';'"):
+        parse('assert X1 "t": forall s:sites. true\nassert X2: true;\n')
 
 
 @pytest.mark.parametrize("text, where", [
+    ("forall s:sites occupancy(s, t)", "expected '.'"),
     ("for all s in sites occupancy(s, t)", "expected ':'"),
     ("for all s in : true", "expected a value"),
     ("count(x in ions where )", "expected a value"),

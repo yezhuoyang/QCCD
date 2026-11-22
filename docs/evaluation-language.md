@@ -4,13 +4,17 @@ Every number a design is judged by is a term of a language, written as text, and
 an interpreter of that text. Python reads it in `qccd/evalset/` (the grader, the workspace, the
 site); the browser reads the same text in `qccd/viz/js/evaluate.js` (every studio page):
 
+Every item is written as QCCDCert writes its programs, a keyword and its fields ended by `;`, and
+its assertions as QCCDCert writes one (`assert name: formula;`); the earlier form (`require`,
+`after g in D:`, no `;`) is still read.
+
 * a **metric** is a named term over the run (`metric T "Execution time" unit "ms" better low
-  = time(final()) / 1000`), optionally on a `clock` of its own (`T_jones`, `T_transport`,
+  = time(final()) / 1000;`), optionally on a `clock` of its own (`T_jones`, `T_transport`,
   `T_quantinuum` replay the programme under that operating-point table);
-* a **requirement** is a formula a design must satisfy to be ranked (`require B1 "The wiring
-  fits the DAC budget" max_dacs = none or dacs <= max_dacs`);
+* a **requirement** is an assertion a design must satisfy to be ranked (`assert B1 "The wiring
+  fits the DAC budget": max_dacs = none or dacs <= max_dacs;`);
 * a **channel** says which Pauli error goes where in the circuit a run becomes
-  (`after g in two_qubit_gates: DEPOLARIZE2(min(15 / 16, ms_error(...))) on ions(g)`), and
+  (`after g:two_qubit_gates. DEPOLARIZE2(min(15 / 16, ms_error(...))) on ions(g);`), and
   which budget line(s) its expected faults are booked under (`counted as ms_base = ...,
   ms_heating = ..., ms_chain = ...`, split in proportion to the terms);
 * `param`, `define` (named terms, with arguments), `include`, `clock` (the operating-point

@@ -402,7 +402,7 @@ theorem apart_breaks_R6b (p : Programme) (g : GateAt) (a b : String)
 /-!
 A statement about every element of an empty list is true, because there is no element to
 check: "every gate fires where it may" holds of a programme with no gate. That is not a trick
-of Lean; it is what "every" means, and the platform's evaluator reads `for all` the same way.
+of Lean; it is what "every" means, and the platform's evaluator reads `forall` the same way.
 
 #### Exercise 7 (★★) `no_gates`
 A programme with no gate keeps R6 and R6b. (`simp [R6, R6b, h]`.)

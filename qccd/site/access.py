@@ -46,7 +46,7 @@ def without_unpublished(markdown: str) -> str:
 # formula without them, and its account without the sentences about layers.  The checker
 # evaluates the rule as it is written (qccd/ruleset/library/catalogue.rules).
 UNPUBLISHED_WORDS = frozenset({"upright", "same_broadcast"})
-_PLANAR = ((re.compile(r"\(for all r in rails: upright\(r\)\)\s*and\s+"), ""),
+_PLANAR = ((re.compile(r"\(forall r:rails\. upright\(r\)\)\s*and\s+"), ""),
            (re.compile(r"\s+and same_broadcast\(a, b\)"), ""))
 
 

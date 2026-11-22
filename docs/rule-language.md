@@ -17,17 +17,22 @@ not be told which to obey.  Now:
 
 ## A rule
 
-    rule R1 "A site holds at most its capacity" core
+    assert R1 "A site holds at most its capacity" core
       about "An ion standing in a site, or passing through it, takes one of its places."
-      source "deck_v3; arXiv:2004.04706"
-      for all s in sites, t in instants:
-        occupancy(s, t) <= capacity(s)
+      source "deck_v3; arXiv:2004.04706":
+      forall s:sites, t:instants.
+        occupancy(s, t) <= capacity(s);
 
-`for all x in D where C: B`, `for some ...`, `and`, `or`, `not`, `implies`, comparisons,
-`in`, arithmetic, `count(x in D where C)`, `sum/max/min(e for x in D where C)`,
-`{e for x in D where C}` and `size(S)`, `all_different(e for x in D)`.  A quoted name stands
-for the site or ion of that name (`position(i, t) != "C3"`).  `when C:` before the formula
-is a precondition: when it is false the rule *does not apply*, which is reported as such.
+A rule is written as QCCDCert writes an assertion, `assert name: formula;`, with a title,
+`core`, `about`, `source` and `when` between the name and the colon.  QCCDCert's
+`forall x:D. B`, `exists x:D. B`, `and`, `or`, `not`, `=>` and comparisons, extended with
+`where C` on a quantifier, `in`, arithmetic, `count(x:D where C)`,
+`sum/max/min(e for x:D where C)`, `{e for x:D where C}` and `size(S)`,
+`all_different(e for x:D)`.  A quoted name stands for the site or ion of that name
+(`position(i, t) != "C3"`).  `when C` before the colon is a precondition: when it is false the
+rule *does not apply*, which is reported as such.  Header items (`ruleset`, `title`, `use`,
+`param`, ...) end with `;`.  The earlier form (`rule R1 "..."`, `for all s in sites: ...`,
+`implies`) is still read; nothing is written in it.
 
 Verdicts: **holds**, **fails** (with the number of counterexamples and the first few, each
 naming the values that make the formula false), **does not apply** (with why: a word the
@@ -101,12 +106,12 @@ Test on this board), or `qccd submit --local --board <b> --rules <name or file>`
 workspace's own `.rules` files (top level or `rules/`).  A set written for a design usually starts
 from the board's:
 
-    ruleset "two-layer"
-    title "Two stacked junction layers"
-    include "standard"
-    drop R19, R20, R21
-    rule L19 "A junction joins at most six rails"
-      for all n in nodes: degree(n) <= 6
+    ruleset "two-layer";
+    title "Two stacked junction layers";
+    include "standard";
+    drop R19, R20, R21;
+    assert L19 "A junction joins at most six rails":
+      forall n:nodes. degree(n) <= 6;
 
 The bundle carries it written out whole (`rules.json`, `qccd.ruleset.declared.rules_doc`), and
 the grader reads it with `load_declared`: `include` names only a shipped set, never a path; the

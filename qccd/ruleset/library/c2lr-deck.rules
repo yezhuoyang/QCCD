@@ -4,10 +4,10 @@
 # the two crystals of a leg are pulsed one position at a time.  `c2lr-demonstrated` itself is left
 # as it is, since the C2LR boards judge by it.
 
-ruleset "c2lr-deck"
-title "C2LR swap-or-stay, as the deck writes it for Goal 3"
-about "The demonstrated C2LR rules (every junction runs the same single diagonal in a step), and a laser step reaches one chain position: where a leg holds two crystals, a pulse reaches the ones at the same position in every leg it plays in."
+ruleset "c2lr-deck";
+title "C2LR swap-or-stay, as the deck writes it for Goal 3";
+about "The demonstrated C2LR rules (every junction runs the same single diagonal in a step), and a laser step reaches one chain position: where a leg holds two crystals, a pulse reaches the ones at the same position in every leg it plays in.";
 
-include "c2lr-demonstrated"
+include "c2lr-demonstrated";
 
-use R34
+use R34;

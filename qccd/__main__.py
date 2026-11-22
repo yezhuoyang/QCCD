@@ -133,14 +133,14 @@ def cmd_arch(args) -> int:
                                    encoding="utf-8")
         print(f"wrote {args.json}")
         return 0
-    if args.python:
-        print(listing.python())
+    if args.source:
+        print(listing.source(), end="")
     else:
         print(listing.text(notes=not args.no_notes, numbers=args.numbers,
                            width=args.width))
     if args.verify:
         ok = listing.round_trip
-        print(f"# round-trip {'verified' if ok else 'FAILED'}"
+        print(f"// round-trip {'verified' if ok else 'FAILED'}"
               + ("" if ok else ": " + "; ".join(listing.round_trip_diff[:4])))
         return 0 if ok else 1
     if args.at:
@@ -941,8 +941,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_arch.add_argument("--mode", default="full",
                         choices=["auto", "full", "generator", "patch", "explicit"],
                         help="'full' is self-contained; 'auto' emits against a template")
-    p_arch.add_argument("--python", action="store_true",
-                        help="only the executable statements, no annotations")
+    p_arch.add_argument("--source", action="store_true",
+                        help="only the declarations, no annotations (Machine.read reads it back)")
     p_arch.add_argument("--no-notes", action="store_true")
     p_arch.add_argument("--numbers", action="store_true", help="number physical lines")
     p_arch.add_argument("--width", type=int, default=100,

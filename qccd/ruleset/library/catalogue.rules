@@ -5,101 +5,101 @@
 # The words a rule may use -- sites, occupancy, simultaneous, ... -- are defined on the
 # Rules page, with how each is read off a programme and off a paper's timed schedule.
 
-ruleset "catalogue"
-title "Every rule"
+ruleset "catalogue";
+title "Every rule";
 
-param max_chain = 15
-param serial_kinds = {"gate2", "split", "merge"}
+param max_chain = 15;
+param serial_kinds = {"gate2", "split", "merge"};
 # how a C2LR swap-or-stay step may pair its legs (C6): "diagonal" was demonstrated,
 # "checkerboard" is the proposal's and assumed
-param c2lr_forms = {"diagonal", "checkerboard"}
+param c2lr_forms = {"diagonal", "checkerboard"};
 
 # ---------------------------------------------------------------- what every model shares
 
-rule R0 "Every operation finds its ions where it says they are" core
-  about "Each operation names its ions and where they are; replaying the execution from the start must find them there, and every ion must end it standing in a site."
+assert R0 "Every operation finds its ions where it says they are" core
+  about "Each operation names its ions and where they are; replaying the execution from the start must find them there, and every ion must end it standing in a site.":
   setup_ok()
-  and (for all o in operations: well_formed(o) and found(o))
-  and (for all i in ions: position(i, final()) != none)
+  and (forall o:operations. well_formed(o) and found(o))
+  and (forall i:ions. position(i, final()) != none);
 
-rule R1 "A site holds at most its capacity" core
+assert R1 "A site holds at most its capacity" core
   about "An ion standing in a site, or passing through it, takes one of its places."
-  source "deck_v3; arXiv:2004.04706; arXiv:2511.15910"
-  for all s in sites, t in instants:
-    occupancy(s, t) <= capacity(s)
+  source "deck_v3; arXiv:2004.04706; arXiv:2511.15910":
+  forall s:sites, t:instants.
+    occupancy(s, t) <= capacity(s);
 
-rule R8 "An ion does one thing at a time" core
+assert R8 "An ion does one thing at a time" core
   about "No ion takes part in two operations at once: it cannot be gated in one place while it is carried to another."
-  source "deck_v3"
-  for all a, b in operations where a != b and simultaneous(a, b):
-    disjoint(ions(a), ions(b))
+  source "deck_v3":
+  forall a, b:operations where a != b and simultaneous(a, b).
+    disjoint(ions(a), ions(b));
 
-rule R24 "Every two-qubit gate of the circuit is performed, and no other" core
-  about "Each two-qubit gate of the input circuit is carried out, and the execution performs no two-qubit gate the circuit does not ask for."
-  (for all c in circuit_ops where needs_gate(c): gate_count(c) >= 1)
-  and (for all g in two_qubit_gates: serves_circuit(g))
+assert R24 "Every two-qubit gate of the circuit is performed, and no other" core
+  about "Each two-qubit gate of the input circuit is carried out, and the execution performs no two-qubit gate the circuit does not ask for.":
+  (forall c:circuit_ops where needs_gate(c). gate_count(c) >= 1)
+  and (forall g:two_qubit_gates. serves_circuit(g));
 
 # ---------------------------------------------------------------- transport
 
-rule R2 "A junction holds one ion at a time"
+assert R2 "A junction holds one ion at a time"
   about "Where three or more rails meet, only one ion may be at any moment, resting or passing through. An ion here is a qubit ion with the coolant ion that shares its well: a qubit-coolant pair crosses a junction as one crystal, as the Ba-Yb pair does through an X-junction. Two qubit ions in one junction at once is what the rule refuses -- except during a swap-or-stay exchange on a C2LR machine, where the shared junction waveform exchanges the two wells nearest it by design, and the routes are the machine's own matching, never the programme's; and during a WISE swap step, whose pairs the replay finds are the machine's own."
-  source "deck_v3; arXiv:2510.23519; arXiv:2206.11888; arXiv:2403.00756"
-  for all j in junctions, t in instants where not exchange(t):
-    occupancy(j, t) <= 1
+  source "deck_v3; arXiv:2510.23519; arXiv:2206.11888; arXiv:2403.00756":
+  forall j:junctions, t:instants where not exchange(t).
+    occupancy(j, t) <= 1;
 
-rule R3 "A rail carries at most its capacity"
+assert R3 "A rail carries at most its capacity"
   about "No more ions travel along one rail at once than the rail is built for (one, on most machines). A swap-or-stay exchange on a C2LR machine carries its two crystals along the junction's two rails by design, and so does a WISE swap step its pair's; neither is judged here."
-  source "deck_v3; arXiv:2510.23519"
-  for all r in rails, t in instants where not exchange(t):
-    occupancy(r, t) <= capacity(r)
+  source "deck_v3; arXiv:2510.23519":
+  forall r:rails, t:instants where not exchange(t).
+    occupancy(r, t) <= capacity(r);
 
-rule R4 "Every transport step uses a movement the machine declares"
+assert R4 "Every transport step uses a movement the machine declares"
   about "A step's motion is one of the movement classes the machine's control system is built to produce."
-  source "deck_v3; arXiv:2504.17886"
-  for all k in steps where is_transport(k): class_declared(k)
+  source "deck_v3; arXiv:2504.17886":
+  forall k:steps where is_transport(k). class_declared(k);
 
-rule R4d "The control channels can drive every transport step"
+assert R4d "The control channels can drive every transport step"
   about "One channel carries one waveform: every ion a channel moves must move the same way, and a site may sit a step out only if it has its own switch."
-  source "deck_v3; arXiv:2403.00756; arXiv:2305.03828"
-  for all k in steps where is_transport(k): drivable(k)
+  source "deck_v3; arXiv:2403.00756; arXiv:2305.03828":
+  forall k:steps where is_transport(k). drivable(k);
 
-rule R4b "A step either moves ions or gates them, never both"
+assert R4b "A step either moves ions or gates them, never both"
   about "Moving ions within traps and between them use different control pathways, and neither runs alongside gates."
-  source "arXiv:2504.17886"
-  for all k in steps where is_transport(k):
-    mode(k) in {"intra", "inter"} and not carries_gates(k)
+  source "arXiv:2504.17886":
+  forall k:steps where is_transport(k).
+    mode(k) in {"intra", "inter"} and not carries_gates(k);
 
-rule R5 "No two ions pass each other on a rail in one step"
+assert R5 "No two ions pass each other on a rail in one step"
   about "Within one step, two ions may not travel the same rail in opposite directions, one from each end: an ion rides the rail's RF null, a single line, so the two would have to pass through each other. Exchanging two ions inside one trap by rotating their crystal is a different operation, the ion swap, and this rule does not concern it; nor does a swap-or-stay exchange on a C2LR machine, whose two crystals pass each other through the junction's shared waveform by design, nor a WISE swap step, whose pair exchanges through its switched swap."
-  source "deck_v3"
-  for all a, b in hops where simultaneous(a, b) and rail(a) = rail(b) and not exchange(a):
-    not (from(a) = to(b) and to(a) = from(b))
+  source "deck_v3":
+  forall a, b:hops where simultaneous(a, b) and rail(a) = rail(b) and not exchange(a).
+    not (from(a) = to(b) and to(a) = from(b));
 
-rule R11 "Along a loop, every ion moves the same way in a step"
+assert R11 "Along a loop, every ion moves the same way in a step"
   about "Transport along one loop is one direction at a time; and every junction's crossing time is declared by the machine (a junction of five or six rails the machine does not price crosses at the X-junction's time and heat, since no table measures one)."
-  source "arXiv:2511.15910"
-  (for all a, b in hops where simultaneous(a, b) and loop(a) = loop(b) and loop(a) != none:
+  source "arXiv:2511.15910":
+  (forall a, b:hops where simultaneous(a, b) and loop(a) = loop(b) and loop(a) != none.
      shift(a) = shift(b))
-  and (for all j in junctions: priced(j))
+  and (forall j:junctions. priced(j));
 
-rule R14 "A split takes the ion at the end of its chain, or pays to reorder"
+assert R14 "A split takes the ion at the end of its chain, or pays to reorder"
   about "An ion leaves its chain from the end that faces the rail; an ion further in must first be swapped to that end, which costs gates."
-  source "arXiv:2510.23519"
-  for all m in splits: at_chain_end(m) or swap_paid(m)
+  source "arXiv:2510.23519":
+  forall m:splits. at_chain_end(m) or swap_paid(m);
 
-rule R22 "A transport step is one waveform"
+assert R22 "A transport step is one waveform"
   about "Under broadcast control every ion that moves in a step performs the exact same motion; a site may sit the step out, never do something else. On a machine built in layers each layer has a broadcast of its own, so the rule holds layer by layer: ions moving in different layers may do different things in one step. A swap-or-stay step on a C2LR machine is one shared waveform by construction -- each crystal's only choice is its direction bit -- so the different routes its crystals take are not judged here (C2, C4 are its rules); nor are a WISE swap step's two directions, one pair kind and parity across the machine (W2)."
   source "collaborator review 2026-09; arXiv:2510.23519; arXiv:2305.12773"
   when control() != "direct":
-  for all a, b in transport where simultaneous(a, b) and same_broadcast(a, b) and not exchange(a):
-    motion(a) = motion(b)
+  forall a, b:transport where simultaneous(a, b) and same_broadcast(a, b) and not exchange(a).
+    motion(a) = motion(b);
 
-rule R23 "A junction is crossed, not rested on"
+assert R23 "A junction is crossed, not rested on"
   about "No ion stops where three or more rails meet while the traps elsewhere have room for every ion. A slot of a loop or rail the programme moves as a whole is part of a conveyor, and is not such a stop."
   source "reader report 2026-09; deck_v3; arXiv:2510.23519"
-  when count(ions) <= sum(min(capacity(s), max_chain) for s in sites where s not in junctions):
-  for all i in ions, t in instants:
-    position(i, t) in junctions implies rotated(position(i, t))
+  when count(ions) <= sum(min(capacity(s), max_chain) for s:sites where s not in junctions):
+  forall i:ions, t:instants.
+    position(i, t) in junctions => rotated(position(i, t));
 
 # ---------------------------------------------------------------- C2LR swap-or-stay transport
 #
@@ -108,334 +108,334 @@ rule R23 "A junction is crossed, not rested on"
 # rule applies only to such a device.  C3, C4 and C9 hold by construction of the replay, C8 is
 # recorded rather than decided, and the checkerboard steps C6 allows are assumed.
 
-rule C1 "A leg holds one crystal, or two between an enter and its exit"
+assert C1 "A leg holds one crystal, or two between an enter and its exit"
   about "A leg holds one crystal. It holds two only after a swap-or-stay step moved a crystal toward a junction into a partner leg whose crystal stayed (an enter), and until that crystal leaves again by the same step type it entered by (its exit): the crystal that entered is the one that leaves, and no other step type takes it out."
   source "arXiv:2403.00756"
   when c2lr_device():
-  (for all s in legs, t in instants: occupancy(s, t) <= 1 or entered(s, t))
-  and (for all k in steps: exits_as_entered(k))
+  (forall s:legs, t:instants. occupancy(s, t) <= 1 or entered(s, t))
+  and (forall k:steps. exits_as_entered(k));
 
-rule C2 "A C2LR step's only per-leg choice is its direction bit"
+assert C2 "A C2LR step's only per-leg choice is its direction bit"
   about "Every crystal shifts toward its pair's junction or away from it, and that is all a step chooses per leg: the step names the crystals shifted toward and nothing else, and its routes are the machine's matching. A step of a C2LR class that writes its own routes is refused."
   source "arXiv:2403.00756"
   when c2lr_device():
-  for all k in steps where is_transport(k): bits_only(k)
+  forall k:steps where is_transport(k). bits_only(k);
 
-rule C3 "Horizontal and vertical legs choose independently"
+assert C3 "Horizontal and vertical legs choose independently"
   about "In one step a crystal on a horizontal leg and one on a vertical leg set their direction bits independently: the step carries one bit per crystal and nothing per axis."
   source "arXiv:2403.00756"
   when c2lr_device():
-  for all k in steps where exchange(k): independent_axes(k)
+  forall k:steps where exchange(k). independent_axes(k);
 
-rule C4 "A step is C2LR, one shared waveform, C2LR back"
+assert C4 "A step is C2LR, one shared waveform, C2LR back"
   about "Every crystal shifts by its bit, one junction waveform shared by every junction exchanges the two wells nearest each junction in play, and the shift is undone: one waveform, whose time is the step's however many crystals move."
   source "arXiv:2403.00756"
   when c2lr_device():
-  for all k in steps where exchange(k): one_waveform(k)
+  forall k:steps where exchange(k). one_waveform(k);
 
-rule C5 "Every crystal ends a step at a leg centre"
+assert C5 "Every crystal ends a step at a leg centre"
   about "After every step each crystal rests at the centre of a leg; a C2LR machine has nowhere else to hold one."
   source "arXiv:2403.00756"
   when c2lr_device():
-  for all i in ions, t in instants where position(i, t) != none:
-    position(i, t) in legs
+  forall i:ions, t:instants where position(i, t) != none.
+    position(i, t) in legs;
 
-rule C6 "A step pairs legs by the machine's matching"
+assert C6 "A step pairs legs by the machine's matching"
   about "A swap-or-stay step pairs every leg with at most one other, at one junction, by one variation of the machine: the same diagonal at every junction (W-S, W-N, E-S or E-N, all four demonstrated; one of the four in a step, never two), or two pairs at the junctions of one checkerboard colour (the proposal's, not demonstrated, so assumed). A crystal shifted toward a junction has a partner leg there, the machine offers the variation, and the rule set allows its form (c2lr_forms)."
   source "arXiv:2403.00756"
   when c2lr_device():
-  for all k in steps where exchange(k): matched(k) and form(k) in c2lr_forms
+  forall k:steps where exchange(k). matched(k) and form(k) in c2lr_forms;
 
-rule C7 "No crystal ends a step in a junction"
+assert C7 "No crystal ends a step in a junction"
   about "A crystal crosses a junction inside a step and never rests on one: where three or more rails meet, nothing is left standing when a step ends."
   source "arXiv:2403.00756"
   when c2lr_device():
-  for all i in ions, t in instants: position(i, t) not in junctions
+  forall i:ions, t:instants. position(i, t) not in junctions;
 
-rule C8 "The trap frequency is held during a shift"
+assert C8 "The trap frequency is held during a shift"
   about "The C2LR shift moves a crystal by a sixth of the leg while holding its centre-of-mass frequency (1.85 MHz for Ba-Sr, 1.4 MHz for Yb-Ba). It is a property of the step's waveform, recorded with its primitive rather than decided from a programme."
   source "arXiv:2403.00756"
   when c2lr_device():
-  com_frequency_held()
+  com_frequency_held();
 
-rule C9 "Every crystal is heated by every waveform"
+assert C9 "Every crystal is heated by every waveform"
   about "The shared waveforms play on every leg, so a step heats every crystal on the machine: one that moved by the step's swap heat, every other by its stay heat. A crystal that sat a step out is not cold."
   source "arXiv:2403.00756"
   when c2lr_device() and models_heating():
-  for all k in steps where c2lr_step(k): heats_every_crystal(k)
+  forall k:steps where c2lr_step(k). heats_every_crystal(k);
 
-rule C10 "Control is shared signals plus one input and one switch per leg"
+assert C10 "Control is shared signals plus one input and one switch per leg"
   about "A C2LR machine is driven by a fixed set of shared analog signals (27 in the paper), plus one digital input and one switch per leg: its document says so, and its drawing is the lattice of legs they drive."
   source "arXiv:2403.00756"
   when control() = "c2lr":
-  c2lr_wiring()
+  c2lr_wiring();
 
 # ---------------------------------------------------------------- WISE
 #
 # A chip of cells, one junction zone and h gate zones each, sorted by parallel switched swaps
 # (arXiv:2305.12773), as the team's transport deck writes it.  Each rule applies only to such a device.
 
-rule W1 "A zone holds one qubit, except for a gate"
+assert W1 "A zone holds one qubit, except for a gate"
   about "The trap is split into zones. A reconfiguration holds one qubit per zone: a swap step exchanges the two ions of a pair inside the step. Two qubits share a zone after a step only because it merged them for a gate, and they split again before anything else happens there. (S1)"
   source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S1"
   when wise_device():
-  for all k in steps: pairs_only_to_gate_or_split(k)
+  forall k:steps. pairs_only_to_gate_or_split(k);
 
-rule W2 "A swap step pairs zones by the chip's parity"
+assert W2 "A swap step pairs zones by the chip's parity"
   about "Every zone is odd or even, and zones of one parity class share their DACs. So a step's pairs are all of one parity: the same waveform plays on all of them. WISE needs this because two swap partners must play different waveforms. (S2)"
   source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S2"
   when wise_device():
-  for all k in steps where is_transport(k): one_parity(k)
+  forall k:steps where is_transport(k). one_parity(k);
 
-rule W4 "One kind of operation runs across the chip in a step"
+assert W4 "One kind of operation runs across the chip in a step"
   about "Only one kind of operation (swap, split, merge or gate) runs across the chip in a step; different kinds run one after another. A design choice that keeps the DAC count fixed, not a hardware limit. Transport's half is W2; a gate's is W10's. (S4)"
   source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S4"
   when wise_device():
-  for all k in steps where is_transport(k): mode(k) = "inter" and not carries_gates(k)
+  forall k:steps where is_transport(k). mode(k) = "inter" and not carries_gates(k);
 
-rule W10 "A gate layer is one gate at one angle"
+assert W10 "A gate layer is one gate at one angle"
   about "The circuit is broken into a few basis gates and run as layers, one gate kind across the chip per layer. A frame change is not a pulse, so it is free of this. Many traps may gate at once, but all must run the same gate. (S10)"
   source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S10"
   when wise_device():
-  for all k in steps: one_kind(k)
+  forall k:steps. one_kind(k);
 
-rule W11 "Every layer pays for its shims first"
+assert W11 "Every layer pays for its shims first"
   about "Shim voltages are set before each reconfiguration or gate layer and held fixed throughout it: 128 shims at 3 us each. A gate, readout or reset carries the charge in its price, and a reconfiguration opens with a layer that charges them and plays no pulse. (S11)"
   source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S11 and T4"
   when wise_device():
-  shims_in_every_layer() and (for all k in steps: shim_opens(k))
+  shims_in_every_layer() and (forall k:steps. shim_opens(k));
 
 # ---------------------------------------------------------------- Cyclone
 #
 # One ring of traps, the data still and the ancillas rotating in lockstep (arXiv:2511.15910), as the
 # team's transport deck writes it.  Each rule applies only to such a device.
 
-rule Y1 "The machine is one ring"
+assert Y1 "The machine is one ring"
   about "Traps sit on one closed ring, with L-shaped junctions only at its corners and no X or T junctions. Split loops were rejected: HGP and BB stabilizers share data across any cut. (S1, S9, HW2)"
   source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone S1, S9 and HW2"
   when cyclone_device():
-  ring_device()
+  ring_device();
 
-rule Y2 "Data stays, ancillas move"
+assert Y2 "Data stays, ancillas move"
   about "Data qubits are spread evenly and never move; only ancillas travel. (S2)"
   source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone S2"
   when cyclone_device():
-  for all k in steps where is_transport(k): data_stays(k)
+  forall k:steps where is_transport(k). data_stays(k);
 
-rule Y3 "Every ancilla moves in lockstep"
+assert Y3 "Every ancilla moves in lockstep"
   about "All ancillas move together, one way round, one trap per step, so there are no roadblocks or rebalances. (S3)"
   source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone S3"
   when cyclone_device():
-  for all k in steps where is_transport(k): lockstep(k)
+  forall k:steps where is_transport(k). lockstep(k);
 
-rule Y4 "A trap holds at most 30 ions"
+assert Y4 "A trap holds at most 30 ions"
   about "Traps hold up to n ions each, and n is at most 30 in QCCD Studio. (HW1)"
   source "QCCD Transport Architectures deck, Cyclone HW1"
   when cyclone_device():
-  traps_within_thirty()
+  traps_within_thirty();
 
 # ---------------------------------------------------------------- Helios
 
-rule HL1 "Helios has one ring, one X junction and eight operation zones"
+assert HL1 "Helios has one ring, one X junction and eight operation zones"
   about "The published Helios functional floorplan is an 82-qubit rotatable storage ring joined through one four-way junction to upper and lower cache, logic and leg-storage paths. Eight operation zones process the other 16 qubits."
   source "arXiv:2511.05465 Fig. 2 and Sec. II A"
   when helios_device():
-  helios_topology()
+  helios_topology();
 
-rule HL2 "Eight operation zones process at most sixteen qubits"
+assert HL2 "Eight operation zones process at most sixteen qubits"
   about "Each of Helios's eight high-fidelity operation zones holds two qubits, so one logic batch contains at most sixteen."
   source "arXiv:2511.05465 Sec. II A"
   when helios_device():
-  helios_logic_capacity()
+  helios_logic_capacity();
 
-rule HL3 "Logic stays in the operation region"
+assert HL3 "Logic stays in the operation region"
   about "Gates, state preparation and measurement are available only in the eight operation zones. Ring storage, cache and leg storage provide transport and sympathetic cooling, not logic."
   source "arXiv:2511.05465 Sec. II A"
   when helios_device():
-  helios_region_abilities()
+  helios_region_abilities();
 
-rule HL4 "The storage ring rotates under broadcast control"
+assert HL4 "The storage ring rotates under broadcast control"
   about "Helios may rotate its storage ring in either direction to bring a selected crystal to the cache; the repeating triplet voltage pattern is shared across memory regions."
   source "arXiv:2511.05465 Fig. 2 and Sec. II A"
   when helios_device():
-  helios_ring_control()
+  helios_ring_control();
 
 # ---------------------------------------------------------------- gates and their places
 
-rule R6 "Each operation runs only where the site is equipped for it"
+assert R6 "Each operation runs only where the site is equipped for it"
   about "Gates only in sites with a gate laser, measurement and reset only where there is readout, cooling only where there is a cooling beam."
-  source "deck_v3; arXiv:2504.17886"
-  (for all g in gates: can(site(g), "gate"))
-  and (for all o in operations where kind(o) in {"measure", "reset"}: can(site(o), "spam"))
-  and (for all c in coolings, i in ions(c): can(position(i, start(c)), "cool"))
+  source "deck_v3; arXiv:2504.17886":
+  (forall g:gates. can(site(g), "gate"))
+  and (forall o:operations where kind(o) in {"measure", "reset"}. can(site(o), "spam"))
+  and (forall c:coolings, i:ions(c). can(position(i, start(c)), "cool"));
 
-rule R6b "A two-ion gate acts on two ions standing in one site"
+assert R6b "A two-ion gate acts on two ions standing in one site"
   about "Both ions of a two-qubit gate are in the same trap when it starts, and in the trap the programme names for it, if it names one."
-  source "arXiv:2504.17886"
-  (for all g in two_qubit_gates, i in ions(g): position(i, start(g)) = site(g))
-  and (for all g in two_qubit_gates where size(declared_sites(g)) > 0:
-         site(g) in declared_sites(g))
+  source "arXiv:2504.17886":
+  (forall g:two_qubit_gates, i:ions(g). position(i, start(g)) = site(g))
+  and (forall g:two_qubit_gates where size(declared_sites(g)) > 0.
+         site(g) in declared_sites(g));
 
-rule R12 "One gate at a time in a trap"
+assert R12 "One gate at a time in a trap"
   about "A trap's laser serves one gate at a time; different traps may gate together."
-  source "arXiv:2511.15910; arXiv:2004.04706"
-  for all a, b in gates where a != b and simultaneous(a, b):
-    site(a) != site(b)
+  source "arXiv:2511.15910; arXiv:2004.04706":
+  forall a, b:gates where a != b and simultaneous(a, b).
+    site(a) != site(b);
 
-rule R13 "A gate's chain holds at most max_chain ions"
+assert R13 "A gate's chain holds at most max_chain ions"
   about "A gate in a chain longer than about fifteen ions is slow and poor, so no gate starts in a site holding more."
-  source "arXiv:2511.15910; arXiv:2004.04706"
-  for all g in gates: occupancy(site(g), start(g)) <= max_chain
+  source "arXiv:2511.15910; arXiv:2004.04706":
+  forall g:gates. occupancy(site(g), start(g)) <= max_chain;
 
-rule R27 "One operation at a time in a trap"
-  about "The operations of the kinds listed in serial_kinds hold their trap: two of them in one trap never overlap in time."
-  for all a, b in operations where a != b and kind(a) in serial_kinds and kind(b) in serial_kinds
-      and site(a) = site(b) and site(a) != none:
-    not simultaneous(a, b)
+assert R27 "One operation at a time in a trap"
+  about "The operations of the kinds listed in serial_kinds hold their trap: two of them in one trap never overlap in time.":
+  forall a, b:operations where a != b and kind(a) in serial_kinds and kind(b) in serial_kinds
+      and site(a) = site(b) and site(a) != none.
+    not simultaneous(a, b);
 
-rule R32 "Single-ion operations run only in the zones the model allows"
-  about "Rotations, preparation and measurement happen only in the zones listed in single_ion_zones."
-  for all o in operations where kind(o) in {"gate1", "reset", "measure"}:
-    zone(site(o)) in single_ion_zones
+assert R32 "Single-ion operations run only in the zones the model allows"
+  about "Rotations, preparation and measurement happen only in the zones listed in single_ion_zones.":
+  forall o:operations where kind(o) in {"gate1", "reset", "measure"}.
+    zone(site(o)) in single_ion_zones;
 
-rule R33 "A two-ion gate acts on ions in one zone or in neighbouring zones"
-  about "On machines whose gate spans two zones of one rail, the two ions stand in the same zone or in zones next to each other."
-  for all g in two_qubit_gates, i, j in ions(g):
+assert R33 "A two-ion gate acts on ions in one zone or in neighbouring zones"
+  about "On machines whose gate spans two zones of one rail, the two ions stand in the same zone or in zones next to each other.":
+  forall g:two_qubit_gates, i, j:ions(g).
     position(i, start(g)) = position(j, start(g))
-    or neighbours(position(i, start(g)), position(j, start(g)))
+    or neighbours(position(i, start(g)), position(j, start(g)));
 
-rule R34 "A laser step addresses one chain position"
+assert R34 "A laser step addresses one chain position"
   about "Lasers broadcast across the chip reach one position in a chain at a time. In a step, every pulse, readout and reset reaches the ions at the same positions of chains of the same length; ions at another position wait for the next step. This holds even where each trap's laser is switched on and off by itself. A frame change and an identity are no pulse. Position 1 is the end of a trap toward the previous trap of its ring, or on any other site the end with the smaller coordinate."
-  source "QCCD Studio Feedback (Ke, 2026-11-07), F2"
-  for all a, b in operations where a != b and laser(a) and laser(b) and simultaneous(a, b):
-    pattern(a) = pattern(b)
+  source "QCCD Studio Feedback (Ke, 2026-11-07), F2":
+  forall a, b:operations where a != b and laser(a) and laser(b) and simultaneous(a, b).
+    pattern(a) = pattern(b);
 
 # ---------------------------------------------------------------- heat
 
-rule R7 "A two-ion gate starts with cool enough ions"
+assert R7 "A two-ion gate starts with cool enough ions"
   about "Both ions' motional energy at the start of a two-qubit gate is within the machine's budget; a cooling operation must come first otherwise. Below the budget the heat is not ignored: it is priced into the gate's error (R16, and the noise model behind every logical error rate). The budget is a hard limit because that error law describes the gate only while the ions stay in the Lamb-Dicke regime; a hotter gate is refused, not priced. A machine that declares no budget leaves only the price."
-  source "deck_v3; arXiv:2511.15910"
-  for all g in two_qubit_gates, i in ions(g):
-    heat(i, start(g)) <= heat_budget()
+  source "deck_v3; arXiv:2511.15910":
+  forall g:two_qubit_gates, i:ions(g).
+    heat(i, start(g)) <= heat_budget();
 
-rule R7b "A gate zone stays within its heat duty cycle"
+assert R7b "A gate zone stays within its heat duty cycle"
   about "A gate zone may absorb only so much heat over time; no machine declares such a budget yet."
   source "arXiv:2504.17886"
   when declares_duty_budget():
-  for all s in sites: duty(s) <= duty_budget(s)
+  forall s:sites. duty(s) <= duty_budget(s);
 
-rule R7c "A programme with two-ion gates cools"
+assert R7c "A programme with two-ion gates cools"
   about "Under broadcast wiring cooling is not optional: a programme that gates and never cools cannot reach a useful error rate."
   source "arXiv:2510.23519; arXiv:2606.06455"
   when models_heating():
-  count(two_qubit_gates) = 0 or count(coolings) > 0
+  count(two_qubit_gates) = 0 or count(coolings) > 0;
 
-rule R15 "Heat figures are upper bounds"
+assert R15 "Heat figures are upper bounds"
   about "The heat from successive motions can interfere and partly cancel; the clock adds it up instead, so every heat figure is an upper bound."
   source "arXiv:2605.25118"
   when models_heating():
-  heat_is_upper_bound()
+  heat_is_upper_bound();
 
-rule R16 "Gate error depends on the ions' heat"
+assert R16 "Gate error depends on the ions' heat"
   about "The error of a two-qubit gate is computed from how hot its ions are when it starts, not taken as a constant."
   source "arXiv:2510.23519; arXiv:2605.25118"
   when models_heating():
-  gate_error_reads_heat()
+  gate_error_reads_heat();
 
-rule R17 "Ions heat with elapsed time, moving or not"
+assert R17 "Ions heat with elapsed time, moving or not"
   about "Background heating accrues with time for every ion, whether or not it moves."
   source "arXiv:2605.25118"
   when models_heating():
-  heat_accrues_with_time()
+  heat_accrues_with_time();
 
 # ---------------------------------------------------------------- the device's drawing
 
-rule R18 "A junction is where three or more rails meet"
+assert R18 "A junction is where three or more rails meet"
   about "Whatever a node is called, it is a junction exactly when three or more rails meet at it, and crossing it is priced by that number."
-  source "quant-ph/0702175; arXiv:2305.03828; arXiv:1210.3655"
-  for all n in nodes: (n in junctions) = (degree(n) >= 3)
+  source "quant-ph/0702175; arXiv:2305.03828; arXiv:1210.3655":
+  forall n:nodes. (n in junctions) = (degree(n) >= 3);
 
-rule R19 "A junction joins at most max_junction_degree() rails"
+assert R19 "A junction joins at most max_junction_degree() rails"
   about "A trap built in more than one layer has junctions of up to six rails, so 6 is the limit unless the machine declares a lower one (4 for a surface trap, which has T- and X-junctions and nothing denser). A junction of five or six rails crosses at the X-junction's time and heat unless its machine prices that degree itself: no shipped table measures one."
-  source "collaborator review 2026-09; collaborator review 2026-10; arXiv:2201.12579"
-  for all n in nodes: degree(n) <= max_junction_degree()
+  source "collaborator review 2026-09; collaborator review 2026-10; arXiv:2201.12579":
+  forall n:nodes. degree(n) <= max_junction_degree();
 
-rule R20 "Rails meet at a wide enough angle"
+assert R20 "Rails meet at a wide enough angle"
   about "Any two rails meeting at a node make at least the machine's minimum angle (60 degrees unless it declares another)."
-  source "collaborator review 2026-09; arXiv:2201.12579"
-  for all n in nodes, r1, r2 in rails_at(n) where r1 != r2:
-    angle(n, r1, r2) >= min_rail_angle()
+  source "collaborator review 2026-09; arXiv:2201.12579":
+  forall n:nodes, r1, r2:rails_at(n) where r1 != r2.
+    angle(n, r1, r2) >= min_rail_angle();
 
-rule R21 "Rails lie in a plane"
+assert R21 "Rails lie in a plane"
   about "A rail meets only the nodes it ends at, and two rails cross only at a node they share: the drawing must be a surface trap. On a machine built in layers every layer is such a plane, and a rail between two layers stands vertical between adjacent ones."
-  source "collaborator review 2026-09; quant-ph/0702175"
-  (for all r in rails: upright(r))
-  and (for all r in rails, n in nodes: not lies_on(n, r))
-  and (for all r1, r2 in rails where r1 < r2: not cross(r1, r2))
+  source "collaborator review 2026-09; quant-ph/0702175":
+  (forall r:rails. upright(r))
+  and (forall r:rails, n:nodes. not lies_on(n, r))
+  and (forall r1, r2:rails where r1 < r2. not cross(r1, r2));
 
 # ---------------------------------------------------------------- the programme's own claims
 
-rule R9 "The programme's figures are the replay's figures"
-  about "Every time, cost, step count or heat figure the programme states about itself equals what replaying it computes."
-  for all c in claims: approx(claimed(c), replayed(c))
+assert R9 "The programme's figures are the replay's figures"
+  about "Every time, cost, step count or heat figure the programme states about itself equals what replaying it computes.":
+  forall c:claims. approx(claimed(c), replayed(c));
 
 # ---------------------------------------------------------------- what is computed, and in what order
 
-rule R10 "The programme computes the circuit"
+assert R10 "The programme computes the circuit"
   about "The pulses the programme fires, read through which ion plays which qubit, compose to the circuit's operation; every gate is performed once, by its own ions, together in a trap that can gate."
-  source "this website; arXiv:2406.19479"
-  computes_circuit()
+  source "this website; arXiv:2406.19479":
+  computes_circuit();
 
-rule R25 "Each qubit's operations keep the circuit's order"
-  about "On every qubit, each operation is over before the next one on that qubit begins, in the order the circuit is written -- even where two of them would commute."
-  for all c1, c2 in circuit_ops where next_on_qubit(c1, c2) and performed(c1) and performed(c2):
-    end(last(c1)) <= start(first(c2))
+assert R25 "Each qubit's operations keep the circuit's order"
+  about "On every qubit, each operation is over before the next one on that qubit begins, in the order the circuit is written -- even where two of them would commute.":
+  forall c1, c2:circuit_ops where next_on_qubit(c1, c2) and performed(c1) and performed(c2).
+    end(last(c1)) <= start(first(c2));
 
-rule R26 "Each qubit's gates keep the circuit's order, up to commuting CNOTs"
-  about "As R25, except that consecutive CNOTs in which a qubit plays the same role (always the control, or always the target) commute, and may run in any order among themselves."
-  for all c1, c2 in circuit_ops where next_run(c1, c2) and performed(c1) and performed(c2):
-    end(last(c1)) <= start(first(c2))
+assert R26 "Each qubit's gates keep the circuit's order, up to commuting CNOTs"
+  about "As R25, except that consecutive CNOTs in which a qubit plays the same role (always the control, or always the target) commute, and may run in any order among themselves.":
+  forall c1, c2:circuit_ops where next_run(c1, c2) and performed(c1) and performed(c2).
+    end(last(c1)) <= start(first(c2));
 
 # ---------------------------------------------------------------- a paper's own model
 
-rule R29 "Every operation lasts what the clock says"
-  about "Each operation's duration is the one the model's duration law gives it."
-  for all o in operations where clocked(o): approx(duration(o), clock(o))
+assert R29 "Every operation lasts what the clock says"
+  about "Each operation's duration is the one the model's duration law gives it.":
+  forall o:operations where clocked(o). approx(duration(o), clock(o));
 
-rule R30 "Operations that hold the same component never overlap"
-  about "The schedule states, for every operation, the components it holds while it runs; two operations naming one component never overlap in time."
-  for all a, b in operations where a != b and simultaneous(a, b):
-    disjoint(locks(a), locks(b))
+assert R30 "Operations that hold the same component never overlap"
+  about "The schedule states, for every operation, the components it holds while it runs; two operations naming one component never overlap in time.":
+  forall a, b:operations where a != b and simultaneous(a, b).
+    disjoint(locks(a), locks(b));
 
-rule R31 "Broadcast transport moves in lockstep"
-  about "One waveform drives every broadcast move of a cycle: moves that overlap start and end together and are of one class, and every such move names its class."
-  (for all a in operations where kind(a) = "hop": motion(a) != none)
-  and (for all a, b in operations where kind(a) = "hop" and kind(b) = "hop" and a != b
-         and simultaneous(a, b):
-       start(a) = start(b) and end(a) = end(b) and motion(a) = motion(b))
+assert R31 "Broadcast transport moves in lockstep"
+  about "One waveform drives every broadcast move of a cycle: moves that overlap start and end together and are of one class, and every such move names its class.":
+  (forall a:operations where kind(a) = "hop". motion(a) != none)
+  and (forall a, b:operations where kind(a) = "hop" and kind(b) = "hop" and a != b
+         and simultaneous(a, b).
+       start(a) = start(b) and end(a) = end(b) and motion(a) = motion(b));
 
-rule R35 "Broadcast moves go in lockstep, in the direction the machine's geometry gives"
+assert R35 "Broadcast moves go in lockstep, in the direction the machine's geometry gives"
   about "Under broadcast control one waveform drives every transport move of a cycle. On a timed schedule: every move's motion (its primitive and its direction) is read off the machine's coordinates, the motion the schedule records for it must agree, and moves that overlap start and end together with the same motion. R31 takes the recorded class on trust; this rule measures it. It fails on a schedule whose machine does not declare broadcast control."
-  source "arXiv:2305.12773; arXiv:2510.23519"
+  source "arXiv:2305.12773; arXiv:2510.23519":
   control() = "broadcast"
-  and (for all a in transport: displacement(a) != none and motion(a) = displacement(a))
-  and (for all a, b in transport where a != b and simultaneous(a, b):
-       start(a) = start(b) and end(a) = end(b) and displacement(a) = displacement(b))
+  and (forall a:transport. displacement(a) != none and motion(a) = displacement(a))
+  and (forall a, b:transport where a != b and simultaneous(a, b).
+       start(a) = start(b) and end(a) = end(b) and displacement(a) = displacement(b));
 
-rule R36 "Transport within traps, transport between them and gates never overlap"
+assert R36 "Transport within traps, transport between them and gates never overlap"
   about "R4b read on a timed schedule: moves within a trap and moves between traps use different control pathways and never run at the same time, and neither runs alongside a gate, preparation, measurement or cooling."
-  source "arXiv:2504.17886"
-  for all a, b in operations where a != b and simultaneous(a, b) and movement_mode(a) != none:
-    (movement_mode(b) != none implies movement_mode(a) = movement_mode(b))
-    and kind(b) not in {"gate1", "gate2", "measure", "reset", "cool"}
+  source "arXiv:2504.17886":
+  forall a, b:operations where a != b and simultaneous(a, b) and movement_mode(a) != none.
+    (movement_mode(b) != none => movement_mode(a) = movement_mode(b))
+    and kind(b) not in {"gate1", "gate2", "measure", "reset", "cool"};
 
-rule R37 "Every trap that sits a broadcast move out has its own switch"
+assert R37 "Every trap that sits a broadcast move out has its own switch"
   about "R4d's opt-out read on a timed schedule: while a broadcast move runs, every trap outside the legs the moves of that time use must declare its own switch, so that it can hold still. R35 asks for the shared waveform."
-  source "deck_v3; arXiv:2305.12773"
-  for all a in transport: opt_out_ready(a)
+  source "deck_v3; arXiv:2305.12773":
+  forall a:transport. opt_out_ready(a);
 
-rule R38 "A recorded global reconfiguration holds the whole machine"
-  about "A reconfiguration a paper's tool records as one global permutation, without its routes, holds every trap, rail and junction while it runs, takes positive time, and overlaps no other operation, not even one on an ion it does not move. Its duration is recorded, not checked: R29 has no law for it."
-  (for all a in operations where kind(a) = "reconfigure": holds_machine(a) and duration(a) > 0)
-  and (for all a, b in operations where a != b and kind(a) = "reconfigure":
-       not simultaneous(a, b))
+assert R38 "A recorded global reconfiguration holds the whole machine"
+  about "A reconfiguration a paper's tool records as one global permutation, without its routes, holds every trap, rail and junction while it runs, takes positive time, and overlaps no other operation, not even one on an ion it does not move. Its duration is recorded, not checked: R29 has no law for it.":
+  (forall a:operations where kind(a) = "reconfigure". holds_machine(a) and duration(a) > 0)
+  and (forall a, b:operations where a != b and kind(a) = "reconfigure".
+       not simultaneous(a, b));

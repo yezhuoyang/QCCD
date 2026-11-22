@@ -1,40 +1,41 @@
 """The evaluation language: its grammar, its parser, and how an item is printed.
 
 An evaluation is a text file that says how a design and its programme are judged.  It uses
-the rule language's formulas and terms (`qccd.ruleset.syntax`) unchanged, and adds the items
-an evaluation needs besides assertions: named numbers (`metric`), noise (`channel`), and
-the assertions a design must meet to be ranked (`require`).
+the rule language's formulas and terms (`qccd.ruleset.syntax`) unchanged, and so writes as
+QCCDCert writes (`assert name: formula;`, `forall x:D. ...`, a keyword and its fields ended
+by `;`).  It adds the items an evaluation needs besides assertions: named numbers
+(`metric`) and noise (`channel`); its assertions are the ones a design must meet to be ranked.
 
-    evaluation "goal1"
-    title "Goal 1: the best QEC memory under 200 ions"
-    include "metrics"
-    include "qccd-noise@2"
-    param max_ions = 200
+    evaluation "goal1";
+    title "Goal 1: the best QEC memory under 200 ions";
+    include "metrics";
+    include "qccd-noise@2";
+    param max_ions = 200;
 
     metric ions "Ions" unit "ions" better low
-      = count(i in ions)
+      = count(i:ions);
 
-    require E1 "At most 200 ions"
-      ions <= max_ions
+    assert E1 "At most 200 ions":
+      ions <= max_ions;
 
     channel ms "Two-ion gate error"
-      after g in two_qubit_gates:
-        DEPOLARIZE2(min(15 / 16, ms_error(g))) on ions(g)
+      after g:two_qubit_gates.
+        DEPOLARIZE2(min(15 / 16, ms_error(g))) on ions(g);
 
-Grammar (EBNF, extending the rule language's; `#` starts a comment):
+Grammar (EBNF, extending the rule language's; `#` or `//` starts a comment):
 
-    file      = { item } ;
+    file      = { item [ ";" ] } ;
     item      = "evaluation" STRING | "title" STRING | "about" STRING
               | "include" STRING | "clock" STRING | "rules" STRING | "rank" NAME
               | "param" NAME "=" expr
               | "define" NAME [ "(" NAME { "," NAME } ")" ] "=" expr
-              | metric | requirement | channel ;
+              | metric | assertion | channel ;
     metric    = "metric" NAME STRING { "unit" STRING | "better" ( "low" | "high" ) | "clock" STRING
                                      | "group" STRING | "about" STRING | "source" STRING }
                 "=" expr ;
-    requirement = "require" ID STRING { "about" STRING | "source" STRING } formula ;
+    assertion = "assert" ID STRING { "about" STRING | "source" STRING } ":" formula ;
     channel   = "channel" NAME STRING { "about" STRING | "source" STRING }
-                ( "before" | "after" ) binders [ "where" formula ] ":"
+                ( "before" | "after" ) binders [ "where" formula ] "."
                 NOISE "(" expr ")" "on" expr [ "counted" "as" budget ] ;
     budget    = NAME | NAME "=" expr { "," NAME "=" expr } ;
     NOISE     = "X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" | "DEPOLARIZE2" ;
@@ -47,8 +48,9 @@ satisfies `where`, put the noise operation with that probability on those ions, 
 before (or just after) what the binding names.  Its expected faults -- the probability, per
 ion (per pair for DEPOLARIZE2) -- are booked under the channel's name, or under `counted as`
 a key; with several `key = term` they are shared out in proportion to the terms.  A metric
-with a `clock` of its own is evaluated on a replay under that operating-point table.  `qccd.evalset.interp` gives every item its
-meaning.
+with a `clock` of its own is evaluated on a replay under that operating-point table.  The
+earlier form (`require E1 "..." formula`, `after g in D:`, no `;`) is still read.
+`qccd.evalset.interp` gives every item its meaning.
 """
 
 from __future__ import annotations
@@ -72,7 +74,7 @@ NOISE_OPS = ("X_ERROR", "Y_ERROR", "Z_ERROR", "DEPOLARIZE1", "DEPOLARIZE2")
 #: Words that begin an item when they start a line.  They are names to the rule language's
 #: tokenizer, so a formula ends where one of them begins a line.
 ITEM_NAMES = frozenset({"evaluation", "title", "about", "include", "clock", "rules", "rank",
-                        "param", "define", "metric", "require", "channel"})
+                        "param", "define", "metric", "require", "assert", "channel"})
 
 
 @dataclass(eq=False, slots=True)
@@ -242,13 +244,15 @@ class _EvalParser(_Parser):
                 ev.defines.append(self.define())
             elif word == "metric":
                 ev.metrics.append(self.metric())
-            elif word == "require":
+            elif word in ("assert", "require"):
                 ev.requirements.append(self.requirement())
             elif word == "channel":
                 ev.channels.append(self.channel())
             else:
                 self.fail("expected evaluation, title, about, include, clock, rules, rank, param, "
-                          "define, metric, require or channel")
+                          "define, metric, assert or channel")
+            if self.at(";"):
+                self.next()
             if not self.item_start():
                 self.fail("the item should end here")
         for kind, items in (("metric", [(m.name, m.line) for m in ev.metrics]),
@@ -320,11 +324,14 @@ class _EvalParser(_Parser):
         return m
 
     def requirement(self) -> Requirement:
+        word = self.tok.text
         line = self.next().line
         rid = self.ident()
         title = self.string()
         r = Requirement(rid, title, Const(True), line=line)
         self._notes(r)
+        if word == "assert":          # QCCDCert's `assert name: formula;`
+            self.expect(":", f"before the formula of {rid}")
         if self.item_start():
             self.fail(f"requirement {rid} has no formula")
         a = self.i
@@ -347,7 +354,10 @@ class _EvalParser(_Parser):
         if self.at("where"):
             self.next()
             c.where = self.formula()
-        self.expect(":", f"before channel {name}'s noise")
+        if self.at(":", "op"):        # the earlier `after g in D:`
+            self.next()
+        else:
+            self.expect(".", f"before channel {name}'s noise")
         if self.tok.kind != "name" or self.tok.text not in NOISE_OPS:
             self.fail(f"channel {name}: expected a noise operation ({', '.join(NOISE_OPS)})")
         c.op = self.next().text

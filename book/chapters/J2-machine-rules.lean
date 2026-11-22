@@ -14,12 +14,12 @@ handful of rules, written as assertions in the rule language (the schedule rule 
 `machine.rules` on the Rules page) and checked on every schedule:
 
 ```
-rule G5 "A place runs one op at a time"
-  for all a, b in events where a != b and place(a) = place(b) and duration(a) > 0 and duration(b) > 0:
-    not simultaneous(a, b)
+assert G5 "A place runs one op at a time" core:
+  forall a, b:events where a != b and place(a) = place(b) and duration(a) > 0 and duration(b) > 0.
+    not simultaneous(a, b);
 
-rule G13 "A road carries one bundle at a time"
-  for all c1, c2 in carries where c1 != c2 and road(c1) = road(c2): not simultaneous(c1, c2)
+assert G13 "A road carries one bundle at a time" core:
+  forall c1, c2:carries where c1 != c2 and road(c1) = road(c2). not simultaneous(c1, c2);
 ```
 
 This lesson writes those rules as Lean propositions on a small schedule, decides them, and

@@ -1,35 +1,32 @@
 """The rule language: its grammar, its parser, and how a rule is printed.
 
 A rule set is a text file.  Every rule in it is one assertion about the hardware and the
-execution -- a formula of first-order logic over finite domains (the sites of the machine,
-the operations of the programme, the instants of its execution, ...), written in words a
-reader can check by eye:
+execution, written as QCCDCert writes an assertion (`assert cap: forall s:Sites. Ntr(s) <=
+cap(s);`), extended with a title, prose, a precondition, aggregates and a larger vocabulary:
 
-    ruleset "standard"
-    title "The rules of this website's machine"
+    ruleset "standard";
+    title "The rules of this website's machine";
 
-    param max_chain = 15
+    param max_chain = 15;
 
-    rule R1 "A site holds at most its capacity" core
-      about "An ion standing in a site, or passing through it, takes one of its places."
-      for all s in sites, t in instants:
-        occupancy(s, t) <= capacity(s)
+    assert R1 "A site holds at most its capacity" core
+      about "An ion standing in a site, or passing through it, takes one of its places.":
+      forall s:sites, t:instants. occupancy(s, t) <= capacity(s);
 
-Grammar (EBNF; `#` starts a comment that runs to the end of the line):
+Grammar (EBNF; `#` or `//` starts a comment that runs to the end of the line):
 
-    file      = { item } ;
+    file      = { item [ ";" ] } ;
     item      = "ruleset" STRING | "title" STRING | "about" STRING | "level" STRING
               | "include" STRING | "use" ID { "," ID } | "drop" ID { "," ID }
               | "param" NAME "=" expr
-              | rule ;
-    rule      = "rule" ID STRING [ "core" ]
-                { "about" STRING | "source" STRING | "when" formula ":" }
-                formula ;
+              | assertion ;
+    assertion = "assert" ID [ STRING ] [ "core" ]
+                { "about" STRING | "source" STRING } [ "when" formula ] ":" formula ";" ;
     formula   = quantified | implication ;
-    quantified= ( "for" "all" | "for" "some" ) binders [ "where" formula ] ":" formula ;
+    quantified= ( "forall" | "exists" ) binders [ "where" formula ] "." formula ;
     binders   = binder { "," binder } ;
-    binder    = NAME { "," NAME } "in" expr ;
-    implication = disjunction [ "implies" formula ] ;
+    binder    = NAME { "," NAME } ":" expr ;
+    implication = disjunction [ "=>" formula ] ;
     disjunction = conjunction { "or" conjunction } ;
     conjunction = negation { "and" negation } ;
     negation  = "not" negation | quantified | comparison ;
@@ -46,9 +43,14 @@ Grammar (EBNF; `#` starts a comment that runs to the end of the line):
               | "(" formula ")" ;
     AGG       = "sum" | "max" | "min" | "all_different" ;
 
-`for all x in D where C: B` holds when B holds for every x in D that satisfies C; `for
-some` asks for one.  A rule's `when` clause is its precondition: when it is false the rule
-does not apply to this execution, which is reported as such and never as a pass.
+`forall x:D where C. B` holds when B holds for every x in D that satisfies C; `exists` asks
+for one.  `=>`, `forall`, `exists`, `x:D` and `assert NAME: formula;` are QCCDCert's; the
+title, `about`, `source`, `core`, `when`, `where`, the aggregates and `param` are this
+project's extensions.  An assertion's `when` clause is its precondition: when it is false
+the rule does not apply to this execution, which is reported as such and never as a pass.
+
+The form this language had before it followed QCCDCert (`rule R1 "..."`, `for all s in
+sites: ...`, `implies`) is still read; it is no longer written.
 
 The parser knows no vocabulary: which names are domains and functions (`sites`,
 `occupancy`, ...) is the evaluator's business (`vocabulary.py`), so a new rule needs no
@@ -66,7 +68,7 @@ __all__ = [
     "Node", "Num", "Str", "Const", "Name", "Call", "BinOp", "Not", "Quant", "Binder",
     "Gen", "SetLit",
     "Rule", "RuleSetSource",
-    "parse", "parse_formula", "show", "free_names",
+    "parse", "parse_formula", "show", "free_names", "rule_text", "assertion_text",
 ]
 
 
@@ -79,20 +81,21 @@ class RuleSyntaxError(ValueError):
 _TOKEN = re.compile(r"""
     (?P<ws>[ \t\r]+)
   | (?P<nl>\n)
-  | (?P<comment>\#[^\n]*)
-  | (?P<num>\d+\.\d*(?:[eE][-+]?\d+)?|\d*\.\d+(?:[eE][-+]?\d+)?|\d+(?:[eE][-+]?\d+)?)
+  | (?P<comment>(?:\#|//)[^\n]*)
+  | (?P<num>\d+\.\d+(?:[eE][-+]?\d+)?|\d*\.\d+(?:[eE][-+]?\d+)?|\d+(?:[eE][-+]?\d+)?)
   | (?P<str>"(?:[^"\\\n]|\\.)*")
   | (?P<name>[A-Za-z_][A-Za-z0-9_]*)
-  | (?P<op><=|>=|!=|[=<>+\-*/(){},:])
+  | (?P<op>=>|<=|>=|!=|[=<>+\-*/(){},:;.])
 """, re.VERBOSE)
 
 KEYWORDS = frozenset({
     "for", "all", "some", "in", "where", "and", "or", "not", "implies", "true", "false",
     "none", "rule", "ruleset", "title", "about", "source", "core", "param", "include",
-    "drop", "when", "count", "use", "level",
+    "drop", "when", "count", "use", "level", "forall", "exists", "assert",
 })
 #: Words that start a top-level item: a rule's formula ends where one of these begins a line.
-ITEM_WORDS = frozenset({"rule", "ruleset", "title", "include", "drop", "param", "use", "level"})
+ITEM_WORDS = frozenset({"rule", "assert", "ruleset", "title", "include", "drop", "param", "use",
+                        "level"})
 AGGREGATES = frozenset({"sum", "max", "min", "all_different", "count"})
 
 
@@ -364,8 +367,12 @@ class _Parser:
                 rs.param_text[name] = self.source_between(a, self.i)
             elif self.at("rule"):
                 rs.rules.append(self.rule())
+            elif self.at("assert"):
+                rs.rules.append(self.assertion())
             else:
-                self.fail("expected ruleset, title, about, level, include, use, drop, param or rule")
+                self.fail("expected ruleset, title, about, level, include, use, drop, param or assert")
+            if self.at(";"):
+                self.next()
         ids = [r.id for r in rs.rules]
         dup = sorted({x for x in ids if ids.count(x) > 1})
         if dup:
@@ -404,13 +411,57 @@ class _Parser:
             self.fail(f"rule {rid}: the formula should end here")
         return r
 
+    def assertion(self) -> Rule:
+        """`assert ID ["title"] [core] {about|source} [when F]: F;` -- QCCDCert's
+        `assert name: formula;` with this project's annotations between name and colon."""
+        line = self.next().line
+        rid = self.ident()
+        title = self.string() if self.tok.kind == "str" else ""
+        r = Rule(id=rid, title=title, formula=Const(True), line=line)
+        if self.at("core"):
+            self.next()
+            r.core = True
+        while True:
+            if self.at("about"):
+                self.next()
+                r.about = self.string()
+            elif self.at("source"):
+                self.next()
+                r.source = self.string()
+            elif self.at("when"):
+                self.next()
+                a = self.i
+                r.when = self.formula()
+                r.when_text = self.source_between(a, self.i)
+                break
+            else:
+                break
+        self.expect(":", f"before the formula of {rid}")
+        a = self.i
+        r.formula = self.formula()
+        r.text = self.source_between(a, self.i)
+        self.expect(";", f"to end assertion {rid}")
+        if not self.item_start():
+            self.fail(f"assertion {rid} ends at its ';'")
+        return r
+
     # -- formulas
     def formula(self) -> Node:
-        if self.at("for"):
+        if self.at("for") or self.at("forall") or self.at("exists"):
             return self.quantified()
         return self.implication()
 
     def quantified(self) -> Quant:
+        if self.at("forall") or self.at("exists"):
+            t = self.next()
+            binders = self.binders()
+            where = None
+            if self.at("where"):
+                self.next()
+                where = self.formula()
+            self.expect(".", "before the body of the quantifier")
+            body = self.formula()
+            return Quant("all" if t.text == "forall" else "some", binders, where, body, t.line)
         line = self.next().line
         if self.at("all"):
             kind = "all"
@@ -435,7 +486,10 @@ class _Parser:
             while self.at(",") and self.peek().kind == "name" and self._names_then_in():
                 self.next()
                 names.append(self.ident())
-            self.expect("in", "after the variable name(s)")
+            if self.at(":", "op"):
+                self.next()
+            else:
+                self.expect("in", "after the variable name(s): `x:D`")
             out.append(Binder(tuple(names), self.sum()))
             if self.at(",") and self.peek().kind == "name" and self._names_then_in():
                 self.next()
@@ -443,12 +497,17 @@ class _Parser:
             break
         return tuple(out)
 
+    @staticmethod
+    def _binds(t: Tok) -> bool:
+        """`:` (QCCDCert's `x:D`) or `in` (the earlier `x in D`) after a binder's names."""
+        return (t.text == "in" and t.kind == "kw") or (t.text == ":" and t.kind == "op")
+
     def _names_then_in(self) -> bool:
-        """After a comma: is this `name {, name} in`?  (Else the comma ends the binders.)"""
+        """After a comma: is this `name {, name} :`?  (Else the comma ends the binders.)"""
         k = 1
         while self.peek(k).kind == "name":
             nxt = self.peek(k + 1)
-            if nxt.text == "in" and nxt.kind == "kw":
+            if self._binds(nxt):
                 return True
             if nxt.text != ",":
                 return False
@@ -457,7 +516,7 @@ class _Parser:
 
     def implication(self) -> Node:
         left = self.disjunction()
-        if self.at("implies"):
+        if self.at("implies") or self.at("=>", "op"):
             line = self.next().line
             return BinOp("implies", left, self.formula(), line)
         return left
@@ -480,7 +539,7 @@ class _Parser:
         if self.at("not") and not (self.peek().text == "in"):
             line = self.next().line
             return Not(self.negation(), line)
-        if self.at("for"):
+        if self.at("for") or self.at("forall") or self.at("exists"):
             return self.quantified()
         return self.comparison()
 
@@ -597,11 +656,11 @@ class _Parser:
         self.fail("expected a value, a name or a parenthesised formula")
 
     def _names_then_in_here(self) -> bool:
-        """At a name: is this `name {, name} in` (a generator) rather than an expression?"""
+        """At a name: is this `name {, name} :` (a generator) rather than an expression?"""
         k = 0
         while self.peek(k).kind == "name":
             nxt = self.peek(k + 1)
-            if nxt.text == "in" and nxt.kind == "kw":
+            if self._binds(nxt):
                 return True
             if nxt.text != ",":
                 return False
@@ -626,7 +685,7 @@ def parse_formula(text: str) -> Node:
 # ----------------------------------------------------------------------------- printing
 
 _SYM = {"<=": "≤", ">=": "≥", "!=": "≠", "in": "∈", "notin": "∉",
-        "and": "and", "or": "or", "implies": "implies"}
+        "and": "and", "or": "or", "implies": "⇒"}
 _PREC = {"implies": 1, "or": 2, "and": 3, "=": 5, "!=": 5, "<": 5, "<=": 5, ">": 5, ">=": 5,
          "in": 5, "notin": 5, "+": 6, "-": 6, "*": 7, "/": 7}
 
@@ -634,10 +693,10 @@ _PREC = {"implies": 1, "or": 2, "and": 3, "=": 5, "!=": 5, "<": 5, "<=": 5, ">":
 def show(n: Node, math: bool = False) -> str:
     """One line of text for a formula; `math=True` uses the symbols the pages print."""
 
-    member = "∈" if math else "in"
-
     def b(x: Binder) -> str:
-        return f"{', '.join(x.names)} {member} {go(x.domain, 0)}"
+        if math:
+            return f"{', '.join(x.names)} ∈ {go(x.domain, 0)}"
+        return f"{', '.join(x.names)}:{go(x.domain, 0)}"
 
     def go(n: Node, ctx: int) -> str:
         if isinstance(n, Num):
@@ -663,18 +722,45 @@ def show(n: Node, math: bool = False) -> str:
                 return f"count({gen}{w})"
             return f"{n.kind}({go(n.expr, 0)} for {gen}{w})"
         if isinstance(n, Quant):
-            q = ("∀" if n.kind == "all" else "∃") if math else f"for {n.kind}"
+            q = ("∀" if n.kind == "all" else "∃") if math else ("forall" if n.kind == "all" else "exists")
             w = f" where {go(n.where, 0)}" if n.where is not None else ""
-            s = f"{q} {', '.join(b(x) for x in n.binders)}{w}: {go(n.body, 0)}"
+            s = f"{q} {', '.join(b(x) for x in n.binders)}{w}. {go(n.body, 0)}"
             return f"({s})" if ctx > 0 else s
         if isinstance(n, BinOp):
             p = _PREC[n.op]
-            op = _SYM.get(n.op, n.op) if math else ("not in" if n.op == "notin" else n.op)
+            op = _SYM.get(n.op, n.op) if math else {"notin": "not in", "implies": "=>"}.get(n.op, n.op)
             s = f"{go(n.left, p)} {op} {go(n.right, p + (0 if n.op == 'implies' else 1))}"
             return f"({s})" if p < ctx else s
         raise TypeError(n)
 
     return go(n, 0)
+
+
+def rule_text(r: Rule, *, formula: str | None = None) -> str:
+    """One assertion as a rule file writes it (`formula` defaults to the text as written)."""
+    head = f"assert {r.id}" + (f' "{_esc(r.title)}"' if r.title else "") + (" core" if r.core else "")
+    lines = [head]
+    if r.about:
+        lines.append(f'  about "{_esc(r.about)}"')
+    if r.source:
+        lines.append(f'  source "{_esc(r.source)}"')
+    if r.when is not None:
+        lines.append(f"  when {r.when_text or show(r.when)}")
+    lines[-1] += ":"
+    body = formula if formula is not None else (r.text or show(r.formula))
+    lines.append("  " + body.replace("\n", "\n  ") + ";")
+    return "\n".join(lines)
+
+
+def assertion_text(r: Rule) -> str:
+    """An assertion as a page shows it: QCCDCert's `assert name: formula;`, with the
+    precondition before the colon (the title and prose are shown beside it)."""
+    head = f"assert {r.id}" + (f" when {r.when_text or show(r.when)}" if r.when is not None else "")
+    return head + ":\n  " + (r.text or show(r.formula)).replace("\n", "\n  ") + ";"
+
+
+def _esc(s: str) -> str:
+    return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def free_names(n: Node, bound: frozenset = frozenset()) -> set[str]:

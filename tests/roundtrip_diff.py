@@ -290,17 +290,15 @@ def main(dump_path: str) -> int:
     for p, a, b in pbad[:8]:
         print(f"        {p}: js={_s(a)}  py={_s(b)}")
 
-    # ---- lane B: the exported Python listing, replayed -------------------------------
+    # ---- lane B: the exported specification, read back ------------------------------
     okB = None
     try:
-        ns: dict = {}
-        exec(compile(dump["python"], "<exported listing>", "exec"), ns)  # noqa: S102
-        m = ns.get("m")
-        if m is None:
-            raise RuntimeError("the exported listing bound no `m`")
-        okB, _ = report(js, belief_of(m.arch), "lane B: exportPython -> replayed listing")
+        from qccd import Machine
+
+        m = Machine.read(dump["spec"])
+        okB, _ = report(js, belief_of(m.arch), "lane B: exportSpec -> Machine.read")
     except Exception as exc:  # noqa: BLE001
-        print("\n---- lane B (exportPython -> replayed listing): REFUSED BY PYTHON ----")
+        print("\n---- lane B (exportSpec -> Machine.read): REFUSED BY PYTHON ----")
         print(f"  {type(exc).__name__}: {exc}")
         okB = False
 

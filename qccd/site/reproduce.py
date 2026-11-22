@@ -158,6 +158,7 @@ def _rules_section(p: dict, res: dict | None) -> str:
     which rule was checked, which holds and which fails, and what each rule says."""
     from ..ruleset import catalogue, load, rule_order
     from .rulespage import highlight
+    from ..ruleset.syntax import assertion_text
     rows = [(r.get("label", r["id"]), r["rules"]) for r in (res or {}).get("runs", [])
             if r.get("rules")]
     for o in (res or {}).get("ours", []):
@@ -219,7 +220,7 @@ def _rules_section(p: dict, res: dict | None) -> str:
         r = cat.get(i)
         if r is None:
             continue
-        text = (f"when {r.when_text}:\n" if r.when is not None else "") + r.text
+        text = assertion_text(r)
         out.append(f'<div id="rule-{_e(i)}" style="margin:8px 0"><b>{_e(i)}</b> {_e(r.title)}'
                    f'<pre class="assert">{highlight(text)}</pre><small>{_e(r.about)}</small></div>')
     out.append("</details>")

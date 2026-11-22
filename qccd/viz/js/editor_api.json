@@ -759,18 +759,18 @@
   "source": {
    "use": "agent",
    "kind": "read",
-   "does": "the machine as its builder program (the Machine panel's source)"
+   "does": "the machine as hardware declarations in QCCDCert's syntax (the Machine panel's source)"
   },
   "applySource": {
    "use": "agent",
    "kind": "design",
-   "does": "replace the machine's builder program with edited text",
+   "does": "replace the machine's declarations with edited text (site, rail, zone, class, curve, ...)",
    "args": "src"
   },
-  "exportPython": {
+  "exportSpec": {
    "use": "agent",
    "kind": "read",
-   "does": "the machine as a Python listing"
+   "does": "the machine as a whole specification, every declaration it needs (Machine.read reads it in Python)"
   },
   "schemaErrors": {
    "use": "agent",

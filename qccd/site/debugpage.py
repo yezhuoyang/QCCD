@@ -209,15 +209,15 @@ def rulesets() -> list[dict]:
 #: a few assertions to start from, in the rule language, offered in the Rules tab
 EXAMPLES = (
     ("Every site holds at most one ion",
-     "assert \"one ion per site\":\nfor all s in sites, t in instants: occupancy(s, t) <= 1"),
+     "assert \"one ion per site\":\nforall s:sites, t:instants. occupancy(s, t) <= 1;"),
     ("An ion never stops in a junction",
-     "assert \"no ion rests in a junction\":\nfor all i in ions, t in instants: not (position(i, t) in junctions)"),
+     "assert \"no ion rests in a junction\":\nforall i:ions, t:instants. not (position(i, t) in junctions);"),
     ("A named site is never over capacity",
-     "assert \"C0 within capacity\":\nfor all t in instants: occupancy(\"C0\", t) <= capacity(\"C0\")"),
+     "assert \"C0 within capacity\":\nforall t:instants. occupancy(\"C0\", t) <= capacity(\"C0\");"),
     ("Every two-ion gate starts cool",
-     "assert \"cool gates\":\nfor all g in two_qubit_gates, i in ions(g): heat(i, start(g)) <= heat_budget()"),
+     "assert \"cool gates\":\nforall g:two_qubit_gates, i:ions(g). heat(i, start(g)) <= heat_budget();"),
     ("A named ion never visits a named site",
-     "assert \"q0 stays out of C3\":\nfor all t in instants: position(\"q0\", t) != \"C3\""),
+     "assert \"q0 stays out of C3\":\nforall t:instants. position(\"q0\", t) != \"C3\";"),
 )
 
 
