@@ -8,7 +8,7 @@ Each family's best point by each measure (they can differ). Time per round under
 |---|---|---|---|---|---|
 | C2LR | 12 of 12 | c2lr15x14 | 352.4 | c2lr15x14 | 1.35e-03 [1.2e-03, 1.5e-03] |
 | WISE | 12 of 12 | wise_h3_8x7 | 1150.6 | wise_h3_8x7 | 2.81e-02 [2.7e-02, 3.0e-02] |
-| Cyclone | 5 of 5 | cyclone10_n16 | 379.8 | cyclone6_n24 | 5.22e-01 [4.6e-01, 5.8e-01] |
+| Cyclone | 6 of 6 | cyclone10_n16 | 379.8 | cyclone6_n24 | 5.22e-01 [4.6e-01, 5.8e-01] |
 | Conveyor | 2 of 4 | conveyor96_96d_j | 256.5 | conveyor96_96d_j | 7.58e-04 [6.6e-04, 8.7e-04] |
 
 ## 6.6.6 colour code [[7,1,3]], 3 rounds, 10 ions

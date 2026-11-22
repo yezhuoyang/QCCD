@@ -190,6 +190,16 @@
    "rules_failed": [],
    "status": "ok"
   },
+  "cyclone72_n2": {
+   "bytes": 98143503,
+   "code": "bb72",
+   "family": "Cyclone",
+   "instructions": 28016,
+   "page": "bb72/cyclone72_n2.html",
+   "point": "cyclone72_n2",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "wise_h3_11x10": {
    "bytes": 32551404,
    "code": "bb72",
