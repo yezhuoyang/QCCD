@@ -1,0 +1,4 @@
+init q0@T0_0h,q1@T0_1h;
+pulse R(0,((pi/2)-(7854/10000))) q0 @T0_0h via c0;
+pulse R(pi,0) q0 @T0_0h via c1;
+pulse R(pi,((0+(7854/10000))/2)) q0 @T0_0h via c2;

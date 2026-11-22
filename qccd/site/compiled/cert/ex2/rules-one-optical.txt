@@ -1,0 +1,4 @@
+assert init: (t = 0 and delta = 0) => N-(S) = 2;
+assert cap: forall s:Sites. Ntr(s) <= cap(s);
+assert traffic: forall p:Paths. M(p) <= 1;
+assert one: n_optical <= 1;

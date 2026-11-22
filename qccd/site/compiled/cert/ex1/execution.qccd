@@ -1,0 +1,10 @@
+init q0@S,q1@G;
+simd transport q0:S->G[p0];
+idle 1;
+idle 1;
+idle 1;
+pulse R((pi/2),(pi/2)) q0 @G via c3;
+pulse MS((pi/2)) q0,q1 @G via c4;
+broadcast R((-(pi/2)),0) q0@G, R((-(pi/2)),0) q1@G via b0;
+pulse R((-(pi/2)),(pi/2)) q0 @G via c6;
+readout q1 -> c0 @G via a0;

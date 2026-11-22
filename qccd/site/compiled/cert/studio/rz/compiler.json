@@ -1,0 +1,6 @@
+{
+ "compiler": "QCCDCert",
+ "sources_sha256": "f21f2ef780e580f8",
+ "files": 224,
+ "lean": "leanprover/lean4:v4.29.0-rc2"
+}

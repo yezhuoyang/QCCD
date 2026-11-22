@@ -429,10 +429,12 @@ FEATURES: tuple[Feature, ...] = (
         "it at its result with no animation -- use it when the person wants designs tried as fast as possible "
         "or runs many. program: a catalogue name or {name, qasm}. draft: 'main' (the working design, default) "
         "or a draft's name. Waits up to wait_s (default 45, max 50); if the run is still going, poll "
-        "qccd_get_job(run_id). A run is an experiment: not Lean-checked, never a submission.",
+        "qccd_get_job(run_id). compiler (default auto): QCCDCert, the verified compiler, when it is installed and "
+        "the design has no closed loop, else the project's own compiler; qccdcert, rotate or compile force one. "
+        "A run is an experiment, never a submission.",
         _obj({"program": {"anyOf": [_S, {"type": "object", "properties": {"name": _S, "qasm": _S},
                                          "required": ["qasm"]}]},
-              "draft": _S, "revision": _I, "compiler": {"type": "string", "enum": ["auto", "rotate", "compile"]},
+              "draft": _S, "revision": _I, "compiler": {"type": "string", "enum": ["auto", "qccdcert", "rotate", "compile"]},
               "animate": {"type": "boolean"}, "wait_s": _I, "request_id": _S, "origin_prompt_id": _S}, ["program"]),
         _run_program, ("POST /api/jobs", "GET /api/jobs/{jid}", "GET /api/views",
                        "GET /api/runs/{run_id}/evaluation"), job_kinds=("run",), group="runs"),

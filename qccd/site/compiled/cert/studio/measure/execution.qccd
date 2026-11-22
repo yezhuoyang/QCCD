@@ -1,0 +1,2 @@
+init q0@T0_0h,q1@T0_1h;
+readout q0 -> c0 @T0_0h via a0;

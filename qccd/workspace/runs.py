@@ -4,9 +4,13 @@ A RUN is an experiment, not a submission.  It takes any program -- one from the 
 (`Compiler/examples/*.qasm`: the BB [[144,12,12]] round, surface-17, steane, GHZ, QFT, ...)
 or QASM the agent writes -- and a design (the working design `main`, or any draft), and:
 
-    1. exports the design for the compiler, and compiles the program onto it with the real
-       compiler (`qccdc_cli rotate` when the design has closed loops, else `compile`;
-       `auto` falls back from rotate to compile);
+    1. exports the design for the compiler, and compiles the program onto it.  `auto` uses
+       QCCDCert, the verified compiler (qccd/cert/), when it is installed and the design has no
+       closed loop: the design is translated into a QCCDCert hardware program, QCCDCert
+       compiles (its theorem, Meaning ∧ Legality ∧ Time, covers that target code) and this
+       project's cooling extension is added.  Otherwise -- and as the explicit modes -- the
+       project's own compiler runs (`qccdc_cli rotate` when the design has closed loops, else
+       `compile`; `auto` falls back from rotate to compile);
     2. checks the compilation stages, including physical binding, scheduling,
        cooling and the serialized program's source semantics;
     3. replays it under the release's cost model and under the transport table, with the
@@ -160,8 +164,8 @@ class RunsMixin:
         from .core import WorkspaceError
         resolve_program(params.get("program"))          # refuse an unknown program at once
         mode = params.get("compiler", "auto")
-        if mode not in ("auto", "rotate", "compile"):
-            raise WorkspaceError("bad_request", "compiler must be auto, rotate or compile", status=422)
+        if mode not in ("auto", "qccdcert", "rotate", "compile"):
+            raise WorkspaceError("bad_request", "compiler must be auto, qccdcert, rotate or compile", status=422)
         params["compiler"] = mode
         # whether the person's tab plays the run or opens it at its result (run_eval.py)
         params["animate"] = params.get("animate", True) is not False
@@ -180,12 +184,19 @@ class RunsMixin:
         from .perf import performance
         from .procs import run_limited
 
+        from ..cert import toolchain as cert_toolchain
         tc = Toolchain.discover()
-        if tc.qccdc is None:
+        mode = params["compiler"]
+        cert_installed = cert_toolchain.available()
+        if mode == "qccdcert" and not cert_installed:
+            raise WorkspaceError("toolchain_missing", "QCCDCert, the verified compiler, is not installed: set "
+                                 "QCCD_CERT to a checkout of it on which `lake build` has run", status=424)
+        if tc.qccdc is None and not (cert_installed and mode in ("auto", "qccdcert")):
             raise WorkspaceError("toolchain_missing", "the compiler (qccdc_cli) is not installed: run "
                                  "`qccd toolchain install` in a terminal (it fetches the prebuilt one), "
                                  "or build Compiler/ocaml", status=424)
-        _refuse_withdrawn_compiler(tc)
+        if tc.qccdc is not None:
+            _refuse_withdrawn_compiler(tc)
         branch, rev = params["branch"], params["revision"]
         name, qasm, source = resolve_program(params["program"])
         r = self.replayed(branch, rev)
@@ -213,13 +224,21 @@ class RunsMixin:
         if not ex.ok:
             return {"_status": "cancelled" if ex.status == "cancelled" else "failed",
                     "summary": "exporting the design for the compiler failed", "log": (ex.stderr or ex.stdout)[-2000:]}
-        mode = params["compiler"]
-        modes = ([mode] if mode != "auto" else (["rotate", "compile"] if closed_loops(r.arch) else ["compile"]))
+        modes = ([mode] if mode not in ("auto", "qccdcert")
+                 else (["rotate", "compile"] if closed_loops(r.arch) else ["compile"]))
         from ..arch.c2lr import is_c2lr
         if is_c2lr(r.arch):
             # a C2LR lattice moves only by swap-or-stay steps, which qccdc does not emit: the
             # baseline router compiles it (docs/c2lr.md), and the same staged finishing accepts it
             modes = ["c2lr-router"]
+        elif mode in ("auto", "qccdcert") and cert_installed and not closed_loops(r.arch):
+            # QCCDCert is the core; the project's own compiler is the fallback under `auto` only
+            modes = ["qccdcert"] + (modes if mode == "auto" and tc.qccdc is not None else [])
+        elif mode == "qccdcert":
+            return {"_status": "failed", "design": design, "program": {"name": name, "qubits": q},
+                    "summary": f"QCCDCert cannot compile for {dname}: it has a closed loop, and conveyor rotation "
+                               "is an extension of the project's own compiler (choose auto or rotate)"}
+        modes = [m for m in modes if m == "qccdcert" or tc.qccdc is not None or m == "c2lr-router"]
         limits = self.release.manifest.get("limits") or {}
         compile_budget = float(params.get("timeout_s") or limits.get("compile_timeout_s", 900))
         semantic_budget = max(compile_budget, float(limits.get("lean_timeout_s", 1800)),
@@ -231,13 +250,26 @@ class RunsMixin:
         # a checker that is still within the release's own timeout/memory budget.
         verification_budget = 2 * compile_budget + semantic_budget + 600
         cp, log, used, compilation = None, "", None, None
+        cert_result = None
         for m in modes:
             self._progress(jid, "compile", f"compiling {name} ({q} qubits) with "
-                                           f"{'the C2LR router' if m == 'c2lr-router' else 'qccdc_cli ' + m}")
+                                           + {"c2lr-router": "the C2LR router",
+                                              "qccdcert": "QCCDCert, the verified compiler"}.get(m, "qccdc_cli " + m))
             compilation = None
             for stale in ("prog.tsir.json", "prog.qcert.json", "prog.stages.json",
                           "prog.native.tsir.json", "prog.cooled.tsir.json", "prog.compilation.json"):
                 (work / stale).unlink(missing_ok=True)
+            if m == "qccdcert":
+                try:
+                    cert_result = _qccdcert_compile(work, self.release.manifest["physics"].get("rank_table", "qccdsim_jones"))
+                    compilation = cert_result["compilation"]
+                    log += f"--- QCCDCert\n{cert_result['log']}\n"
+                    used = m
+                    break
+                except Exception as exc:  # untranslatable, refused, or a tool error: the next mode, if any
+                    log += f"--- QCCDCert did not compile this design: {str(exc)[-1500:]}\n"
+                    cert_result = None
+                    continue
             if m == "c2lr-router":
                 cp = _c2lr_compile(work, name)
                 log += f"--- {cp.stdout}\n{cp.stderr}"[-4000:]
@@ -294,6 +326,9 @@ class RunsMixin:
         except Exception:
             t_tr = None
         perf = performance(arch, prog, res, table=table, t_transport_ms=t_tr)
+        if used == "qccdcert":
+            return self._store_qccdcert_run(jid, work, device, qasm, prog, res, perf, cert_result,
+                                            name, q, source, design, shown, dname, rev, params, log)
         # Recheck the manifest and exact output hashes at the artifact boundary,
         # after the analysis work, instead of trusting a previously read flag.
         try:
@@ -353,6 +388,43 @@ class RunsMixin:
                                 "board eligibility is checked when submitted"},
                 "compilation": compilation_ref, "log": log[-2000:]}
 
+    def _store_qccdcert_run(self, jid, work, device, qasm, prog, res, perf, cert_result,
+                            name, q, source, design, shown, dname, rev, params, log) -> dict:
+        """Keep a QCCDCert run: the cooled programme the page plays, QCCDCert's own target code
+        (as TSIR), the circuit map, and the compiler's stage file and target file as evidence.
+        A QCCDCert run is never adopted as a board submission: the official grader compiles
+        and checks a submission itself."""
+        d_dev = self.put_artifact(canonical_bytes(device), "application/json", f"run {jid}: machine")
+        d_prog = self.put_artifact(canonical_bytes(prog.to_json()), "application/json", f"run {jid}: program (cooled)")
+        d_times = self.put_artifact(canonical_bytes({"times_us": _step_times(prog, res)}), "application/json",
+                                    f"run {jid}: step start times")
+        d_cert = self.put_artifact(canonical_bytes(cert_result["certificate"]), "application/json",
+                                   f"run {jid}: QCCDCert circuit map")
+        d_qasm = self.put_artifact(qasm.encode("utf-8"), "text/plain", f"run {jid}: circuit")
+        d_raw = self.put_artifact(canonical_bytes(cert_result["tsir"]), "application/json",
+                                  f"run {jid}: QCCDCert target code (TSIR)")
+        folder = work / "qccdcert"
+        evidence = {n: self.put_artifact((folder / n).read_bytes(), "application/json", f"run {jid}: QCCDCert {n}")
+                    for n in ("hardware.json", "rules.json", "effective.json", "stages.json", "target.json",
+                              "parallel.json", "compiler.json") if (folder / n).exists()}
+        compilation_ref = {**cert_result["compilation"], "evidence": evidence,
+                           "artifacts": {"program": d_prog, "certified": d_raw, "certificate": d_cert},
+                           "program": d_prog, "certified": d_raw, "certificate": d_cert}
+        headline = perf["bottleneck"][0] if perf["bottleneck"] else ""
+        return {"summary": f"{shown} on {dname} (r{rev}), compiled by QCCDCert: {perf['total']['ms']:g} ms per round. "
+                           + headline,
+                "run": {"run_id": jid, "program": {"name": name, "qubits": q, "source": source},
+                        "design": design, "compiler": "qccdcert", "performance": perf,
+                        "compilation": compilation_ref,
+                        "animate": params.get("animate", True) is not False,
+                        "artifacts": {"device": d_dev, "program": d_prog, "times": d_times,
+                                      "certificate": d_cert, "circuit": d_qasm, "certified": d_raw},
+                        "view": f"/runview/{jid}",
+                        "note": "compiled by QCCDCert (Meaning, Legality and Time hold for its target code); cooling "
+                                "is this project's extension, checked by the replay; board eligibility is checked "
+                                "when submitted"},
+                "compilation": compilation_ref, "log": log[-2000:]}
+
     # ------------------------------------------------------------------ reading runs
 
     def runs(self, limit: int = 30) -> list:
@@ -400,6 +472,32 @@ class RunsMixin:
         if a["program"]["name"] != b["program"]["name"]:
             out["warning"] = "the two runs ran DIFFERENT programs; their times are not comparable"
         return out
+
+
+def _qccdcert_compile(work: Path, table: str) -> dict:
+    """QCCDCert on the exported design (qccd/cert/driver.py), then this project's cooling
+    extension; writes prog.tsir.json, prog.cooled.tsir.json and prog.qcert.json as the other
+    engines do.  Raises when the design cannot be translated or QCCDCert refuses."""
+    from ..arch.device import Architecture
+    from ..cert.driver import compile_for_machine
+    from ..compile import insert_cooling
+    from ..cost.models import corrected_model
+    from ..ir.tsir import TSIR
+    arch = Architecture.from_json(json.loads((work / "device.arch.json").read_text(encoding="utf-8")))
+    model = corrected_model(table)
+    r = compile_for_machine(arch, model, work / "circuit.qasm", work / "qccdcert")
+    prog = TSIR.from_json(r.tsir)
+    cooled = insert_cooling(prog, arch, model).program
+    (work / "prog.tsir.json").write_text(json.dumps(r.tsir), encoding="utf-8")
+    (work / "prog.cooled.tsir.json").write_text(json.dumps(cooled.to_json()), encoding="utf-8")
+    (work / "prog.qcert.json").write_text(json.dumps(r.certificate), encoding="utf-8")
+    c = r.compilation
+    return {"tsir": r.tsir, "certificate": r.certificate, "log": "\n".join(r.translation.notes),
+            "compilation": {"engine": "QCCDCert", "status": "passed", "compiler": c.fingerprint,
+                            "events": len(c.execution["instructions"]), "finish_us": c.finish,
+                            "parallel_us": c.parallel.get("finish"),
+                            "rules": c.lines["rules"], "translation": r.translation.notes,
+                            "theorem": "verified_compilation: Meaning, Legality and Time hold for this target code"}}
 
 
 def _c2lr_compile(work: Path, name: str):

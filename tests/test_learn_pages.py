@@ -44,10 +44,10 @@ def test_nothing_is_marked_inside_links_headings_code_drawings_or_the_studio_car
 
 def test_a_word_defined_on_this_page_links_to_a_bare_fragment_and_others_to_the_page():
     out, _ = learn.mark("<p>a hop and a rule</p>", "compilation/", 1)
-    assert 'href="#def-trap-graph">hop</a>' in out
+    assert 'href="#hardware">hop</a>' in out
     assert 'href="../rules/#language">rule</a>' in out
     out2, _ = learn.mark("<p>a hop</p>", "board/goal1/", 2)
-    assert 'href="../../compilation/#def-trap-graph">hop</a>' in out2
+    assert 'href="../../compilation/#hardware">hop</a>' in out2
 
 
 def test_spellings_with_capitals_are_matched_exactly_and_plurals_are_taken():
@@ -100,7 +100,7 @@ def _ids_in(*files: Path) -> set[str]:
 
 
 def test_every_glossary_anchor_is_one_the_page_builders_write():
-    from qccd.site.algorithm import IDS
+    from qccd.site.certpage import IDS
     from qccd.site.evaluation import HEADINGS as EVAL
     from qccd.site.examples import VERBS
     from qccd.site import machinepage
@@ -109,7 +109,7 @@ def test_every_glossary_anchor_is_one_the_page_builders_write():
         "physics/": _physics_anchors(),
         "machine/": set(machinepage.IDS.values()) | {a for a, _ in machinepage.HEADINGS}
                     | {f"m-{k}" for k, _, _, _ in machinepage.MACHINES},
-        "compilation/": _ids_in(SITE / "algorithm.py", SITE / "build.py") | set(IDS.values()),
+        "compilation/": _ids_in(SITE / "certpage.py", SITE / "build.py") | set(IDS.values()),
         "evaluation/": {a for a, _ in EVAL} | _ids_in(SITE / "evaluation.py"),
         "language/": {v["verb"] for v in VERBS} | _ids_in(SITE / "build.py"),
         "rules/": {r.id for r in catalogue().rules} | _ids_in(SITE / "rulespage.py"),

@@ -23,7 +23,7 @@ import dataclasses
 import html
 
 from . import learn
-from .algorithm import df as _df_algo, eg, esc, fig, tbl
+from .formal import eg, esc, fig, tbl
 from .examples import CHAIN, DUAL, GRID, GRID3, RACE, RING, build_example, machine, rec
 
 # --------------------------------------------------------------------------- anchors
@@ -482,7 +482,7 @@ pos        ::= (x, y)        id ::= a name        zone ::= a name declared in zo
 
 
 def page(PAGE: str, STYLE: str, built: dict) -> str:
-    from .algorithm import CSS as ALGO_CSS
+    from .formal import CSS as ALGO_CSS
     ms = _machines()
     ring, chain, grid, race, dual, grid3, tee = (ms[k] for k in ("ring6d", "chain4", "grid2x3", "race8", "dual3", "grid3x3", "tee"))
     rd = ring.arch.device
@@ -815,9 +815,9 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
     w(tbl(["reader", "what it reads of M", "what it calls it", "where"], [
         ["<b>Language</b>", "sites, hops, closed loops, declared classes, abilities", "the names a statement may use (M15)", '<a href="../language/#semantics">Language · semantics</a>'],
         ["<b>Rules</b>", "sites, junctions, rails, capacity, degree, zone, can, ends, rails_at, loops, the declared numbers", "the machine vocabulary: the Hardware record", '<a href="../rules/#words">Rules · the words</a>'],
-        ["<b>Compiler</b>", "traps T, junctions J, rails E, cap, gate, meas, closed loops L; the curves, for cooling insertion", "the trap graph A(M), Definition 1 there", '<a href="../compilation/#def-device">Compilation · 5.1</a>'],
+        ["<b>Compiler</b>", "traps and junctions (sites, with capacities), the routes between traps (paths, with durations from the curves), gate and readout zones (calibrations)", "the hardware program QCCDCert compiles against", '<a href="../compilation/#studio">Compilation · on a studio machine</a>'],
         ["<b>Evaluation</b>", "the curves under a policy, the wiring and budget, the heating rate, the species", "the machine's tables, the machine's wiring, the machine's laws", '<a href="../evaluation/#words">Evaluation · the words</a>'],
-        ["<b>Proved checker</b>", "gate-capable sites, hops(M), each closed loop's slots", "gateSites, hops, loops: facts the compiler cannot widen", '<a href="../compilation/#correctness">Compilation · 5.9</a>'],
+        ["<b>Proved checker</b>", "gate-capable sites, hops(M), each closed loop's slots", "gateSites, hops, loops: facts a certified programme cannot widen", '<a href="../rules/#R10">Rules · R10</a>'],
     ]))
     w(eg("The three projections of <code>ring6d</code>, read when the site was built."
          f"<p><b>The Hardware record the rules read</b> (field, meaning, value here):</p>"
@@ -963,9 +963,10 @@ def page(PAGE: str, STYLE: str, built: dict) -> str:
       "is a step of Σ<sub><var>M</var></sub>, well-typed only in <var>M</var>'s names. On the "
       "<a href=\"../rules/\">Rules</a> page every rule quantifies over sets <var>M</var> defines (sites, rails, "
       "junctions) and reads numbers <var>M</var> declares (capacity, the geometry limits), beside the sets a run "
-      "defines (operations, instants). On the <a href=\"../compilation/\">Compilation</a> page the compiler's first "
-      "definition is the trap graph A(<var>M</var>), a projection of <var>M</var>, and its proved checker is handed "
-      "three facts read off <var>M</var>'s document. On the <a href=\"../evaluation/\">Evaluation</a> page the three "
+      "defines (operations, instants). On the <a href=\"../compilation/\">Compilation</a> page the compiler, QCCDCert, "
+      "reads <var>M</var> as a hardware program, another projection of it: its traps and junctions are sites, the "
+      "routes between traps are paths, its gate and readout zones carry calibrations. On the "
+      "<a href=\"../evaluation/\">Evaluation</a> page the three "
       "texts a number is a function of are <var>M</var>, a programme and an evaluation.</p>")
     w("</div>")  # .algo
     w(learn.recap([

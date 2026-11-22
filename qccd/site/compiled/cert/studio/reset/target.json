@@ -1,0 +1,1 @@
+{"bits":2,"execution":{"initial":[0,1],"instructions":[{"pump":{"calibration":0,"guarded":false,"ion":0,"origin":{"expansion":[],"statement":33}}}]},"expandedOperations":1,"finalTick":50,"hardwareName":"grid2x3","pulseControlTokens":1,"qubits":2,"schema":"qccd.dynamic-target.v1","sourceRoot":"profile:qiskit:.\\main.qasm","status":"verified-quantum-classical-execution"}

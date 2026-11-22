@@ -1,0 +1,17 @@
+{
+ "compiler": "QCCDCert",
+ "circuit_ops": [
+  {
+   "i": 0,
+   "name": "measure",
+   "qubits": [
+    0,
+    0
+   ],
+   "params": [],
+   "line": 5
+  }
+ ],
+ "gates": [],
+ "note": "QCCDCert target code: Meaning is a clause of the compiler's theorem, no per-gate witness"
+}

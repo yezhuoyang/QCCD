@@ -594,7 +594,7 @@ def studio_pages(dst: Path) -> list[Path]:
     * ex/dev-<arch>.html: the machine, no programme; a chapter figure loads into it the programme
       Lean's replay of a certificate describes;
     * ex/<id>.html: a published example's REAL compiled programme with its circuit through the
-      checked source map, exactly as the Compilation page renders it (build_compiled_pages)."""
+      checked source map, rendered with the one design-page template."""
     from . import build as site
     from ..__main__ import main as qccd_main
     from ..arch import Architecture
@@ -621,7 +621,8 @@ def studio_pages(dst: Path) -> list[Path]:
         embed(p)
     wanted = {c["id"] for c in published_cases()}
     model, archs = corrected_model(), {}
-    for g in site.load_compiled() + site.load_algo():
+    from .compile_examples import load_algo, load_compiled
+    for g in load_compiled() + load_algo():
         if g["id"] not in wanted:
             continue
         dev = g["meta"].get("device", "ring6d")

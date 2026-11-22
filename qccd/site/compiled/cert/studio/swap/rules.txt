@@ -1,0 +1,5 @@
+assert cap: forall s:Sites. Ntr(s) <= cap(s);
+assert rest: N+(J0_1) = 0 and N+(J1_1) = 0;
+assert wave: forall c:Channels. W(c) <= 1;
+assert beam: forall s:Sites. P(s) <= 1;
+assert spread: forall s:Sites. (t = 0 and delta = 0) => N-(s) <= 1;

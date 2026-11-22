@@ -1,0 +1,11 @@
+OPENQASM 2.0;
+qreg q[2];
+creg c[2];
+U(pi/7,0,0) q[0];
+CX q[0],q[1];
+measure q[0] -> c[0];
+if(c==1) CX q[0],q[1];
+if(c==1) measure q -> c;
+reset q[0];
+if(c==1) reset q[1];
+barrier q;

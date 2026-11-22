@@ -864,6 +864,62 @@ def cmd_site(args) -> int:
     return build(Path(args.out))
 
 
+def cmd_cert(args) -> int:
+    """`qccd cert` -- QCCDCert, the verified compiler (qccd/cert/).
+
+    `qccd cert compile circuit.qasm --arch machine.arch.json -o out/` translates the machine
+    into a QCCDCert hardware program, compiles with QCCDCert (Theorem verified_compilation
+    covers the result), adds this project's cooling extension, and writes every stage, the
+    target code in the paper's syntax, the TSIR programme and, with --html, the studio page
+    with the circuit beside it.  `qccd cert examples` rebuilds the Compilation page's data."""
+    import json as _json
+    if args.action == "examples":
+        from .cert import examples, studio_examples
+        examples.build()
+        studio_examples.build()
+        return 0
+    from .arch import Architecture
+    from .cert.driver import SPREAD, compile_for_machine
+    from .cert.machine import Untranslatable
+    from .cert.toolchain import ToolchainMissing, ToolFailed
+    from .compile import insert_cooling
+    from .cost import corrected_model
+    from .ir.source_map import build as build_source
+    from .ir.tsir import TSIR
+    from .verify import verify
+    if not args.qasm or not args.arch:
+        raise SystemExit("qccd cert compile needs a circuit and --arch")
+    arch = Architecture.from_json(_json.loads(Path(args.arch).read_text(encoding="utf-8")))
+    model = corrected_model()
+    out = Path(args.out)
+    try:
+        r = compile_for_machine(arch, model, args.qasm, out, extra_rules=[SPREAD] if args.spread else [])
+    except (Untranslatable, ToolchainMissing) as exc:
+        print(f"qccd cert: {exc}", file=sys.stderr)
+        return 2
+    except ToolFailed as exc:
+        print(f"QCCDCert refused the compilation (no target code exists):\n{exc.output[-2000:]}", file=sys.stderr)
+        return 1
+    c = r.compilation
+    print("\n".join(c.lines["timed"]))
+    print(f"\nQCCDCert: {len(c.execution['instructions'])} events, {c.finish} us in sequence, "
+          f"{c.parallel.get('finish')} us parallel -- Meaning, Legality, Time hold (verified_compilation)")
+    prog = TSIR.from_json(r.tsir)
+    cooled = insert_cooling(prog, arch, model).program
+    (out / "prog.cooled.tsir.json").write_text(_json.dumps(cooled.to_json(), indent=1) + "\n", encoding="utf-8")
+    rep = verify(cooled, arch, model, check_metrics=False)
+    failed = rep.summary()["rules"]["failed"]
+    print(f"extension (cooling, studio replay): {rep.summary()['metrics']['runtime_us']:g} us, "
+          f"studio rules failed: {failed or 'none'}")
+    if args.html:
+        from .viz.render import render_html
+        render_html(arch, cooled, rep.result, model, args.html, kicker="COMPILED BY QCCDCERT",
+                    headline=f"{Path(args.qasm).name} on {arch.name}",
+                    source=build_source(cooled, r.certificate, out / "main.qasm"), open_pane="Q")
+        print(f"page: {args.html}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The parser, as a value.
 
@@ -1051,6 +1107,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_site = sub.add_parser("site", help="the website, as static files (docs/WEBSITE_PLAN.md)")
     p_site.add_argument("-o", "--out", default=str(ROOT / "site"))
 
+    p_cert = sub.add_parser("cert", help="QCCDCert, the verified compiler: compile a circuit for a machine")
+    p_cert.add_argument("action", choices=["compile", "examples"])
+    p_cert.add_argument("qasm", nargs="?", help="the OpenQASM 2 circuit (compile)")
+    p_cert.add_argument("--arch", help="the machine, an .arch.json (compile)")
+    p_cert.add_argument("-o", "--out", default=str(ROOT / "out" / "cert"), help="where every stage is written")
+    p_cert.add_argument("--html", help="also write the studio page with the circuit beside it")
+    p_cert.add_argument("--spread", action="store_true",
+                        help="add the rule that starts at most one ion per site")
+
     return ap
 
 
@@ -1064,7 +1129,7 @@ def main(argv=None) -> int:
             "analyses": cmd_analyses,
             "arch": cmd_arch,
             "source": cmd_arch, "studio": cmd_studio, "open": cmd_open,
-            "tutorial": cmd_tutorial, "site": cmd_site,
+            "tutorial": cmd_tutorial, "site": cmd_site, "cert": cmd_cert,
             "listing": cmd_listing, "disasm": cmd_listing}[args.cmd](args)
 
 

@@ -24,20 +24,30 @@ GROUPS = (
 )
 
 PUBS: list[dict] = [
-    # The list is empty on purpose (2026-09-10): the papers of the project go here as they
-    # appear.  An entry looks like this, and the `used` line says where the paper enters
-    # the site:
-    #
-    # {"key": "ye2026", "group": "this",
-    #  "title": "...", "authors": ["Zhuoyang Ye", "..."],
-    #  "venue": "...", "year": 2026, "arxiv": "2609.xxxxx", "doi": "10.xxxx/xxxxx",
-    #  "used": "..."},
+    # The papers of the project, newest first.  `arxiv`/`doi` are added when they exist;
+    # `used` says where the paper enters the site.
+    {"key": "qccdcert", "group": "this",
+     "title": "QCCDCert: Formally Verified Compilation for QCCD Co-Design",
+     "authors": ["John Zhuoyang Ye", "Jens Palsberg", "Ke Sun", "Hartmut Häffner"],
+     "venue": "Preprint", "year": 2026,
+     "url": "../compilation/", "url_label": "the compiler, explained on this site",
+     "used": "The compiler of this site: its hardware and rule programs, the event frame, the nine "
+             "stages and the theorem Meaning ∧ Legality ∧ Time are the paper's, on the Compilation page "
+             "and in the tutorial."},
 ]
 
-#: How to cite the website and the tool while no paper about them is published.
+#: How to cite the paper, the website and the tool.
 SOFTWARE = {
-    "note": "No paper about the tool has been published yet. Until there is one, cite the software and the website.",
-    "bibtex": """@software{qccd,
+    "note": "For the verified compiler and the co-design method, cite the QCCDCert paper; for the website "
+            "and the design tool, cite the software.",
+    "bibtex": """@misc{qccdcert,
+  author = {Ye, John Zhuoyang and Palsberg, Jens and Sun, Ke and H{\\"a}ffner, Hartmut},
+  title  = {{QCCDCert}: Formally Verified Compilation for {QCCD} Co-Design},
+  year   = {2026},
+  note   = {Preprint}
+}
+
+@software{qccd,
   author = {Ye, Zhuoyang},
   title  = {QCCD: a fault-tolerant algorithm and trapped-ion architecture codesign tool},
   year   = {2026},

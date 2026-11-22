@@ -292,6 +292,13 @@ def _wait_for_job(workspace, job_id):
     pytest.fail("Studio run did not finish within 120 seconds")
 
 
+@pytest.fixture(autouse=True)
+def _project_compiler_path(monkeypatch):
+    """These tests are about the project's own compiler's staged evidence.  Under `auto` the
+    studio prefers QCCDCert when it is installed (qccd/cert/), so it is turned off here."""
+    monkeypatch.setenv("QCCD_CERT", "off")
+
+
 def _studio_workspace(tmp_path):
     from qccd.workspace.app import Workspace
     from qccd.workspace.evaluator import Toolchain

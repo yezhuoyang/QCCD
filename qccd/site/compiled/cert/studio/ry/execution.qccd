@@ -1,0 +1,4 @@
+init q0@T0_0h,q1@T0_1h;
+pulse R((5/10),((pi/2)-0)) q0 @T0_0h via c0;
+pulse R(pi,0) q0 @T0_0h via c1;
+pulse R(pi,((0+0)/2)) q0 @T0_0h via c2;

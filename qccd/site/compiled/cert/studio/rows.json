@@ -1,0 +1,372 @@
+[
+ {
+  "id": "bell",
+  "statement": "h q[0]; cx q[0],q[1]; measure q -> c;",
+  "what": "a Hadamard, a CNOT that needs transport, two readouts",
+  "device": "grid2x3",
+  "finish_us": 735,
+  "parallel_us": 735,
+  "instructions": 12,
+  "pulses": [
+   "pulse R(pi/2,pi/2-pi) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+pi)/2) q0;",
+   "pulse R(pi/2,pi/2) q0;",
+   "pulse MS(pi/2) q0,q1;",
+   "pulse R(-pi/2,0) q0;",
+   "pulse R(-pi/2,0) q1;",
+   "pulse R(-pi/2,pi/2) q0;",
+   "measure q0 -> c0;",
+   "measure q1 -> c1;"
+  ],
+  "cools": 1,
+  "cooled_us": 795.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (7 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "h",
+  "statement": "h q[0];",
+  "what": "a Hadamard",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(pi/2,pi/2-pi) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+pi)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "x",
+  "statement": "x q[0];",
+  "what": "a bit flip",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(pi,pi/2-pi) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+pi)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "y",
+  "statement": "y q[0];",
+  "what": "a bit flip with a phase",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(pi,pi/2-pi/2) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(pi/2+pi/2)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "z",
+  "statement": "z q[0];",
+  "what": "a phase flip",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(0,pi/2-pi) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+pi)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "s",
+  "statement": "s q[0];",
+  "what": "a quarter turn about z",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(0,pi/2-pi/2) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+pi/2)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "t",
+  "statement": "t q[0];",
+  "what": "an eighth of a turn about z",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(0,pi/2-pi/4) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+pi/4)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "rx",
+  "statement": "rx(0.5) q[0];",
+  "what": "a rotation about x by 0.5",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(5/10,pi/2-pi/2) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(-pi/2+pi/2)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "ry",
+  "statement": "ry(0.5) q[0];",
+  "what": "a rotation about y by 0.5",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(5/10,pi/2-0) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+0)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "rz",
+  "statement": "rz(0.7854) q[0];",
+  "what": "a rotation about z by 0.7854",
+  "device": "grid2x3",
+  "finish_us": 15,
+  "parallel_us": 15,
+  "instructions": 3,
+  "pulses": [
+   "pulse R(0,pi/2-7854/10000) q0;",
+   "pulse R(pi,0) q0;",
+   "pulse R(pi,(0+7854/10000)/2) q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 15.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "cx",
+  "statement": "cx q[0],q[1];",
+  "what": "the entangler",
+  "device": "grid2x3",
+  "finish_us": 480,
+  "parallel_us": 480,
+  "instructions": 7,
+  "pulses": [
+   "pulse R(pi/2,pi/2) q0;",
+   "pulse MS(pi/2) q0,q1;",
+   "pulse R(-pi/2,0) q0;",
+   "pulse R(-pi/2,0) q1;",
+   "pulse R(-pi/2,pi/2) q0;"
+  ],
+  "cools": 1,
+  "cooled_us": 540.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (4 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "cz",
+  "statement": "cz q[0],q[1];",
+  "what": "a controlled phase",
+  "device": "grid2x3",
+  "finish_us": 510,
+  "parallel_us": 495,
+  "instructions": 13,
+  "pulses": [
+   "pulse R(pi/2,pi/2-pi) q1;",
+   "pulse R(pi,0) q1;",
+   "pulse R(pi,(0+pi)/2) q1;",
+   "pulse R(pi/2,pi/2) q0;",
+   "pulse MS(pi/2) q0,q1;",
+   "pulse R(-pi/2,0) q0;",
+   "pulse R(-pi/2,0) q1;",
+   "pulse R(-pi/2,pi/2) q0;",
+   "pulse R(pi/2,pi/2-pi) q1;",
+   "pulse R(pi,0) q1;",
+   "pulse R(pi,(0+pi)/2) q1;"
+  ],
+  "cools": 1,
+  "cooled_us": 570.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (7 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "swap",
+  "statement": "swap q[0],q[1];",
+  "what": "three CNOTs",
+  "device": "grid2x3",
+  "finish_us": 570,
+  "parallel_us": 570,
+  "instructions": 17,
+  "pulses": [
+   "pulse R(pi/2,pi/2) q0;",
+   "pulse MS(pi/2) q0,q1;",
+   "pulse R(-pi/2,0) q0;",
+   "pulse R(-pi/2,0) q1;",
+   "pulse R(-pi/2,pi/2) q0;",
+   "pulse R(pi/2,pi/2) q1;",
+   "pulse MS(pi/2) q1,q0;",
+   "pulse R(-pi/2,0) q1;",
+   "pulse R(-pi/2,0) q0;",
+   "pulse R(-pi/2,pi/2) q1;",
+   "pulse R(pi/2,pi/2) q0;",
+   "pulse MS(pi/2) q0,q1;",
+   "pulse R(-pi/2,0) q0;",
+   "pulse R(-pi/2,0) q1;",
+   "pulse R(-pi/2,pi/2) q0;"
+  ],
+  "cools": 3,
+  "cooled_us": 1230.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (4 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "measure",
+  "statement": "measure q[0] -> c[0];",
+  "what": "a readout",
+  "device": "grid2x3",
+  "finish_us": 120,
+  "parallel_us": 120,
+  "instructions": 1,
+  "pulses": [
+   "measure q0 -> c0;"
+  ],
+  "cools": 0,
+  "cooled_us": 120.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (0 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ },
+ {
+  "id": "reset",
+  "statement": "reset q[0];",
+  "what": "optical pumping to 0",
+  "device": "grid2x3",
+  "finish_us": 50,
+  "parallel_us": 50,
+  "instructions": 1,
+  "pulses": [
+   "reset q0;"
+  ],
+  "cools": 0,
+  "cooled_us": 50.0,
+  "studio_failed": [],
+  "studio_passed": 25,
+  "notes": [
+   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+   "7 gate zones get one calibration per exact waveform of the program (0 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  ]
+ }
+]

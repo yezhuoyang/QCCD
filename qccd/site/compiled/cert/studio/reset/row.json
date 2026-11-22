@@ -1,0 +1,21 @@
+{
+ "id": "reset",
+ "statement": "reset q[0];",
+ "what": "optical pumping to 0",
+ "device": "grid2x3",
+ "finish_us": 50,
+ "parallel_us": 50,
+ "instructions": 1,
+ "pulses": [
+  "reset q0;"
+ ],
+ "cools": 0,
+ "cooled_us": 50.0,
+ "studio_failed": [],
+ "studio_passed": 25,
+ "notes": [
+  "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+  "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+  "7 gate zones get one calibration per exact waveform of the program (0 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+ ]
+}

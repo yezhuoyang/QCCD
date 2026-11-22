@@ -1,0 +1,15 @@
+init q0@S,q1@S,q2@G;
+simd transport q0:S->G[p0];
+pulse R((pi/2),(pi/2)) q0 @G via c0;
+pulse MS((pi/2)) q0,q2 @G via c1;
+broadcast R((-(pi/2)),0) q0@G, R((-(pi/2)),0) q2@G via b0;
+pulse R((-(pi/2)),(pi/2)) q0 @G via c3;
+simd transport q0:G->S[p1];
+simd transport q1:S->G[p0];
+pulse R((pi/2),(pi/2)) q1 @G via c0;
+pulse MS((pi/2)) q1,q2 @G via c1;
+broadcast R((-(pi/2)),0) q1@G, R((-(pi/2)),0) q2@G via b0;
+pulse R((-(pi/2)),(pi/2)) q1 @G via c3;
+readout q2 -> c0 @G via a0;
+latch saved <- little_endian(c0) == 1;
+when saved pump q2 @G via p0;

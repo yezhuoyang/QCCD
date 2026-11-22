@@ -1,0 +1,381 @@
+{
+ "name": "circuit+cooling",
+ "arch_spec": "grid2x3",
+ "instructions": [
+  {
+   "type": "init",
+   "id": 0,
+   "placement": {
+    "q0": "T0_0h",
+    "q1": "T0_1h"
+   },
+   "quanta": {
+    "q0": 0.0,
+    "q1": 0.0
+   },
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "init",
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 1,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     1.5707963267948966,
+     -1.5707963267948966
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_0h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 0,
+    "op": [
+     0
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 2,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     3.141592653589793,
+     0.0
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_0h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 1,
+    "op": [
+     0
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 3,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     3.141592653589793,
+     1.5707963267948966
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_0h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 2,
+    "op": [
+     0
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 4,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     1.5707963267948966,
+     1.5707963267948966
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_0h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 3,
+    "op": [
+     1
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "simd",
+   "id": 5,
+   "class": "shuttle",
+   "mode": "inter",
+   "participants": [
+    {
+     "ion": "q0",
+     "from": "T0_0h",
+     "to": "T1_0v",
+     "via": [
+      "T0_0h.b",
+      "T1_0v.a"
+     ]
+    }
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "transport",
+    "target_index": 4,
+    "op": [
+     1
+    ],
+    "op_from": "next use",
+    "call": 0
+   }
+  },
+  {
+   "type": "simd",
+   "id": 6,
+   "class": "shuttle",
+   "mode": "inter",
+   "participants": [
+    {
+     "ion": "q0",
+     "from": "T1_0v",
+     "to": "T0_1h",
+     "via": [
+      "T1_0v.b",
+      "T0_1h.b"
+     ]
+    }
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "transport",
+    "target_index": 5,
+    "op": [
+     1
+    ],
+    "op_from": "next use",
+    "call": 0
+   }
+  },
+  {
+   "type": "cool",
+   "id": 13,
+   "broadcast": true,
+   "meta": {
+    "batch": null,
+    "before_instruction": 7,
+    "kind": "cool",
+    "trigger": "R7_gate",
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 7,
+   "mode": "intra",
+   "gate": "MS",
+   "params": [
+    [
+     1.5707963267948966
+    ]
+   ],
+   "pairs": [
+    [
+     "q0",
+     "q1"
+    ]
+   ],
+   "sites": [
+    "T0_1h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 6,
+    "op": [
+     1
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 8,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     -1.5707963267948966,
+     0.0
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_1h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 7,
+    "op": [
+     1
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 9,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     -1.5707963267948966,
+     0.0
+    ]
+   ],
+   "ions": [
+    "q1"
+   ],
+   "sites": [
+    "T0_1h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 8,
+    "op": [
+     1
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "gate",
+   "id": 10,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     -1.5707963267948966,
+     1.5707963267948966
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_1h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 9,
+    "op": [
+     1
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "measure",
+   "id": 11,
+   "ions": [
+    "q0"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "readout",
+    "target_index": 10,
+    "op": [
+     2
+    ],
+    "call": 0
+   }
+  },
+  {
+   "type": "measure",
+   "id": 12,
+   "ions": [
+    "q1"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "readout",
+    "target_index": 11,
+    "op": [
+     2
+    ],
+    "call": 0
+   }
+  }
+ ],
+ "metrics": {},
+ "meta": {
+  "compiler": "QCCDCert",
+  "derived_from": "circuit",
+  "cooling_policy": {
+   "max_gate_quanta": 1.0,
+   "max_quanta_between_cools": null,
+   "broadcast": true
+  },
+  "prov": {
+   "version": 1,
+   "level": "calls",
+   "root": "",
+   "sites": [
+    {
+     "file": "qccd/compile/cooling.py",
+     "line": 368,
+     "text": "prov.stamp(cooled, \"compile.insert_cooling\", only_untagged=True,",
+     "func": "insert_cooling"
+    }
+   ],
+   "calls": [
+    {
+     "op": "compile.insert_cooling",
+     "site": 0,
+     "args": {
+      "max_gate_quanta": 1.0,
+      "broadcast": true,
+      "max_quanta_between_cools": null
+     }
+    }
+   ]
+  }
+ },
+ "id_seq": 14
+}

@@ -1,0 +1,1 @@
+{"finish":480,"instructions":7,"scheduler":"exclusive","schema":"qccd.parallel-schedule.v1","sequentialFinish":480,"starts":[0,5,175,440,465,470,475],"status":"parallel"}

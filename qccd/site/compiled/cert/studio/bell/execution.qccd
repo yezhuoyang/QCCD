@@ -1,0 +1,13 @@
+init q0@T0_0h,q1@T0_1h;
+pulse R((pi/2),((pi/2)-pi)) q0 @T0_0h via c0;
+pulse R(pi,0) q0 @T0_0h via c1;
+pulse R(pi,((0+pi)/2)) q0 @T0_0h via c2;
+pulse R((pi/2),(pi/2)) q0 @T0_0h via c3;
+simd transport q0:T0_0h->T1_0v[p0];
+simd transport q0:T1_0v->T0_1h[p14];
+pulse MS((pi/2)) q0,q1 @T0_1h via c11;
+pulse R((-(pi/2)),0) q0 @T0_1h via c12;
+pulse R((-(pi/2)),0) q1 @T0_1h via c12;
+pulse R((-(pi/2)),(pi/2)) q0 @T0_1h via c13;
+readout q0 -> c0 @T0_1h via a1;
+readout q1 -> c1 @T0_1h via a1;

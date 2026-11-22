@@ -1,0 +1,3745 @@
+{"timed":
+ {"initial": [0, 1],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 0}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 1}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 2}}]},
+ "status": "verified-quantum-classical-execution",
+ "source":
+ {"root":
+  "profile:qiskit:.\\main.qasm",
+  "bundle":
+  {"units":
+   [{"version": {"minor": 0, "major": 2},
+     "statements":
+     [{"include": {"path": "qelib1.inc"}},
+      {"qreg": {"size": 2, "name": "q"}},
+      {"creg": {"size": 2, "name": "c"}},
+      {"operation":
+       {"operation":
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters": [],
+            "operands": [{"indexed": {"name": "q", "index": 0}}],
+            "name": "t"}}}}}}],
+     "id":
+     ".\\main.qasm"},
+    {"version": null,
+     "statements":
+     [{"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": ["theta", "phi", "lambda"],
+         "name": "u3",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"parameter": {"name": "theta"}},
+              "target": "q",
+              "phi": {"parameter": {"name": "phi"}},
+              "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": ["phi", "lambda"],
+         "name": "u2",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}},
+              "target": "q",
+              "phi": {"parameter": {"name": "phi"}},
+              "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": ["lambda"],
+         "name": "u1",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "q",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["c", "t"],
+         "parameters": [],
+         "name": "cx",
+         "body":
+         [{"unitary":
+           {"operation": {"cx": {"target": "t", "control": "c"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "id",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "a",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"rational": {"numerator": 0, "denominator": 1}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "x",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              ["pi", {"rational": {"numerator": 0, "denominator": 1}}, "pi"],
+              "operands": ["a"],
+              "name": "u3"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "y",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              ["pi",
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}},
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}],
+              "operands": ["a"],
+              "name": "u3"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "z",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters": ["pi"], "operands": ["a"], "name": "u1"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "h",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"rational": {"numerator": 0, "denominator": 1}}, "pi"],
+              "operands": ["a"],
+              "name": "u2"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "s",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}],
+              "operands": ["a"],
+              "name": "u1"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "sdg",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"neg":
+                {"argument":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left": "pi"}}}}],
+              "operands": ["a"],
+              "name": "u1"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "t",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"div":
+                {"right": {"rational": {"numerator": 4, "denominator": 1}},
+                 "left": "pi"}}],
+              "operands": ["a"],
+              "name": "u1"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": [],
+         "name": "tdg",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"neg":
+                {"argument":
+                 {"div":
+                  {"right": {"rational": {"numerator": 4, "denominator": 1}},
+                   "left": "pi"}}}}],
+              "operands": ["a"],
+              "name": "u1"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": ["theta"],
+         "name": "rx",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"parameter": {"name": "theta"}},
+               {"neg":
+                {"argument":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left": "pi"}}}},
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}],
+              "operands": ["a"],
+              "name": "u3"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": ["theta"],
+         "name": "ry",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"parameter": {"name": "theta"}},
+               {"rational": {"numerator": 0, "denominator": 1}},
+               {"rational": {"numerator": 0, "denominator": 1}}],
+              "operands": ["a"],
+              "name": "u3"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a"],
+         "parameters": ["phi"],
+         "name": "rz",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [{"parameter": {"name": "phi"}}],
+              "operands": ["a"],
+              "name": "u1"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": [],
+         "name": "cz",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": [],
+         "name": "cy",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "sdg"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "s"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": [],
+         "name": "ch",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "sdg"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "s"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "x"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["a"], "name": "s"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b", "c"],
+         "parameters": [],
+         "name": "ccx",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["c"], "name": "h"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["b", "c"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["c"], "name": "tdg"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "c"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["c"], "name": "t"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["b", "c"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["c"], "name": "tdg"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "c"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["c"], "name": "t"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["c"], "name": "h"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["a"], "name": "t"}}}},
+          {"unitary":
+           {"operation":
+            {"call": {"parameters": [], "operands": ["b"], "name": "tdg"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": ["lambda"],
+         "name": "crz",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": {"parameter": {"name": "lambda"}}}}],
+              "operands": ["b"],
+              "name": "u1"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"neg":
+                {"argument":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left": {"parameter": {"name": "lambda"}}}}}}],
+              "operands": ["b"],
+              "name": "u1"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": ["lambda"],
+         "name": "cu1",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": {"parameter": {"name": "lambda"}}}}],
+              "operands": ["a"],
+              "name": "u1"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"neg":
+                {"argument":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left": {"parameter": {"name": "lambda"}}}}}}],
+              "operands": ["b"],
+              "name": "u1"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": {"parameter": {"name": "lambda"}}}}],
+              "operands": ["b"],
+              "name": "u1"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["c", "t"],
+         "parameters": ["theta", "phi", "lambda"],
+         "name": "cu3",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left":
+                 {"sub":
+                  {"right": {"parameter": {"name": "phi"}},
+                   "left": {"parameter": {"name": "lambda"}}}}}}],
+              "operands": ["t"],
+              "name": "u1"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["c", "t"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"neg":
+                {"argument":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left": {"parameter": {"name": "theta"}}}}}},
+               {"rational": {"numerator": 0, "denominator": 1}},
+               {"neg":
+                {"argument":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left":
+                   {"add":
+                    {"right": {"parameter": {"name": "lambda"}},
+                     "left": {"parameter": {"name": "phi"}}}}}}}}],
+              "operands": ["t"],
+              "name": "u3"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters": [], "operands": ["c", "t"], "name": "cx"}}}},
+          {"unitary":
+           {"operation":
+            {"call":
+             {"parameters":
+              [{"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": {"parameter": {"name": "theta"}}}},
+               {"parameter": {"name": "phi"}},
+               {"rational": {"numerator": 0, "denominator": 1}}],
+              "operands": ["t"],
+              "name": "u3"}}}}]}}}],
+     "id": "builtin:qelib1.inc"},
+    {"version": null,
+     "statements":
+     [{"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": ["theta", "phi", "lambda"],
+         "name": "u",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"parameter": {"name": "theta"}},
+              "target": "q",
+              "phi": {"parameter": {"name": "phi"}},
+              "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": ["gamma"],
+         "name": "u0",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "q",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"rational": {"numerator": 0, "denominator": 1}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": ["lambda"],
+         "name": "p",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "q",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": ["lambda"],
+         "name": "cp",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "a",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}}}}},
+          {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+          {"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "b",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": {"parameter": {"name": "lambda"}}}}}}}}}},
+          {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+          {"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "b",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": [],
+         "name": "sx",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}},
+              "target": "q",
+              "phi":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}},
+              "lambda":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["q"],
+         "parameters": [],
+         "name": "sxdg",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}},
+              "target": "q",
+              "phi":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}},
+              "lambda":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": [],
+         "name": "swap",
+         "body":
+         [{"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+          {"unitary": {"operation": {"cx": {"target": "a", "control": "b"}}}},
+          {"unitary":
+           {"operation": {"cx": {"target": "b", "control": "a"}}}}]}}},
+      {"gate":
+       {"declaration":
+        {"qubits": ["a", "b"],
+         "parameters": [],
+         "name": "csx",
+         "body":
+         [{"unitary":
+           {"operation":
+            {"u":
+             {"theta":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}},
+              "target": "b",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda": "pi"}}}},
+          {"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "a",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}}}}}},
+          {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+          {"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "b",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left":
+                  {"div":
+                   {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                    "left": "pi"}}}}}}}}}},
+          {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+          {"unitary":
+           {"operation":
+            {"u":
+             {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+              "target": "b",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}}}}}},
+          {"unitary":
+           {"operation":
+            {"u":
+             {"theta":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}},
+              "target": "b",
+              "phi": {"rational": {"numerator": 0, "denominator": 1}},
+              "lambda": "pi"}}}}]}}}],
+     "id": "builtin:qiskit-supplement.inc"},
+    {"version": {"minor": 0, "major": 2},
+     "statements":
+     [{"include": {"path": "<qiskit-supplement>"}},
+      {"include": {"path": "<original-source>"}}],
+     "id":
+     "profile:qiskit:.\\main.qasm"}],
+   "links":
+   [{"target": "builtin:qelib1.inc",
+     "path": "qelib1.inc",
+     "caller":
+     ".\\main.qasm"},
+    {"target": "builtin:qiskit-supplement.inc",
+     "path": "<qiskit-supplement>",
+     "caller":
+     "profile:qiskit:.\\main.qasm"},
+    {"target":
+     ".\\main.qasm",
+     "path": "<original-source>",
+     "caller":
+     "profile:qiskit:.\\main.qasm"}]}},
+ "schema": "qccd.dynamic-hardware.v1",
+ "routed":
+ {"initial": [0, 1],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 0}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 1}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 2}}]},
+ "pulses":
+ {"qubits": 2,
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false}}],
+  "bits": 2},
+ "placed":
+ {"initial": [0, 1],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false}}]},
+ "packed":
+ {"initial": [0, 1],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 0}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 1}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 2}}]},
+ "hardware":
+ {"rules":
+  [{"and":
+    {"rhs":
+     {"and":
+      {"rhs":
+       {"and":
+        {"rhs":
+         {"and":
+          {"rhs":
+           {"and":
+            {"rhs":
+             {"and":
+              {"rhs":
+               {"and":
+                {"rhs":
+                 {"and":
+                  {"rhs":
+                   {"and":
+                    {"rhs":
+                     {"eq":
+                      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                       "lhs":
+                       {"base": {"expression": {"const": {"value": 0}}}}}},
+                     "lhs":
+                     {"le":
+                      {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                       "lhs":
+                       {"base":
+                        {"expression":
+                         {"occupancy": {"site": 8, "phase": "during"}}}}}}}},
+                   "lhs":
+                   {"le":
+                    {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                     "lhs":
+                     {"base":
+                      {"expression":
+                       {"occupancy": {"site": 7, "phase": "during"}}}}}}}},
+                 "lhs":
+                 {"le":
+                  {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+                   "lhs":
+                   {"base":
+                    {"expression":
+                     {"occupancy": {"site": 6, "phase": "during"}}}}}}}},
+               "lhs":
+               {"le":
+                {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+                 "lhs":
+                 {"base":
+                  {"expression":
+                   {"occupancy": {"site": 5, "phase": "during"}}}}}}}},
+             "lhs":
+             {"le":
+              {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+               "lhs":
+               {"base":
+                {"expression":
+                 {"occupancy": {"site": 4, "phase": "during"}}}}}}}},
+           "lhs":
+           {"le":
+            {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+             "lhs":
+             {"base":
+              {"expression":
+               {"occupancy": {"site": 3, "phase": "during"}}}}}}}},
+         "lhs":
+         {"le":
+          {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+           "lhs":
+           {"base":
+            {"expression": {"occupancy": {"site": 2, "phase": "during"}}}}}}}},
+       "lhs":
+       {"le":
+        {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+         "lhs":
+         {"base":
+          {"expression": {"occupancy": {"site": 1, "phase": "during"}}}}}}}},
+     "lhs":
+     {"le":
+      {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+       "lhs":
+       {"base":
+        {"expression": {"occupancy": {"site": 0, "phase": "during"}}}}}}}},
+   {"and":
+    {"rhs":
+     {"eq":
+      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+       "lhs":
+       {"base": {"expression": {"occupancy": {"site": 8, "phase": "after"}}}}}},
+     "lhs":
+     {"eq":
+      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+       "lhs":
+       {"base":
+        {"expression": {"occupancy": {"site": 7, "phase": "after"}}}}}}}},
+   {"and":
+    {"rhs":
+     {"eq":
+      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+       "lhs": {"base": {"expression": {"const": {"value": 0}}}}}},
+     "lhs":
+     {"le":
+      {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+       "lhs": {"channelWaves": {"channel": 0}}}}}},
+   {"and":
+    {"rhs":
+     {"and":
+      {"rhs":
+       {"and":
+        {"rhs":
+         {"and":
+          {"rhs":
+           {"and":
+            {"rhs":
+             {"and":
+              {"rhs":
+               {"and":
+                {"rhs":
+                 {"and":
+                  {"rhs":
+                   {"and":
+                    {"rhs":
+                     {"eq":
+                      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                       "lhs":
+                       {"base": {"expression": {"const": {"value": 0}}}}}},
+                     "lhs":
+                     {"le":
+                      {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                       "lhs":
+                       {"base": {"expression": {"pulsesAt": {"site": 8}}}}}}}},
+                   "lhs":
+                   {"le":
+                    {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                     "lhs":
+                     {"base": {"expression": {"pulsesAt": {"site": 7}}}}}}}},
+                 "lhs":
+                 {"le":
+                  {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                   "lhs":
+                   {"base": {"expression": {"pulsesAt": {"site": 6}}}}}}}},
+               "lhs":
+               {"le":
+                {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                 "lhs": {"base": {"expression": {"pulsesAt": {"site": 5}}}}}}}},
+             "lhs":
+             {"le":
+              {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+               "lhs": {"base": {"expression": {"pulsesAt": {"site": 4}}}}}}}},
+           "lhs":
+           {"le":
+            {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+             "lhs": {"base": {"expression": {"pulsesAt": {"site": 3}}}}}}}},
+         "lhs":
+         {"le":
+          {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+           "lhs": {"base": {"expression": {"pulsesAt": {"site": 2}}}}}}}},
+       "lhs":
+       {"le":
+        {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+         "lhs": {"base": {"expression": {"pulsesAt": {"site": 1}}}}}}}},
+     "lhs":
+     {"le":
+      {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+       "lhs": {"base": {"expression": {"pulsesAt": {"site": 0}}}}}}}},
+   {"and":
+    {"rhs":
+     {"and":
+      {"rhs":
+       {"and":
+        {"rhs":
+         {"and":
+          {"rhs":
+           {"and":
+            {"rhs":
+             {"and":
+              {"rhs":
+               {"and":
+                {"rhs":
+                 {"and":
+                  {"rhs":
+                   {"and":
+                    {"rhs":
+                     {"eq":
+                      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                       "lhs":
+                       {"base": {"expression": {"const": {"value": 0}}}}}},
+                     "lhs":
+                     {"implies":
+                      {"premise":
+                       {"and":
+                        {"rhs":
+                         {"eq":
+                          {"rhs":
+                           {"base": {"expression": {"const": {"value": 0}}}},
+                           "lhs": {"base": {"expression": "duration"}}}},
+                         "lhs":
+                         {"eq":
+                          {"rhs":
+                           {"base": {"expression": {"const": {"value": 0}}}},
+                           "lhs": {"base": {"expression": "start"}}}}}},
+                       "conclusion":
+                       {"le":
+                        {"rhs":
+                         {"base": {"expression": {"const": {"value": 1}}}},
+                         "lhs":
+                         {"base":
+                          {"expression":
+                           {"occupancy":
+                            {"site": 8, "phase": "before"}}}}}}}}}},
+                   "lhs":
+                   {"implies":
+                    {"premise":
+                     {"and":
+                      {"rhs":
+                       {"eq":
+                        {"rhs":
+                         {"base": {"expression": {"const": {"value": 0}}}},
+                         "lhs": {"base": {"expression": "duration"}}}},
+                       "lhs":
+                       {"eq":
+                        {"rhs":
+                         {"base": {"expression": {"const": {"value": 0}}}},
+                         "lhs": {"base": {"expression": "start"}}}}}},
+                     "conclusion":
+                     {"le":
+                      {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                       "lhs":
+                       {"base":
+                        {"expression":
+                         {"occupancy": {"site": 7, "phase": "before"}}}}}}}}}},
+                 "lhs":
+                 {"implies":
+                  {"premise":
+                   {"and":
+                    {"rhs":
+                     {"eq":
+                      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                       "lhs": {"base": {"expression": "duration"}}}},
+                     "lhs":
+                     {"eq":
+                      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                       "lhs": {"base": {"expression": "start"}}}}}},
+                   "conclusion":
+                   {"le":
+                    {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                     "lhs":
+                     {"base":
+                      {"expression":
+                       {"occupancy": {"site": 6, "phase": "before"}}}}}}}}}},
+               "lhs":
+               {"implies":
+                {"premise":
+                 {"and":
+                  {"rhs":
+                   {"eq":
+                    {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                     "lhs": {"base": {"expression": "duration"}}}},
+                   "lhs":
+                   {"eq":
+                    {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                     "lhs": {"base": {"expression": "start"}}}}}},
+                 "conclusion":
+                 {"le":
+                  {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                   "lhs":
+                   {"base":
+                    {"expression":
+                     {"occupancy": {"site": 5, "phase": "before"}}}}}}}}}},
+             "lhs":
+             {"implies":
+              {"premise":
+               {"and":
+                {"rhs":
+                 {"eq":
+                  {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                   "lhs": {"base": {"expression": "duration"}}}},
+                 "lhs":
+                 {"eq":
+                  {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                   "lhs": {"base": {"expression": "start"}}}}}},
+               "conclusion":
+               {"le":
+                {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+                 "lhs":
+                 {"base":
+                  {"expression":
+                   {"occupancy": {"site": 4, "phase": "before"}}}}}}}}}},
+           "lhs":
+           {"implies":
+            {"premise":
+             {"and":
+              {"rhs":
+               {"eq":
+                {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                 "lhs": {"base": {"expression": "duration"}}}},
+               "lhs":
+               {"eq":
+                {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                 "lhs": {"base": {"expression": "start"}}}}}},
+             "conclusion":
+             {"le":
+              {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+               "lhs":
+               {"base":
+                {"expression":
+                 {"occupancy": {"site": 3, "phase": "before"}}}}}}}}}},
+         "lhs":
+         {"implies":
+          {"premise":
+           {"and":
+            {"rhs":
+             {"eq":
+              {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+               "lhs": {"base": {"expression": "duration"}}}},
+             "lhs":
+             {"eq":
+              {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+               "lhs": {"base": {"expression": "start"}}}}}},
+           "conclusion":
+           {"le":
+            {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+             "lhs":
+             {"base":
+              {"expression":
+               {"occupancy": {"site": 2, "phase": "before"}}}}}}}}}},
+       "lhs":
+       {"implies":
+        {"premise":
+         {"and":
+          {"rhs":
+           {"eq":
+            {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+             "lhs": {"base": {"expression": "duration"}}}},
+           "lhs":
+           {"eq":
+            {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+             "lhs": {"base": {"expression": "start"}}}}}},
+         "conclusion":
+         {"le":
+          {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+           "lhs":
+           {"base":
+            {"expression":
+             {"occupancy": {"site": 1, "phase": "before"}}}}}}}}}},
+     "lhs":
+     {"implies":
+      {"premise":
+       {"and":
+        {"rhs":
+         {"eq":
+          {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+           "lhs": {"base": {"expression": "duration"}}}},
+         "lhs":
+         {"eq":
+          {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+           "lhs": {"base": {"expression": "start"}}}}}},
+       "conclusion":
+       {"le":
+        {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+         "lhs":
+         {"base":
+          {"expression": {"occupancy": {"site": 0, "phase": "before"}}}}}}}}}}],
+  "device":
+  {"readouts":
+   [{"site": 0, "duration": 120, "channel": 1001},
+    {"site": 1, "duration": 120, "channel": 1003},
+    {"site": 2, "duration": 120, "channel": 1005},
+    {"site": 3, "duration": 120, "channel": 1002},
+    {"site": 4, "duration": 120, "channel": 1004},
+    {"site": 5, "duration": 120, "channel": 1006},
+    {"site": 6, "duration": 120, "channel": 1007}],
+   "pumps":
+   [{"site": 0, "duration": 50, "channel": 1001},
+    {"site": 1, "duration": 50, "channel": 1003},
+    {"site": 2, "duration": 50, "channel": 1005},
+    {"site": 3, "duration": 50, "channel": 1002},
+    {"site": 4, "duration": 50, "channel": 1004},
+    {"site": 5, "duration": 50, "channel": 1006},
+    {"site": 6, "duration": 50, "channel": 1007}],
+   "controller": {"duration": 1},
+   "chainLengths": null,
+   "base":
+   {"pathDurations":
+    [170,
+     170,
+     265,
+     265,
+     265,
+     265,
+     170,
+     170,
+     265,
+     265,
+     170,
+     170,
+     265,
+     265,
+     265,
+     265,
+     170,
+     170,
+     265,
+     265],
+    "opticalChannels": [1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007],
+    "name": "grid2x3",
+    "geometry":
+    {"sites":
+     [{"operations": [], "name": "T0_0h", "capacity": 2},
+      {"operations": [], "name": "T0_1h", "capacity": 2},
+      {"operations": [], "name": "T0_2h", "capacity": 2},
+      {"operations": [], "name": "T0_0v", "capacity": 2},
+      {"operations": [], "name": "T0_1v", "capacity": 2},
+      {"operations": [], "name": "T1_0v", "capacity": 2},
+      {"operations": [], "name": "T1_1v", "capacity": 2},
+      {"operations": [], "name": "J0_1", "capacity": 1},
+      {"operations": [], "name": "J1_1", "capacity": 1}],
+     "paths":
+     [{"waveform": 0, "via": [], "src": 0, "dst": 5, "channel": 0},
+      {"waveform": 1, "via": [], "src": 0, "dst": 3, "channel": 0},
+      {"waveform": 2, "via": [8], "src": 1, "dst": 5, "channel": 0},
+      {"waveform": 3, "via": [8], "src": 1, "dst": 6, "channel": 0},
+      {"waveform": 4, "via": [7], "src": 1, "dst": 3, "channel": 0},
+      {"waveform": 5, "via": [7], "src": 1, "dst": 4, "channel": 0},
+      {"waveform": 6, "via": [], "src": 2, "dst": 6, "channel": 0},
+      {"waveform": 7, "via": [], "src": 2, "dst": 4, "channel": 0},
+      {"waveform": 8, "via": [7], "src": 3, "dst": 1, "channel": 0},
+      {"waveform": 9, "via": [7], "src": 3, "dst": 4, "channel": 0},
+      {"waveform": 10, "via": [], "src": 3, "dst": 0, "channel": 0},
+      {"waveform": 11, "via": [], "src": 4, "dst": 2, "channel": 0},
+      {"waveform": 12, "via": [7], "src": 4, "dst": 1, "channel": 0},
+      {"waveform": 13, "via": [7], "src": 4, "dst": 3, "channel": 0},
+      {"waveform": 14, "via": [8], "src": 5, "dst": 1, "channel": 0},
+      {"waveform": 9, "via": [8], "src": 5, "dst": 6, "channel": 0},
+      {"waveform": 15, "via": [], "src": 5, "dst": 0, "channel": 0},
+      {"waveform": 16, "via": [], "src": 6, "dst": 2, "channel": 0},
+      {"waveform": 17, "via": [8], "src": 6, "dst": 1, "channel": 0},
+      {"waveform": 13, "via": [8], "src": 6, "dst": 5, "channel": 0}],
+     "broadcasts": [{"mandatory": false, "channel": 0}]},
+    "calibrations":
+    [{"waveform":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}}}},
+      "site": 0,
+      "duration": 5,
+      "channel": 1001},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 0,
+      "duration": 5,
+      "channel": 1001},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}}}},
+      "site": 0,
+      "duration": 5,
+      "channel": 1001},
+     {"waveform":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}}}},
+      "site": 1,
+      "duration": 5,
+      "channel": 1003},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 1,
+      "duration": 5,
+      "channel": 1003},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}}}},
+      "site": 1,
+      "duration": 5,
+      "channel": 1003},
+     {"waveform":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}}}},
+      "site": 2,
+      "duration": 5,
+      "channel": 1005},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 2,
+      "duration": 5,
+      "channel": 1005},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}}}},
+      "site": 2,
+      "duration": 5,
+      "channel": 1005},
+     {"waveform":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}}}},
+      "site": 3,
+      "duration": 5,
+      "channel": 1002},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 3,
+      "duration": 5,
+      "channel": 1002},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}}}},
+      "site": 3,
+      "duration": 5,
+      "channel": 1002},
+     {"waveform":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}}}},
+      "site": 4,
+      "duration": 5,
+      "channel": 1004},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 4,
+      "duration": 5,
+      "channel": 1004},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}}}},
+      "site": 4,
+      "duration": 5,
+      "channel": 1004},
+     {"waveform":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}}}},
+      "site": 5,
+      "duration": 5,
+      "channel": 1006},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 5,
+      "duration": 5,
+      "channel": 1006},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}}}},
+      "site": 5,
+      "duration": 5,
+      "channel": 1006},
+     {"waveform":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}}}},
+      "site": 6,
+      "duration": 5,
+      "channel": 1007},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 6,
+      "duration": 5,
+      "channel": 1007},
+     {"waveform":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}}}},
+      "site": 6,
+      "duration": 5,
+      "channel": 1007}],
+    "broadcasts":
+    [{"theta": {"rational": {"numerator": 0, "denominator": 1}},
+      "sites": [0, 1, 2, 3, 4, 5, 6],
+      "phi":
+      {"sub":
+       {"right":
+        {"div":
+         {"right": {"rational": {"numerator": 4, "denominator": 1}},
+          "left": "pi"}},
+        "left":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "maxPerSite": 1,
+      "duration": 5,
+      "channel": 1000},
+     {"theta": "pi",
+      "sites": [0, 1, 2, 3, 4, 5, 6],
+      "phi": {"rational": {"numerator": 0, "denominator": 1}},
+      "maxPerSite": 1,
+      "duration": 5,
+      "channel": 1000},
+     {"theta": "pi",
+      "sites": [0, 1, 2, 3, 4, 5, 6],
+      "phi":
+      {"div":
+       {"right": {"rational": {"numerator": 2, "denominator": 1}},
+        "left":
+        {"add":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+      "maxPerSite": 1,
+      "duration": 5,
+      "channel": 1000}]}},
+  "config":
+  {"useOnlyInitialPlacements": false,
+   "routeLookahead": 0,
+   "maxStates": 2000,
+   "maxPlacements": 64,
+   "maxDepth": 24,
+   "maxCandidates": 256,
+   "maxBatch": 2,
+   "initialPlacements": [],
+   "enableBroadcast": true,
+   "broadcastPlan": null}},
+ "frontend":
+ {"resolved":
+  {"entries":
+   [{"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": ["theta", "phi", "lambda"],
+        "name": "u",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"parameter": {"name": "theta"}},
+             "target": "q",
+             "phi": {"parameter": {"name": "phi"}},
+             "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 0},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": ["gamma"],
+        "name": "u0",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "q",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda": {"rational": {"numerator": 0, "denominator": 1}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 1},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": ["lambda"],
+        "name": "p",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "q",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 2},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": ["lambda"],
+        "name": "cp",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "a",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": {"parameter": {"name": "lambda"}}}}}}}},
+         {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+         {"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "b",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": {"parameter": {"name": "lambda"}}}}}}}}}},
+         {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+         {"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "b",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": {"parameter": {"name": "lambda"}}}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 3},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": [],
+        "name": "sx",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}},
+             "target": "q",
+             "phi":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}},
+             "lambda":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 4},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": [],
+        "name": "sxdg",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}},
+             "target": "q",
+             "phi":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}},
+             "lambda":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 5},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": [],
+        "name": "swap",
+        "body":
+        [{"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+         {"unitary": {"operation": {"cx": {"target": "a", "control": "b"}}}},
+         {"unitary":
+          {"operation": {"cx": {"target": "b", "control": "a"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 6},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": [],
+        "name": "csx",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}},
+             "target": "b",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda": "pi"}}}},
+         {"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "a",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}}}}}},
+         {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+         {"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "b",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left": "pi"}}}}}}}}}},
+         {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+         {"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "b",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}}}}}},
+         {"unitary":
+          {"operation":
+           {"u":
+            {"theta":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}},
+             "target": "b",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda": "pi"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qiskit-supplement.inc", "statement": 7},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": ["theta", "phi", "lambda"],
+        "name": "u3",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"parameter": {"name": "theta"}},
+             "target": "q",
+             "phi": {"parameter": {"name": "phi"}},
+             "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 0},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": ["phi", "lambda"],
+        "name": "u2",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}},
+             "target": "q",
+             "phi": {"parameter": {"name": "phi"}},
+             "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 1},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["q"],
+        "parameters": ["lambda"],
+        "name": "u1",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "q",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda": {"parameter": {"name": "lambda"}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 2},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["c", "t"],
+        "parameters": [],
+        "name": "cx",
+        "body":
+        [{"unitary":
+          {"operation": {"cx": {"target": "t", "control": "c"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 3},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "id",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"u":
+            {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+             "target": "a",
+             "phi": {"rational": {"numerator": 0, "denominator": 1}},
+             "lambda": {"rational": {"numerator": 0, "denominator": 1}}}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 4},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "x",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             ["pi", {"rational": {"numerator": 0, "denominator": 1}}, "pi"],
+             "operands": ["a"],
+             "name": "u3"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 5},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "y",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             ["pi",
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}},
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}],
+             "operands": ["a"],
+             "name": "u3"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 6},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "z",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters": ["pi"], "operands": ["a"], "name": "u1"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 7},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "h",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"rational": {"numerator": 0, "denominator": 1}}, "pi"],
+             "operands": ["a"],
+             "name": "u2"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 8},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "s",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}],
+             "operands": ["a"],
+             "name": "u1"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 9},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "sdg",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}}],
+             "operands": ["a"],
+             "name": "u1"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 10},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "t",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"div":
+               {"right": {"rational": {"numerator": 4, "denominator": 1}},
+                "left": "pi"}}],
+             "operands": ["a"],
+             "name": "u1"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 11},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": [],
+        "name": "tdg",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 4, "denominator": 1}},
+                  "left": "pi"}}}}],
+             "operands": ["a"],
+             "name": "u1"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 12},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": ["theta"],
+        "name": "rx",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"parameter": {"name": "theta"}},
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}},
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}],
+             "operands": ["a"],
+             "name": "u3"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 13},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": ["theta"],
+        "name": "ry",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"parameter": {"name": "theta"}},
+              {"rational": {"numerator": 0, "denominator": 1}},
+              {"rational": {"numerator": 0, "denominator": 1}}],
+             "operands": ["a"],
+             "name": "u3"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 14},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a"],
+        "parameters": ["phi"],
+        "name": "rz",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters": [{"parameter": {"name": "phi"}}],
+             "operands": ["a"],
+             "name": "u1"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 15},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": [],
+        "name": "cz",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 16},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": [],
+        "name": "cy",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "sdg"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "s"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 17},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": [],
+        "name": "ch",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "sdg"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "s"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "x"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a"], "name": "s"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 18},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b", "c"],
+        "parameters": [],
+        "name": "ccx",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c"], "name": "h"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b", "c"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c"], "name": "tdg"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "c"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c"], "name": "t"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b", "c"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c"], "name": "tdg"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "c"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c"], "name": "t"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c"], "name": "h"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a"], "name": "t"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["b"], "name": "tdg"}}}},
+         {"unitary":
+          {"operation":
+           {"call":
+            {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 19},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": ["lambda"],
+        "name": "crz",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}],
+             "operands": ["b"],
+             "name": "u1"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": {"parameter": {"name": "lambda"}}}}}}],
+             "operands": ["b"],
+             "name": "u1"}}}},
+         {"unitary":
+          {"operation":
+           {"call":
+            {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 20},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["a", "b"],
+        "parameters": ["lambda"],
+        "name": "cu1",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}],
+             "operands": ["a"],
+             "name": "u1"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": {"parameter": {"name": "lambda"}}}}}}],
+             "operands": ["b"],
+             "name": "u1"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}],
+             "operands": ["b"],
+             "name": "u1"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 21},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement":
+     {"gate":
+      {"declaration":
+       {"qubits": ["c", "t"],
+        "parameters": ["theta", "phi", "lambda"],
+        "name": "cu3",
+        "body":
+        [{"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left":
+                {"sub":
+                 {"right": {"parameter": {"name": "phi"}},
+                  "left": {"parameter": {"name": "lambda"}}}}}}],
+             "operands": ["t"],
+             "name": "u1"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c", "t"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": {"parameter": {"name": "theta"}}}}}},
+              {"rational": {"numerator": 0, "denominator": 1}},
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left":
+                  {"add":
+                   {"right": {"parameter": {"name": "lambda"}},
+                    "left": {"parameter": {"name": "phi"}}}}}}}}],
+             "operands": ["t"],
+             "name": "u3"}}}},
+         {"unitary":
+          {"operation":
+           {"call": {"parameters": [], "operands": ["c", "t"], "name": "cx"}}}},
+         {"unitary":
+          {"operation":
+           {"call":
+            {"parameters":
+             [{"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "theta"}}}},
+              {"parameter": {"name": "phi"}},
+              {"rational": {"numerator": 0, "denominator": 1}}],
+             "operands": ["t"],
+             "name": "u3"}}}}]}}},
+     "origin":
+     {"site": {"unit": "builtin:qelib1.inc", "statement": 22},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1},
+       {"unit":
+        ".\\main.qasm",
+        "statement": 0}]}},
+    {"statement": {"qreg": {"size": 2, "name": "q"}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 1},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1}]}},
+    {"statement": {"creg": {"size": 2, "name": "c"}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 2},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1}]}},
+    {"statement":
+     {"operation":
+      {"operation":
+       {"unitary":
+        {"operation":
+         {"call":
+          {"parameters": [],
+           "operands": [{"indexed": {"name": "q", "index": 0}}],
+           "name": "t"}}}}}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 3},
+      "includedFrom":
+      [{"unit":
+        "profile:qiskit:.\\main.qasm",
+        "statement": 1}]}}]},
+  "expanded":
+  {"qubits": 2,
+   "code":
+   [{"gate":
+     {"operation":
+      {"origin": {"statement": 33, "expansion": [0, 0]},
+       "gate":
+       {"u":
+        {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+         "target": 0,
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "lambda":
+         {"div":
+          {"right": {"rational": {"numerator": 4, "denominator": 1}},
+           "left": "pi"}}}}},
+      "guarded": false}}],
+   "bits": 2},
+  "analyzed":
+  {"versionMinor": 0,
+   "versionMajor": 2,
+   "statements":
+   [{"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": ["theta", "phi", "lambda"],
+       "name": "u",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "unknown", "expression": {"parameter": {"name": "theta"}}},
+            "target": "q",
+            "phi":
+            {"sign": "unknown", "expression": {"parameter": {"name": "phi"}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression": {"parameter": {"name": "lambda"}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": ["gamma"],
+       "name": "u0",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "q",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "zero",
+             "expression":
+             {"rational": {"numerator": 0, "denominator": 1}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": ["lambda"],
+       "name": "p",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "q",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression": {"parameter": {"name": "lambda"}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": ["lambda"],
+       "name": "cp",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "a",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": {"parameter": {"name": "lambda"}}}}}}}}},
+        {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+        {"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "b",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": {"parameter": {"name": "lambda"}}}}}}}}}}},
+        {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+        {"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "b",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": {"parameter": {"name": "lambda"}}}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": [],
+       "name": "sx",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}},
+            "target": "q",
+            "phi":
+            {"sign": "negative",
+             "expression":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}}},
+            "lambda":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": [],
+       "name": "sxdg",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "negative",
+             "expression":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}}},
+            "target": "q",
+            "phi":
+            {"sign": "negative",
+             "expression":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}}},
+            "lambda":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": [],
+       "name": "swap",
+       "body":
+       [{"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+        {"unitary": {"operation": {"cx": {"target": "a", "control": "b"}}}},
+        {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": [],
+       "name": "csx",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}},
+            "target": "b",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda": {"sign": "positive", "expression": "pi"}}}}},
+        {"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "a",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}}}}}}},
+        {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+        {"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "b",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "negative",
+             "expression":
+             {"neg":
+              {"argument":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left":
+                 {"div":
+                  {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                   "left": "pi"}}}}}}}}}}},
+        {"unitary": {"operation": {"cx": {"target": "b", "control": "a"}}}},
+        {"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "b",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left":
+               {"div":
+                {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                 "left": "pi"}}}}}}}}},
+        {"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}},
+            "target": "b",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda": {"sign": "positive", "expression": "pi"}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": ["theta", "phi", "lambda"],
+       "name": "u3",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "unknown", "expression": {"parameter": {"name": "theta"}}},
+            "target": "q",
+            "phi":
+            {"sign": "unknown", "expression": {"parameter": {"name": "phi"}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression": {"parameter": {"name": "lambda"}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": ["phi", "lambda"],
+       "name": "u2",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "positive",
+             "expression":
+             {"div":
+              {"right": {"rational": {"numerator": 2, "denominator": 1}},
+               "left": "pi"}}},
+            "target": "q",
+            "phi":
+            {"sign": "unknown", "expression": {"parameter": {"name": "phi"}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression": {"parameter": {"name": "lambda"}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["q"],
+       "parameters": ["lambda"],
+       "name": "u1",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "q",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "unknown",
+             "expression": {"parameter": {"name": "lambda"}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["c", "t"],
+       "parameters": [],
+       "name": "cx",
+       "body":
+       [{"unitary": {"operation": {"cx": {"target": "t", "control": "c"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "id",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"u":
+           {"theta":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "target": "a",
+            "phi":
+            {"sign": "zero",
+             "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+            "lambda":
+            {"sign": "zero",
+             "expression":
+             {"rational": {"numerator": 0, "denominator": 1}}}}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "x",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "positive", "expression": "pi"},
+             {"sign": "zero",
+              "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+             {"sign": "positive", "expression": "pi"}],
+            "operands": ["a"],
+            "name": "u3"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "y",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "positive", "expression": "pi"},
+             {"sign": "positive",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}},
+             {"sign": "positive",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}}],
+            "operands": ["a"],
+            "name": "u3"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "z",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters": [{"sign": "positive", "expression": "pi"}],
+            "operands": ["a"],
+            "name": "u1"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "h",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "zero",
+              "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+             {"sign": "positive", "expression": "pi"}],
+            "operands": ["a"],
+            "name": "u2"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "s",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "positive",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}}],
+            "operands": ["a"],
+            "name": "u1"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "sdg",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "negative",
+              "expression":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}}}],
+            "operands": ["a"],
+            "name": "u1"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "t",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "positive",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 4, "denominator": 1}},
+                "left": "pi"}}}],
+            "operands": ["a"],
+            "name": "u1"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": [],
+       "name": "tdg",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "negative",
+              "expression":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 4, "denominator": 1}},
+                  "left": "pi"}}}}}],
+            "operands": ["a"],
+            "name": "u1"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": ["theta"],
+       "name": "rx",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression": {"parameter": {"name": "theta"}}},
+             {"sign": "negative",
+              "expression":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": "pi"}}}}},
+             {"sign": "positive",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": "pi"}}}],
+            "operands": ["a"],
+            "name": "u3"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": ["theta"],
+       "name": "ry",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression": {"parameter": {"name": "theta"}}},
+             {"sign": "zero",
+              "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+             {"sign": "zero",
+              "expression": {"rational": {"numerator": 0, "denominator": 1}}}],
+            "operands": ["a"],
+            "name": "u3"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a"],
+       "parameters": ["phi"],
+       "name": "rz",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown", "expression": {"parameter": {"name": "phi"}}}],
+            "operands": ["a"],
+            "name": "u1"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": [],
+       "name": "cz",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": [],
+       "name": "cy",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "sdg"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "s"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": [],
+       "name": "ch",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "sdg"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "h"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "s"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "x"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a"], "name": "s"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b", "c"],
+       "parameters": [],
+       "name": "ccx",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c"], "name": "h"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b", "c"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c"], "name": "tdg"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "c"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c"], "name": "t"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b", "c"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c"], "name": "tdg"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "c"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "t"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c"], "name": "t"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c"], "name": "h"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a"], "name": "t"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["b"], "name": "tdg"}}}},
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": ["lambda"],
+       "name": "crz",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}}],
+            "operands": ["b"],
+            "name": "u1"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": {"parameter": {"name": "lambda"}}}}}}}],
+            "operands": ["b"],
+            "name": "u1"}}}},
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["a", "b"],
+       "parameters": ["lambda"],
+       "name": "cu1",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}}],
+            "operands": ["a"],
+            "name": "u1"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": {"parameter": {"name": "lambda"}}}}}}}],
+            "operands": ["b"],
+            "name": "u1"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["a", "b"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "lambda"}}}}}],
+            "operands": ["b"],
+            "name": "u1"}}}}]}}},
+    {"gate":
+     {"declaration":
+      {"qubits": ["c", "t"],
+       "parameters": ["theta", "phi", "lambda"],
+       "name": "cu3",
+       "body":
+       [{"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left":
+                {"sub":
+                 {"right": {"parameter": {"name": "phi"}},
+                  "left": {"parameter": {"name": "lambda"}}}}}}}],
+            "operands": ["t"],
+            "name": "u1"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c", "t"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left": {"parameter": {"name": "theta"}}}}}}},
+             {"sign": "zero",
+              "expression": {"rational": {"numerator": 0, "denominator": 1}}},
+             {"sign": "unknown",
+              "expression":
+              {"neg":
+               {"argument":
+                {"div":
+                 {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                  "left":
+                  {"add":
+                   {"right": {"parameter": {"name": "lambda"}},
+                    "left": {"parameter": {"name": "phi"}}}}}}}}}],
+            "operands": ["t"],
+            "name": "u3"}}}},
+        {"unitary":
+         {"operation":
+          {"call": {"parameters": [], "operands": ["c", "t"], "name": "cx"}}}},
+        {"unitary":
+         {"operation":
+          {"call":
+           {"parameters":
+            [{"sign": "unknown",
+              "expression":
+              {"div":
+               {"right": {"rational": {"numerator": 2, "denominator": 1}},
+                "left": {"parameter": {"name": "theta"}}}}},
+             {"sign": "unknown", "expression": {"parameter": {"name": "phi"}}},
+             {"sign": "zero",
+              "expression": {"rational": {"numerator": 0, "denominator": 1}}}],
+            "operands": ["t"],
+            "name": "u3"}}}}]}}},
+    {"qreg": {"size": 2, "name": "q"}},
+    {"creg": {"size": 2, "name": "c"}},
+    {"operation":
+     {"operation":
+      {"unitary":
+       {"operation":
+        {"call":
+         {"parameters": [],
+          "operands": [{"indexed": {"name": "q", "index": 0}}],
+          "name": "t"}}}}}}]}},
+ "execution":
+ {"instructions":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+        "phi":
+        {"sub":
+         {"right":
+          {"div":
+           {"right": {"rational": {"numerator": 4, "denominator": 1}},
+            "left": "pi"}},
+          "left":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 0}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 1}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta": "pi",
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left":
+          {"add":
+           {"right":
+            {"div":
+             {"right": {"rational": {"numerator": 4, "denominator": 1}},
+              "left": "pi"}},
+            "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+        "ion": 0}},
+      "origin": {"statement": 33, "expansion": [0, 0]}},
+     "guarded": false,
+     "calibration": 2}}],
+  "initial": [0, 1]},
+ "bound":
+ {"qubits": 2,
+  "code":
+  [{"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta": {"rational": {"numerator": 0, "denominator": 1}},
+         "phi":
+         {"sub":
+          {"right":
+           {"div":
+            {"right": {"rational": {"numerator": 4, "denominator": 1}},
+             "left": "pi"}},
+           "left":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "ion": 0}},
+       "origin": {"statement": 33, "expansion": [0, 0]}},
+      "guarded": false}},
+    "candidates": [0, 3, 6, 9, 12, 15, 18]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta": "pi",
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 33, "expansion": [0, 0]}},
+      "guarded": false}},
+    "candidates": [1, 4, 7, 10, 13, 16, 19]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta": "pi",
+         "phi":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left":
+           {"add":
+            {"right":
+             {"div":
+              {"right": {"rational": {"numerator": 4, "denominator": 1}},
+               "left": "pi"}},
+             "left": {"rational": {"numerator": 0, "denominator": 1}}}}}},
+         "ion": 0}},
+       "origin": {"statement": 33, "expansion": [0, 0]}},
+      "guarded": false}},
+    "candidates": [2, 5, 8, 11, 14, 17, 20]}],
+  "bits": 2}}

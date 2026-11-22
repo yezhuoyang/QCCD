@@ -1,0 +1,2307 @@
+{"timed":
+ {"initial": [0, 1, 2, 3],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 0}},
+   {"transport": {"moves": [{"path": 0, "ion": 0}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 1,
+        "control": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 5}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 2, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 1}},
+       "origin": {"statement": 2, "expansion": []}}],
+     "profile": 1,
+     "guarded": false,
+     "calibrations": [6, 6]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 7}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 8}},
+   {"transport": {"moves": [{"path": 2, "ion": 2}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 13}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 2}},
+       "origin": {"statement": 3, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 3, "expansion": []}}],
+     "profile": 3,
+     "guarded": false,
+     "calibrations": [14, 14]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 15}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 4}},
+   {"transport": {"moves": [{"path": 1, "ion": 0}]}},
+   {"transport": {"moves": [{"path": 5, "ion": 3}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 9}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 4, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 4, "expansion": []}}],
+     "profile": 2,
+     "guarded": false,
+     "calibrations": [10, 10]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 11}},
+   {"readout":
+    {"origin": {"statement": 5, "expansion": []},
+     "ion": 0,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 0}},
+   {"readout":
+    {"origin": {"statement": 6, "expansion": []},
+     "ion": 3,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 1}}]},
+ "status": "verified-quantum-classical-execution",
+ "source":
+ {"root":
+  ".\\main.qasm",
+  "bundle":
+  {"units":
+   [{"version": {"minor": 0, "major": 2},
+     "statements":
+     [{"qreg": {"size": 4, "name": "q"}},
+      {"creg": {"size": 2, "name": "c"}},
+      {"operation":
+       {"operation":
+        {"unitary":
+         {"operation":
+          {"cx":
+           {"target": {"indexed": {"name": "q", "index": 1}},
+            "control": {"indexed": {"name": "q", "index": 0}}}}}}}},
+      {"operation":
+       {"operation":
+        {"unitary":
+         {"operation":
+          {"cx":
+           {"target": {"indexed": {"name": "q", "index": 3}},
+            "control": {"indexed": {"name": "q", "index": 2}}}}}}}},
+      {"operation":
+       {"operation":
+        {"unitary":
+         {"operation":
+          {"cx":
+           {"target": {"indexed": {"name": "q", "index": 3}},
+            "control": {"indexed": {"name": "q", "index": 0}}}}}}}},
+      {"operation":
+       {"operation":
+        {"measure":
+         {"target": {"indexed": {"name": "c", "index": 0}},
+          "source": {"indexed": {"name": "q", "index": 0}}}}}},
+      {"operation":
+       {"operation":
+        {"measure":
+         {"target": {"indexed": {"name": "c", "index": 1}},
+          "source": {"indexed": {"name": "q", "index": 3}}}}}}],
+     "id":
+     ".\\main.qasm"}],
+   "links": []}},
+ "schema": "qccd.dynamic-hardware.v1",
+ "routed":
+ {"initial": [0, 1, 2, 3],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 0}},
+   {"transport": {"moves": [{"path": 0, "ion": 0}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 1,
+        "control": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 5}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 6}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 1}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 6}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 7}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 8}},
+   {"transport": {"moves": [{"path": 2, "ion": 2}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 13}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 14}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 3}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 14}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 15}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 4}},
+   {"transport": {"moves": [{"path": 1, "ion": 0}]}},
+   {"transport": {"moves": [{"path": 5, "ion": 3}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 9}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 10}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 3}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 10}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 11}},
+   {"readout":
+    {"origin": {"statement": 5, "expansion": []},
+     "ion": 0,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 0}},
+   {"readout":
+    {"origin": {"statement": 6, "expansion": []},
+     "ion": 3,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 1}}]},
+ "pulses":
+ {"qubits": 4,
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 1,
+        "control": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 1}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 3}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 3}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"measure":
+    {"origin": {"statement": 5, "expansion": []},
+     "ion": 0,
+     "guarded": false,
+     "bit": 0}},
+   {"measure":
+    {"origin": {"statement": 6, "expansion": []},
+     "ion": 3,
+     "guarded": false,
+     "bit": 1}}],
+  "bits": 2},
+ "placed":
+ {"initial": [0, 1, 2, 3],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 1,
+        "control": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 1}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 3}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}},
+        "ion": 3}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false}},
+   {"measure":
+    {"origin": {"statement": 5, "expansion": []},
+     "ion": 0,
+     "guarded": false,
+     "bit": 0}},
+   {"measure":
+    {"origin": {"statement": 6, "expansion": []},
+     "ion": 3,
+     "guarded": false,
+     "bit": 1}}]},
+ "packed":
+ {"initial": [0, 1, 2, 3],
+  "code":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 0}},
+   {"transport": {"moves": [{"path": 0, "ion": 0}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 1,
+        "control": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 5}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 2, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 1}},
+       "origin": {"statement": 2, "expansion": []}}],
+     "profile": 1,
+     "guarded": false,
+     "calibrations": [6, 6]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 7}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 8}},
+   {"transport": {"moves": [{"path": 2, "ion": 2}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 13}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 2}},
+       "origin": {"statement": 3, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 3, "expansion": []}}],
+     "profile": 3,
+     "guarded": false,
+     "calibrations": [14, 14]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 15}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 4}},
+   {"transport": {"moves": [{"path": 1, "ion": 0}]}},
+   {"transport": {"moves": [{"path": 5, "ion": 3}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 9}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 4, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 4, "expansion": []}}],
+     "profile": 2,
+     "guarded": false,
+     "calibrations": [10, 10]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 11}},
+   {"readout":
+    {"origin": {"statement": 5, "expansion": []},
+     "ion": 0,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 0}},
+   {"readout":
+    {"origin": {"statement": 6, "expansion": []},
+     "ion": 3,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 1}}]},
+ "hardware":
+ {"rules":
+  [{"and":
+    {"rhs":
+     {"and":
+      {"rhs":
+       {"and":
+        {"rhs":
+         {"and":
+          {"rhs":
+           {"eq":
+            {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+             "lhs": {"base": {"expression": {"const": {"value": 0}}}}}},
+           "lhs":
+           {"implies":
+            {"premise":
+             {"and":
+              {"rhs":
+               {"eq":
+                {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                 "lhs": {"base": {"expression": "duration"}}}},
+               "lhs":
+               {"eq":
+                {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+                 "lhs": {"base": {"expression": "start"}}}}}},
+             "conclusion":
+             {"eq":
+              {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+               "lhs":
+               {"base":
+                {"expression":
+                 {"occupancy": {"site": 3, "phase": "before"}}}}}}}}}},
+         "lhs":
+         {"implies":
+          {"premise":
+           {"and":
+            {"rhs":
+             {"eq":
+              {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+               "lhs": {"base": {"expression": "duration"}}}},
+             "lhs":
+             {"eq":
+              {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+               "lhs": {"base": {"expression": "start"}}}}}},
+           "conclusion":
+           {"eq":
+            {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+             "lhs":
+             {"base":
+              {"expression":
+               {"occupancy": {"site": 2, "phase": "before"}}}}}}}}}},
+       "lhs":
+       {"implies":
+        {"premise":
+         {"and":
+          {"rhs":
+           {"eq":
+            {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+             "lhs": {"base": {"expression": "duration"}}}},
+           "lhs":
+           {"eq":
+            {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+             "lhs": {"base": {"expression": "start"}}}}}},
+         "conclusion":
+         {"eq":
+          {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+           "lhs":
+           {"base":
+            {"expression":
+             {"occupancy": {"site": 1, "phase": "before"}}}}}}}}}},
+     "lhs":
+     {"implies":
+      {"premise":
+       {"and":
+        {"rhs":
+         {"eq":
+          {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+           "lhs": {"base": {"expression": "duration"}}}},
+         "lhs":
+         {"eq":
+          {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+           "lhs": {"base": {"expression": "start"}}}}}},
+       "conclusion":
+       {"eq":
+        {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+         "lhs":
+         {"base":
+          {"expression": {"occupancy": {"site": 0, "phase": "before"}}}}}}}}}},
+   {"and":
+    {"rhs":
+     {"and":
+      {"rhs":
+       {"and":
+        {"rhs":
+         {"and":
+          {"rhs":
+           {"eq":
+            {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+             "lhs": {"base": {"expression": {"const": {"value": 0}}}}}},
+           "lhs":
+           {"le":
+            {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+             "lhs":
+             {"base":
+              {"expression":
+               {"occupancy": {"site": 3, "phase": "during"}}}}}}}},
+         "lhs":
+         {"le":
+          {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+           "lhs":
+           {"base":
+            {"expression": {"occupancy": {"site": 2, "phase": "during"}}}}}}}},
+       "lhs":
+       {"le":
+        {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+         "lhs":
+         {"base":
+          {"expression": {"occupancy": {"site": 1, "phase": "during"}}}}}}}},
+     "lhs":
+     {"le":
+      {"rhs": {"base": {"expression": {"const": {"value": 2}}}},
+       "lhs":
+       {"base":
+        {"expression": {"occupancy": {"site": 0, "phase": "during"}}}}}}}},
+   {"and":
+    {"rhs":
+     {"eq":
+      {"rhs": {"base": {"expression": {"const": {"value": 0}}}},
+       "lhs": {"base": {"expression": {"const": {"value": 0}}}}}},
+     "lhs":
+     {"le":
+      {"rhs": {"base": {"expression": {"const": {"value": 1}}}},
+       "lhs": {"channelWaves": {"channel": 0}}}}}}],
+  "device":
+  {"readouts":
+   [{"site": 0, "duration": 3, "channel": 10},
+    {"site": 1, "duration": 3, "channel": 11},
+    {"site": 2, "duration": 3, "channel": 12},
+    {"site": 3, "duration": 3, "channel": 13}],
+   "pumps":
+   [{"site": 0, "duration": 4, "channel": 10},
+    {"site": 1, "duration": 4, "channel": 11},
+    {"site": 2, "duration": 4, "channel": 12},
+    {"site": 3, "duration": 4, "channel": 13}],
+   "controller": {"duration": 1},
+   "chainLengths": null,
+   "base":
+   {"pathDurations": [2, 2, 2, 2, 2, 2],
+    "opticalChannels": [10, 11, 12, 13],
+    "name": "Line4",
+    "geometry":
+    {"sites":
+     [{"operations": [], "name": "C0", "capacity": 2},
+      {"operations": [], "name": "C1", "capacity": 2},
+      {"operations": [], "name": "C2", "capacity": 2},
+      {"operations": [], "name": "C3", "capacity": 2}],
+     "paths":
+     [{"waveform": 0, "via": [], "src": 0, "dst": 1, "channel": 0},
+      {"waveform": 0, "via": [], "src": 1, "dst": 2, "channel": 0},
+      {"waveform": 0, "via": [], "src": 2, "dst": 3, "channel": 0},
+      {"waveform": 1, "via": [], "src": 1, "dst": 0, "channel": 0},
+      {"waveform": 1, "via": [], "src": 2, "dst": 1, "channel": 0},
+      {"waveform": 1, "via": [], "src": 3, "dst": 2, "channel": 0}],
+     "broadcasts": [{"mandatory": false, "channel": 0}]},
+    "calibrations":
+    [{"waveform":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 0,
+      "duration": 2,
+      "channel": 10},
+     {"waveform":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 0,
+      "duration": 4,
+      "channel": 10},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 0,
+      "duration": 2,
+      "channel": 10},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 0,
+      "duration": 2,
+      "channel": 10},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 1,
+      "duration": 2,
+      "channel": 11},
+     {"waveform":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 1,
+      "duration": 4,
+      "channel": 11},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 1,
+      "duration": 2,
+      "channel": 11},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 1,
+      "duration": 2,
+      "channel": 11},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 2,
+      "duration": 2,
+      "channel": 12},
+     {"waveform":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 2,
+      "duration": 4,
+      "channel": 12},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 2,
+      "duration": 2,
+      "channel": 12},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 2,
+      "duration": 2,
+      "channel": 12},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 3,
+      "duration": 2,
+      "channel": 13},
+     {"waveform":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 3,
+      "duration": 4,
+      "channel": 13},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi": {"rational": {"numerator": 0, "denominator": 1}}}},
+      "site": 3,
+      "duration": 2,
+      "channel": 13},
+     {"waveform":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "site": 3,
+      "duration": 2,
+      "channel": 13}],
+    "broadcasts":
+    [{"theta":
+      {"neg":
+       {"argument":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "sites": [0],
+      "phi": {"rational": {"numerator": 0, "denominator": 1}},
+      "maxPerSite": 2,
+      "duration": 2,
+      "channel": 10},
+     {"theta":
+      {"neg":
+       {"argument":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "sites": [1],
+      "phi": {"rational": {"numerator": 0, "denominator": 1}},
+      "maxPerSite": 2,
+      "duration": 2,
+      "channel": 11},
+     {"theta":
+      {"neg":
+       {"argument":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "sites": [2],
+      "phi": {"rational": {"numerator": 0, "denominator": 1}},
+      "maxPerSite": 2,
+      "duration": 2,
+      "channel": 12},
+     {"theta":
+      {"neg":
+       {"argument":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}}}},
+      "sites": [3],
+      "phi": {"rational": {"numerator": 0, "denominator": 1}},
+      "maxPerSite": 2,
+      "duration": 2,
+      "channel": 13}]}},
+  "config":
+  {"useOnlyInitialPlacements": false,
+   "routeLookahead": 0,
+   "maxStates": 2000,
+   "maxPlacements": 64,
+   "maxDepth": 24,
+   "maxCandidates": 256,
+   "maxBatch": 2,
+   "initialPlacements": [],
+   "enableBroadcast": true,
+   "broadcastPlan": null}},
+ "frontend":
+ {"resolved":
+  {"entries":
+   [{"statement": {"qreg": {"size": 4, "name": "q"}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 0},
+      "includedFrom": []}},
+    {"statement": {"creg": {"size": 2, "name": "c"}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 1},
+      "includedFrom": []}},
+    {"statement":
+     {"operation":
+      {"operation":
+       {"unitary":
+        {"operation":
+         {"cx":
+          {"target": {"indexed": {"name": "q", "index": 1}},
+           "control": {"indexed": {"name": "q", "index": 0}}}}}}}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 2},
+      "includedFrom": []}},
+    {"statement":
+     {"operation":
+      {"operation":
+       {"unitary":
+        {"operation":
+         {"cx":
+          {"target": {"indexed": {"name": "q", "index": 3}},
+           "control": {"indexed": {"name": "q", "index": 2}}}}}}}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 3},
+      "includedFrom": []}},
+    {"statement":
+     {"operation":
+      {"operation":
+       {"unitary":
+        {"operation":
+         {"cx":
+          {"target": {"indexed": {"name": "q", "index": 3}},
+           "control": {"indexed": {"name": "q", "index": 0}}}}}}}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 4},
+      "includedFrom": []}},
+    {"statement":
+     {"operation":
+      {"operation":
+       {"measure":
+        {"target": {"indexed": {"name": "c", "index": 0}},
+         "source": {"indexed": {"name": "q", "index": 0}}}}}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 5},
+      "includedFrom": []}},
+    {"statement":
+     {"operation":
+      {"operation":
+       {"measure":
+        {"target": {"indexed": {"name": "c", "index": 1}},
+         "source": {"indexed": {"name": "q", "index": 3}}}}}},
+     "origin":
+     {"site":
+      {"unit":
+       ".\\main.qasm",
+       "statement": 6},
+      "includedFrom": []}}]},
+  "expanded":
+  {"qubits": 4,
+   "code":
+   [{"gate":
+     {"operation":
+      {"origin": {"statement": 2, "expansion": []},
+       "gate": {"cx": {"target": 1, "control": 0}}},
+      "guarded": false}},
+    {"gate":
+     {"operation":
+      {"origin": {"statement": 3, "expansion": []},
+       "gate": {"cx": {"target": 3, "control": 2}}},
+      "guarded": false}},
+    {"gate":
+     {"operation":
+      {"origin": {"statement": 4, "expansion": []},
+       "gate": {"cx": {"target": 3, "control": 0}}},
+      "guarded": false}},
+    {"measure":
+     {"origin": {"statement": 5, "expansion": []},
+      "ion": 0,
+      "guarded": false,
+      "bit": 0}},
+    {"measure":
+     {"origin": {"statement": 6, "expansion": []},
+      "ion": 3,
+      "guarded": false,
+      "bit": 1}}],
+   "bits": 2},
+  "analyzed":
+  {"versionMinor": 0,
+   "versionMajor": 2,
+   "statements":
+   [{"qreg": {"size": 4, "name": "q"}},
+    {"creg": {"size": 2, "name": "c"}},
+    {"operation":
+     {"operation":
+      {"unitary":
+       {"operation":
+        {"cx":
+         {"target": {"indexed": {"name": "q", "index": 1}},
+          "control": {"indexed": {"name": "q", "index": 0}}}}}}}},
+    {"operation":
+     {"operation":
+      {"unitary":
+       {"operation":
+        {"cx":
+         {"target": {"indexed": {"name": "q", "index": 3}},
+          "control": {"indexed": {"name": "q", "index": 2}}}}}}}},
+    {"operation":
+     {"operation":
+      {"unitary":
+       {"operation":
+        {"cx":
+         {"target": {"indexed": {"name": "q", "index": 3}},
+          "control": {"indexed": {"name": "q", "index": 0}}}}}}}},
+    {"operation":
+     {"operation":
+      {"measure":
+       {"target": {"indexed": {"name": "c", "index": 0}},
+        "source": {"indexed": {"name": "q", "index": 0}}}}}},
+    {"operation":
+     {"operation":
+      {"measure":
+       {"target": {"indexed": {"name": "c", "index": 1}},
+        "source": {"indexed": {"name": "q", "index": 3}}}}}}]}},
+ "execution":
+ {"instructions":
+  [{"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 0}},
+   {"transport": {"moves": [{"path": 0, "ion": 0}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 1,
+        "control": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 5}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 2, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 1}},
+       "origin": {"statement": 2, "expansion": []}}],
+     "profile": 1,
+     "guarded": false,
+     "calibrations": [6, 6]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 2, "expansion": []}},
+     "guarded": false,
+     "calibration": 7}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 8}},
+   {"transport": {"moves": [{"path": 2, "ion": 2}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 13}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 2}},
+       "origin": {"statement": 3, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 3, "expansion": []}}],
+     "profile": 3,
+     "guarded": false,
+     "calibrations": [14, 14]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 2}},
+      "origin": {"statement": 3, "expansion": []}},
+     "guarded": false,
+     "calibration": 15}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 4}},
+   {"transport": {"moves": [{"path": 1, "ion": 0}]}},
+   {"transport": {"moves": [{"path": 5, "ion": 3}]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"ms":
+       {"theta":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "target": 3,
+        "control": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 9}},
+   {"broadcast":
+    {"pulses":
+     [{"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 4, "expansion": []}},
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 4, "expansion": []}}],
+     "profile": 2,
+     "guarded": false,
+     "calibrations": [10, 10]}},
+   {"pulse":
+    {"operation":
+     {"pulse":
+      {"r":
+       {"theta":
+        {"neg":
+         {"argument":
+          {"div":
+           {"right": {"rational": {"numerator": 2, "denominator": 1}},
+            "left": "pi"}}}},
+        "phi":
+        {"div":
+         {"right": {"rational": {"numerator": 2, "denominator": 1}},
+          "left": "pi"}},
+        "ion": 0}},
+      "origin": {"statement": 4, "expansion": []}},
+     "guarded": false,
+     "calibration": 11}},
+   {"readout":
+    {"origin": {"statement": 5, "expansion": []},
+     "ion": 0,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 0}},
+   {"readout":
+    {"origin": {"statement": 6, "expansion": []},
+     "ion": 3,
+     "guarded": false,
+     "calibration": 2,
+     "bit": 1}}],
+  "initial": [0, 1, 2, 3]},
+ "bound":
+ {"qubits": 4,
+  "code":
+  [{"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "phi":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "ion": 0}},
+       "origin": {"statement": 2, "expansion": []}},
+      "guarded": false}},
+    "candidates": [0, 4, 8, 12]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"ms":
+        {"theta":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "target": 1,
+         "control": 0}},
+       "origin": {"statement": 2, "expansion": []}},
+      "guarded": false}},
+    "candidates": [1, 5, 9, 13]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 2, "expansion": []}},
+      "guarded": false}},
+    "candidates": [2, 6, 10, 14]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 1}},
+       "origin": {"statement": 2, "expansion": []}},
+      "guarded": false}},
+    "candidates": [2, 6, 10, 14]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "ion": 0}},
+       "origin": {"statement": 2, "expansion": []}},
+      "guarded": false}},
+    "candidates": [3, 7, 11, 15]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "phi":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "ion": 2}},
+       "origin": {"statement": 3, "expansion": []}},
+      "guarded": false}},
+    "candidates": [0, 4, 8, 12]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"ms":
+        {"theta":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "target": 3,
+         "control": 2}},
+       "origin": {"statement": 3, "expansion": []}},
+      "guarded": false}},
+    "candidates": [1, 5, 9, 13]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 2}},
+       "origin": {"statement": 3, "expansion": []}},
+      "guarded": false}},
+    "candidates": [2, 6, 10, 14]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 3, "expansion": []}},
+      "guarded": false}},
+    "candidates": [2, 6, 10, 14]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "ion": 2}},
+       "origin": {"statement": 3, "expansion": []}},
+      "guarded": false}},
+    "candidates": [3, 7, 11, 15]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "phi":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "ion": 0}},
+       "origin": {"statement": 4, "expansion": []}},
+      "guarded": false}},
+    "candidates": [0, 4, 8, 12]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"ms":
+        {"theta":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "target": 3,
+         "control": 0}},
+       "origin": {"statement": 4, "expansion": []}},
+      "guarded": false}},
+    "candidates": [1, 5, 9, 13]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 0}},
+       "origin": {"statement": 4, "expansion": []}},
+      "guarded": false}},
+    "candidates": [2, 6, 10, 14]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi": {"rational": {"numerator": 0, "denominator": 1}},
+         "ion": 3}},
+       "origin": {"statement": 4, "expansion": []}},
+      "guarded": false}},
+    "candidates": [2, 6, 10, 14]},
+   {"source":
+    {"pulse":
+     {"operation":
+      {"pulse":
+       {"r":
+        {"theta":
+         {"neg":
+          {"argument":
+           {"div":
+            {"right": {"rational": {"numerator": 2, "denominator": 1}},
+             "left": "pi"}}}},
+         "phi":
+         {"div":
+          {"right": {"rational": {"numerator": 2, "denominator": 1}},
+           "left": "pi"}},
+         "ion": 0}},
+       "origin": {"statement": 4, "expansion": []}},
+      "guarded": false}},
+    "candidates": [3, 7, 11, 15]},
+   {"source":
+    {"measure":
+     {"origin": {"statement": 5, "expansion": []},
+      "ion": 0,
+      "guarded": false,
+      "bit": 0}},
+    "candidates": [0, 1, 2, 3]},
+   {"source":
+    {"measure":
+     {"origin": {"statement": 6, "expansion": []},
+      "ion": 3,
+      "guarded": false,
+      "bit": 1}},
+    "candidates": [0, 1, 2, 3]}],
+  "bits": 2}}

@@ -1,0 +1,31 @@
+{
+ "id": "cz",
+ "statement": "cz q[0],q[1];",
+ "what": "a controlled phase",
+ "device": "grid2x3",
+ "finish_us": 510,
+ "parallel_us": 495,
+ "instructions": 13,
+ "pulses": [
+  "pulse R(pi/2,pi/2-pi) q1;",
+  "pulse R(pi,0) q1;",
+  "pulse R(pi,(0+pi)/2) q1;",
+  "pulse R(pi/2,pi/2) q0;",
+  "pulse MS(pi/2) q0,q1;",
+  "pulse R(-pi/2,0) q0;",
+  "pulse R(-pi/2,0) q1;",
+  "pulse R(-pi/2,pi/2) q0;",
+  "pulse R(pi/2,pi/2-pi) q1;",
+  "pulse R(pi,0) q1;",
+  "pulse R(pi,(0+pi)/2) q1;"
+ ],
+ "cools": 1,
+ "cooled_us": 570.0,
+ "studio_failed": [],
+ "studio_passed": 25,
+ "notes": [
+  "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
+  "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
+  "7 gate zones get one calibration per exact waveform of the program (7 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+ ]
+}

@@ -35,14 +35,25 @@ MATRIX = ROOT / "Compiler" / "build" / "matrix"
 #: no Part D table and `qccd tutorial` skipped the companion page (Yuewen, 2026-10-15).  The
 #: copies differ from the build's only in `meta.prov.root`, blanked: it was this machine's path.
 SHIPPED = ROOT / "Compiler" / "examples" / "micro"
+#: QCCDCert's compiles of micro.qasm, for the machines it compiles (no closed loop):
+#: `python -m qccd.cert.studio_examples --micro` writes them.  They win over the others.
+QCCDCERT = SHIPPED / "qccdcert"
 MICRO_QASM = ROOT / "Compiler" / "examples" / "micro.qasm"
 
 
 def matrix_file(name: str) -> Path:
-    """A compiled `micro.qasm` artifact: the compiler's build directory when it has one (a
-    fresh matrix run), else the copy the repository ships, which may not exist either."""
+    """A compiled `micro.qasm` artifact: QCCDCert's when it compiled this machine, else the
+    project's compiler's build directory when it has one (a fresh matrix run), else the copy
+    the repository ships, which may not exist either."""
+    if (QCCDCERT / name).exists():
+        return QCCDCERT / name
     built = MATRIX / name
     return built if built.exists() else SHIPPED / name
+
+
+def compiled_by(name: str) -> str:
+    """Which compiler wrote a micro artifact: QCCDCert, or the project's own (rotation)."""
+    return "QCCDCert" if (QCCDCERT / name).exists() else "the project's compiler"
 
 #: The nine shipped architectures Part D compares, in the order the table shows them.
 ARCHES = ("chain", "stationary_chain", "h2_racetrack", "cyclone_base", "cyclone_dual_loop",
@@ -216,6 +227,7 @@ def measured(model: CostModel) -> dict:
                 "instructions": len(prog), "total_cost": m["total_cost"],
                 "total_steps": m["total_steps"], "runtime_us": m["runtime_us"],
                 "peak_quanta": m["peak_quanta"], "failed": list(rep.rules.summary()["failed"]),
+                "compiler": compiled_by(name),
                 # THE ARTIFACT'S NAME, not where it sits in this repository.  `micro_chain
                 # .cooled.tsir.json` is a thing the reader can recognise and export for
                 # themselves; `Compiler/build/matrix/` in front of it is a build directory

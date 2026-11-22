@@ -1,0 +1,107 @@
+{
+ "name": "circuit",
+ "arch_spec": "grid2x3",
+ "instructions": [
+  {
+   "type": "init",
+   "id": 0,
+   "placement": {
+    "q0": "T0_0h",
+    "q1": "T0_1h"
+   },
+   "quanta": {
+    "q0": 0.0,
+    "q1": 0.0
+   },
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "init"
+   }
+  },
+  {
+   "type": "gate",
+   "id": 1,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     0.5,
+     0.0
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_0h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 0,
+    "op": [
+     0
+    ]
+   }
+  },
+  {
+   "type": "gate",
+   "id": 2,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     3.141592653589793,
+     0.0
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_0h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 1,
+    "op": [
+     0
+    ]
+   }
+  },
+  {
+   "type": "gate",
+   "id": 3,
+   "mode": "intra",
+   "gate": "R",
+   "arity": 1,
+   "params": [
+    [
+     3.141592653589793,
+     0.0
+    ]
+   ],
+   "ions": [
+    "q0"
+   ],
+   "sites": [
+    "T0_0h"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "pulse",
+    "target_index": 2,
+    "op": [
+     0
+    ]
+   }
+  }
+ ],
+ "metrics": {},
+ "meta": {
+  "compiler": "QCCDCert"
+ }
+}

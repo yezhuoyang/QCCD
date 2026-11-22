@@ -1,0 +1,41 @@
+{
+ "name": "circuit",
+ "arch_spec": "grid2x3",
+ "instructions": [
+  {
+   "type": "init",
+   "id": 0,
+   "placement": {
+    "q0": "T0_0h",
+    "q1": "T0_1h"
+   },
+   "quanta": {
+    "q0": 0.0,
+    "q1": 0.0
+   },
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "init"
+   }
+  },
+  {
+   "type": "measure",
+   "id": 1,
+   "ions": [
+    "q0"
+   ],
+   "meta": {
+    "compiler": "QCCDCert",
+    "kind": "readout",
+    "target_index": 0,
+    "op": [
+     0
+    ]
+   }
+  }
+ ],
+ "metrics": {},
+ "meta": {
+  "compiler": "QCCDCert"
+ }
+}
