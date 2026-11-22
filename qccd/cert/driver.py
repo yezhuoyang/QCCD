@@ -21,6 +21,7 @@ project's extension and is labelled so wherever it is shown.
 from __future__ import annotations
 
 import json
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,7 +74,10 @@ def rest_rule(tr: M.Translation, n_traps: int) -> dict | None:
 
 
 def compile_for_machine(arch, model, qasm_path: str | Path, folder: str | Path, *,
-                        tc: Toolchain | None = None, extra_rules: list[dict] = ()) -> Result:
+                        tc: Toolchain | None = None, extra_rules: list[dict] = (),
+                        search_seconds: float = 120) -> Result:
+    """`search_seconds` boxes QCCDCert's own transport search; past it, or when the search
+    finds no route, this project's router proposes the routes and QCCDCert checks them."""
     tc = tc or find()
     qasm_path = Path(qasm_path)
     waves = M.waveforms(qasm_path, tc)
@@ -83,13 +87,14 @@ def compile_for_machine(arch, model, qasm_path: str | Path, folder: str | Path, 
              *([ONE_CLASS] if tr.loop_channels else []), *extra_rules]
     text = qasm_path.read_text(encoding="utf-8")
     routing = "QCCDCert's transport search"
+    searched = Toolchain(tc.root, timeout=min(tc.timeout, search_seconds))
     try:
-        comp = compile_dir(folder, tr.hardware, rules, text, tc=tc, profile="qiskit")
-    except ToolFailed as exc:
-        if "No placement, route" not in exc.output:
+        comp = compile_dir(folder, tr.hardware, rules, text, tc=searched, profile="qiskit")
+    except (ToolFailed, subprocess.TimeoutExpired) as exc:
+        if isinstance(exc, ToolFailed) and "No placement, route" not in exc.output:
             raise
-        # the search found no route: this project's router proposes one, and QCCDCert's
-        # checked routing-proposal stage admits each transport with its legality proof or refuses
+        # the search found no route, or not in time: this project's router proposes one, and
+        # QCCDCert's checked routing-proposal stage admits each transport with its legality proof
         from .planner import propose
         plan = propose(tr.hardware, tr.rest, qasm_path, tc)
         comp = compile_dir(folder, tr.hardware, rules, text, tc=tc, profile="qiskit", route_plan=plan)
