@@ -170,8 +170,9 @@ def translate(arch, model, wave_list: list[dict], *, name: str | None = None) ->
                 motions.append([f"{lid}{'+' if delta > 0 else '-'}1"])
 
     zone = lambda n: arch.zone_types.get(n.zone_type or "", {})  # noqa: E731
-    gate_traps = [n for n in traps if zone(n).get("gate")]
-    spam_traps = [n for n in traps if zone(n).get("spam")]
+    # no ion rests where three rails meet (R23), so such a trap carries no calibration
+    gate_traps = [n for n in traps if zone(n).get("gate") and not dev.is_junction(n.id)]
+    spam_traps = [n for n in traps if zone(n).get("spam") and not dev.is_junction(n.id)]
     if not gate_traps:
         raise Untranslatable(f"{arch.name} has no gate zone")
     base_ch = 1000  # optical channels live in their own namespace; keep them visibly apart
