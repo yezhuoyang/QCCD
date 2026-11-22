@@ -31,7 +31,7 @@ var QCCD_TUTORIAL = {
     { id: 'R', title: 'The rules the machine must obey',
       milestone: 'Part R done: you have broken and fixed every rule this machine obeys, or read why it cannot be checked here. Part C builds circuits under all of them.' },
     { id: 'C', title: 'Circuits by hand',
-      milestone: 'Part C done: a syndrome round and a plaquette, scheduled by hand under every rule, with the heat paid for. Part D lets the compiler do it and asks you to judge the machine.' },
+      milestone: 'Part C done: a syndrome round and a plaquette, scheduled by hand under every rule, with the heat paid for. Part D lets the verified compiler do it and asks you to judge the machine.' },
     { id: 'D', title: 'Architecture decisions with the compiler',
       milestone: 'The course is done. You can read the map, build a machine, program it by hand, break and fix every rule, schedule a circuit, and judge an architecture from measured numbers. The rest is practice, and the compiler.' }
   ],
@@ -1029,24 +1029,45 @@ var QCCD_TUTORIAL = {
 
     // =============================================================== D1
     { id: 'D1', part: 'D', title: 'What the compiler does',
-      story: 'You have written every instruction by hand. Now read what a compiler wrote for a real circuit, and find the instruction that does the CNOT.',
+      story: 'You have written every instruction by hand. Now read what the verified compiler wrote for a real circuit, find the instruction that does the CNOT, and say what its theorem promises.',
       teaches: ['tab:Q', 'rule:R10', 'tab:P'],
       page: 'micro_grid9x9',
       text: [
-        'The compiler takes a circuit and a machine. The circuit here is `micro.qasm`: four qubits, seven statements. The compiler writes the hardware programme: where the ions start, every shuttle, every gate (as the pulses that make it), every cooling.',
-        'It also writes a **certificate**: for each instruction, which statement of the circuit it carries out. [[R10|rule:R10]] says the programme does what the circuit says. The certificate says where and when each statement is carried out; which gate the pulses make is checked separately, by composing them back into the circuit.',
-        'On this page the [[Circuit|tab:Q]] tab shows the circuit next to the animation. The statement being carried out now is marked. Click a statement, and the animation jumps to the instruction that carries it out.'
+        'The compiler of this site is **QCCDCert**, written and proved in Lean. It takes three inputs: a **hardware program** (the machine: sites with capacities, paths between them with their durations, and calibrations that bind each exact laser pulse to a site), a **rule program** (assertions such as `forall s:Sites. Ntr(s) <= cap(s)`, true on every step), and the circuit, here `micro.qasm`: four qubits, seven statements.',
+        'It returns **target code**: where the ions start, every transport, every pulse, every readout, each with its duration. This machine was translated into a hardware program, QCCDCert compiled `micro.qasm` for it, and cooling was added afterwards by this site.',
+        'One theorem covers every result, on every machine: **Meaning** (erase the transports and waits and you get back the circuit’s pulses, in order; the result is the circuit’s), **Legality** (every step passes the capacity, position and channel checks and every rule) and **Time** (every step takes its declared duration; the finish is the latest end). That is why [[R10|rule:R10]] holds here without a certificate.',
+        'The [[Circuit|tab:Q]] tab shows the circuit next to the animation. Click a statement, and the animation jumps to the instruction that carries it out: each instruction says which statement it serves.'
       ],
       setup: [['seekTo', 0]],
-      exercise: 'Open the **Circuit** tab. Click the statement `cx q[0],q[1]`: the animation jumps to the instruction that carries out that CNOT, and the line above the circuit reads `executing cx q[0],q[1]`. Then go back to **Learn** and press **Check**.',
-      check: ['frameIs', 'realises:1'],
-      guide: [['stmt', 1], ['check']],
+      stages: [
+        { exercise: 'Open the **Circuit** tab. Click the statement `cx q[0],q[1]`: the animation jumps to the instruction that carries out that CNOT, and the line above the circuit reads `executing cx q[0],q[1]`. Then go back to **Learn** and press **Check**.',
+          check: ['frameIs', 'realises:1'],
+          guide: [['stmt', 1], ['check']] },
+        { exercise: '**Meaning.** A compiler drops one pulse of a CNOT by mistake. Which part of the theorem would fail?',
+          check: ['answer', 'erase'] },
+        { exercise: '**Legality.** A laboratory adds the rule `assert one: n_optical <= 1;` (one laser action per step). What changes?',
+          check: ['answer', 'code'] },
+        { exercise: '**Time.** A program takes 44 microseconds one step after another, and the compiler reports 32. Why may you believe 32?',
+          check: ['answer', 'overlap'] }
+      ],
+      choices: [
+        { id: 'erase', text: 'Meaning: erasing transports and waits from the target code no longer gives back the circuit’s pulses.' },
+        { id: 'legal', text: 'Legality: a step would break a capacity.' },
+        { id: 'none', text: 'Nothing: a missing pulse is only slower.' },
+        { id: 'code', text: 'The target code changes (a pulse shared by two ions is split in two) and the proof does not: rules are inputs.' },
+        { id: 'proof', text: 'The compiler needs a new proof for the new rule.' },
+        { id: 'ignored', text: 'Nothing: the compiler only reads its own built-in rules.' },
+        { id: 'overlap', text: 'Steps that overlap share no ion, site, channel or bit, and such steps give the same result in either order; the finish is the latest end, never more than the sum.' },
+        { id: 'estimate', text: 'It is an estimate; the real time is 44.' },
+        { id: 'faster', text: 'The machine runs faster than its calibrations say.' }
+      ],
       nudges: {
-        frameIs: ['You are on instruction {have}. Click the cx q[0],q[1] statement in the Circuit tab.', 'The statement you want is the first cx. The certificate says which instruction carries it out.'],
+        frameIs: ['You are on instruction {have}. Click the cx q[0],q[1] statement in the Circuit tab.', 'The statement you want is the first cx. Each instruction says which statement it serves.'],
+        answer: ['Read the theorem again in the text above: Meaning, Legality, Time.'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'Instruction {frame} is the CNOT: the certificate says so, and the page checked that certificate before it drew anything. Every CNOT you wrote by hand in Part B was this, with the compiler doing the trip.',
-      solution: { steps: [['seekTo', 'realises:1']] } },
+      praise: 'The CNOT is five pulses at one trap, and the theorem says why they are the right five, why every step was allowed, and why the clock is honest. Every CNOT you wrote by hand in Part B was this, with the compiler doing the trip.',
+      solution: { stages: [[['seekTo', 'realises:1']], [['setAnswer', 'erase']], [['setAnswer', 'code']], [['setAnswer', 'overlap']]] } },
 
     // =============================================================== D2
     { id: 'D2', part: 'D', title: 'The same circuit on nine machines',
@@ -1054,7 +1075,7 @@ var QCCD_TUTORIAL = {
       teaches: ['m:cost', 'm:runtime', 'm:junctiontransits', 'el:loop'],
       table: 'micro',
       text: [
-        'These numbers are measured, not estimated: the compiler output for `micro.qasm` on each shipped machine, replayed when this page was built, with cooling added.',
+        'These numbers are measured, not estimated: `micro.qasm` compiled for each shipped machine and replayed when this page was built, with cooling added. QCCDCert compiled the two machines without a closed loop (`grid9x9`, `deck_unit_cell`); the rings, chains and ladders turn their loops, which this site’s own compiler does as an extension.',
         'In the table: **cost** is the charge for moving ions, **steps** are machine steps, **runtime** is how long it takes, and **DACs** are the control channels of the machine.',
         'Two families stand out. A ring pays for a **rotation** every time it moves anything, because all 144 ions turn together: its cost is high and its programme long. A grid pays for **junction crossings** and the cooling they force: its runtime is long even when its cost is small. A chain pays almost nothing on a four-qubit circuit, but could not hold a bigger one.'
       ],
@@ -1091,7 +1112,7 @@ var QCCD_TUTORIAL = {
       text: [
         '`grid9x9` and `deck_unit_cell` have the same layout: 144 traps, 77 junctions, and the same 8496 electrodes. The grid is wired **direct**, with thousands of DACs. The deck is wired **broadcast** (the table calls its scheme `wise`): whole groups of electrodes share one signal.',
         'The table below is the hardware report of every shipped machine. Its DAC column is the whole case for broadcasting.',
-        'The price of broadcasting, from R5: one signal per channel per step, so some programmes need more steps. The D2 table shows whether this one did.'
+        'The price of broadcasting, from R5: one signal per channel per step, so some programmes need more steps. The D2 table shows whether this one did. In QCCDCert’s hardware program a broadcast channel is one `share channel` line, and the rule `forall c:Channels. W(c) <= 1` (one waveform per channel per step) is R22.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
       stages: [
@@ -1125,25 +1146,25 @@ var QCCD_TUTORIAL = {
       text: [
         '**Save your work:** press **Ctrl+S** to save it as `<name>.studio.json`. To copy the machine or the programme, open **Machine**, press **Source**, choose `as .arch.json` or `as .tsir.json` under the text, and press **Copy**.',
         '**Check everything:** `python -m qccd open <name>.studio.json` runs the full checker on what you built, including the rules the [[Report|tab:R]] lists as not checked here.',
-        '**Open a machine:** `python -m qccd studio --seed <name>.arch.json --program rotate -o x.html` opens a machine with a built-in programme.',
-        '**Open a compiled programme:** `python -m qccd studio --tsir <compiled>.tsir.json --qasm <circuit>.qasm -o x.html` opens it with its circuit beside it. Lesson D1 uses such a page.',
+        '**Compile a circuit with QCCDCert:** `python -m qccd cert compile <circuit>.qasm --arch <name>.arch.json --html x.html` translates the machine into a hardware program, compiles, prints the target code with its times, adds cooling, and writes the page with the circuit beside it. Lesson D1 uses such a page. A machine with a closed loop is compiled by this site’s own compiler instead.',
+        '**Open a compiled programme:** `python -m qccd studio --tsir <compiled>.tsir.json --qasm <circuit>.qasm -o x.html` opens any compiled programme with its circuit beside it.',
         '**Build this course:** `python -m qccd tutorial -o tutorial` builds this page and its companion page.',
-        'The compiler takes a QASM file and a machine, and writes the `.tsir.json` programme and the `.qcert.json` certificate that the **Circuit** tab checks. The D2 table was built with it. A programme of your own goes in the [[Write|tab:W]] tab.'
+        'The Compilation page of the website explains QCCDCert from its inputs to its theorem, on the paper’s own examples. A programme of your own goes in the [[Write|tab:W]] tab.'
       ],
       setup: [['newCanvas', { name: 'scratch' }]],
-      exercise: 'Last question. Which command opens a compiled programme with its circuit beside it?',
-      check: ['answer', 'studio'],
+      exercise: 'Last question. Which command compiles a circuit with the verified compiler?',
+      check: ['answer', 'cert'],
       choices: [
         { id: 'open', text: 'python -m qccd open <file>.studio.json' },
-        { id: 'studio', text: 'python -m qccd studio --tsir <x>.tsir.json --qasm <x>.qasm -o x.html' },
-        { id: 'compile', text: 'python -m qccd compile <x>.qasm' }
+        { id: 'cert', text: 'python -m qccd cert compile <x>.qasm --arch <m>.arch.json --html x.html' },
+        { id: 'studio', text: 'python -m qccd studio --tsir <x>.tsir.json --qasm <x>.qasm -o x.html' }
       ],
       nudges: {
-        answer: ['Read the commands again: which one names a circuit?'],
+        answer: ['Read the commands again: which one names a circuit and a machine, and compiles?'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'That is the whole loop: design here, check everything on your own machine, compile a circuit, and read the result back on a page like this one. You started with one picture of a chip. Now you can build, program, break, fix and judge one.',
-      solution: { stages: [[['setAnswer', 'studio']]] } }
+      praise: 'That is the whole loop: design here, check everything on your own machine, compile a circuit with a compiler whose result is proved correct, and read it back on a page like this one. You started with one picture of a chip. Now you can build, program, break, fix and judge one.',
+      solution: { stages: [[['setAnswer', 'cert']]] } }
   ]
 };
 
