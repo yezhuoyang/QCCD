@@ -4,7 +4,7 @@ import QCCDC.Cert.Sound
 # Composition: a program of proved gates is the program it says
 
 *Part J, lesson J5. You need lesson J4 (a gate is a program of places, with a contract), and
-lesson I2 helps (correct by construction). Here you prove the theorem that lets the site check
+lesson I5 helps (one theorem put together from the lemmas of its parts). Here you prove the theorem that lets the site check
 a fault-tolerant program in parts.*
 
 Shor's algorithm for 15, compiled for the site's machine, is 157 instructions after its gates
