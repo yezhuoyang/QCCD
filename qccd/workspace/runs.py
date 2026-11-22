@@ -5,12 +5,14 @@ A RUN is an experiment, not a submission.  It takes any program -- one from the 
 or QASM the agent writes -- and a design (the working design `main`, or any draft), and:
 
     1. exports the design for the compiler, and compiles the program onto it.  `auto` uses
-       QCCDCert, the verified compiler (qccd/cert/), when it is installed and the design has no
-       closed loop: the design is translated into a QCCDCert hardware program, QCCDCert
-       compiles (its theorem, Meaning ∧ Legality ∧ Time, covers that target code) and this
-       project's cooling extension is added.  Otherwise -- and as the explicit modes -- the
-       project's own compiler runs (`qccdc_cli rotate` when the design has closed loops, else
-       `compile`; `auto` falls back from rotate to compile);
+       QCCDCert, the verified compiler (qccd/cert/), extended by this project: the design is
+       translated into a QCCDCert hardware program (closed loops as mandatory broadcast
+       channels), QCCDCert compiles -- with this project's router proposing routes to its
+       checked routing stage where its own search finds none -- so its theorem, Meaning ∧
+       Legality ∧ Time, covers the target code, and this project's cooling extension is added
+       (qccd/cert/extensions.py).  Only if that fails, and as the explicit modes, the legacy
+       compiler runs, outside the theorem (`qccdc_cli rotate` when the design has closed loops,
+       else `compile`; `auto` falls back from rotate to compile);
     2. checks the compilation stages, including physical binding, scheduling,
        cooling and the serialized program's source semantics;
     3. replays it under the release's cost model and under the transport table, with the
@@ -231,13 +233,11 @@ class RunsMixin:
             # a C2LR lattice moves only by swap-or-stay steps, which qccdc does not emit: the
             # baseline router compiles it (docs/c2lr.md), and the same staged finishing accepts it
             modes = ["c2lr-router"]
-        elif mode in ("auto", "qccdcert") and cert_installed and not closed_loops(r.arch):
-            # QCCDCert is the core; the project's own compiler is the fallback under `auto` only
+        elif mode in ("auto", "qccdcert") and cert_installed:
+            # QCCDCert is the compiler (closed loops are its mandatory broadcast channels; where its
+            # search finds no route, this project's router proposes one and QCCDCert checks it).  The
+            # legacy compiler, outside QCCDCert's theorem, is tried under `auto` only if that fails.
             modes = ["qccdcert"] + (modes if mode == "auto" and tc.qccdc is not None else [])
-        elif mode == "qccdcert":
-            return {"_status": "failed", "design": design, "program": {"name": name, "qubits": q},
-                    "summary": f"QCCDCert cannot compile for {dname}: it has a closed loop, and conveyor rotation "
-                               "is an extension of the project's own compiler (choose auto or rotate)"}
         modes = [m for m in modes if m == "qccdcert" or tc.qccdc is not None or m == "c2lr-router"]
         limits = self.release.manifest.get("limits") or {}
         compile_budget = float(params.get("timeout_s") or limits.get("compile_timeout_s", 900))
@@ -261,7 +261,8 @@ class RunsMixin:
                 (work / stale).unlink(missing_ok=True)
             if m == "qccdcert":
                 try:
-                    cert_result = _qccdcert_compile(work, self.release.manifest["physics"].get("rank_table", "qccdsim_jones"))
+                    cert_result = _qccdcert_compile(work, self.release.manifest["physics"].get("rank_table", "qccdsim_jones"),
+                                                    compile_budget)
                     compilation = cert_result["compilation"]
                     log += f"--- QCCDCert\n{cert_result['log']}\n"
                     used = m
@@ -474,7 +475,7 @@ class RunsMixin:
         return out
 
 
-def _qccdcert_compile(work: Path, table: str) -> dict:
+def _qccdcert_compile(work: Path, table: str, budget: float = 900) -> dict:
     """QCCDCert on the exported design (qccd/cert/driver.py), then this project's cooling
     extension; writes prog.tsir.json, prog.cooled.tsir.json and prog.qcert.json as the other
     engines do.  Raises when the design cannot be translated or QCCDCert refuses."""
@@ -485,9 +486,11 @@ def _qccdcert_compile(work: Path, table: str) -> dict:
     from ..ir.tsir import TSIR
     arch = Architecture.from_json(json.loads((work / "device.arch.json").read_text(encoding="utf-8")))
     model = corrected_model(table)
-    r = compile_for_machine(arch, model, work / "circuit.qasm", work / "qccdcert")
-    prog = TSIR.from_json(r.tsir)
-    cooled = insert_cooling(prog, arch, model).program
+    from ..cert.toolchain import Toolchain, find
+    tc = Toolchain(find().root, timeout=budget)   # the release's compile budget, per tool call
+    r = compile_for_machine(arch, model, work / "circuit.qasm", work / "qccdcert", tc=tc)
+    from ..cert.extensions import heat
+    cooled, _ = heat(r.tsir, arch, model)
     (work / "prog.tsir.json").write_text(json.dumps(r.tsir), encoding="utf-8")
     (work / "prog.cooled.tsir.json").write_text(json.dumps(cooled.to_json()), encoding="utf-8")
     (work / "prog.qcert.json").write_text(json.dumps(r.certificate), encoding="utf-8")

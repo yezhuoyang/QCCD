@@ -33,7 +33,7 @@ IDS = {"question": "question", "inputs": "inputs", "hardware": "hardware", "rule
        "frame": "frame", "core": "core", "rules": "rules", "observations": "observations",
        "elaboration": "elaboration", "stages": "stages", "theorem": "theorem", "meaning": "meaning",
        "legality": "legality", "time": "time", "parallel": "parallel", "chain": "chain", "ex1": "ex1",
-       "ex2": "ex2", "ex3": "ex3", "studio": "studio", "gates": "gates", "proof": "proof",
+       "ex2": "ex2", "ex3": "ex3", "studio": "studio", "loops": "loops", "gates": "gates", "proof": "proof",
        "trust": "trust", "extensions": "extensions", "conclusion": "conclusion"}
 
 #: (anchor, heading) for the search index
@@ -44,8 +44,9 @@ HEADINGS = [("question", "What must a compiler know?"), ("inputs", "The three in
             ("legality", "Legality: every frame is legal"), ("time", "Time: the declared durations"),
             ("ex1", "Example 1: one CX, stage by stage"), ("ex2", "Example 2: feedback, and a rule that changes the code"),
             ("ex3", "Example 3: broadcast transport, parallel time, chain order"),
-            ("studio", "On a studio machine"), ("gates", "Every basic gate, compiled by QCCDCert"),
-            ("proof", "How the proof is built"), ("extensions", "What this site adds, and what it does not claim")]
+            ("studio", "On a studio machine"), ("loops", "A machine with a loop, and a router that proposes"),
+            ("gates", "Every basic gate, compiled by QCCDCert"),
+            ("proof", "How the proof is built"), ("extensions", "The compiler of this site: QCCDCert, extended")]
 
 esc = html.escape
 
@@ -687,16 +688,40 @@ def body(rows: list[dict], device_svg: Callable) -> str:
                                               "and a designer&rsquo;s rule that starts one ion per trap.")
              + code(bc.lines["timed"])
              + f"<p>QCCDCert: {bell['instructions']} events, {bell['finish_us']} µs. With this site&rsquo;s cooling extension "
-               f"({bell['cools']} cooling operation): {bell['cooled_us']:g} µs, and the studio&rsquo;s replay passes all "
+               f"({bell['cools']} cooling operation{'' if bell['cools'] == 1 else 's'}): {bell['cooled_us']:g} µs, and the studio&rsquo;s replay passes all "
                f"{bell['studio_passed']} rules it checks.</p>"
              + learn.runbox(bell["page"], bell["poster"], "the Bell pair, compiled by QCCDCert, with cooling added", cls="wide")))
+    ring = next((r for r in rows if r["id"] == "ghz4_ring6d"), None)
+    if ring:
+        rc = _load_studio("ghz4_ring6d")
+        plan = json.loads((STUDIO / "ghz4_ring6d" / "route-plan.json").read_text(encoding="utf-8")) \
+            if (STUDIO / "ghz4_ring6d" / "route-plan.json").exists() else None
+        W('<h3 id="loops">A machine with a loop, and a router that proposes</h3>')
+        W("<p>ring6d is a ring of six storage sites with two gate zones on spurs, each for two ions. Its loop is "
+          "QCCDCert&rsquo;s own broadcast transport: one mandatory channel whose waveform moves every ion on the ring one "
+          "slot. Where three rails meet (S0, S3) the studio&rsquo;s rules R2 and R23 become a capacity of one and a "
+          "<code>rest</code> rule. QCCDCert&rsquo;s transport search moves the operands of the next pulse; here a gate "
+          "zone is full and a bystander must leave first, so the search finds no route. This site&rsquo;s router "
+          "then proposes one, and QCCDCert&rsquo;s routing-proposal stage admits each proposed transport only with its "
+          "legality proof: the theorem covers the result exactly as before.</p>")
+        moved = sum(len(ev) for ev in plan["transports"]) if plan else 0
+        W(eg("GHZ-4 on ring6d",
+             fig(code(rc.lines["rules"]), "The rule program on ring6d: R1, R23 (rest), R22, R12 and R4 (one movement "
+                                          "class per step) as QCCDCert assertions.")
+             + (f"<p>The proposal: an initial placement and {moved} transports before the {len(plan['transports'])} "
+                f"tokens of the pulse program; QCCDCert admitted every one.</p>" if plan else "")
+             + code(rc.lines["timed"][:14] + ["..."])
+             + f"<p>QCCDCert: {ring['instructions']} events, {ring['finish_us']} µs. With cooling: {ring['cooled_us']:g} µs, "
+               f"and the studio&rsquo;s replay passes all {ring['studio_passed']} rules it checks.</p>"
+             + (learn.runbox(ring["page"], ring["poster"], "GHZ-4 on ring6d, compiled by QCCDCert from a checked proposal",
+                             cls="wide") if ring.get("page") else "")))
     W('<h3 id="gates">Every basic gate, compiled by QCCDCert</h3>')
     W("<p>Stage 4 on each gate of the standard library, as the compiler emitted it. QCCDCert has no virtual Z: a beam reaches "
       "every ion of a trap, so a phase cannot be advanced for one ion alone, and every U becomes three R pulses with exact "
       "angles. A CX is one MS between four R pulses.</p>")
     grows = []
     for r in rows:
-        if r["id"] == "bell":
+        if r["id"] == "bell" or r["device"] != "grid2x3":
             continue
         grows.append([f"<code>{esc(r['statement'])}</code>", esc(r["what"]),
                       "<code>" + "<br>".join(esc(x) for x in r["pulses"]) + "</code>",
@@ -742,16 +767,28 @@ def body(rows: list[dict], device_svg: Callable) -> str:
     ], "ct trust"))
 
     # ------------------------------------------------------------------ 12 extensions
-    W('<h2 id="extensions">12. What this site adds, and what it does not claim</h2>')
-    W("<p>This site&rsquo;s tools extend QCCDCert; they never replace one of its passes. Each extension reads QCCDCert&rsquo;s "
-      "input or output, and each is named wherever its numbers appear:</p>")
+    W('<h2 id="extensions">12. The compiler of this site: QCCDCert, extended</h2>')
+    W(learn.ask("If this site needs more than the paper&rsquo;s compiler does, does it write a second compiler?",
+                "No. Its compiler is QCCDCert with extensions. An extension either changes what QCCDCert is given, and "
+                "QCCDCert checks the result, or adds to what QCCDCert returns, and says so; none replaces one of its passes."))
     W(tbl(["extension", "what it does", "covered by the theorem?"], [
-        ["machine translation", "writes a studio machine as a hardware program (&sect;10); durations from the cost model", "no: the theorem covers the hardware program it writes"],
-        ["the studio&rsquo;s frame-level rules", "capacity, junction rest, R22, R12, written as QCCDCert rules", "<b>yes</b>: they are in the rule program"],
-        ["cooling insertion", "adds cooling where the studio&rsquo;s heat model needs it (R7, R7c)", "no: heat is outside QCCDCert&rsquo;s model; the cooled programme is checked by the studio&rsquo;s replay"],
-        ["the studio&rsquo;s replay", "judges the played programme under all studio rules and prices it", "no: it is a second, independent check"],
-        ["conveyor rotation", "machines with closed loops are compiled by this project&rsquo;s own router", "no: such pages say so"],
+        ["machine translation", "writes a studio machine as a hardware program (&sect;10): traps and junctions as sites, "
+         "routes as paths, durations from the cost model", "the theorem covers the hardware program it writes"],
+        ["the studio&rsquo;s rules as QCCDCert rules", "capacity during every event (R1), one ion on a junction (R2, as its "
+         "capacity), no ion resting on a junction (R23), one waveform per channel (R22), one movement class per step (R4), "
+         "one optical action per trap (R12)", "<b>yes</b>: they are in the hardware and rule programs"],
+        ["closed loops", "a conveyor loop is QCCDCert&rsquo;s own broadcast transport: a mandatory channel whose one waveform "
+         "moves every ion on the loop one slot", "<b>yes</b>: every rotation is a checked transport event"],
+        ["this site&rsquo;s router", "where QCCDCert&rsquo;s transport search finds no route (a gate zone that is full), it "
+         "proposes routes to QCCDCert&rsquo;s checked routing-proposal stage", "<b>yes</b>: each proposed transport is "
+         "admitted only with its legality proof, or the compilation is refused"],
+        ["cooling", "a state-preparation cool, and cooling before any gate whose ions would be over the motional budget "
+         "(R7, R7c)", "no: heat is outside QCCDCert&rsquo;s model; the studio&rsquo;s replay checks the cooled programme"],
+        ["the studio&rsquo;s replay", "judges the played programme under every studio rule and prices it", "no: a second, "
+         "independent check"],
     ]))
+    W("<p>The project&rsquo;s earlier compiler is kept only as a fallback for a design this pipeline cannot compile, outside "
+      "the theorem; a programme it wrote says so where it is shown.</p>")
     W(f"<p class=\"note\">Compiler build used for this page: QCCDCert, Lean sources {esc(fp.get('sources_sha256', '?'))} "
       f"({fp.get('files', '?')} files, {esc(fp.get('lean', '?'))}).</p>")
 

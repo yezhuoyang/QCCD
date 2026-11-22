@@ -80,13 +80,27 @@ def _relative(path: Path, folder: Path) -> None:
 
 def compile_dir(folder: str | Path, hardware: dict, rules: list[dict], qasm: str, *,
                 flags: tuple[str, ...] = (), chain_ports: dict | None = None,
-                suffix: str = "", tc: Toolchain | None = None, profile: str | None = None) -> Compilation:
+                suffix: str = "", tc: Toolchain | None = None, profile: str | None = None,
+                route_plan: dict | None = None) -> Compilation:
     """Compile `qasm` for `hardware` under `rules`, writing every file into `folder`.
     `profile="qiskit"` lets the source include qelib1.inc (the compiler's compatibility
     definitions); the default is the strict profile."""
     tc = tc or find()
     prof = ("--qasm-profile", profile) if profile else ()
     flags = (*flags, *prof)
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    if route_plan is not None:
+        # an untrusted routing proposal (qccd.cert.planner): QCCDCert admits each transport only
+        # with its legality proof, or refuses the whole compilation
+        draft = folder / "route-plan.draft.json"
+        _write(draft, json.dumps(route_plan) + "\n")
+        try:
+            tc.run("qccd-dynamic", "strict", "route-plan", draft.name, "route-plan.json", cwd=folder)
+        finally:
+            draft.unlink(missing_ok=True)
+        flags = (*flags, "--route-plan", "route-plan.json")
+        prof = (*prof, "--route-plan", "route-plan.json")
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     tc.strict("hardware", {**hardware, "rules": []}, folder / "hardware.json")

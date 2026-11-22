@@ -11,13 +11,14 @@
   "pulse R(pi,0) q0;",
   "pulse R(pi,(0+pi)/2) q0;"
  ],
- "cools": 0,
- "cooled_us": 15.0,
+ "cools": 1,
+ "cooled_us": 315.0,
  "studio_failed": [],
  "studio_passed": 25,
  "notes": [
   "7 traps and 2 junctions become 9 sites; 20 paths join traps through junctions, all on one shared transport channel with 18 waveforms, one per motion.",
   "Durations are whole microseconds from the machine's cost model (corrected): a path is its split, segments, junction crossings and merge; R 5 µs, MS 25 µs, readout 120 µs, pumping 50 µs.",
-  "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone."
+  "7 gate zones get one calibration per exact waveform of the program (3 waveforms), on their own optical channels; a broadcast R reaches every gate zone, one ion per zone.",
+  "Routing: QCCDCert's transport search."
  ]
 }

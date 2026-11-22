@@ -20,6 +20,16 @@
    }
   },
   {
+   "type": "cool",
+   "id": 4,
+   "broadcast": true,
+   "meta": {
+    "kind": "state_prep",
+    "extension": "heat",
+    "call": 0
+   }
+  },
+  {
    "type": "gate",
    "id": 1,
    "mode": "intra",
@@ -138,5 +148,5 @@
    ]
   }
  },
- "id_seq": 4
+ "id_seq": 5
 }

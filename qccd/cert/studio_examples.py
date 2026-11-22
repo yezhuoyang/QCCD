@@ -4,7 +4,7 @@
 
 For each circuit: QCCDCert compiles it for the machine's hardware program
 (`qccd.cert.driver.compile_for_machine`), and this project's extension then inserts cooling
-(`qccd.compile.insert_cooling`), which the studio's replay needs for its heat rules (R7,
+(`qccd.cert.extensions.heat`), which the studio's replay needs for its heat rules (R7,
 R7c).  Both programmes are written: `prog.tsir.json` is QCCDCert's target code, the one
 Theorem `verified_compilation` covers; `prog.cooled.tsir.json` is the same code with cooling
 added, which the page plays and the studio's replay judges.  The site build reads these files
@@ -43,6 +43,14 @@ CIRCUITS = [
 ]
 
 
+#: Circuits on machines with a closed loop: the loop is a mandatory broadcast channel, and where
+#: QCCDCert's search finds no route this site's router proposes one for QCCDCert to check.
+LOOP_CIRCUITS = [
+    ("ghz4_ring6d", "GHZ-4 on ring6d", "a ring with two docks: the gate zones fill up, so routes are proposed and checked",
+     "ring6d", ROOT / "Compiler" / "examples" / "ghz4.qasm"),
+]
+
+
 def publishable(prog: dict) -> dict:
     """The cooling pass records the repository root it ran in (`meta.prov.root`): blank it,
     as the course's shipped copies do, so no local path is published."""
@@ -54,22 +62,25 @@ def publishable(prog: dict) -> dict:
 
 def build(out: Path = OUT) -> list[dict]:
     from ..arch import Architecture
-    from ..compile import insert_cooling
+    from .extensions import heat
     from ..cost import corrected_model
     from ..ir.tsir import TSIR
     from ..verify import verify
-    arch = Architecture.from_json(json.loads((SRC / f"{DEVICE}.arch.json").read_text(encoding="utf-8")))
     model = corrected_model()
+    archs = {}
     rows = []
-    for gid, stmt, what in CIRCUITS:
+    jobs = [(gid, stmt, what, DEVICE, SRC / gid / "circuit.qasm", [SPREAD]) for gid, stmt, what in CIRCUITS]
+    jobs += [(gid, stmt, what, dev, qasm, []) for gid, stmt, what, dev, qasm in LOOP_CIRCUITS]
+    for gid, stmt, what, dev, qasm, extra in jobs:
+        if dev not in archs:
+            archs[dev] = Architecture.from_json(json.loads((SRC / f"{dev}.arch.json").read_text(encoding="utf-8")))
+        arch = archs[dev]
         folder = Path(out) / gid
-        r = compile_for_machine(arch, model, SRC / gid / "circuit.qasm", folder, extra_rules=[SPREAD])
-        prog = TSIR.from_json(r.tsir)
-        cooled = insert_cooling(prog, arch, model)
-        cp = cooled.program
+        r = compile_for_machine(arch, model, qasm, folder, extra_rules=extra)
+        cp, cooled = heat(r.tsir, arch, model)
         (folder / "prog.cooled.tsir.json").write_text(json.dumps(publishable(cp.to_json()), indent=1) + "\n", encoding="utf-8")
         rep = verify(cp, arch, model, check_metrics=False).summary()
-        row = {"id": gid, "statement": stmt, "what": what, "device": DEVICE,
+        row = {"id": gid, "statement": stmt, "what": what, "device": dev,
                "finish_us": r.compilation.finish, "parallel_us": r.compilation.parallel.get("finish"),
                "instructions": len(r.compilation.execution["instructions"]),
                "pulses": [ln for ln in r.compilation.lines["pulses"]],
@@ -94,7 +105,7 @@ def build_micro() -> list[str]:
     machine, as Compiler/examples/micro/qccdcert/micro_<arch>.{tsir,cooled.tsir,qcert}.json --
     the files the course's companion page (lesson D1) and its D2 table read."""
     from ..arch import Architecture
-    from ..compile import insert_cooling
+    from .extensions import heat
     from ..cost import corrected_model
     from ..ir.tsir import TSIR
     from ..viz.course import MICRO_QASM, QCCDCERT
@@ -109,7 +120,7 @@ def build_micro() -> list[str]:
         arch = Architecture.from_json(json.loads(text))
         work = ROOT / "out" / "cert" / f"micro_{stem}"
         r = compile_for_machine(arch, model, MICRO_QASM, work)
-        cooled = insert_cooling(TSIR.from_json(r.tsir), arch, model).program
+        cooled, _ = heat(r.tsir, arch, model)
         (QCCDCERT / f"micro_{stem}.tsir.json").write_text(json.dumps(r.tsir, indent=1) + "\n", encoding="utf-8")
         (QCCDCERT / f"micro_{stem}.cooled.tsir.json").write_text(json.dumps(publishable(cooled.to_json()), indent=1) + "\n",
                                                                 encoding="utf-8")

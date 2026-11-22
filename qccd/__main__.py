@@ -904,8 +904,8 @@ def cmd_cert(args) -> int:
     print("\n".join(c.lines["timed"]))
     print(f"\nQCCDCert: {len(c.execution['instructions'])} events, {c.finish} us in sequence, "
           f"{c.parallel.get('finish')} us parallel -- Meaning, Legality, Time hold (verified_compilation)")
-    prog = TSIR.from_json(r.tsir)
-    cooled = insert_cooling(prog, arch, model).program
+    from .cert.extensions import heat
+    cooled, _ = heat(r.tsir, arch, model)
     (out / "prog.cooled.tsir.json").write_text(_json.dumps(cooled.to_json(), indent=1) + "\n", encoding="utf-8")
     rep = verify(cooled, arch, model, check_metrics=False)
     failed = rep.summary()["rules"]["failed"]

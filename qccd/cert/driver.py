@@ -27,7 +27,7 @@ from pathlib import Path
 from . import machine as M
 from .compile import Compilation, compile_dir
 from .examples import CAP, ONE_WAVEFORM, const, observe
-from .toolchain import Toolchain, find
+from .toolchain import ToolFailed, Toolchain, find
 from .tsir import certificate, to_tsir
 
 
@@ -35,6 +35,13 @@ from .tsir import certificate, to_tsir
 ONE_PER_TRAP = {"name": "beam", "category": "operationTiming",
                 "formula": {"all": {"name": "s", "domain": "sites",
                                     "body": {"le": {"lhs": observe("pulsesAt", "s"), "rhs": const(1)}}}}}
+#: R4 as an assertion: one movement class per step -- a transport uses one channel only
+#: (the shared shuttle channel, or one loop's rotation channel).
+ONE_CLASS = {"name": "class", "category": "transportControl",
+             "formula": {"all": {"name": "c", "domain": "channels",
+                                 "body": {"or": {"lhs": {"eq": {"lhs": observe("channelUse", "c"), "rhs": const(0)}},
+                                                 "rhs": {"eq": {"lhs": observe("channelUse", "c"),
+                                                                "rhs": {"atom": {"expression": {"base": {"expression": "moveCount"}}}}}}}}}}}
 #: A designer's placement rule: at most one ion per site at the start.
 SPREAD = {"name": "spread", "category": "staticOccupancy",
           "formula": {"all": {"name": "s", "domain": "sites",
@@ -53,8 +60,9 @@ class Result:
 
 
 def rest_rule(tr: M.Translation, n_traps: int) -> dict | None:
-    """`assert rest: N+(J..) = 0 and ...;` -- after every event, no ion sits on a junction."""
-    js = list(range(n_traps, len(tr.site_ids)))
+    """`assert rest: N+(J..) = 0 and ...;` -- after every event, no ion sits on a junction
+    (a pure junction, or a trap where three or more rails meet: studio rule R23)."""
+    js = list(tr.rest)
     if not js:
         return None
     f = None
@@ -71,9 +79,23 @@ def compile_for_machine(arch, model, qasm_path: str | Path, folder: str | Path, 
     waves = M.waveforms(qasm_path, tc)
     tr = M.translate(arch, model, waves)
     n_traps = len(arch.device.sites())
-    rules = [CAP, *([r] if (r := rest_rule(tr, n_traps)) else []), ONE_WAVEFORM, ONE_PER_TRAP, *extra_rules]
-    comp = compile_dir(folder, tr.hardware, rules, qasm_path.read_text(encoding="utf-8"), tc=tc,
-                       profile="qiskit")
+    rules = [CAP, *([r] if (r := rest_rule(tr, n_traps)) else []), ONE_WAVEFORM, ONE_PER_TRAP,
+             *([ONE_CLASS] if tr.loop_channels else []), *extra_rules]
+    text = qasm_path.read_text(encoding="utf-8")
+    routing = "QCCDCert's transport search"
+    try:
+        comp = compile_dir(folder, tr.hardware, rules, text, tc=tc, profile="qiskit")
+    except ToolFailed as exc:
+        if "No placement, route" not in exc.output:
+            raise
+        # the search found no route: this project's router proposes one, and QCCDCert's
+        # checked routing-proposal stage admits each transport with its legality proof or refuses
+        from .planner import propose
+        plan = propose(tr.hardware, tr.rest, qasm_path, tc)
+        comp = compile_dir(folder, tr.hardware, rules, text, tc=tc, profile="qiskit", route_plan=plan)
+        routing = ("this site's router (qccd.cert.planner), proposing; QCCDCert's routing-proposal stage "
+                   "admitted every transport with its legality proof")
+    tr.notes.append(f"Routing: {routing}.")
     prog = to_tsir(tr, comp.execution, name=qasm_path.stem, arch_spec=arch.name, stages=comp.stages, qasm=comp.qasm)
     (Path(folder) / "prog.tsir.json").write_text(json.dumps(prog, indent=1) + "\n", encoding="utf-8")
     (Path(folder) / "translation.json").write_text(json.dumps(

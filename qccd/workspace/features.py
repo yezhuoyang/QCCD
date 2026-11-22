@@ -429,8 +429,9 @@ FEATURES: tuple[Feature, ...] = (
         "it at its result with no animation -- use it when the person wants designs tried as fast as possible "
         "or runs many. program: a catalogue name or {name, qasm}. draft: 'main' (the working design, default) "
         "or a draft's name. Waits up to wait_s (default 45, max 50); if the run is still going, poll "
-        "qccd_get_job(run_id). compiler (default auto): QCCDCert, the verified compiler, when it is installed and "
-        "the design has no closed loop, else the project's own compiler; qccdcert, rotate or compile force one. "
+        "qccd_get_job(run_id). compiler (default auto): QCCDCert, the verified compiler, with this project's "
+        "extensions (routes it checks, cooling) when it is installed, else the legacy compiler; qccdcert, rotate "
+        "or compile force one. "
         "A run is an experiment, never a submission.",
         _obj({"program": {"anyOf": [_S, {"type": "object", "properties": {"name": _S, "qasm": _S},
                                          "required": ["qasm"]}]},

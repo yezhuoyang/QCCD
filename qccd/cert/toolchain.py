@@ -36,6 +36,7 @@ class ToolFailed(RuntimeError):
 @dataclass(frozen=True)
 class Toolchain:
     root: Path
+    timeout: float = 3600       # seconds per tool call; a job with a budget passes its own
 
     @property
     def bin(self) -> Path:
@@ -47,10 +48,10 @@ class Toolchain:
                 return cand
         raise ToolchainMissing(f"{name} is not built in {self.bin}: run `lake build` in {self.root}")
 
-    def run(self, tool: str, *args, cwd: Path | None = None, timeout: float = 3600) -> str:
+    def run(self, tool: str, *args, cwd: Path | None = None, timeout: float | None = None) -> str:
         cmd = [str(self.exe(tool)), *map(str, args)]
         done = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=timeout)
+                              errors="replace", timeout=timeout or self.timeout)
         if done.returncode:
             raise ToolFailed(cmd, done.stdout + done.stderr)
         return done.stdout

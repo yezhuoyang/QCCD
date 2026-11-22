@@ -20,6 +20,16 @@
    }
   },
   {
+   "type": "cool",
+   "id": 2,
+   "broadcast": true,
+   "meta": {
+    "kind": "state_prep",
+    "extension": "heat",
+    "call": 0
+   }
+  },
+  {
    "type": "measure",
    "id": 1,
    "ions": [
@@ -70,5 +80,5 @@
    ]
   }
  },
- "id_seq": 2
+ "id_seq": 3
 }

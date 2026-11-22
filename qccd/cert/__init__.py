@@ -23,9 +23,11 @@ This package is the boundary between that compiler and the rest of the repositor
 * `tsir`       QCCDCert target code as a TSIR programme, so the one design-page template
                (`qccd.viz.render.render_html`) can play it.
 
-Anything this repository adds to the compiler -- physical durations, cooling, conveyor
-rotation -- is an *extension*: it reads QCCDCert's input or output and never replaces one of
-its passes, and the page that shows it says which numbers the theorem covers.
+The compiler of this site is QCCDCert *extended*, never a second compiler beside it
+(`extensions` lists what is added): the machine translation and the studio's rules as
+QCCDCert rules (closed loops as mandatory broadcast channels), this project's router as a
+proposal to QCCDCert's checked routing stage (`planner`) -- all inside the theorem -- and
+cooling after it, outside the theorem, which the studio's replay checks.
 """
 
 from .toolchain import Toolchain, ToolchainMissing, find  # noqa: F401

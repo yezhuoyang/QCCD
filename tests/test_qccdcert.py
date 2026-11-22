@@ -125,12 +125,50 @@ def test_the_workspace_engine_compiles_a_studio_design(tmp_path):
         assert (tmp_path / f).exists()
 
 
-@needs_cert
-def test_a_machine_with_a_closed_loop_is_refused_by_the_translation():
+def _arch(name):
     from qccd.arch import Architecture
-    from qccd.cert.machine import Untranslatable, translate
+    src = Path(__file__).resolve().parents[1] / "qccd" / "site" / "compiled" / f"{name}.arch.json"
+    return Architecture.from_json(json.loads(src.read_text(encoding="utf-8")))
+
+
+def test_a_closed_loop_is_a_mandatory_broadcast_channel():
+    """A conveyor loop is QCCDCert's own broadcast transport: one channel, declared mandatory,
+    one path per slot each way, one waveform per direction, one duration."""
+    from qccd.cert.machine import translate
     from qccd.cost import corrected_model
-    src = Path(__file__).resolve().parents[1] / "qccd" / "site" / "compiled" / "chain4.arch.json"
-    arch = Architecture.from_json(json.loads(src.read_text(encoding="utf-8")))
-    with pytest.raises(Untranslatable):
-        translate(arch, corrected_model(), [])
+    tr = translate(_arch("ring6d"), corrected_model(), [])
+    geo = tr.hardware["device"]["base"]["geometry"]
+    ch = tr.loop_channels["L0"]
+    assert {"channel": ch, "mandatory": True} in geo["broadcasts"]
+    loop = [i for i, p in enumerate(geo["paths"]) if p["channel"] == ch]
+    assert len(loop) == 12 and {geo["paths"][i]["waveform"] for i in loop} == {0, 1}
+    assert len({tr.hardware["device"]["base"]["pathDurations"][i] for i in loop}) == 1
+    assert {tr.rotations[i][1] for i in loop} == {1, -1}
+
+
+def test_studio_junction_rules_are_in_the_hardware_program():
+    """R2 (one ion on a node where three rails meet) is that site's capacity; R23 (never rest
+    there) puts it in `rest` and in the `via` of the routes through it, never at their ends."""
+    from qccd.cert.machine import translate
+    from qccd.cost import corrected_model
+    tr = translate(_arch("ring6d"), corrected_model(), [])
+    geo = tr.hardware["device"]["base"]["geometry"]
+    junction_traps = [i for i, s in enumerate(geo["sites"]) if s["name"] in ("S0", "S3")]
+    assert all(geo["sites"][i]["capacity"] == 1 for i in junction_traps)
+    assert sorted(tr.rest) == sorted(junction_traps)
+    ordinary = [p for p in geo["paths"] if p["channel"] == 0]
+    assert not any(p["src"] in tr.rest or p["dst"] in tr.rest for p in ordinary)
+    assert any(set(p["via"]) & set(tr.rest) for p in ordinary)
+
+
+@needs_cert
+def test_a_full_gate_zone_is_routed_by_a_proposal_qccdcert_checks(tmp_path):
+    """ring6d has two gate zones of two ions: QCCDCert's search cannot make room, so this
+    site's router proposes routes and QCCDCert's routing-proposal stage admits them."""
+    from qccd.cert.driver import compile_for_machine
+    from qccd.cost import corrected_model
+    ghz = Path(__file__).resolve().parents[1] / "Compiler" / "examples" / "ghz4.qasm"
+    r = compile_for_machine(_arch("ring6d"), corrected_model(), ghz, tmp_path)
+    assert (tmp_path / "route-plan.json").exists()
+    assert any("routing-proposal stage" in n for n in r.translation.notes)
+    assert r.compilation.finish > 0

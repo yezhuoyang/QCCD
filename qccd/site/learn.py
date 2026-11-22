@@ -316,7 +316,7 @@ GLOSSARY: dict[str, dict] = {
     "routing": {"t": "Routing", "u": "compilation/#stages", "a": ["routing", "router", "routed"],
                 "d": "Stage 7: transports that bring the operands of each pulse to a site with its control. Every transport is admitted only with a proof that it passes the core checks at the current placement; an external router's proposal is admitted the same way or rejected."},
     "conveyor": {"t": "Conveyor rotation", "u": "compilation/#extensions", "a": ["conveyor pass", "conveyor"],
-                 "d": "Turning a closed loop like a belt to bring riders beside docks. Machines with closed loops are compiled by this project's own router, an extension outside QCCDCert's theorem, and such pages say so."},
+                 "d": "Turning a closed loop like a belt to bring riders beside docks. For QCCDCert it is a broadcast transport on a mandatory channel: one waveform moves every ion on the loop one slot, in one checked event."},
     "cooling pass": {"t": "Cooling insertion", "u": "compilation/#extensions", "a": ["cooling insertion", "cooling pass"],
                      "d": "This site's extension: it replays a programme with the heating model and inserts cooling before any two-qubit gate whose ions would be over budget (R7). Outside QCCDCert's theorem; the studio's replay checks the result."},
     "primitive realization": {"t": "The primitive-realization assumption", "u": "compilation/#trust", "a": ["primitive-realization assumption"],

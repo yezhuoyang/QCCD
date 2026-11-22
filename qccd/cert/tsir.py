@@ -94,7 +94,16 @@ def to_tsir(tr: Translation, execution: dict, *, name: str, arch_spec: str = "",
         meta = {"compiler": "QCCDCert", "kind": kind, "target_index": k - 1}
         if st is not None:
             meta["op"] = [st]
-        if kind == "transport":
+        if kind == "transport" and b["moves"] and all(m["path"] in tr.rotations for m in b["moves"]) and (
+                len({tr.rotations[m["path"]] for m in b["moves"]}) == 1):
+            # a rotation of a closed loop (QCCDCert: one waveform on the loop's mandatory channel)
+            lid, delta = tr.rotations[b["moves"][0]["path"]]
+            meta["kind"] = "rotate"
+            out.append({"type": "simd", "id": k, "class": "rotate_cw" if delta > 0 else "rotate_ccw", "mode": "inter",
+                        "template": {"kind": "loop_shift", "loop": lid, "delta": delta},
+                        "holds": [lid, *sorted({tr.path_segments[p][0] for p in tr.rotations if tr.rotations[p][0] == lid})],
+                        "meta": meta})
+        elif kind == "transport":
             parts = []
             for m in b["moves"]:
                 p = base["geometry"]["paths"][m["path"]]
@@ -144,7 +153,7 @@ def _stamp_transports(instructions: list[dict]) -> None:
     nxt: dict[str, list[int]] = {}
     for ins in reversed(instructions):
         if ins["type"] == "simd":
-            ops = sorted({o for p in ins["participants"] for o in nxt.get(p["ion"], [])})
+            ops = sorted({o for p in ins.get("participants", []) for o in nxt.get(p["ion"], [])})
             if ops:
                 ins["meta"]["op"] = ops
                 ins["meta"]["op_from"] = "next use"
