@@ -33,33 +33,38 @@ see "open".
 
 ## The architectures
 
-Five. Three as the team's transport deck ("QCCD Transport Architectures", Ke, 2026-11-06) defines them:
+Six. Three as the team's transport deck ("QCCD Transport Architectures", Ke, 2026-11-06) defines them:
 their shuttling rules, hardware, parameters and cost models, with Ke's feedback on the first sweep
 ("QCCD Studio Feedback", 2026-11-07). [DECK.md](DECK.md) maps every item of both to what happens to it
 here, and lists the readings taken where the documents leave a gap, each open or answered. The
 definitions and the sizes tried are data in [families.py](families.py). The Goal 3 page's cost table
 (feedback F1) lists every term each family pays. Two more came in as submitted architectures on the Rules
-page (2026-11-19): Quantinuum's Helios floorplan and the general conveyor loop.
+page (2026-11-19): Quantinuum's Helios floorplan and a conveyor.  The sixth is the default QCCD grid, Goal 3's baseline
+before the deck, back at the team's request (2026-11-23).  The team's comments on the pages of 2026-11-20 and
+11-23 changed three of them and added two rules; [DECK.md](DECK.md) lists each comment with what was done.
 
 | family | machine | swept, per the deck | rule set | compiler |
 |---|---|---|---|---|
+| Grid | the default QCCD machine: a x b X-junctions with a trap on every rail between them, every ion shuttled by itself | a, b | `grid-deck` | qccdc (the released compiler), its general router, its laser steps split by chain position |
 | C2LR | Cx x Cy cells, an X-junction and two legs each, one crystal per leg, moved by swap-or-stay steps (Yb-Ba, the demonstrated diagonals) | Cx, Cy | `c2lr-deck` | the baseline C2LR router |
 | WISE | Cx x Cy cells, a junction zone and h gate zones each, sorted by parallel switched swaps (a pair exchanges in one step), one kind of operation across the chip in a step | h, Cx, Cy | `wise` | the baseline WISE router |
-| Cyclone | one ring of x traps of up to n ions, L-shaped junctions at its corners; data still, ancillas rotating in lockstep, each swapping its way to its trap's edge to leave | x, n <= 30 | `cyclone-deck` | the baseline Cyclone router |
+| Cyclone | one ring of x traps of up to n ions, L-shaped junctions at its corners; data still, ancillas rotating in lockstep, each swapping its way to its trap's edge to leave; every trap holds the same number of ions (Y5), spare ions filling a trap that would be short | x, n <= 30 | `cyclone-deck` | the baseline Cyclone router |
 | Helios | Quantinuum Helios's published floorplan (arXiv:2511.05465): an 82-site storage ring that turns, one X junction, two caches and eight two-ion operation zones on two legs | fixed (one point; codes over its qubits get none) | `helios-deck` | the baseline Helios batch router |
-| Conveyor | a loop of rail slots with junction corners and dock spurs, turned rigidly, ions docked to gate | loop length, docks | `conveyor-deck` | qccdc (the released compiler), rotation first, its laser steps split by chain position |
+| Conveyor | data traps that stand still beside one or two conveyor loops that carry the ancillas; a loop turns as one (R39), and the ancillas hop into the traps they face to gate | data traps (one data qubit each, or two), loops | `conveyor-deck` | the baseline conveyor router |
 
 Every family heats and cools by the same rule (R7) and time (3 ms), and in every family a laser step
 reaches one chain position (R34).
 
-All five compilers keep the circuit's gate order. For Cyclone that departs from the deck's S6, which
+All six compilers keep the circuit's gate order. For Cyclone that departs from the deck's S6, which
 assigns all X checks to one rotation and all Z checks to the next: Goal 3 runs one circuit per code on
 every architecture (the project owner's decision, 2026-11-06). So Cyclone takes as many rotations a
 round as the circuit's order needs, about 3 on surface d=3, and judges order by R25, not R26.
 
-The earlier families, a plain Grid and a WISE that was the same grid with broadcast wiring, are
-retired; the Conveyor of that time is back, now with the deck's physics and R34. Their rows are in
-`results/pre_deck/`. The first sweep on the deck, before the
+The earlier WISE, a grid with broadcast wiring, is retired; its rows and the earlier Grid's and Conveyor's are in
+`results/pre_deck/`.  Three more folders hold rows the comments of 2026-11-20 and 11-23 superseded:
+`results/loop_by_general_router/` (the first Conveyor: a loop with dock spurs that qccdc's general router compiled,
+shuttling ions one at a time along the loop), `results/uneven_traps/` (Cyclone rings whose traps held different
+numbers of ions) and `results/helios_fewest_crossings/` (Helios before its ring turned the quicker way). The first sweep on the deck, before the
 feedback (Cyclone cooling free, its gate swap time only, WISE's swap in two halves, no R34), is in
 `results/deck_r1/`.
 
@@ -83,6 +88,20 @@ certificate step left out ([sweep.py](sweep.py)):
 6. **the hardware census:** electrodes, DACs, switches, lasers and area, by the deck's formulas (`census` in each row).
 
 A size a compiler refuses, or that breaks a rule, is recorded with its reason and counted under its family.
+
+## The shuttling speed
+
+The main figure prices a straight rail at a fixed time whatever its length: 5 us in the noise model's example
+clock, 10 us for a Cyclone move, half of WISE's t0, which on the 464 um trap pitch the pages are drawn in is 93, 46
+and 9 m/s.  [speed.py](speed.py) runs each family's lowest-error point with every rail carried at one speed, from 1
+to 35 m/s (`results/speed/<code>.jsonl`): a rail takes its length over the speed and heats as the speed's square
+(`qccd.arch.speed`, with its sources).  The Goal 3 page draws both panels against the speed.  Which speed the main
+figure should take is with the team ([DECK.md](DECK.md), reading 18).
+
+```
+python goals/goal3/speed.py --code surface5            # after the sweep: each family's best point, 1 to 35 m/s
+python goals/goal3/sweep.py --code surface5 --speed 4  # or a whole sweep at one speed (results/variants/speed4/)
+```
 
 ## The figure
 

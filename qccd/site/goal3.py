@@ -60,6 +60,36 @@ def _size(r: dict) -> float:
     return 0
 
 
+#: one colour a family in the speed charts, in the families' fixed order: a categorical palette
+#: checked for colour-vision separation on this page's surface (the charts above use one accent
+#: and grey; here six lines must be told apart)
+SERIES = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300")
+
+
+def _speed(code: str, fams: list[str]) -> dict | None:
+    """goals/goal3/results/speed/<code>.jsonl (goals/goal3/speed.py): each family's best point at
+    each shuttling speed, or None where no such run exists."""
+    f = GOAL / "results" / "speed" / f"{code}.jsonl"
+    if not f.exists():
+        return None
+    rows: dict = {}
+    for ln in f.read_text(encoding="utf-8").splitlines():
+        if ln.strip():
+            r = json.loads(ln)
+            if r.get("status") == "ok" and r.get("speed_m_s") is not None:
+                rows[(r["family"], float(r["speed_m_s"]))] = r
+    speeds = sorted({v for _, v in rows})
+    out = {}
+    for fam in fams:
+        mine = {v: r for (ff, v), r in rows.items() if ff == fam}
+        if mine:
+            col = lambda k: [mine[v]["ler"][k] if v in mine else None for v in speeds]      # noqa: E731
+            out[fam] = {"n": next(iter(mine.values()))["point"],
+                        "t": [round(mine[v]["T_round_ms"], 4) if v in mine else None for v in speeds],
+                        "l": col("per_round"), "lo": col("per_round_lo"), "hi": col("per_round_hi")}
+    return {"v": [int(v) if float(v).is_integer() else v for v in speeds], "fams": out} if out else None
+
+
 def data() -> dict | None:
     """Every Goal 3 release with its reference points, or None when this build has none."""
     try:
@@ -110,9 +140,11 @@ def data() -> dict | None:
         codes.append({"task": task, "id": b.id, "title": name, "short": short, "about": about,
                       "ions": (b.manifest.get("qec") or {}).get("n_ions"), "rounds": spec.get("rounds"),
                       "counts": counts, "points": pts, "failed": failed,
+                      **({"speed": sp} if (sp := _speed(code, fams)) else {}),
                       **({"rules": _code_rules(code, b.manifest.get("rules") or "standard", judged)}
                          if judged and code in judged["codes"] else {})})
-    out = {"families": fams, "caveats": caveats, "codes": codes}
+    out = {"families": fams, "caveats": caveats, "codes": codes,
+           "series": {f: SERIES[i % len(SERIES)] for i, f in enumerate(fams)}}
     if judged:
         out["rules"] = _rules_key(judged, {c["rules"]["board"] for c in codes if c.get("rules")})
     return out
@@ -217,6 +249,12 @@ CSS = """
 .g3-panel .hit{fill:transparent}
 .g3-key{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 2px 0;font:12.5px/1.4 var(--sans);color:var(--ink2)}
 .g3-key svg{vertical-align:-2px;margin-right:5px}
+.g3-panel .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.g3-panel .mk{stroke:var(--paper);stroke-width:2}
+.g3-panel .xh{stroke:#8f8e88;stroke-width:1;display:none}
+.g3-tip .row{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.g3-tip .row i{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none}
+.g3-tip .row b{display:inline;font-size:12.5px;margin-left:auto;padding-left:10px}
 .g3-tip{position:fixed;z-index:50;pointer-events:none;background:var(--paper);border:1px solid var(--line);
  border-radius:8px;box-shadow:0 6px 18px rgba(20,20,30,.12);padding:8px 10px;font:12.5px/1.45 var(--sans);
  color:var(--ink);max-width:300px;display:none}
@@ -281,7 +319,7 @@ SCRIPT = r"""
     var lo = Math.log10(Math.min.apply(null, vals)), hi = Math.log10(Math.max.apply(null, vals));
     var pad = Math.max(0.08, (hi - lo) * 0.08); lo -= pad; hi += pad;
     function y(v){ return T + (Hh - T - B) * (1 - (Math.log10(v) - lo) / (hi - lo)); }
-    var colW = (W - L - R) / fams.length, labels = [];
+    var colW = (W - L - R) / fams.length, labels = [], boxes = [];
     function xc(i){ return L + colW * (i + 0.5); }
     // grid + y ticks: decades, and 2 and 5 between them for time or a range under two decades
     var subs = (key === 't' || hi - lo < 2) ? [1, 2, 5] : [1];
@@ -330,8 +368,14 @@ SCRIPT = r"""
         }
         svg.appendChild(g);
         // the best point's name, to its right unless that runs off the panel
-        if (on) { var room = x + 9 + 6.2 * p.n.length <= W - 2;
-          labels.push(E('text', {x: room ? x + 9 : x - 9, y: yy + 3.5, 'class': 'lab', 'text-anchor': room ? 'start' : 'end'}, p.n)); }
+        if (on) { var room = x + 9 + 6.2 * p.n.length <= W - 2, wd = 6.2 * p.n.length,
+              bx = room ? x + 9 : x - 9 - wd, by = yy + 3.5;
+          // a name that would print over one already placed moves up a line (or down, at the top)
+          var hits = function(v){ return boxes.some(function(b){ return bx < b[0] + b[2] + 4 && b[0] < bx + wd + 4 && Math.abs(b[1] - v) < 12; }); };
+          if (hits(by)) { var free = [13, -13, 26, -26].filter(function(o){ return by + o > T + 8 && by + o < Hh - B - 2 && !hits(by + o); });
+            if (free.length) by += free[0]; }
+          boxes.push([bx, by, wd]);
+          labels.push(E('text', {x: room ? x + 9 : x - 9, y: by, 'class': 'lab', 'text-anchor': room ? 'start' : 'end'}, p.n)); }
       });
     });
     labels.forEach(function(t){ svg.appendChild(t); });
@@ -467,6 +511,91 @@ SCRIPT = r"""
     });
   }
 
+  // each family's best point against the shuttling speed: one line a family, time and error apart
+  function speedChart(host, c, key, title){
+    var S = c.speed, fams = D.families.filter(function(f){ return S.fams[f]; });
+    var W = 560, Hh = 300, L = 58, R = 14, T = 12, B = 44, vals = [];
+    fams.forEach(function(f){ S.fams[f][key].forEach(function(v){ if (v > 0) vals.push(v); }); });
+    var box = H('div', 'g3-panel'); box.appendChild(H('h3', null, title)); host.appendChild(box);
+    var svg = E('svg', {viewBox: '0 0 ' + W + ' ' + Hh, role: 'img', 'aria-label': title + ', ' + c.title});
+    box.appendChild(svg);
+    if (!vals.length) { svg.appendChild(E('text', {x: W / 2, y: Hh / 2, 'text-anchor': 'middle'}, 'No run yet.')); return; }
+    var lo = Math.log10(Math.min.apply(null, vals)), hi = Math.log10(Math.max.apply(null, vals));
+    var pad = Math.max(0.08, (hi - lo) * 0.1); lo -= pad; hi += pad;
+    var xs = S.v, xlo = Math.log10(xs[0]), xhi = Math.log10(xs[xs.length - 1]);
+    function x(v){ return L + (W - L - R) * (xhi > xlo ? (Math.log10(v) - xlo) / (xhi - xlo) : 0.5); }
+    function y(v){ return T + (Hh - T - B) * (1 - (Math.log10(v) - lo) / (hi - lo)); }
+    var subs = (key === 't' || hi - lo < 2) ? [1, 2, 5] : [1];
+    for (var d = Math.floor(lo); d <= Math.ceil(hi); d++) {
+      subs.forEach(function(m){
+        var v = m * Math.pow(10, d), lv = Math.log10(v); if (lv < lo || lv > hi) return;
+        svg.appendChild(E('line', {x1: L, x2: W - R, y1: y(v), y2: y(v), 'class': 'gr'}));
+        svg.appendChild(E('text', {x: L - 6, y: y(v) + 3.5, 'text-anchor': 'end'},
+          key === 't' ? String(+v.toPrecision(3)) : (m === 1 ? '' : m + '\u00d7') + '10' + sup(d)));
+      });
+    }
+    svg.appendChild(E('line', {x1: L, x2: L, y1: T, y2: Hh - B, 'class': 'ax'}));
+    svg.appendChild(E('line', {x1: L, x2: W - R, y1: Hh - B, y2: Hh - B, 'class': 'ax'}));
+    svg.appendChild(E('text', {x: 14, y: T + (Hh - T - B) / 2, transform: 'rotate(-90 14 ' + (T + (Hh - T - B) / 2) + ')',
+      'text-anchor': 'middle'}, key === 't' ? 'ms per round' : 'logical error rate per round'));
+    xs.forEach(function(v){ svg.appendChild(E('text', {x: x(v), y: Hh - B + 15, 'text-anchor': 'middle'}, String(v))); });
+    svg.appendChild(E('text', {x: L + (W - L - R) / 2, y: Hh - B + 33, 'text-anchor': 'middle'}, 'shuttling speed along a rail, m/s'));
+    var hair = E('line', {x1: 0, x2: 0, y1: T, y2: Hh - B, 'class': 'xh'}); svg.appendChild(hair);
+    fams.forEach(function(f){
+      var col = D.series[f], ps = [];
+      xs.forEach(function(v, j){ var val = S.fams[f][key][j]; if (val > 0) ps.push([x(v), y(val)]); });
+      if (ps.length > 1) svg.appendChild(E('path', {d: 'M' + ps.map(function(p){ return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('L'),
+        'class': 'ln', stroke: col}));
+      ps.forEach(function(p){ svg.appendChild(E('circle', {cx: p[0], cy: p[1], r: 4.5, fill: col, 'class': 'mk'})); });
+    });
+    // one readout for every family at the speed under the pointer
+    var hit = E('rect', {x: L, y: T, width: W - L - R, height: Hh - T - B, fill: 'transparent'});
+    svg.appendChild(hit);
+    function at(ev){
+      var b = svg.getBoundingClientRect(), px = (ev.clientX - b.left) * W / b.width, j = 0;
+      xs.forEach(function(v, k){ if (Math.abs(x(v) - px) < Math.abs(x(xs[j]) - px)) j = k; });
+      hair.setAttribute('x1', x(xs[j])); hair.setAttribute('x2', x(xs[j])); hair.style.display = 'block';
+      tip.textContent = '';
+      tip.appendChild(H('b', null, xs[j] + ' m/s'));
+      fams.forEach(function(f){
+        var F = S.fams[f], row = H('div', 'row'), sw = H('i'); sw.style.background = D.series[f];
+        row.appendChild(sw); row.appendChild(document.createTextNode(f));
+        row.appendChild(H('b', null, F[key][j] > 0 ? (key === 't' ? ms(F.t[j]) + ' ms' : sci(F.l[j])) : 'no run'));
+        tip.appendChild(row);
+      });
+      tip.appendChild(H('div', 'm', key === 't' ? 'time per round' : 'logical error rate per round'));
+      tip.style.display = 'block'; move(ev);
+    }
+    hit.addEventListener('pointermove', at);
+    hit.addEventListener('pointerleave', function(){ hair.style.display = 'none'; hide(); });
+  }
+  function speed(c){
+    var boxEl = document.getElementById('g3-speedbox'), S = c.speed;
+    boxEl.hidden = !S;
+    var host = document.getElementById('g3-speed'), key = document.getElementById('g3-speed-key'),
+        tb = document.getElementById('g3-speed-table');
+    host.textContent = ''; key.textContent = ''; tb.textContent = '';
+    if (!S) return;
+    speedChart(host, c, 't', 'Time per syndrome round, against the shuttling speed');
+    speedChart(host, c, 'l', 'Logical error rate per round, against the shuttling speed');
+    var fams = D.families.filter(function(f){ return S.fams[f]; });
+    fams.forEach(function(f){
+      var s = H('span'), sw = E('svg', {width: 12, height: 12});
+      sw.appendChild(E('circle', {cx: 6, cy: 6, r: 5, fill: D.series[f]}));
+      s.appendChild(sw); s.appendChild(document.createTextNode(f + ': ' + S.fams[f].n)); key.appendChild(s);
+    });
+    var tw = H('div', 'tw'), t = H('table'), hd = H('tr');
+    hd.appendChild(H('th', null, 'family, size'));
+    S.v.forEach(function(v){ hd.appendChild(H('th', null, v + ' m/s')); });
+    t.appendChild(hd);
+    fams.forEach(function(f){
+      var F = S.fams[f], tr = H('tr'); tr.appendChild(H('td', null, f + ', ' + F.n));
+      S.v.forEach(function(v, j){ tr.appendChild(H('td', 'n', F.l[j] > 0 ? ms(F.t[j]) + ' ms \u00b7 ' + sci(F.l[j]) : '\u2013')); });
+      t.appendChild(tr);
+    });
+    tw.appendChild(t); tb.appendChild(tw);
+  }
+
   function draw(i){
     cur = i; var c = D.codes[i];
     [].forEach.call(tabs.querySelectorAll('button'), function(b, j){ b.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
@@ -477,6 +606,7 @@ SCRIPT = r"""
     var pan = document.getElementById('g3-panels'); pan.textContent = '';
     panel(pan, c, 't', 'Time per syndrome round');
     panel(pan, c, 'l', 'Logical error rate per round (Z and X memories)');
+    speed(c);
     var tb = document.getElementById('g3-table'); tb.textContent = ''; table(tb, c);
     var fl = document.getElementById('g3-failed'); fl.textContent = ''; failures(fl, c);
     var rl = document.getElementById('g3-rules'); rl.textContent = ''; rules(rl, c);
@@ -578,6 +708,30 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "submitted entry</span>"
         "<span>Bars: 95% interval</span><span>Click any point to open its page</span></div>"
         '<details><summary>Each family&rsquo;s best, as a table</summary><div id="g3-table"></div></details>'
+        '<details id="g3-speedbox" open hidden><summary>Against the shuttling speed</summary>'
+        "<p>Each family&rsquo;s lowest-error size, with every straight rail carried at one speed in metres per "
+        "second: slower costs idle time, faster costs heat.</p>"
+        '<div class="g3-panels" id="g3-speed"></div><div class="g3-key" id="g3-speed-key"></div>'
+        '<details><summary>The same numbers as a table</summary><div id="g3-speed-table"></div></details>'
+        "<details><summary>How the speed is counted</summary>"
+        "<p>In the charts at the top, a straight rail costs a fixed time whatever its length: 5 &micro;s in the "
+        "Helios nominal noise model, 10 &micro;s for a Cyclone move, half of WISE&rsquo;s 100 &micro;s. On the "
+        "464 &micro;m trap pitch these pages are drawn in, that is 93, 46 and 9 m/s. Here every rail is carried at "
+        "the same speed instead: it takes its length divided by the speed, and each shuttle leaves "
+        "0.36 &times; (speed / 35 m/s)&sup2; quanta of motion behind. That is the fastest shuttle measured with "
+        'less than a quantum of excitation (<a href="https://arxiv.org/abs/2201.07358">Sterk and colleagues</a>: '
+        "35 m/s, at most 0.36 quanta), scaled as the square of the speed; at 4 m/s it gives 0.005 quanta a rail, "
+        "which is what Quantinuum measures there for a barium&ndash;ytterbium crystal once the background heating "
+        'is taken off (<a href="https://arxiv.org/abs/2206.11888">Burton and colleagues</a>: at most 0.03 quanta '
+        "for a round trip of four 375 &micro;m legs). The same measurement finds little excitation up to 6 m/s "
+        "through a junction and more above, so junction crossings, splits and merges, a C2LR swap-or-stay step "
+        "(its paper&rsquo;s own, at 3.3 m/s) and a WISE junction step keep their own times, and C2LR does not "
+        "change with the speed.</p>"
+        "<p>No error is charged for a shuttle itself; the noise model has none. Speed reaches the logical error "
+        "rate two ways: a slower rail is more idle time on every ion that waits through it (dephasing, idle "
+        "leakage and background heating all grow with time), and a faster rail is more heat for the next two-ion "
+        "gate to meet, or one more cooling before it. It is a simulation assumption, not a measurement of one "
+        "machine.</p></details></details>"
         + goal3_costs.section() +
         '<details><summary>The sizes that failed, and why</summary><div id="g3-failed"></div></details>'
         "<details hidden><summary>The rules each submission is judged by</summary>"

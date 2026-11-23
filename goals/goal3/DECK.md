@@ -16,7 +16,8 @@ transport numbers beat it, and it only fills what the deck also lacks.
 | its physics, table `helios` | [`qccd-physics@3.json`](../../qccd/workspace/physics/qccd-physics@3.json) |
 | prices and hardware census | [`c2lr.py`](../../qccd/arch/c2lr.py), [`wise.py`](../../qccd/arch/wise.py), [`cyclone.py`](../../qccd/arch/cyclone.py) |
 | compilers | [`c2lr_router.py`](../../qccd/compile/c2lr_router.py), [`wise_router.py`](../../qccd/compile/wise_router.py), [`cyclone_router.py`](../../qccd/compile/cyclone_router.py) |
-| rule sets | [`c2lr-deck`](../../qccd/ruleset/library/c2lr-deck.rules), [`wise`](../../qccd/ruleset/library/wise.rules), [`cyclone-deck`](../../qccd/ruleset/library/cyclone-deck.rules) |
+| rule sets | [`c2lr-deck`](../../qccd/ruleset/library/c2lr-deck.rules), [`wise`](../../qccd/ruleset/library/wise.rules), [`cyclone-deck`](../../qccd/ruleset/library/cyclone-deck.rules), [`conveyor-deck`](../../qccd/ruleset/library/conveyor-deck.rules), [`grid-deck`](../../qccd/ruleset/library/grid-deck.rules) |
+| the shuttling speed | [`speed.py`](../../qccd/arch/speed.py) (the law), [`speed.py`](speed.py) (the runs) |
 | chain order, for R34 and the gate swap | [`chains.py`](../../qccd/verify/chains.py) |
 | the cost table on the Goal 3 page (F1) | [`goal3_costs.py`](../../qccd/site/goal3_costs.py) |
 | families and sizes | [`families.py`](families.py) |
@@ -141,6 +142,19 @@ answers to the first round's questions.
 | slide 4, GateSwap | 3 x 70 us and 3 x the two-qubit error: the error is now charged (`gate_swap`, `gate_swap_leakage`) on the ancilla and the ion it changes places with |
 | slide 4, WISE junction step | C2LR's time, 400 us, for a swap across a junction zone or between rows |
 
+## The comments on the pages (Ke, 2026-11-20 and 11-23)
+
+Six notes pinned on the Rules and Goal 3 pages, after the five families went up.
+
+| comment | here |
+|---|---|
+| Conveyor, BB code: "some of the data qubits on the outer side don't move while others are moving", and many sites on the ring stand empty | **Right, and it was every Conveyor point, not only BB72's.** The family was a loop with dock spurs compiled by the released qccdc, whose rotation mode declines a memory experiment (it cannot read out an ion that rides the loop), so its general router compiled all 26 points: ions shuttled one at a time along the loop, past ions standing on it (on BB72, 10,234 of 11,000 loop steps). No rule judged it: the machine declares a switch at every site, so R4d lets a site sit a step out. **Now:** the family is the planar conveyor of `qccd.arch.sandwich`, data traps that stand still beside one or two loops that carry the ancillas, under the conveyor router; a loop turns as one. **R39** says so, in `conveyor-deck`; the old points fail it (kept in `results/loop_by_general_router/`) |
+| Cyclone: "every trapping zone need to hold the same number of ions", ex. colour d=3 | **Y5**, in `cyclone-deck`. One set of waveforms is broadcast to every trap, so every trap holds the same number of data qubits and of ancillas after every step. Colour d=3's traps held 4 and 6. Where a code's qubits do not divide among the traps, spare ions fill them: a spare among the data stands still; a spare in an ancilla's place rotates with the ancillas and pays the same gate swap. The sweep takes rings whose trap count divides the ancillas where there are any, which need no rotating spare. BB72's 6- and 72-trap rings were level already; its 10, 16, 26 and 44-trap rings were not (`results/uneven_traps/`), and its level rings are 6, 12, 18, 24, 36 and 72 |
+| Helios: "why is it preferable for ions to complete a full loop rather than shuttling back and forth through junctions? Does this help reduce error rates?" | It does not reduce error; it was the baseline router's choice, and a consequence of the 5 us rail. The router turned the ring the way that carried fewer ions across the X junction, whatever the distance: on colour d=3 its first fetch went 75 sites round rather than 7 back. At 5 us a rail and 120 us a crossing that is in fact quicker (375 us against 875). **Now** the turn is chosen by time at the machine's own prices, so at a shuttling speed of a few m/s it goes back and forth through the junction |
+| "Add default QCCD architecture" | **Grid**, a sixth family: the junction lattice of this website's boards, every ion shuttled by itself, compiled by the released qccdc, judged by `grid-deck` (the standard rules and R34). It was Goal 3's baseline before the deck (`results/pre_deck/`) |
+| WISE: "the ion-swapping is wrong: need to add one more trapping site in between every two trapping sites, mainly for ion swap. Or add one more rule that ions can swap in between trapping sites" | The second: **W5**, in `wise`. A swap is a switched swap between a pair's two zones, over the rail that joins them, with no site of its own; two ions cross on a rail only so. Until now only the exemptions in R2, R3 and R5 implied it. No program or number changes. A site between every two zones would be a different chip (2h - 1 sites a cell) and a recompile of every WISE point; see reading 19 |
+| "How is the shuttling speed counted? m/s?" | It was not. A rail cost a fixed time whatever its length: 5 us in the noise model's example clock, 10 us for a Cyclone move (deck T1), half of WISE's t0. On the 464 um trap pitch the pages are drawn in that is 93, 46 and 9 m/s. **Now** `qccd.arch.speed` prices a rail from a speed in m/s, and `speed.py` runs each family's best point at 1 to 35 m/s; the Goal 3 page draws it ("Against the shuttling speed"). The main figure keeps each family's own prices until the team picks a speed; see reading 18 |
+
 ## Readings
 
 These are the choices a person could reasonably have made another way, the ones that move results first.
@@ -208,6 +222,30 @@ Each is open unless it says it was answered.
 17. **The values to verify (F1).** Split and merge 6 quanta each, a junction 3, a WISE swap ~5 x 10⁻³ and 12
     quanta, an error per shuttle and per junction, ion loss: shown in the cost table, not charged, until the
     noise-model team confirms them.
+18. **The shuttling speed.** A rail's time is its length over the speed; its heat is 0.36 (v / 35 m/s)^2 quanta a
+    shuttle, the fastest low-excitation shuttle measured (arXiv:2201.07358: 35 m/s, at most 0.36 +- 0.08 quanta),
+    scaled as the square of the speed, a kick's law. At 4 m/s that is 0.005 quanta a rail, which is Quantinuum's
+    Ba-Yb figure there once the background heating is taken off (arXiv:2206.11888: at most 0.03 quanta for four
+    375 um legs, of which 29 quanta/s over 375 us is 0.011). The noise model's 0.1 quanta a shuttle is this law at
+    18 m/s. Only straight rails scale: a junction crossing (100 to 120 us, about 4 m/s over a pitch already), a
+    split, a merge, a C2LR step (its paper's, at 3.3 m/s) and a WISE junction step keep their sources' times,
+    since the same paper finds coherent excitation above 6 m/s through a junction. A WISE swap between neighbours
+    is two rails, as t0 is twice its half. No error is charged for a shuttle itself. Open: which speed the main
+    figure should take, and whether a junction's time should scale too.
+19. **Where a WISE swap happens.** Between the pair's two zones, over the rail that joins them (W5), as the
+    feedback's F4 made it one step. The other reading the comment offers, a trapping site between every two
+    zones where the pair merges, turns and splits, would make a cell 2h - 1 sites and price a swap as a merge, a
+    crystal rotation and a split there; it changes every WISE program.
+20. **Cyclone's spare ions.** Y5 needs every trap to hold the same number; the deck does not say what fills a
+    trap when a code's qubits do not divide. Here: spare ions, which are real ions (they heat, are cooled, and
+    lengthen their chain), carry no qubit, and where they stand in an ancilla's place rotate and are gate-swapped
+    to the trap's edge like one, the swap's error landing on the ion they change places with. Read otherwise (a
+    spare slot left empty, or no swap for a spare), the larger rings of an indivisible code would do better.
+21. **What a conveyor is.** Data traps that stand still beside the loops, the ancillas riding (the planar
+    machine of `qccd.arch.sandwich`), since that is the conveyor this platform has a router for that can run a
+    memory experiment. Its loop slots carry lasers, so an ancilla is prepared and read out where it rides. A loop
+    with dock spurs in which every ion that gates is docked is another conveyor; qccdc's rotation mode compiles
+    it for a syndrome round but not for a memory, whose data are read out.
 
 ## Differences from the paper the deck may want to check
 

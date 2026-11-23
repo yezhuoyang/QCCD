@@ -56,6 +56,11 @@ def _arith(text: str) -> float:
     return ev(ast.parse(text.split("#")[0].strip(), mode="eval").body)
 
 
+def _pitch_um() -> float:
+    from ..arch import speed
+    return speed.pitch_um()
+
+
 def _numbers() -> dict:
     """What the sweep runs on, read where it is defined."""
     from ..arch import c2lr, cyclone, wise
@@ -83,6 +88,7 @@ def _numbers() -> dict:
         "reorder_q": float(c2lr.C2LR_DECK["Yb-Ba"]["reorder_or_not"]["quanta"]),
         "t0": wise.SWAP_US, "shim": wise.SHIM_US, "wise_1q": wise.PULSE_1Q_US, "residual": wise.RESIDUAL_1Q,
         "cy_split": cyclone.SPLIT_US, "cy_move": cyclone.MOVE_US, "cy_merge": cyclone.MERGE_US,
+        "pitch_um": _pitch_um(),
         **par,
     }
 
@@ -131,9 +137,13 @@ def section() -> str:
         ["Doppler cooling", "—", "5.3 reference", "—", "not used"],
         ["anomalous heating", "per second", f"{_g(n['anomalous_per_s'])} a second, all three families",
          "through the two-qubit heating penalty", "as written"],
-        ["shuttle, one rail", f"{_g(n['rail_us'])} µs (Jaewon: 10 to 100 µs)", f"{_g(n['rail_q'])}",
+        ["shuttle, one rail", f"{_g(n['rail_us'])} µs whatever the rail's length (Jaewon: 10 to 100 µs). On the "
+         f"{_g(n['pitch_um'])} µm trap pitch these pages are drawn in that is {_g(round(n['pitch_um'] / n['rail_us']))} "
+         f"m/s; Cyclone's {_g(n['cy_move'])} µs move is {_g(round(n['pitch_um'] / n['cy_move']))} m/s, half of WISE's "
+         f"t0 {_g(round(2 * n['pitch_um'] / n['t0'], 1))} m/s", f"{_g(n['rail_q'])}",
          "10⁻⁵ to 10⁻⁴ a shuttle; loss 10⁻⁶",
-         f"{_g(n['rail_q'])} a rail; time from each family's own prices; no error a shuttle"],
+         f"{_g(n['rail_q'])} a rail; time from each family's own prices; no error a shuttle. "
+         "“Against the shuttling speed”, above, runs every family at one speed in m/s instead"],
         ["split", f"{_g(n['split_us'])} µs", f"6 (Helios: 2 or 4.16) {pend}", pend,
          f"{_g(n['split_q'])}, the noise model's lower figure"],
         ["merge", f"{_g(n['merge_us'])} µs", f"6 (Helios: grouped with the split) {pend}", pend,
