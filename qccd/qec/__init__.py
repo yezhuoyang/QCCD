@@ -5,7 +5,9 @@
     extract      TSIR + architecture + experiment -> noisy stim circuit + error budget, written
                  by the noise model's evaluation text (qccd.evalset)
     check        the noiseless determinism-and-parity check of an extracted circuit
-    decode       adaptive sampling, pymatching / BP-OSD, Wilson interval, LER per round
+    decode       adaptive sampling, pymatching / BP-OSD (or, asked for by name, IonQ's beam
+                 search: docs/decoders.md), Wilson interval, LER per round; every estimate
+                 records its decoder's configuration
 
 `evaluate_memory` runs the whole chain and returns a `qccd.ler_report`; a program that
 cannot be read, or reads as the wrong circuit, is a report with `check.ok = false` and no
@@ -27,7 +29,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .check import CheckResult, noiseless_check
-from .decode import LerEstimate, estimate_ler, per_round, wilson
+from .decode import BEAM_KEYS, LerEstimate, describe_decoder, estimate_ler, per_round, wilson
 from .experiments import (EXPERIMENTS, MemoryExperiment, bb, css_memory, ideal_stim,
                           repetition, rotated_surface, steane, steane_code)
 from .experiments import get as get_experiment
@@ -49,13 +51,14 @@ __all__ = [
     # extract / check / decode
     "extract", "Extraction", "ExtractionError", "load_program", "load_arch",
     "noiseless_check", "CheckResult",
-    "estimate_ler", "LerEstimate", "wilson", "per_round",
+    "estimate_ler", "LerEstimate", "wilson", "per_round", "describe_decoder",
 ]
 
 REPORT_KIND = "qccd.ler_report"
 
 _REPO = Path(__file__).resolve().parents[2]
-_LER_BUDGET_KEYS = ("decoder", "max_shots", "max_errors", "batch", "time_limit_s", "bp_max_iter")
+_LER_BUDGET_KEYS = ("decoder", "max_shots", "max_errors", "batch", "time_limit_s", "bp_max_iter",
+                    *BEAM_KEYS)
 
 
 def tool_versions() -> dict[str, str | None]:
@@ -78,7 +81,9 @@ def evaluate_memory(prog, arch, exp: MemoryExperiment, *, noise_id: str = "qccd-
     """Extract, check, and (if the check passes) estimate the LER.  JSON-safe report.
 
     `ler_budget` passes sampling limits through to `estimate_ler` (`decoder`,
-    `max_shots`, `max_errors`, `batch`, `time_limit_s`).  `noise` evaluates under an
+    `max_shots`, `max_errors`, `batch`, `time_limit_s`, `bp_max_iter`, and the beam
+    decoder's `beam_width` and other `beam_*` settings).  The report's `ler.decoder_config`
+    says what decoded it.  `noise` evaluates under an
     unpublished model (a sweep); a report then names that model's id with its settings.
     """
     budget_kw = dict(ler_budget or {})
