@@ -108,7 +108,8 @@ The gate test fails when any of these happens:
   certificate is needed.
 * `check`: the noiseless determinism-and-parity check.
 * `decode`: pymatching for graph-like models, BP-OSD for the rest. Sampling is adaptive (stop at
-  `max_errors` or `max_shots`), with a Wilson interval and LER per round.
+  `max_errors` or `max_shots`), with a Wilson interval and LER per round. Every estimate records
+  its decoder's configuration, and IonQ's beam search can be asked for by name: `docs/decoders.md`.
 * Agent surface: job kind `ler`, `qccd_estimate_ler`, `qccd ler`, a `noise` reference section,
   and the `qccd.ler_report` schema.
 

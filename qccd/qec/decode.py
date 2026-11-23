@@ -368,7 +368,6 @@ class _MatrixDecoder:
         self.no = dem.num_observables
         self.cache: dict[bytes, tuple] = {}
         self.unsolved = 0
-        self.times: list[float] | None = None    # a benchmark sets []: seconds per decoded syndrome
 
     def correction(self, row):
         raise NotImplementedError
@@ -382,10 +381,7 @@ class _MatrixDecoder:
             key = np.packbits(row).tobytes()
             hit = self.cache.get(key)
             if hit is None:
-                t0 = time.perf_counter()
                 e = np.asarray(self.correction(row), dtype=np.uint8)
-                if self.times is not None:
-                    self.times.append(time.perf_counter() - t0)
                 solved = not self.check_solution or not np.any((self.H @ e) % 2 != row)
                 hit = self.cache[key] = ((self.L @ e) % 2, solved)
             out[s] = hit[0]
