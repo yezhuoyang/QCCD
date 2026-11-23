@@ -451,3 +451,9 @@ assert R38 "A recorded global reconfiguration holds the whole machine"
   (forall a:operations where kind(a) = "reconfigure". holds_machine(a) and duration(a) > 0)
   and (forall a, b:operations where a != b and kind(a) = "reconfigure".
        not simultaneous(a, b));
+
+assert R39 "A conveyor loop turns as one"
+  about "A conveyor is one waveform for the whole loop: when a step carries an ion along a loop, every ion standing on that loop is carried the same way in that step. An ion in a trap or a dock off the loop is not on it and may stay where it is; so may one that leaves the loop for a trap in that step. Shuttling one ion along a loop while another stands on it is a lattice's motion, not a conveyor's, even on a machine with a switch at every site."
+  source "arXiv:2305.03828; the team's comment on Goal 3 (Ke, 2026-11-20)"
+  when conveyor_device():
+  forall k:steps where is_transport(k). loop_turns_whole(k);

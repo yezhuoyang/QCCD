@@ -53,6 +53,10 @@ def _size(r: dict) -> float:
         return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
     if gen == "helios":
         return 8                           # the fixed floorplan's eight operation zones
+    if gen == "lattice":
+        return p["a"] * p["b"]
+    if gen == "conveyor":
+        return p["traps"] * (1 + p["loops"])       # its data traps and its loops' slots
     return 0
 
 
@@ -523,15 +527,25 @@ def page(PAGE: str, STYLE: str) -> str | None:
                     + leaderboard.board_block(c["task"], c["title"], live=False, root="../../").replace(
                         "Coloured dots are submitted designs", "Diamonds are submitted designs") + "</div>"
                     for c in d["codes"])
-    fams = ("<tr><td>C2LR</td><td>Cx &times; Cy cells, an X-junction and two legs each, one crystal per leg; "
+    fams = ("<tr><td>Grid</td><td>the default QCCD machine: a &times; b X-junctions with a trap on every rail "
+            "between them, every ion shuttled by itself through the junctions, under this website&rsquo;s standard "
+            "rules</td><td>a, b</td></tr>"
+            "<tr><td>C2LR</td><td>Cx &times; Cy cells, an X-junction and two legs each, one crystal per leg; "
             "crystals move only by swap-or-stay steps, one direction bit a leg (Yb-Ba, the demonstrated diagonals)</td>"
             "<td>Cx, Cy</td></tr>"
             "<tr><td>WISE</td><td>Cx &times; Cy cells, a junction zone and h gate zones each; parallel switched swaps, "
-            "each pair exchanging its two ions in one step, one parity and one kind of operation across the chip in a "
+            "each pair exchanging its two ions in one step, in the space between its two zones, one parity and one "
+            "kind of operation across the chip in a "
             "step, and every layer pays for its shims</td><td>h, Cx, Cy</td></tr>"
             "<tr><td>Cyclone</td><td>one ring of x traps of up to n ions, L-shaped junctions at its corners; the data "
             "stands still and the ancillas rotate in lockstep, an ancilla swapping its way to its trap&rsquo;s edge "
-            "before it leaves</td><td>x, n &le; 30</td></tr>")
+            "before it leaves; every trap holds the same number of ions, spare ions filling a trap that would be "
+            "short</td><td>x, n &le; 30</td></tr>"
+            "<tr><td>Helios</td><td>Quantinuum Helios&rsquo;s published floorplan: an 82-site storage ring that "
+            "turns, one X junction, two caches and eight two-ion operation zones</td><td>fixed</td></tr>"
+            "<tr><td>Conveyor</td><td>data traps that stand still beside one or two conveyor loops that carry the "
+            "ancillas; a loop turns as one, every ion on it carried the same way, and the ancillas hop into the traps "
+            "they face to gate</td><td>data traps, loops</td></tr>")
     body = (
         "<h1>Goal 3: one code at a time, every architecture</h1>"
         '<p class="sub">For each fixed QEC code, every architecture family at every size its rules allow. '

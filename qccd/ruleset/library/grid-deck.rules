@@ -1,0 +1,12 @@
+# The default QCCD machine as Goal 3 judges it: the rule set `standard` (this website's machine, the
+# rules every board entry is checked against) and R34, the team's feedback F2 (Ke, 2026-11-07), which
+# Goal 3 applies to every architecture: a laser step addresses one chain position.  `standard` itself
+# is left as it is: the boards judge by it.
+
+ruleset "grid-deck";
+title "The default QCCD grid, as Goal 3 judges it";
+about "A lattice of X-junctions with a trap on every rail between them, every ion shuttled by itself, judged by this website's standard rules, and a laser step reaches one chain position: where a trap holds two ions, a pulse reaches the ones at the same position in every trap it plays in.";
+
+include "standard";
+
+use R34;

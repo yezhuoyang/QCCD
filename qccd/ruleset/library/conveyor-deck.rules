@@ -1,12 +1,15 @@
 # The general conveyor loop as Goal 3 judges it: the rule set `conveyor` (the website's standard rules,
 # no transport rule removed) and R34, the team's feedback F2 (Ke, 2026-11-07), which Goal 3 applies to
 # every architecture: a laser step addresses one chain position.  `conveyor` itself is left as it is
-# (the Rules page's demo).
+# (the Rules page's demo).  R39 says what the conveyor's own rules leave to the wiring: a loop turns
+# as one, even where every site has a switch.  Goal 3's first Conveyor points were a loop with dock spurs compiled by qccdc's general
+# router, which shuttled ions one at a time along the loop past ions standing on it; nothing judged
+# that, since the machine declared a switch at every site (the team's comment, Ke, 2026-11-20).
 
 ruleset "conveyor-deck";
 title "Conveyor-belt transport, as Goal 3 judges it";
-about "A named closed loop under broadcast control, judged by the standard rules with no transport rule removed, and a laser step reaches one chain position: where a trap holds several ions, a pulse reaches the ones at the same position in every trap it plays in.";
+about "Loops under broadcast control, judged by the standard rules with no transport rule removed; a loop turns as one, every ion on it carried the same way in a step; and a laser step reaches one chain position: where a trap holds several ions, a pulse reaches the ones at the same position in every trap it plays in.";
 
 include "conveyor";
 
-use R34;
+use R34, R39;

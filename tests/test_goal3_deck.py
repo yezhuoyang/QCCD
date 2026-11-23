@@ -101,18 +101,24 @@ def test_the_gate_time_law_is_flat_to_twelve_ions_and_scaled_to_the_noise_model(
 
 
 def test_the_families_are_the_deck_s_three_and_their_sizes_the_deck_s():
-    """The deck's three, and since 2026-11-19 the Rules page's Helios and general conveyor loop."""
+    """The deck's three, since 2026-11-19 Helios and a conveyor, and since 2026-11-23 the default
+    QCCD grid (the team's comment: "add default QCCD architecture")."""
     import families
-    assert families.FAMILIES == ("C2LR", "WISE", "Cyclone", "Helios", "Conveyor")
+    assert families.FAMILIES == ("Grid", "C2LR", "WISE", "Cyclone", "Helios", "Conveyor")
     assert set(families.RULES) == set(families.FAMILIES) == set(families.COLOURS)
     assert all("R34" in __import__("qccd.ruleset", fromlist=["load"]).load(s).ids for s in families.RULES.values())
     for code in ("surface3", "surface7", "color5", "bb72", "hgp58"):
         meta = json.loads((GOAL / "codes" / f"{code}_z" / "meta.json").read_text(encoding="utf-8"))
         # Helios's floorplan is fixed: one point where the code's qubits fit its 98, none where not
         assert len(families.points_for("Helios", meta)) == (1 if meta["ions"] <= families.HELIOS_QUBITS else 0), code
+        # a conveyor's loops have a slot for every ancilla, and a trap room for its data and a visitor a loop
+        data = meta["ions"] - meta["n_ancilla"]
         for p in families.points_for("Conveyor", meta):
-            w, v = p["params"]["width"] - 2, p["params"]["verticals"]
-            assert (2 * w) % v == 0 and 2 * w >= meta["ions"] * 1.3 and v >= meta["n_ancilla"], p["name"]
+            traps, loops, cap = (p["params"][k] for k in ("traps", "loops", "capacity"))
+            assert traps % 2 == 0 and traps * loops >= meta["n_ancilla"] and traps * (cap - loops) >= data, p["name"]
+        assert families.points_for("Conveyor", meta), code
+        for p in families.points_for("Grid", meta):
+            assert 2 * p["params"]["a"] * p["params"]["b"] - p["params"]["a"] - p["params"]["b"] >= 1.1 * meta["ions"], p["name"]
     for code in ("surface3", "surface7", "color5", "bb72", "hgp58"):
         meta = json.loads((GOAL / "codes" / f"{code}_z" / "meta.json").read_text(encoding="utf-8"))
         ions, anc = meta["ions"], meta["n_ancilla"]
@@ -135,7 +141,9 @@ def _compile(family: str, tmp: Path):
     exp = boards.experiment("surface3")
     point = {"C2LR": {"family": "C2LR", "name": "c2lr5x4", "generator": "grid", "params": {"a": 5, "b": 4}, "species": "Yb-Ba"},
              "WISE": {"family": "WISE", "name": "wise_h3_3x3", "generator": "wise", "params": {"h": 3, "cx": 3, "cy": 3}},
-             "Cyclone": {"family": "Cyclone", "name": "cyclone8_n3", "generator": "cyclone", "params": {"x": 8, "n": 3}}}[family]
+             "Cyclone": {"family": "Cyclone", "name": "cyclone8_n3", "generator": "cyclone", "params": {"x": 8, "n": 3}},
+             "Conveyor": {"family": "Conveyor", "name": "conveyor10_2L", "generator": "conveyor",
+                          "params": {"traps": 10, "loops": 2, "capacity": 3}}}[family]
     work = tmp / family
     work.mkdir()
     arch_p = work / "device.arch.json"
@@ -145,7 +153,7 @@ def _compile(family: str, tmp: Path):
     return exp, arch, TSIR.load(str(cooled)), json.loads(cert_p.read_text(encoding="utf-8")), work
 
 
-@pytest.fixture(scope="module", params=["C2LR", "WISE", "Cyclone"])
+@pytest.fixture(scope="module", params=["C2LR", "WISE", "Cyclone", "Conveyor"])
 def compiled(request, tmp_path_factory):
     return (request.param, *_compile(request.param, tmp_path_factory.mktemp("deck")))
 
@@ -344,6 +352,26 @@ def test_y5_every_trap_holds_the_same_number_of_ions(cyclone_prog):
     assert all(cyclone.spares(25, 24, x)[1] == 0 for x, _n in cyclone.traps_for(25, 24))
     assert [x for x, _n in cyclone.traps_for(72, 72)] == [6, 12, 18, 24, 36, 72]
     assert cyclone.spares(7, 3, 2) == (1, 1)
+
+
+def test_r39_a_conveyor_loop_turns_as_one(tmp_path):
+    """R39 (the team's comment of 2026-11-20): when a step carries an ion along a loop, every ion
+    standing on that loop goes with it.  Goal 3's conveyor does; leave one behind and it does not."""
+    _exp, arch, prog, cert, _work = _compile("Conveyor", tmp_path)
+    assert _judge("conveyor-deck", prog, arch, cert) == {}
+    loops = {lid: list(arch.device.loop_slots(lid)) for lid in arch.device.loops}
+    def rides_together(i):
+        return i.cls == "conveyor" and len(i.participants) >= 2
+    def leave_one(p):
+        k = p.instructions.index(_first(p, rides_together))
+        ins = p.instructions[k]
+        p.instructions[k] = replace(ins, participants=ins.participants[1:])
+    assert any(set(s) >= {q.src for q in _first(prog, rides_together).participants} for s in loops.values())
+    from qccd.verify.replay import ReplayError
+    try:
+        assert "R39" in _judge("conveyor-deck", _forged(prog, leave_one), arch, cert)
+    except ReplayError:
+        pass
 
 
 def test_the_rule_words_run_in_the_debug_page_s_python():

@@ -48,6 +48,10 @@ def size_key(r: dict) -> float:
         return 2 * p.get("width", 0) - (4 if p.get("corners") == "junction" else 0) + p.get("verticals", 0)
     if r["generator"] == "helios":
         return 8                       # the fixed floorplan's eight operation zones
+    if r["generator"] == "lattice":
+        return p["a"] * p["b"]
+    if r["generator"] == "conveyor":
+        return p["traps"] * (1 + p["loops"])
     return p["x"]
 
 

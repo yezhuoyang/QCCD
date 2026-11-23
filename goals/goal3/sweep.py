@@ -1,7 +1,7 @@
 """Goal 3's sweep: one fixed code, every architecture family, every size the deck allows.
 
     python goals/goal3/sweep.py --code surface5 [--family C2LR WISE ...] [--workers 3]
-                                [--list] [--max-points N] [--cool-us 300]
+                                [--list] [--max-points N] [--cool-us 300] [--speed 4]
 
 Each design point of each family (`families.py`) runs the code's experiment from its release
 (`boards.py`: the Z memory then the X memory on the same ions), minus the certificate chain:
@@ -22,6 +22,11 @@ stay in `work/<code>/<point>/`, and a point already in the results file is not r
 outputs go to `results/variants/cool<us>us/` and `work_cool<us>us/`.  The noise model's two cooling
 figures, 3 ms and Studio's 300 us, "use different reset assumptions"; the main figure takes its 3 ms.
 Every family cools by the same rule and time, Cyclone included (the team's feedback, Q2).
+
+`--speed` is the shuttling speed, in m/s: every straight rail then takes its length over that speed
+and heats as the speed's square (`qccd.arch.speed`), where the main figure takes each family's own
+fixed time per rail.  Its rows go to `results/variants/speed<v>/` (`speed.py` runs each family's
+best point over a range of speeds).
 """
 
 from __future__ import annotations
@@ -91,6 +96,17 @@ def device_doc(point: dict, exp) -> dict:
         from qccd.arch import helios
         doc = helios.device_doc(point["name"])
         prims, species = phys["primitives"], phys["species"]
+    elif point["generator"] == "conveyor":
+        # data traps that stand still between one or two conveyor loops, drawn in one plane
+        from qccd.arch.sandwich import conveyor_sandwich
+        doc = json.loads(json.dumps(conveyor_sandwich(p["traps"], layers=1, loops=p["loops"], capacity=p["capacity"],
+                                                      name=point["name"]).arch.to_json()))
+        prims, species = phys["primitives"], phys["species"]
+    elif point["generator"] == "lattice":
+        # the default QCCD machine: the junction lattice as this website's boards draw it, every
+        # ion shuttled by itself (Goal 3's baseline before the deck, results/pre_deck/)
+        doc = Machine.grid(p["a"], p["b"], name=point["name"]).arch.to_json()
+        prims, species = phys["primitives"], phys["species"]
     elif point["generator"] == "ring":
         # the general conveyor loop: a ring with dock spurs and junction corners, as Goal 3's
         # Conveyor family was before the deck (results/pre_deck/)
@@ -101,6 +117,9 @@ def device_doc(point: dict, exp) -> dict:
         raise KeyError(point["generator"])
     if point.get("cool_us") is not None:
         prims = {**prims, "cool": {**prims["cool"], "us": point["cool_us"]}}
+    if point.get("speed_m_s") is not None:
+        from qccd.arch import speed
+        prims = speed.at_speed(prims, point["speed_m_s"])
     doc.update(primitives=prims, heating=heating, species=species, budget=phys["budget"])
     doc["description"] = point.get("about", "")
     return doc
@@ -120,6 +139,11 @@ def census(point: dict, exp) -> dict:
     if point["generator"] == "ring":
         w, v = p["width"] - 2, p["verticals"]
         return {"loop_slots": 2 * w, "docks": v, "corners": p.get("corners", "site")}
+    if point["generator"] == "lattice":
+        return {"junctions": p["a"] * p["b"], "traps": 2 * p["a"] * p["b"] - p["a"] - p["b"]}
+    if point["generator"] == "conveyor":
+        return {"data_traps": p["traps"], "loops": p["loops"], "loop_slots": p["traps"] * p["loops"],
+                "trap_capacity": p["capacity"]}
     return cyclone.census(exp.n_data, exp.n_ancilla, p["x"], p["n"], ancillas=exp.n_ancilla)
 
 
@@ -127,8 +151,12 @@ def compile_point(point: dict, exp, arch_p: Path, work: Path) -> tuple[Path, Pat
     from qccd.compile import c2lr_router, cyclone_router, helios_router, wise_router
     if point["generator"] == "helios":
         return helios_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE)
-    if point["generator"] == "ring":
+    if point["generator"] in ("ring", "lattice"):
         return conveyor_compile(exp, arch_p, work)
+    if point["generator"] == "conveyor":
+        from qccd.compile import conveyor_router
+        return conveyor_router.compile_with_router(exp.qasm, arch_p, work, n_data=exp.n_data, table=TABLE,
+                                                   positions=True, lazy_cooling=True)
     if point["generator"] == "grid":
         return c2lr_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE, reads_together=True,
                                                positions=True, lazy_cooling=True)
@@ -138,8 +166,9 @@ def compile_point(point: dict, exp, arch_p: Path, work: Path) -> tuple[Path, Pat
 
 
 def conveyor_compile(exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
-    """The conveyor loop by the released qccdc (rotation first on the loop), cooled as the other
-    families are (lazily: heat since the last inserted cool, `CoolingPolicy(lazy=True)`)."""
+    """The conveyor loop, or the junction lattice, by the released qccdc (on a loop, rotation
+    first), cooled as the other families are (lazily: heat since the last inserted cool,
+    `CoolingPolicy(lazy=True)`)."""
     from qccd.arch import load
     from qccd.compile.cooling import CoolingPolicy, insert_cooling
     from qccd.cost.models import corrected_model
@@ -178,7 +207,8 @@ def grade(code: str, point: dict, work_root: str) -> dict:
            "point": point["name"], "generator": point["generator"], "params": point["params"],
            "deck": point.get("deck") or {}, "compiler": COMPILERS[point["family"]],
            "rule_set": RULES[point["family"]],
-           **({"cool_us": point["cool_us"]} if point.get("cool_us") is not None else {})}
+           **({"cool_us": point["cool_us"]} if point.get("cool_us") is not None else {}),
+           **({"speed_m_s": point["speed_m_s"]} if point.get("speed_m_s") is not None else {})}
     t0 = time.time()
     work = Path(work_root) / code / point["name"]
     work.mkdir(parents=True, exist_ok=True)
@@ -259,11 +289,14 @@ def main() -> int:
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--work", default=None)
     ap.add_argument("--cool-us", type=float, default=None, help="a sensitivity run at this cooling time")
+    ap.add_argument("--speed", type=float, default=None, help="the shuttling speed along a straight rail, in m/s")
     ap.add_argument("--ler-batch", type=int, default=None,
                     help="sample in batches of this many shots, not the release's (a point past threshold "
                          "otherwise decodes a whole batch of failing shots, for hours under BP-OSD)")
     a = ap.parse_args()
     tag = f"cool{a.cool_us:g}us" if a.cool_us is not None else None
+    if a.speed is not None:
+        tag = (tag + "_" if tag else "") + f"speed{a.speed:g}"
     a.work = a.work or str(HERE / (f"work_{tag}" if tag else "work"))
     meta = json.loads((HERE / "codes" / f"{a.code}_z" / "meta.json").read_text(encoding="utf-8"))
     pts = []
@@ -272,8 +305,10 @@ def main() -> int:
             continue
         ps = points_for(fam, meta)
         pts += ps[:a.max_points] if a.max_points else ps
-    if tag:
+    if a.cool_us is not None:
         pts = [{**p, "cool_us": a.cool_us} for p in pts]
+    if a.speed is not None:
+        pts = [{**p, "speed_m_s": a.speed} for p in pts]
     if a.ler_batch:
         pts = [{**p, "ler_batch": a.ler_batch} for p in pts]
     if a.list:

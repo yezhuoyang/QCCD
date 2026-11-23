@@ -42,6 +42,7 @@ from typing import Mapping, Sequence
 from ..arch import Architecture
 from ..arch.sandwich import CONVEYOR, HOP, sandwich_roles
 from ..ir.tsir import TSIR, Participant
+from ..verify.chains import Chains
 from ..verify.replay import bend_vias
 from ..verify.rules import hop_label, loop_node_set
 from .c2lr_router import GATES_2Q, U3, Refused, RouteError, SourceOp, _parse
@@ -444,8 +445,12 @@ class _Run:
             if gates:
                 self.em.play(gates, self.ion)
             for kind in ("measure", "reset"):
-                group = [self.ops[k] for k in solo if self.ops[k].name == kind]
-                if group:
+                # one instruction for the ions at one chain position (R34), where an order is kept
+                by_pattern: dict = {}
+                for k in solo:
+                    if self.ops[k].name == kind:
+                        by_pattern.setdefault(self.em.pattern((self.ion[self.ops[k].qubits[0]],)), []).append(self.ops[k])
+                for group in by_pattern.values():
                     self.em.emit(type=kind, ions=tuple(self.ion[o.qubits[0]] for o in group),
                                  meta={"kind": "readout" if kind == "measure" else "reset",
                                        "op": [o.i for o in group]})
@@ -546,8 +551,13 @@ def _cooling_in_steps(arch: Architecture) -> float:
 def compile_conveyor(qasm_text: str, arch: Architecture, n_data: int, *, name: str = "circuit",
                      per_layer: bool | None = None, align: str = "best",
                      wait: float | None = None,
-                     data_at: Mapping[int, int] | None = None) -> tuple[TSIR, dict]:
+                     data_at: Mapping[int, int] | None = None,
+                     positions: bool = False) -> tuple[TSIR, dict]:
     """`(programme, certificate)` for `qasm_text` on the sandwich `arch`, uncooled.
+
+    `positions`: pack every laser step by the chain position it addresses (R34, the team's
+    feedback F2): a pulse, readout or reset reaches the ions at one position of chains of one
+    length, and the others wait for the next step.  Off by default: the boards keep their packing.
 
     `per_layer`: one waveform a layer (a sandwich built in layers) or one waveform (the same
     machine in a plane).  Read off the machine when left out.
@@ -599,7 +609,7 @@ def compile_conveyor(qasm_text: str, arch: Architecture, n_data: int, *, name: s
                           "qubit_map": {str(q): ion[q] for q in range(n)},
                           "data_ions": [ion[q] for q in range(n_data)],
                           "waveforms": "one a layer" if per_layer else "one"})
-        em = Emitter(prog, dict(placement))
+        em = Emitter(prog, dict(placement), chains=Chains(dev) if positions else None)
         em.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
                 meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
         em.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -623,9 +633,11 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int,
                         table: str = "qccdsim_jones", name: str = "circuit",
                         per_layer: bool | None = None, align: str = "best",
                         wait: float | None = None,
-                        data_at: Mapping[int, int] | None = None) -> tuple[Path, Path]:
-    """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate)."""
-    from ..compile.cooling import insert_cooling
+                        data_at: Mapping[int, int] | None = None,
+                        positions: bool = False, lazy_cooling: bool = False) -> tuple[Path, Path]:
+    """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate).
+    `lazy_cooling` counts a gate's heat from the last cool the pass put in, as Goal 3's families do."""
+    from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model
     t0 = time.time()
     work = Path(workdir)
@@ -639,10 +651,11 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int,
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
     prog, cert = compile_conveyor(qasm_text, arch, n_data, name=name, per_layer=per_layer,
-                                  align=align, wait=wait, data_at=data_at)
+                                  align=align, wait=wait, data_at=data_at, positions=positions)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
-    cooled = insert_cooling(prog, arch, corrected_model(table)).program
+    cooled = (insert_cooling(prog, arch, corrected_model(table), policy=CoolingPolicy(lazy=True)) if lazy_cooling
+              else insert_cooling(prog, arch, corrected_model(table))).program
     cooled.meta.update(prog.meta)
     final = work / "prog.cooled.tsir.json"
     cooled.save(str(final), indent=None)

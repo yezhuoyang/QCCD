@@ -121,7 +121,7 @@ def test_the_goal_3_board_gives_family_time_per_round_and_ler(svc, monkeypatch):
     monkeypatch.setattr(svc, "_ranked_rows", rows)
     monkeypatch.setattr(svc, "_entry_family", lambda sid: ("Cyclone", "cyclone24_n2"))
     g = svc.goal_board("goal3")
-    assert g["goal"] == "goal3" and g["families"] == ["C2LR", "WISE", "Cyclone", "Helios", "Conveyor", "Other"]
+    assert g["goal"] == "goal3" and g["families"] == ["Grid", "C2LR", "WISE", "Cyclone", "Helios", "Conveyor", "Other"]
     import boards
     assert [r["id"] for r in g["releases"]] == [boards.release_id(c) for c in CODES]
     s5 = next(r for r in g["releases"] if r["id"] == "goal3_surface5_mem@1")

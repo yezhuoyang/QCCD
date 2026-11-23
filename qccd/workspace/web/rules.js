@@ -13,7 +13,7 @@
       id: 'rules-transport',
       title: 'Transport & control',
       blurb: 'How ions may move: declared movement classes, rail ordering, loop direction, split placement and the waveforms that can run together.',
-      rules: ['R4', 'R4b', 'R4d', 'R5', 'R11', 'R14', 'R22', 'R31', 'R35', 'R36', 'R37']
+      rules: ['R4', 'R4b', 'R4d', 'R5', 'R11', 'R14', 'R22', 'R31', 'R35', 'R36', 'R37', 'R39']
     },
     {
       id: 'rules-operation',

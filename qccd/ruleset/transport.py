@@ -267,6 +267,53 @@ def _lockstep(ctx: Ctx, k):
     return set(times) == {i.id for i in ctx.exe.ions} - _data(ctx) and len(set(times.values())) == 1
 
 
+@term("conveyor_device()", "true or false", "Whether the machine is a conveyor: it has a named "
+      "loop, and its drawing names no family with rules of its own for one (a Cyclone ring keeps "
+      "its data on the loop's traps, and Helios turns its ring a site at a time past the junction).",
+      "hardware")
+def _conveyor_device(ctx: Ctx):
+    return bool(ctx.hw.loops) and _params(ctx).get("family") not in ("cyclone", "helios", "wise")
+
+
+@term("loop_turns_whole(k)", "true or false", "Whether step k, if it carries an ion along a loop, "
+      "carries every ion standing on that loop along it, the same number of slots the same way.  An "
+      "ion that leaves the loop in the step, or stands off it, is not counted.", "execution",
+      kinds=("programme",))
+def _loop_turns_whole(ctx: Ctx, k):
+    _step(ctx, k, "loop_turns_whole")
+
+    def make() -> list[bool]:
+        # a slot is a place an ion can stand: a corner the loop passes is none, so an ion carried
+        # round one has moved one slot, as every other has
+        dev = ctx.hw.arch.device
+        loops = {lid: (set(lp.nodes), list(dev.loop_slots(lid))) for lid, lp in dev.loops.items()}
+        where: dict[str, str] = {}
+        for i in ctx.exe.ions:
+            s = ctx.exe.position.at(i, 0)
+            if s is not None:
+                where[i.id] = s.id
+        out = []
+        for st in ctx.exe.steps:
+            ins = st["instruction"]
+            ok = True
+            if ins.type == "simd":
+                for on, slots in loops.values():
+                    n = len(slots)
+                    along = {p.ion: (slots.index(p.dst) - slots.index(p.src)) % n
+                             for p in ins.participants if p.src in slots and p.dst in slots}
+                    if not along:
+                        continue
+                    gone = {p.ion for p in ins.participants if p.src in on and p.dst not in on}
+                    riding = {i for i, s in where.items() if s in on} - gone
+                    if riding - set(along) or len(set(along.values())) > 1:
+                        ok = False
+                for p in ins.participants:
+                    where[p.ion] = p.dst
+            out.append(ok)
+        return out
+    return ctx.once("loop_turns_whole", make)[k.id]
+
+
 @term("traps_level(k)", "true or false", "Whether every trap of the ring holds the same number of "
       "ions once step k is over: counted from where the programme puts its ions at the start and "
       "every move since.", "execution", kinds=("programme",))
