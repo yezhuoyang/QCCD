@@ -19,6 +19,13 @@ A step is the trap's gates, then its rotation: every ancilla splits, moves and m
 trap (S4), the ancillas of one trap in turn.  The ring keeps rotating through a step with nothing
 to do (S3).
 
+EVERY TRAP HOLDS THE SAME NUMBER OF IONS (rule Y5): one set of waveforms is broadcast to every
+trap.  Each trap gets the same number of data qubits and of ancillas; where the code's qubits do
+not divide, spare ions fill the traps (`Plan.spare_data`, `Plan.spare_start`).  A spare among the
+data never moves.  A spare in an ancilla's place rotates with the ancillas, in turn with them, so
+every trap sends one ion and receives one in each step of a rotation.  Spares carry no qubit: no
+gate, readout or reset names one.
+
 The ions of a program with `n_data` data qubits are the circuit's first `n_data` qubits, as Goal
 3's circuits number them.  An operation between two qubits that never stand together, two
 ancillas in different traps say, is refused by name.
@@ -49,10 +56,14 @@ CLASS = "cyclone_shift"
 
 
 class Plan:
-    """Where everything stands: data qubit -> trap, ancilla qubit -> the trap it starts in."""
+    """Where everything stands: data qubit -> trap, ancilla qubit -> the trap it starts in, and
+    the spare ions that level the traps (Y5): name -> its trap, for those among the data, and
+    name -> the trap it starts in, for those that rotate in an ancilla's place."""
 
-    def __init__(self, x: int, data: dict[int, int], start: dict[int, int]):
+    def __init__(self, x: int, data: dict[int, int], start: dict[int, int],
+                 spare_data: dict[str, int] | None = None, spare_start: dict[str, int] | None = None):
         self.x, self.data, self.start = x, data, start
+        self.spare_data, self.spare_start = dict(spare_data or {}), dict(spare_start or {})
 
     def trap(self, q: int, t: int) -> int:
         return self.data[q] if q in self.data else (self.start[q] + t) % self.x
@@ -129,7 +140,7 @@ def place(ops: Sequence[SourceOp], n: int, n_data: int, x: int, capacity: int, *
 
     best = Plan(x, dict(data), dict(start))
     if not round_ops or x < 2:
-        return best
+        return level(best, capacity)
     best_c = cost(best)
     rng = random.Random(seed)
     cur, cur_c = Plan(x, dict(data), dict(start)), best_c
@@ -156,7 +167,26 @@ def place(ops: Sequence[SourceOp], n: int, n_data: int, x: int, capacity: int, *
         else:
             table = cur.start if swap[0] == "s" else cur.data
             table[swap[1]], table[swap[2]] = table[swap[2]], table[swap[1]]
-    return best
+    return level(best, capacity)
+
+
+def level(pl: Plan, capacity: int) -> Plan:
+    """`pl` with the spare ions that give every trap the same number of data-side ions and the
+    same number of rotating ions (Y5): as many as the fullest trap has of each."""
+    held = [0] * pl.x
+    for t in pl.data.values():
+        held[t] += 1
+    turning = [0] * pl.x
+    for t in pl.start.values():
+        turning[t] += 1
+    d, a = max(held, default=0), max(turning, default=0)
+    if d + a > capacity:
+        raise Refused(f"{pl.x} traps of {capacity} ions cannot all hold the same number: the fullest "
+                      f"holds {d} data qubits and {a} ancillas")
+    names = (f"s{i}" for i in range(pl.x * (d + a)))
+    pl.spare_data = {next(names): t for t in range(pl.x) for _ in range(d - held[t])}
+    pl.spare_start = {next(names): t for t in range(pl.x) for _ in range(a - turning[t])}
+    return pl
 
 
 def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: str = "circuit",
@@ -175,10 +205,18 @@ def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: st
     pl = place(ops, n, n_data, x, capacity, seed=seed)
     times = plan_times(ops, pl)
     ion = {q: f"q{q}" for q in range(n)}
-    placement = {ion[q]: traps[pl.trap(q, 0)] for q in range(n)}
+    # a trap's chain starts in the order listed: its data, the spares among them, then the ions
+    # that rotate (the ancillas and the spares in their place), which so begin at the end they
+    # leave by
+    placement = {ion[q]: traps[pl.data[q]] for q in range(n_data)}
+    placement.update({s: traps[t] for s, t in pl.spare_data.items()})
+    placement.update({ion[q]: traps[pl.start[q]] for q in range(n_data, n)})
+    placement.update({s: traps[t] for s, t in pl.spare_start.items()})
+    spare = sorted(set(pl.spare_data) | set(pl.spare_start), key=lambda s: int(s[1:]))
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)},
-                      "data_ions": [ion[q] for q in range(n_data)]})
+                      "data_ions": [ion[q] for q in range(n_data)] + sorted(pl.spare_data, key=lambda s: int(s[1:])),
+                      **({"spare_ions": spare} if spare else {})})
     em = Emitter(prog, dict(placement), chains=Chains(dev))
     em.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
             meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
@@ -189,7 +227,7 @@ def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: st
         if op.name != "barrier":
             by_step.setdefault(t, []).append(op)
     last_step = max(by_step, default=0)
-    ancillas = [ion[q] for q in range(n_data, n)]
+    ancillas = [ion[q] for q in range(n_data, n)] + list(pl.spare_start)      # every ion that rotates
     for t in range(last_step + 1):
         _run_step(em, by_step.get(t, ()), pl, t, ion)
         if t < last_step:

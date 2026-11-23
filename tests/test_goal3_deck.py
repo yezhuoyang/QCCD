@@ -297,6 +297,55 @@ def test_y2_and_y3_catch_data_moved_and_an_ancilla_left_behind(cyclone_prog):
         pass
 
 
+def test_w5_catches_two_ions_crossing_outside_a_swap_step(wise_prog):
+    """A swap happens between a pair's two zones, in a swap step (W5, the team's comment of
+    2026-11-23): the same two moves under a gate's merge class are two ions crossing on a rail."""
+    _exp, arch, prog, cert, _work = wise_prog
+    from qccd.arch.wise import swap_kind
+    def is_swap(i):
+        moves = {(p.src, p.dst) for p in i.participants} if i.type == "simd" else set()
+        return swap_kind(i.cls) is not None and any((b, a) in moves for a, b in moves)
+    assert "W5" not in _judge("wise", prog, arch, cert)
+    def change(p):
+        i = p.instructions.index(_first(p, is_swap))
+        p.instructions[i] = replace(p.instructions[i], cls="wise_h0_a")
+    assert "W5" in _judge("wise", _forged(prog, change), arch, cert)
+
+
+def test_y5_every_trap_holds_the_same_number_of_ions(cyclone_prog):
+    """Y5 (the team's comment of 2026-11-23): one set of waveforms is broadcast to every trap, so
+    every trap holds the same number of ions after every step, spare ions filling a trap that would
+    be short.  A ring one ion short breaks it."""
+    from collections import Counter
+    _exp, arch, prog, cert, _work = cyclone_prog
+    assert "Y5" not in _judge("cyclone-deck", prog, arch, cert)
+    sites = list(arch.device.loop_slots(next(iter(arch.device.loops))))
+    held = Counter(prog.instructions[0].placement.values())
+    for ins in prog.instructions:
+        if ins.type == "simd":
+            for p in ins.participants:
+                held[p.src] -= 1
+                held[p.dst] += 1
+            assert len({held[s] for s in sites}) == 1, ins.id
+    def drop_a_spare_or_data(p):
+        init = p.instructions[0]
+        gone = (p.meta.get("spare_ions") or p.meta["data_ions"])[0]
+        place = {k: v for k, v in init.placement.items() if k != gone}
+        p.instructions[0] = replace(init, placement=place, quanta={k: v for k, v in init.quanta.items() if k != gone})
+        p.instructions[:] = [i if i.type != "simd" else replace(i, participants=tuple(q for q in i.participants if q.ion != gone))
+                             for i in p.instructions]
+    from qccd.verify.replay import ReplayError
+    try:
+        assert "Y5" in _judge("cyclone-deck", _forged(prog, drop_a_spare_or_data), arch, cert)
+    except ReplayError:
+        pass
+    # the sizes swept need no rotating spare where the code's ancillas divide among some even ring
+    from qccd.arch import cyclone
+    assert all(cyclone.spares(25, 24, x)[1] == 0 for x, _n in cyclone.traps_for(25, 24))
+    assert [x for x, _n in cyclone.traps_for(72, 72)] == [6, 12, 18, 24, 36, 72]
+    assert cyclone.spares(7, 3, 2) == (1, 1)
+
+
 def test_the_rule_words_run_in_the_debug_page_s_python():
     """The Debug page's bundle holds no compiler, so a word that needs one fails there on WISE alone."""
     from qccd.site.debugpage import PY_PACKAGES

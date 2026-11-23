@@ -77,7 +77,7 @@ def _cyclone_arch() -> Architecture:
     ``arch/cyclone_base.arch.json`` predates the Goal 3 router: it has the physical loop and
     broadcast wiring, but its compact document does not identify the family or declare the
     router's one-step ancilla rotation.  Expand that exact graph, then add only those declarations.
-    The resulting page therefore keeps all 72 original nodes while making Y1--Y4 applicable.
+    The resulting page therefore keeps all 72 original nodes while making Y1--Y5 applicable.
     """
     from ..arch import cyclone
 

@@ -193,6 +193,12 @@ assert W4 "One kind of operation runs across the chip in a step"
   when wise_device():
   forall k:steps where is_transport(k). mode(k) = "inter" and not carries_gates(k);
 
+assert W5 "Two neighbouring zones swap their ions between them"
+  about "A swap is a switched swap: the two ions of a pair of neighbouring zones meet in the space between the two zones, turn about each other as one two-ion crystal, and part into each other's zone, all inside one step. No trapping site stands between the two zones, and none is needed: the exchange happens over the rail that joins them. It is the only way two ions pass each other on this chip, so two ions cross on a rail only in a swap step, and only as one of the chip's own pairs of that step's kind. (S5, S6)"
+  source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S5 and S6; the team's comment on Goal 3 (Ke, 2026-11-23)"
+  when wise_device():
+  forall k:steps where is_transport(k). swaps_between_zones(k);
+
 assert W10 "A gate layer is one gate at one angle"
   about "The circuit is broken into a few basis gates and run as layers, one gate kind across the chip per layer. A frame change is not a pulse, so it is free of this. Many traps may gate at once, but all must run the same gate. (S10)"
   source "arXiv:2305.12773; QCCD Transport Architectures deck, WISE S10"
@@ -233,6 +239,12 @@ assert Y4 "A trap holds at most 30 ions"
   source "QCCD Transport Architectures deck, Cyclone HW1"
   when cyclone_device():
   traps_within_thirty();
+
+assert Y5 "Every trap holds the same number of ions"
+  about "One set of waveforms is broadcast to every trap of the ring, so every trap holds the same number of ions whenever a step is over: the same number of data qubits each and the same number of ancillas each. Where a code's qubits do not divide evenly among the traps, spare ions fill them, and a spare standing in an ancilla's place rotates with the ancillas."
+  source "arXiv:2511.15910; QCCD Transport Architectures deck, Cyclone HW4; the team's comment on Goal 3 (Ke, 2026-11-23)"
+  when cyclone_device():
+  forall k:steps. traps_level(k);
 
 # ---------------------------------------------------------------- Helios
 

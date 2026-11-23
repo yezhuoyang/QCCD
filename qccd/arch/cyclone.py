@@ -21,6 +21,13 @@ of sides' traps, so x is even.
 * a gate's time grows with the trap's capacity by the QCCDSim law the deck's T4 names.  The noise
   model's 70 us is its flat part: the law's 100 us at up to 12 ions is scaled to it.
 
+**Every trap holds the same number of ions** (rule Y5; the team's comment on Goal 3's first pages,
+Ke, 2026-11-23): one set of waveforms is broadcast to every trap, so each holds the same number of
+data qubits and the same number of ancillas.  Where a code's qubits do not divide among the traps,
+spare ions fill them (`spares`): a spare among the data stands still, and a spare in an ancilla's
+place rotates with the ancillas, paying the same gate swap to reach its trap's edge.  A sweep
+therefore prefers rings whose trap count divides the ancillas, which need no rotating spare.
+
 **Heat and cooling are the other families'** (the team's feedback Q2: S10's free cooling is a paper
 assumption, not hardware): the noise model's 2 quanta a split, 0.1 a rail and 3 quanta a second in
 the background, and the same 3 ms cooling, which the cooling pass adds before any batch of gates
@@ -34,7 +41,7 @@ import math
 from typing import Mapping
 
 __all__ = ["MAX_IONS_PER_TRAP", "SPLIT_US", "MERGE_US", "MOVE_US", "chain_gate_us", "device_doc",
-           "primitives", "census", "traps_for", "is_cyclone", "fits"]
+           "primitives", "census", "traps_for", "is_cyclone", "fits", "spares"]
 
 MAX_IONS_PER_TRAP = 30               # deck HW1
 SPLIT_US, MOVE_US, MERGE_US = 80.0, 10.0, 80.0   # deck T1
@@ -55,21 +62,35 @@ def fits(data: int, ancillas: int, x: int, n: int) -> bool:
             and math.ceil(data / x) + math.ceil(ancillas / x) <= n)
 
 
+def spares(data: int, ancillas: int, x: int) -> tuple[int, int]:
+    """The spare ions a ring of x traps needs so every trap holds the same number (Y5): how many
+    stand among the data, and how many rotate in an ancilla's place."""
+    return x * math.ceil(data / x) - data, x * math.ceil(ancillas / x) - ancillas
+
+
 def traps_for(data: int, ancillas: int) -> list[tuple[int, int]]:
     """The (x, n) a code is swept at: from the smallest ring whose traps stay within 30 ions up
     to a trap for every ancilla, or for every data qubit if there are more of those, each at the
     least n that fits (a larger n only slows the gates, T4).  Six rings at most, evenly spread
-    on a logarithmic scale, the two ends always among them."""
+    on a logarithmic scale, the two ends always among them.  Every trap holds n ions (Y5), so
+    the rings are those whose trap count divides the ancillas, which need no rotating spare;
+    a code with no such ring in range (an odd number of ancillas with no even divisor) takes any
+    even count, and its spares rotate."""
     total = data + ancillas
+    if total <= 0:
+        return []
     low = 2
     while not fits(data, ancillas, low, MAX_IONS_PER_TRAP):
         low += 2
     high = max(data, ancillas)
     high += high % 2
     high = max(high, low)
-    want = [low, high] + [low * (high / low) ** (i / 5) for i in range(1, 5)]
-    xs = sorted({max(low, 2 * round(v / 2)) for v in want})
-    return [(x, math.ceil(data / x) + math.ceil(ancillas / x)) for x in xs if total > 0]
+    evens = list(range(low, high + 1, 2))
+    pool = [x for x in evens if ancillas and ancillas % x == 0] or evens
+    lo, hi = pool[0], pool[-1]
+    want = [lo * (hi / lo) ** (i / 5) for i in range(6)]
+    xs = sorted({min(pool, key=lambda x: (abs(math.log(x / v)), x)) for v in want})
+    return [(x, math.ceil(data / x) + math.ceil(ancillas / x)) for x in xs]
 
 
 def device_doc(x: int, n: int, *, name: str | None = None) -> dict:
@@ -148,8 +169,11 @@ def census(data: int, stabilizers: int, x: int, n: int, *, ancillas: int | None 
     g = chain_gate_us(n)
     s = SPLIT_US + MOVE_US + MERGE_US
     t5 = 2 * x * (s + math.ceil(stabilizers / x) * (3 * g + g * math.ceil(x * data / stabilizers))) if stabilizers else 0
+    spare_data, spare_anc = spares(data, a, x)
     return {"data_qubits": data, "stabilizers": stabilizers, "ancillas": a, "traps": x, "ions_per_trap": n,
-            "total_ions": data + a, "smallest_ring_at_30": math.ceil((data + a) / MAX_IONS_PER_TRAP),
+            "total_ions": data + a, "spare_ions": spare_data + spare_anc, "spare_ions_rotating": spare_anc,
+            "ions_loaded": x * (math.ceil(data / x) + math.ceil(a / x)),
+            "smallest_ring_at_30": math.ceil((data + a) / MAX_IONS_PER_TRAP),
             "shuttling_paths": x, "l_junctions": 4, "dc_electrodes": 10 * x + 20 * 4, "dacs": 10 + 20,
             "moves_per_ancilla_per_round": rotations * x, "laser_pairs": n * x,
             "t5_worst_case_ms": t5 / 1000.0}

@@ -156,6 +156,19 @@ def _one_parity(ctx: Ctx, k):
     return True
 
 
+@term("swaps_between_zones(k)", "true or false", "Whether every two ions that pass each other in "
+      "WISE step k do so as a switched swap: the step is a swap step, and the two are one of the "
+      "machine's pairs of its kind exchanging zones.  A step in which no two ions cross holds it.",
+      "execution", kinds=("programme",))
+def _swaps_between(ctx: Ctx, k):
+    from ..arch.wise import swap_kind
+    ins = _step(ctx, k, "swaps_between_zones")["instruction"]
+    moves = {(p.src, p.dst) for p in ins.participants}
+    if not any((b, a) in moves for a, b in moves):
+        return True
+    return swap_kind(ins.cls) is not None and bool(_one_parity(ctx, k))
+
+
 @term("one_kind(k)", "true or false", "Whether step k is one kind of operation across the chip: a "
       "gate step's physical pulses all the same gate at the same angle.  A frame change is not a "
       "pulse.", "execution", kinds=("programme",))
@@ -252,6 +265,28 @@ def _lockstep(ctx: Ctx, k):
             moved.append(p.ion)
     times = Counter(moved)
     return set(times) == {i.id for i in ctx.exe.ions} - _data(ctx) and len(set(times.values())) == 1
+
+
+@term("traps_level(k)", "true or false", "Whether every trap of the ring holds the same number of "
+      "ions once step k is over: counted from where the programme puts its ions at the start and "
+      "every move since.", "execution", kinds=("programme",))
+def _traps_level(ctx: Ctx, k):
+    _step(ctx, k, "traps_level")
+
+    def make() -> list[bool]:
+        # the start is not a step: where the programme puts its ions is the first instant
+        sites = [s.id for s in ctx.hw.sites if isinstance(s, Site)]
+        held: Counter = Counter({s: int(ctx.exe.occupancy.at(Site(s), 0) or 0) for s in sites})
+        out = []
+        for st in ctx.exe.steps:
+            ins = st["instruction"]
+            if ins.type == "simd":
+                for p in ins.participants:
+                    held[p.src] -= 1
+                    held[p.dst] += 1
+            out.append(len({held[s] for s in sites}) <= 1)
+        return out
+    return ctx.once("traps_level", make)[k.id]
 
 
 @term("laser(o)", "true or false", "Whether operation o needs a laser to reach its ions: a pulse, a "

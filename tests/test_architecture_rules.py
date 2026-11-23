@@ -60,8 +60,8 @@ def test_profiles_point_to_the_pulled_physical_architectures():
 def test_every_profile_rule_is_in_the_rule_set_the_website_names():
     expected = {
         "c2lr": ("c2lr", {f"C{i}" for i in range(1, 11)}),
-        "wise": ("wise", {"W1", "W2", "W4", "W10", "W11"}),
-        "cyclone": ("cyclone-deck", {"Y1", "Y2", "Y3", "Y4"}),
+        "wise": ("wise", {"W1", "W2", "W4", "W5", "W10", "W11"}),
+        "cyclone": ("cyclone-deck", {"Y1", "Y2", "Y3", "Y4", "Y5"}),
         "conveyor": ("conveyor", {"R3", "R4", "R4d", "R5", "R11", "R14", "R22", "R23"}),
         "helios": ("helios", {"HL1", "HL2", "HL3", "HL4", "R6", "R11", "R22"}),
     }

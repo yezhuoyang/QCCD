@@ -266,8 +266,8 @@ def test_architecture_rule_profiles_are_complete_scoped_and_unique():
     assert [p["id"] for p in profiles] == ["c2lr", "wise", "cyclone", "conveyor", "helios"]
     assert [p["ruleset"] for p in profiles] == ["c2lr", "wise", "cyclone-deck", "conveyor", "helios"]
     assert set(profiles[0]["rule_ids"]) == {f"C{i}" for i in range(1, 11)}
-    assert set(profiles[1]["rule_ids"]) == {"W1", "W2", "W4", "W10", "W11"}
-    assert set(profiles[2]["rule_ids"]) == {"Y1", "Y2", "Y3", "Y4"}
+    assert set(profiles[1]["rule_ids"]) == {"W1", "W2", "W4", "W5", "W10", "W11"}
+    assert set(profiles[2]["rule_ids"]) == {"Y1", "Y2", "Y3", "Y4", "Y5"}
     assert {"R4d", "R11", "R22"} <= set(profiles[3]["rule_ids"])
     assert {"HL1", "HL2", "HL3", "HL4"} <= set(profiles[4]["rule_ids"])
     catalogue_ids = {r.id for r in catalogue().rules}

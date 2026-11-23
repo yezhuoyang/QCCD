@@ -31,14 +31,14 @@
     {
       id: 'rules-wise',
       title: 'Parallel switched swaps (WISE)',
-      blurb: 'What a WISE chip may do: one parity and one kind of operation across the chip in a step, one gate at one angle in a layer, and a shim charge before every layer.',
-      rules: ['W1', 'W2', 'W4', 'W10', 'W11']
+      blurb: 'What a WISE chip may do: one parity and one kind of operation across the chip in a step, a swap between a pair's two zones, one gate at one angle in a layer, and a shim charge before every layer.',
+      rules: ['W1', 'W2', 'W4', 'W5', 'W10', 'W11']
     },
     {
       id: 'rules-cyclone',
       title: 'Ring codesign (Cyclone)',
-      blurb: 'What a Cyclone ring may do: one closed ring, the data still, every ancilla one trap on in lockstep, at most 30 ions a trap.',
-      rules: ['Y1', 'Y2', 'Y3', 'Y4']
+      blurb: 'What a Cyclone ring may do: one closed ring, the data still, every ancilla one trap on in lockstep, at most 30 ions a trap, and the same number in every trap.',
+      rules: ['Y1', 'Y2', 'Y3', 'Y4', 'Y5']
     },
     {
       id: 'rules-helios',

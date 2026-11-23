@@ -57,14 +57,14 @@
         {"label": "Split again", "detail": "no pair remains accidentally merged"}
       ]
     },
-    "rule_ids": ["W1", "W2", "W4", "W10", "W11"],
+    "rule_ids": ["W1", "W2", "W4", "W5", "W10", "W11"],
     "rule_label": "WISE-only rules",
     "changes": [
       {
         "kind": "Strengthen",
         "rules": ["R4", "R22"],
         "when": "for every WISE reconfiguration layer",
-        "reason": "W2 requires one parity, while W4 requires one operation kind across the chip. W10 applies the same idea to gates, and W11 requires the shim charge before the layer."
+        "reason": "W2 requires one parity, while W4 requires one operation kind across the chip. W5 says where a swap happens: between the pair's two zones, over the rail that joins them, with no trapping site of its own. W10 applies the same idea to gates, and W11 requires the shim charge before the layer."
       },
       {
         "kind": "Not applicable",
@@ -81,7 +81,7 @@
     ],
     "verification": [
       "The generated WISE compiler output passes its complete rule set.",
-      "Mutations independently fail mixed parity (W2), mixed gate angles (W10), missing shim charge (W11), and a pair left merged (W1)."
+      "Mutations independently fail mixed parity (W2), mixed gate angles (W10), missing shim charge (W11), a pair left merged (W1), and two ions crossing outside a swap step (W5)."
     ]
   },
   {
@@ -105,14 +105,14 @@
         {"label": "Repeat", "detail": "the next contact pattern arrives"}
       ]
     },
-    "rule_ids": ["Y1", "Y2", "Y3", "Y4"],
+    "rule_ids": ["Y1", "Y2", "Y3", "Y4", "Y5"],
     "rule_label": "Cyclone-only rules",
     "changes": [
       {
         "kind": "Add",
-        "rules": ["Y1", "Y2", "Y3", "Y4", "R27"],
+        "rules": ["Y1", "Y2", "Y3", "Y4", "Y5", "R27"],
         "when": "for the Cyclone ring",
-        "reason": "Y1-Y4 are the deck's ring, still-data, lockstep-rotation and 30-ions-a-trap rules; R27 is its one operation at a time in a trap."
+        "reason": "Y1-Y4 are the deck's ring, still-data, lockstep-rotation and 30-ions-a-trap rules; Y5 keeps the same number of ions in every trap, since one set of waveforms is broadcast to all of them (spare ions fill a trap that would be short); R27 is its one operation at a time in a trap."
       },
       {
         "kind": "Replace",
@@ -134,8 +134,8 @@
       }
     ],
     "verification": [
-      "The Cyclone compiler output passes Y1–Y4 and the deck's selected general rules.",
-      "Mutations catch moving data (Y2), leaving an ancilla behind (Y3), a non-ring floorplan (Y1), and capacity 31 (Y4)."
+      "The Cyclone compiler output passes Y1–Y5 and the deck's selected general rules.",
+      "Mutations catch moving data (Y2), leaving an ancilla behind (Y3), a non-ring floorplan (Y1), capacity 31 (Y4), and a trap one ion short (Y5)."
     ]
   },
   {
