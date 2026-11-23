@@ -223,9 +223,11 @@ facts about it, each with its global phase:
 
 * `cz_decomp`, `cz_decomp_vz`: `RZZ(π/2)` is a controlled-Z up to a quarter-turn frame
   change on each qubit, in the rotation convention `RZ` and in the hardware's `VZ`;
-* `cx_decomp_rzz`: so a CNOT is **one `RZZ`, two physical one-qubit pulses** (the target's
-  two Hadamards, one pulse each by `u3_decomp`) **and frame changes** -- against one `MS`
-  and four physical pulses in `cx_decomp`;
+* `cx_rzz_via_cz`, `cx_decomp_rzz`: so a CNOT is **one `RZZ`, two physical one-qubit
+  pulses** (the target's two Hadamards, one pulse each by `u3_decomp`) **and frame
+  changes** -- against one `MS` and four physical pulses in `cx_decomp`.  The first is
+  read off the CZ; the second folds the Hadamards' frame changes into the pulses' axes
+  and is the sequence a compiler emits, as `cx_decomp` is for the `ms` set;
 * `MS_eq_conj_RZZ`: at every angle the two entanglers differ by a Hadamard on each
   qubit, so anything one set can do the other can, with local basis changes.
 
@@ -349,12 +351,12 @@ theorem Had_decomp : Had = VZ Real.pi * R (Real.pi / 2) (-(Real.pi / 2)) := by
   rw [Had_eq_u3, h]
 
 /-- **CX = e^{iπ/4} · [1⊗H] · [VZ(−π/2)⊗VZ(−π/2)] · RZZ(π/2) · [1⊗H]**, with
-**H = VZ(π) · R(π/2, −π/2)**.
+**H = VZ(π) · R(π/2, −π/2)**: the CNOT of the `rzz` set, read off the three facts above.
 
 Matrix order: the rightmost factor is the first pulse in time.  One `RZZ` gate, two
 physical one-qubit pulses (both on the target, qubit 1) and four frame changes -- where
 `cx_decomp` has one `MS` gate and four physical pulses. -/
-theorem cx_decomp_rzz :
+theorem cx_rzz_via_cz :
     CX =
       Complex.exp ((Real.pi / 4 : ℝ) * Complex.I) •
         (kron 1 (VZ Real.pi * R (Real.pi / 2) (-(Real.pi / 2)))
@@ -366,6 +368,42 @@ theorem cx_decomp_rzz :
   rw [← Had_decomp, Matrix.mul_assoc (kron 1 Had), ← Matrix.smul_mul, ← Matrix.mul_smul,
     ← cz_decomp_vz]
   exact cx_from_cz
+
+/-- `R(π/2, π)`, at its one used angle: a quarter turn about `−X`, the same matrix as
+`Rx(−π/2)`. -/
+theorem R_pi_half_pi :
+    R (Real.pi / 2) Real.pi =
+      !![(Real.cos (Real.pi / 4) : ℂ), Complex.I * (Real.sin (Real.pi / 4) : ℂ);
+         Complex.I * (Real.sin (Real.pi / 4) : ℂ), (Real.cos (Real.pi / 4) : ℂ)] := by
+  have h1 : Real.pi / 2 / 2 = Real.pi / 4 := by ring
+  unfold R axis
+  rw [h1]
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [PX, PY, Real.cos_pi, Real.sin_pi]
+
+/-- **CX = e^{iπ/4} · [VZ(−π/2)⊗VZ(−π/2)] · [1⊗R(π/2, π)] · RZZ(π/2) · [1⊗R(−π/2, π/2)]**
+
+The same CNOT with each Hadamard's frame change folded into the pulses' axes: the form
+with the fewest operations, and the one a compiler emits for the `rzz` set.  Matrix
+order: the rightmost factor is the first pulse in time.  One `RZZ` gate, two physical
+one-qubit pulses, both on the target (qubit 1), and one frame change per qubit. -/
+theorem cx_decomp_rzz :
+    CX =
+      Complex.exp ((Real.pi / 4 : ℝ) * Complex.I) •
+        (kron (VZ (-(Real.pi / 2))) (VZ (-(Real.pi / 2)))
+          * kron 1 (R (Real.pi / 2) Real.pi)
+          * RZZ (Real.pi / 2)
+          * kron 1 (R (-(Real.pi / 2)) (Real.pi / 2))) := by
+  rw [show R (-(Real.pi / 2)) (Real.pi / 2) = Ry (-(Real.pi / 2)) from rfl, Ry_neg_pi_half,
+    R_pi_half_pi, VZ_neg_pi_half, RZZ_pi_half, exp_pi_div_four_mul_I]
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [CX, kron, hiBit, loBit, ZZ, PZ, Matrix.mul_apply, Fin.sum_univ_four,
+      Matrix.one_apply] <;>
+    ring_nf <;>
+    simp [sqrtTwo_pow_four] <;>
+    ring
 
 /-- `(H⊗H)² = 1`. -/
 theorem HH_sq : kron Had Had * kron Had Had = 1 := by
@@ -412,6 +450,7 @@ nothing. -/
 #print axioms cz_decomp_vz
 #print axioms cx_from_cz
 #print axioms Had_decomp
+#print axioms cx_rzz_via_cz
 #print axioms cx_decomp_rzz
 #print axioms MS_eq_conj_RZZ
 
