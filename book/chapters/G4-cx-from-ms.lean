@@ -5,11 +5,12 @@ import QCCDC.Cert.Sound
 
 *Part G, lesson G4. You need lessons G1 to G3.*
 
-The only entangling operation of the machine is the Mølmer-Sørensen pulse. Every CNOT of a
-circuit becomes four one-ion pulses around one MS(π/2). This
+In the gate set `ms`, the compiler's default, the only entangling operation of the machine is the
+Mølmer-Sørensen pulse. Every CNOT of a circuit becomes four one-ion pulses around one MS(π/2). This
 lesson proves that exactly, including the phase e^(−iπ/4) the identity carries; says what
 "equal up to a global phase" means, and why it is the right equality for a whole programme and the
 wrong one for a building block; and proves the CNOT that the Bell certificate's witness stands for.
+Lesson G8 does the same for the other gate set, `rzz`.
 -/
 
 -- setup
@@ -184,11 +185,11 @@ theorem cx_decomp :
           * kron (Ry (Real.pi / 2)) 1)
 ```
 
-`Rx θ` is `R θ 0` and `Ry θ` is `R θ (π/2)`. The compiler's lowering, `decompose_cx`, emits
+`Rx θ` is `R θ 0` and `Ry θ` is `R θ (π/2)`. The compiler's lowering for this gate set, `decompose_cx_ms`, emits
 the same five pulses in time order, the reverse of the matrix order, and records the phase:
 
 ```
-let decompose_cx ~(control : int) ~(target : int) : decomposed =
+let decompose_cx_ms ~(control : int) ~(target : int) : decomposed =
   {
     pulses =
       [
@@ -351,7 +352,7 @@ and `q1`, `q0` (qubit 0) the control. The compiler wrote its pulses beside it in
           "R(-1.5708,0)@q1","R(-1.5708,1.5708)@q0"]
 ```
 
-These are `decompose_cx`'s five, with qubit 0 on ion `q0` and qubit 1 on `q1`. The programme
+These are `decompose_cx_ms`'s five, with qubit 0 on ion `q0` and qubit 1 on `q1`. The programme
 fires the two −π/2 beams as two instructions, one per ion, where the theorem has one `kron`. Here
 is the witness, at its cycle, in the studio: the proved checker's row says the two ions are
 together in a trap that can gate, and are the op's own. Which gate the five pulses make is

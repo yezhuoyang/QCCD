@@ -418,7 +418,7 @@ Lesson F5 explains why that is right: a witness names the ions an operation ran 
 one is the control, and `OwnIons` compares them as a rearrangement, so the order of a witness's ions
 carries no meaning. The bug the mutation stands for is real all the same, and it lives in the
 pulses: a CNOT with its control and target exchanged. A compiler with that bug emits
-`decompose_cx` with `q1` as the control, so the single-ion pulses move to the other ion; the
+`decompose_cx_ms` with `q1` as the control, so the single-ion pulses move to the other ion; the
 witnesses need not change at all, and the proved checker, which never reads a pulse, cannot tell.
 The Compilation page's `swap` certificate has exactly this sequence, as the second of its three
 CNOTs:

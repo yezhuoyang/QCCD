@@ -1034,7 +1034,7 @@ var QCCD_TUTORIAL = {
       page: 'micro_grid9x9',
       text: [
         'The compiler of this site is **QCCDCert**, written and proved in Lean. It takes three inputs: a **hardware program** (the machine: sites with capacities, paths between them with their durations, and calibrations that bind each exact laser pulse to a site), a **rule program** (assertions such as `forall s:Sites. Ntr(s) <= cap(s)`, true on every step), and the circuit, here `micro.qasm`: four qubits, seven statements.',
-        'It returns **target code**: where the ions start, every transport, every pulse, every readout, each with its duration. This machine was translated into a hardware program, QCCDCert compiled `micro.qasm` for it, and cooling was added afterwards by this site.',
+        'It returns **target code**: where the ions start, every transport, every pulse, every readout, each with its duration. This machine was translated into a hardware program, QCCDCert compiled `micro.qasm` for it, and cooling was added afterwards by this site. Its pulses are `R` and `MS`: the native gate set `ms`. There is a second set, `rzz` (lesson D4).',
         'One theorem covers every result, on every machine: **Meaning** (erase the transports and waits and you get back the circuit’s pulses, in order; the result is the circuit’s), **Legality** (every step passes the capacity, position and channel checks and every rule) and **Time** (every step takes its declared duration; the finish is the latest end). That is why [[R10|rule:R10]] holds here without a certificate.',
         'The [[Circuit|tab:Q]] tab shows the circuit next to the animation. Click a statement, and the animation jumps to the instruction that carries it out: each instruction says which statement it serves.'
       ],
@@ -1066,7 +1066,7 @@ var QCCD_TUTORIAL = {
         answer: ['Read the theorem again in the text above: Meaning, Legality, Time.'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'The CNOT is five pulses at one trap, and the theorem says why they are the right five, why every step was allowed, and why the clock is honest. Every CNOT you wrote by hand in Part B was this, with the compiler doing the trip.',
+      praise: 'The CNOT is five pulses at one trap, one MS between four R, and the theorem says why they are the right five, why every step was allowed, and why the clock is honest. Every CNOT you wrote by hand in Part B was this, with the compiler doing the trip. In the other native gate set, rzz, it would be one RZZ, two R and two frame changes: lesson D4 says how to choose.',
       solution: { stages: [[['seekTo', 'realises:1']], [['setAnswer', 'erase']], [['setAnswer', 'code']], [['setAnswer', 'overlap']]] } },
 
     // =============================================================== D2
@@ -1147,6 +1147,7 @@ var QCCD_TUTORIAL = {
         '**Save your work:** press **Ctrl+S** to save it as `<name>.studio.json`. To copy the machine or the programme, open **Machine**, press **Source**, choose `as .arch.json` or `as .tsir.json` under the text, and press **Copy**.',
         '**Check everything:** `python -m qccd open <name>.studio.json` runs the full checker on what you built, including the rules the [[Report|tab:R]] lists as not checked here.',
         '**Compile a circuit with QCCDCert:** `python -m qccd cert compile <circuit>.qasm --arch <name>.arch.json --html x.html` translates the machine into a hardware program, compiles, prints the target code with its times, adds cooling, and writes the page with the circuit beside it. Lesson D1 uses such a page. A machine with a closed loop is compiled by this site’s own compiler instead.',
+        '**Choose the native gate set:** a native gate set is the laser operations a machine really has, and there are two. `ms` is the pulse `R` and the two-ion Mølmer–Sørensen pulse `MS`; a CNOT is one `MS` between four `R` (lesson D1). `rzz`, the set of Quantinuum’s machines, is `R`, a frame change `VZ` and the two-ion pulse `RZZ`; a CNOT is one `RZZ`, two `R` and two frame changes. QCCDCert compiles to `ms`. This site’s own compiler takes either: its option `gate_set` is `ms` unless you write `--gate-set rzz` on its command line. Lesson G8 proves both CNOTs in Lean.',
         '**Open a compiled programme:** `python -m qccd studio --tsir <compiled>.tsir.json --qasm <circuit>.qasm -o x.html` opens any compiled programme with its circuit beside it.',
         '**Build this course:** `python -m qccd tutorial -o tutorial` builds this page and its companion page.',
         'The Compilation page of the website explains QCCDCert from its inputs to its theorem, on the paper’s own examples. A programme of your own goes in the [[Write|tab:W]] tab.'

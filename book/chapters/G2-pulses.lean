@@ -15,6 +15,9 @@ semantic half can compose"):
   no laser fires and it takes no time;
 * `MS(θ)`, the Mølmer-Sørensen pulse, which entangles two ions in one trap.
 
+These three are the gate set `ms`, the compiler's default. Its other gate set, `rzz`, has the
+pulse `RZZ(θ)` where this one has `MS(θ)`; lesson G8 is about it.
+
 The platform's proofs define all three in the module `QCCDC.Pulse.Native`, with Mathlib's
 complex matrices. This lesson writes them again as exact matrices over the numbers of lesson G1,
 quotes each definition from `QCCDC.Pulse.Native` beside its twin, and checks the twins agree on the π/4

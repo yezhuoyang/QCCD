@@ -7,16 +7,31 @@ pulse sequence whose unitary equals it *up to global phase*.
 ## Why there is no matrix exponential here
 
 A physical pulse is `exp (-i·θ/2·A)` for a Hermitian generator `A`.  Every generator this
-machine has -- `X⊗X` for the Mølmer-Sørensen entangler, `cos φ·X + sin φ·Y` for a
-resonant single-qubit pulse -- is an *involution*, `A² = 1`.  For an involution the
-exponential collapses:
+machine has -- `X⊗X` for the Mølmer-Sørensen entangler, `Z⊗Z` for the `RZZ` entangler,
+`cos φ·X + sin φ·Y` for a resonant single-qubit pulse -- is an *involution*, `A² = 1`.
+For an involution the exponential collapses:
 
     exp (-i·θ/2·A) = cos (θ/2)·1 - i·sin (θ/2)·A
 
 so the gates can be *defined* by that closed form and no matrix exponential is needed
 anywhere in the development.  The collapse is only legitimate because `A² = 1`, so that
-is proved here (`axis_sq`, `XX_sq`) rather than assumed -- it is the hypothesis the whole
-definitional choice rests on.
+is proved here (`axis_sq`, `XX_sq`, `ZZ_sq`) rather than assumed -- it is the hypothesis
+the whole definitional choice rests on.
+
+## Two native gate sets
+
+A machine has one entangler, and the compiler is told which (its `gate_set` option):
+
+* `ms`: the one-qubit pulse `R θ φ`, the frame change `VZ λ`, and `MS θ`.
+* `rzz`: the same one-qubit pulse and frame change, and `RZZ θ = exp (-i·θ/2·Z⊗Z)`.  This
+  is the native set of Quantinuum's H-series and Helios machines (arXiv:2003.01293,
+  arXiv:2511.05465), where the pulse is called U1q and the frame change is virtual.
+
+`QCCDC.Pulse.Decompose` proves the CNOT in each (`cx_decomp`, `cx_decomp_rzz`) and that
+the two entanglers differ by a Hadamard on each qubit (`MS_eq_conj_RZZ`).  These files
+prove what each sequence *is*, not what it costs: whether a frame change takes time is the
+machine's to declare (it is virtual where each qubit's phase is tracked, as on
+Quantinuum's machines, and it is not free where one beam reaches every ion of a trap).
 
 ## Conventions
 
@@ -27,7 +42,9 @@ Fixed here, and mirrored exactly by `bridge/derive_pulses.py` and `native/gatese
 * `RZ λ` is **virtual** -- a phase-frame update, zero duration, free.  This is why
   `u3_decomp` below matters for cost and not only for correctness: it says every
   single-qubit gate is exactly *one* physical pulse.
-* `MS θ` is the entangler, `exp (-i·θ/2·X⊗X)`.
+* `MS θ` is the entangler of the `ms` set, `exp (-i·θ/2·X⊗X)`.
+* `RZZ θ` is the entangler of the `rzz` set, `exp (-i·θ/2·Z⊗Z)`.  It is diagonal in the
+  computational basis.
 * Qubit order is big-endian: in `kron A B`, `A` acts on qubit 0, and `CX` has qubit 0 as
   control.
 -/
@@ -153,10 +170,34 @@ noncomputable def MS (θ : ℝ) : Matrix (Fin 4) (Fin 4) ℂ :=
   (Real.cos (θ / 2) : ℂ) • (1 : Matrix (Fin 4) (Fin 4) ℂ)
     - (Complex.I * (Real.sin (θ / 2) : ℂ)) • XX
 
+/-- `Z ⊗ Z`, the generator of the `RZZ` entangler.  It is diagonal: `diag (1, -1, -1, 1)`. -/
+def ZZ : Matrix (Fin 4) (Fin 4) ℂ := kron PZ PZ
+
+/-- The `RZZ` generator is an involution -- the fact that licenses `RZZ`'s closed form. -/
+@[simp] theorem ZZ_sq : ZZ * ZZ = 1 := by
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [ZZ, kron, PZ, hiBit, loBit, Matrix.mul_apply, Fin.sum_univ_four]
+
+/-- The entangler of the `rzz` gate set, `exp (-i·θ/2·Z⊗Z)`: Quantinuum's native
+two-qubit gate (arXiv:2003.01293, arXiv:2511.05465).  The same closed form as `MS`, with
+`Z⊗Z` where `MS` has `X⊗X`. -/
+noncomputable def RZZ (θ : ℝ) : Matrix (Fin 4) (Fin 4) ℂ :=
+  (Real.cos (θ / 2) : ℂ) • (1 : Matrix (Fin 4) (Fin 4) ℂ)
+    - (Complex.I * (Real.sin (θ / 2) : ℂ)) • ZZ
+
 /-! ## Targets -/
 
 /-- The controlled-NOT, qubit 0 controlling qubit 1. -/
 def CX : Matrix (Fin 4) (Fin 4) ℂ := !![1, 0, 0, 0; 0, 1, 0, 0; 0, 0, 0, 1; 0, 0, 1, 0]
+
+/-- The controlled-Z.  Symmetric in its two qubits. -/
+def CZ : Matrix (Fin 4) (Fin 4) ℂ := !![1, 0, 0, 0; 0, 1, 0, 0; 0, 0, 1, 0; 0, 0, 0, -1]
+
+/-- The Hadamard, `(1/√2)·[[1, 1], [1, −1]]`, with `1/√2` written `√2/2` as Mathlib writes
+`cos (π/4)`. -/
+noncomputable def Had : Matrix (Fin 2) (Fin 2) ℂ :=
+  ((Real.sqrt 2 / 2 : ℝ) : ℂ) • !![1, 1; 1, -1]
 
 /-- The general single-qubit gate, in OpenQASM's `u3` parameterisation. -/
 noncomputable def u3 (θ φ lam : ℝ) : Matrix (Fin 2) (Fin 2) ℂ :=
