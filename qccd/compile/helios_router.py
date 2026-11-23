@@ -95,6 +95,7 @@ class _Helios:
         self.arch, self.em, self.ion = arch, em, ion
         self.slots = _storage(arch)
         self.home = dict(home)
+        self._us: tuple[float, float] | None = None           # (a rail, a junction crossing), in us
         self.zone_of: dict[int, str] = {}                     # qubit -> its zone, while it is in one
         self.held: dict[str, list[int]] = {z: [] for _, zs in LEGS.values() for z in zs}
 
@@ -130,10 +131,29 @@ class _Helios:
     def _ring(self) -> set[int]:
         return {self.home[p] for p in self.ion if p not in self.zone_of}
 
+    def _turn_us(self, way: tuple[int, int]) -> float:
+        """What turning one way costs in time on this machine: `way` is (crossings, steps).  A step
+        is one rail for the ions it carries; an ion that crosses the junction goes alone, in a step
+        of its own that lasts the crossing, and the run behind it follows in a third (`_step`)."""
+        crossings, steps = way
+        if self._us is None:
+            prims = self.arch.primitives
+            pick = lambda curve: min(p.us for p in curve)            # noqa: E731
+            rail = pick(prims.curve("shuttle_segment"))
+            cross = max(rail, pick(prims.degree_curve("junction_cross").get(self.arch.device.degree("X0"))))
+            self._us = (rail, cross)
+        rail, cross = self._us
+        return steps * rail + crossings * (cross + rail)
+
     def _turn(self, forward: tuple[int, int], back: tuple[int, int], ops: Sequence[int]) -> None:
-        """Turn the ring the way that carries fewer ions across the junction (each crossing is a step
-        of its own, through X0), and on a tie the shorter way: each way is (crossings, steps)."""
-        step, n = (1, forward[1]) if forward <= back else (-1, back[1])
+        """Turn the ring the way that takes less time at this machine's own prices, and on a tie the
+        way with fewer steps: each way is (crossings, steps).  A turn all the way round carries no
+        ion across the junction and a short turn back carries several; which is quicker depends on
+        what a rail and a crossing cost.  At 5 us a rail the long way round wins (75 rails are 375 us,
+        7 crossings 875 us), and at a shuttling speed of a few m/s the short way through the junction
+        does (the team's feedback, 2026-11-23: "why a full loop rather than back and forth?")."""
+        f, b = self._turn_us(forward), self._turn_us(back)
+        step, n = (1, forward[1]) if (f, forward[1]) <= (b, back[1]) else (-1, back[1])
         for _ in range(n):
             self._step(step, ops)
 
@@ -206,15 +226,16 @@ class _Helios:
                 self.zone_of[q] = zone
 
     def _free_r0(self, ops: Sequence[int]) -> None:
-        """Turn the ring, the shorter way, until R0 is free: the nearest free site comes to it."""
+        """Turn the ring, the quicker way at this machine's prices, until R0 is free."""
         k = len(self.slots)
         on = self._ring()
         if 0 not in on:
             return
         # forward d steps brings the free site k-d to R0, and the ions at k-d .. k-1 cross; back d steps
         # brings the free site d, and the ions at 0 .. d-1 cross
-        best_f = min(((sum(1 for i in on if i >= k - d), d) for d in range(1, k) if (k - d) not in on))
-        best_b = min(((sum(1 for i in on if i < d), d) for d in range(1, k) if d not in on))
+        quickest = lambda way: (self._turn_us(way), way[1])       # noqa: E731
+        best_f = min(((sum(1 for i in on if i >= k - d), d) for d in range(1, k) if (k - d) not in on), key=quickest)
+        best_b = min(((sum(1 for i in on if i < d), d) for d in range(1, k) if d not in on), key=quickest)
         self._turn(best_f, best_b, ops)
 
     def unload(self, ops: Sequence[int]) -> None:
