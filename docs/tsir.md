@@ -94,6 +94,14 @@ the `ms*` noise channels). What changes with the set is the one-qubit dressing o
 | `cx c,t` | `R c, MS c t, R c, R t, R c`: 1 MS + 4 R | `R(−π/2, π/2) t, RZZ(π/2) c t, R(π/2, π) t, VZ(−π/2) c, VZ(−π/2) t`: 1 RZZ + 2 R |
 | `cz a,b` | `H b, cx a,b, H b`: 1 MS + 6 R | `RZZ(π/2) a b, VZ(−π/2) a, VZ(−π/2) b`: 1 RZZ, no R |
 
+The `VZ` is priced by the machine's physics, as before: it takes no time where the machine
+declares a free frame change (`z_gate` at 0 µs, as the Helios nominal physics qccd-physics@3
+does), and three one-qubit pulses where it declares none (`CostModel.gate_1q`: on a machine
+whose beams are shared a Z is turned by three pulses). So in one-qubit pulse times a `cx` is 4
+in `ms`, and in `rzz` 2 with a free frame change but 8 without; a `cz` is 6 (12 without) in
+`ms` against 0 (6 without) in `rzz`. The rzz set is the faster one for a CX only on a machine
+with a free frame change, which is the machine it was built for.
+
 A program compiled in `rzz` says so in its `meta` (`"gate_set": "rzz"`) and in its
 certificate's `claims`; a program in the default set says nothing, and is byte for byte what it
 was before the second set existed. Every compiler takes the option:

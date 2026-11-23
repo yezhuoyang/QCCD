@@ -28,7 +28,6 @@ import importlib.util
 import itertools
 import json
 import math
-import os
 import sys
 from pathlib import Path
 
@@ -143,7 +142,8 @@ def test_the_pulse_counts_of_the_two_sets():
     assert _counts(pulses(cz, ion, "rzz")) == {"RZZ": 1, "VZ": 2}
     # the rzz CX drives the target only: its control takes a frame change and no laser of its own
     assert {o for g, o, _ in pulses(cx, ion, "rzz") if g == "R"} == {("t",)}
-    # and the forms are exactly Quantinuum's (arXiv:2003.01293): the angles, in time order
+    # and the forms are these, angle for angle, in time order (the CNOT as Quantinuum documents it
+    # for the H-series: a pulse on the target either side of the ZZ, a frame change on each ion)
     assert pulses(cx, ion, "rzz") == [("R", ("t",), (-PI / 2, PI / 2)), ("RZZ", ("c", "t"), (PI / 2,)),
                                       ("R", ("t",), (PI / 2, PI)), ("VZ", ("c",), (-PI / 2,)),
                                       ("VZ", ("t",), (-PI / 2,))]
@@ -608,6 +608,30 @@ def test_the_helios_router_in_its_own_gate_set(cc, tmp_path):
     _r10(cc, c)
 
 
+def test_the_conveyor_router_takes_the_option(cc, tmp_path):
+    """The conveyor sandwich's router lowers through the same emitter: an X check and a Z check
+    in rzz keep the standard rules, are the circuit, and move as the ms programme moves."""
+    from qccd.arch.sandwich import conveyor_sandwich
+    two_checks = ('OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[6];\ncreg c[2];\nh q[4];\ncx q[4],q[0];\n'
+                  'cx q[0],q[5];\ncx q[4],q[1];\ncx q[1],q[5];\ncx q[4],q[2];\ncx q[3],q[5];\nh q[4];\n'
+                  'measure q[4] -> c[0];\nmeasure q[5] -> c[1];\n')
+    (tmp_path / "circuit.qasm").write_text(two_checks, encoding="utf-8")
+    arch = conveyor_sandwich(4, layers=2).arch
+    rs = load_rules("standard")
+    moves = {}
+    for gs in SETS:
+        raw, cert = conveyor_router.compile_conveyor(two_checks, arch, 4, name="two_checks", gate_set=gs)
+        c = _Compiled(raw, _cooled(raw, arch, "qccdsim_jones", False), cert, arch, tmp_path / "circuit.qasm")
+        assert gate_sets.of_program(c.prog) == gs and _gates(c.raw)[gate_sets.ENTANGLER[gs]] == 6
+        exe = programme_execution(c.prog, arch, corrected_model("qccdsim_jones"), circuit=circuit_of_certificate(cert),
+                                  rule_config=legacy_config(rs) or None, check_metrics=False)
+        assert [x.id for x in check(rs, exe).results if x.verdict == FAILS] == []
+        _r10(cc, c)
+        moves[gs] = [(i.cls, tuple((p.ion, p.src, p.dst) for p in i.participants))
+                     for i in c.raw.instructions if i.type == "simd"]
+    assert moves["ms"] == moves["rzz"] and moves["ms"]
+
+
 def test_the_tiled_surface_compiler_takes_the_option(cc, tmp_path):
     """The tiled compiler shares the lowering: a d = 3 surface round in rzz is one RZZ a CNOT."""
     from qccd.compile.tiled_surface import compile_tiled
@@ -780,7 +804,7 @@ def test_a_workspace_job_takes_the_gate_set_and_refuses_what_cannot_compile_it(t
         assert e.value.status == 422 and "the sets are ms, rzz" in str(e.value)
         with pytest.raises(WorkspaceError) as e:
             ws.start_job(human, "evaluate", {"gate_set": "rzz"})
-        assert e.value.status == 422 and "compiles nothing" in str(e.value)
+        assert e.value.status == 422 and "takes no gate_set" in str(e.value)
         # QCCDCert lowers to MS only: asking for it AND another set is refused when the job is started
         with pytest.raises(WorkspaceError) as e:
             ws.start_job(human, "run", {"program": "ghz4", "gate_set": "rzz", "compiler": "qccdcert"})

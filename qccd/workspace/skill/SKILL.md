@@ -49,6 +49,12 @@ so neither of you can silently overwrite the other.
   BB [[144,12,12]] syndrome round `bb144_esm`, 168 qubits); you may also pass your own
   OpenQASM 2.0 as `{name, qasm}`. "The current design" is the draft the user's Studio shows
   (`qccd_get_context` -> view.branch).
+- **The gate set** is the compiler's option: `gate_set="rzz"` on `qccd_run_program`,
+  `qccd_start_job` (compile) or `qccd_estimate_ler` lowers to Quantinuum's native set (R, VZ and
+  RZZ) instead of the default `ms` (R, VZ, MS). Ask for it only when the user does. The result
+  says which compiler ran and in which set; if the installed compiler is older than the option
+  the tool refuses and says how to get one that has it. Tell the user that, never compile in
+  the other set instead.
 - **Explain it from the report, never from memory**: the round time, `breakdown` (transport,
   cooling, gates, measurement, reset, with shares), `transport_by_class_ms`, `longest`,
   `hotspots` (junctions and their imbalance, busiest ions), `heating`, failed `rules`, and the

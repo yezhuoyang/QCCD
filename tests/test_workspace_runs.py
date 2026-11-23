@@ -149,9 +149,20 @@ def test_a_run_in_the_rzz_gate_set_says_which_compiler_ran(ws, monkeypatch):
     if built is None or "rzz" not in gate_sets.binary_gate_sets(built):
         pytest.skip("no qccdc_cli built from this source with the gate-set option")
     monkeypatch.setenv("QCCD_QCCDC", str(built))
+    # as on a machine where QCCDCert is installed, so `auto` would pick it: every call to it is
+    # counted (and declines, as it does a design it cannot translate, so `auto` goes on to qccdc)
+    asked: list = []
+
+    def qccdcert(work, table, budget=900):
+        asked.append(work)
+        raise RuntimeError("QCCDCert is not run in this test")
+
+    monkeypatch.setattr("qccd.cert.toolchain.available", lambda: True)
+    monkeypatch.setattr("qccd.workspace.runs._qccdcert_compile", qccdcert)
     j = _wait(ws, ws.start_job(HUMAN, "run", {"program": "ghz4", "gate_set": "rzz", "animate": False})["job_id"])
     assert j["status"] == "succeeded", j
     run = ws.run(j["id"])
+    assert asked == []                                       # QCCDCert, which knows MS only, was never asked
     assert run["gate_set"] == "rzz" and run["compiler"] in ("compile", "rotate")
     assert "qccdc_cli" in j["result"]["summary"] and "gate set rzz (R, VZ, RZZ)" in j["result"]["summary"]
     prog = json.loads(ws.get_artifact(run["artifacts"]["program"]))
@@ -164,6 +175,7 @@ def test_a_run_in_the_rzz_gate_set_says_which_compiler_ran(ws, monkeypatch):
     j = _wait(ws, ws.start_job(HUMAN, "run", {"program": "ghz4", "gate_set": "ms", "animate": False})["job_id"])
     assert j["status"] == "succeeded", j
     run = ws.run(j["id"])
+    assert len(asked) == 1                                   # the default set still goes to QCCDCert first
     assert "gate_set" not in run and "gate set" not in j["result"]["summary"]
     prog = json.loads(ws.get_artifact(run["artifacts"]["program"]))
     assert "MS" in {i.get("gate") for i in prog["instructions"] if i["type"] == "gate"} and "gate_set" not in prog.get("meta", {})

@@ -203,9 +203,13 @@ def pulses(op: SourceOp, ion: Mapping[int, str],
         rzz   cx(c, t) = R(-pi/2, pi/2) t, RZZ(pi/2) c t, R(pi/2, pi) t, VZ(-pi/2) c, VZ(-pi/2) t
               cz(a, b) = RZZ(pi/2) a b, VZ(-pi/2) a, VZ(-pi/2) b
 
-    The rzz forms are Quantinuum's (the H-series' CNOT from ZZ, arXiv:2003.01293) and the fewest
-    physical pulses there are: no CX is one RZZ(+-pi/2) and a single one-qubit pulse.  Every
-    form is held to its gate's unitary, up to a global phase, by `tests/test_gate_set.py`."""
+    The rzz forms are the usual CNOT and CZ from a ZZ interaction (the CNOT is the one Quantinuum
+    documents for its H-series: a pulse on the target either side of the ZZ, a frame change on
+    each ion), derived here and checked rather than quoted, and they are the fewest physical
+    pulses there are: no CX is one RZZ(+-pi/2) and a single one-qubit pulse.  Every form is held
+    to its gate's unitary, up to a global phase, by `tests/test_gate_set.py`.  A frame change is
+    priced by the machine (`qccd.ir.gate_sets`): free on one that declares it so, three pulses on
+    one that does not."""
     if op.name in U3:
         theta, phi, lam = U3[op.name]
         q = ion[op.qubits[0]]

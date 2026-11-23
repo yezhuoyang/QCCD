@@ -20,6 +20,17 @@ and noised by the `ms*` channels (`qccd.cost.models`, the `.eval` noise texts), 
 primitive, not the axis.  A programme may hold pulses of one set only when it was compiled, but
 nothing that reads a programme (the replay, the rules, the stim translation, `check_cert.py`)
 asks which set it is in: every pulse of `ALL_NATIVE` is read by its name.
+
+A frame change is priced by the machine's physics, as it always was (`CostModel.gate_1q`): no
+time where the machine declares a free one (`z_gate` at 0 us: the Helios nominal physics,
+qccd-physics@3), and three one-qubit pulses where it declares none.  The rzz forms lean on frame
+changes -- two for a CX, where the ms form has none -- so in one-qubit pulse times a CX costs
+
+    ms    4                  rzz    2 with a free frame change, 8 without
+
+and a CZ 6 (ms; 12 without a free frame change) against 0 (rzz; 6 without).  On a machine with
+no free frame change an rzz CX is therefore the slower one, by four one-qubit pulses, and under
+a noise text that charges a frame change as pulses (qccd-noise@2) the noisier one.
 """
 
 from __future__ import annotations

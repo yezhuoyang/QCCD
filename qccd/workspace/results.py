@@ -170,18 +170,13 @@ class ResultsMixin:
             except ValueError as exc:
                 raise WorkspaceError("bad_request", str(exc), status=422) from None
             if kind not in ("compile", "run", "ler"):
-                raise WorkspaceError("bad_request", f"a {kind} job compiles nothing: gate_set is for compile, "
-                                                    "run and ler", status=422)
+                raise WorkspaceError("bad_request", f"a {kind} job takes no gate_set: it is an option of compile, "
+                                                    "run and ler (a design is entered on a board with the programme "
+                                                    "it adopted: compile that one in the set wanted)", status=422)
             if chosen == gate_sets.DEFAULT:
                 params.pop("gate_set")
             else:
                 params["gate_set"] = chosen
-                # refused HERE, with the way out, when the compiler installed is older than the option:
-                # the caller hears it at once, not from a job that failed
-                from .evaluator import Toolchain
-                design = self.replayed(branch, rev)
-                _gate_set_args(params, Toolchain.discover(), design.arch if design.ok else None,
-                               router=kind != "ler")
         if kind == "evaluate":
             prof = params.get("profile", "draft")
             if prof not in ("draft", "reference"):
@@ -195,6 +190,12 @@ class ResultsMixin:
         if kind in ("compile", "evaluate", "submit"):
             rel = self.board(params.get("board"))
             params["board"] = rel.id
+        if params.get("gate_set"):
+            # a compiler older than the option is refused HERE, with the way out: the caller hears it
+            # at once, not from a job that failed (and the job asks again before it compiles)
+            from .evaluator import Toolchain
+            design = self.replayed(branch, rev)
+            _gate_set_args(params, Toolchain.discover(), design.arch if design.ok else None, router=kind != "ler")
         jid = new_id("job")
         lim = rel.manifest.get("limits") or {}
         limit = float(params.get("timeout_s") or (lim.get("lean_timeout_s", 1800) +

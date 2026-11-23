@@ -272,10 +272,14 @@ def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
         # the binary said it knows the set; hold what it wrote to that all the same
         from ..ir.tsir import TSIR
 
-        got = gate_sets.of_program(TSIR.load(str(tsir)))
-        if got != gate_set:
-            raise CompileFailed("crash", f"qccdc was asked for gate_set={gate_set!r} and wrote a programme "
-                                         f"in {got or 'a mix of gate sets'}", log[-6000:])
+        wrote = TSIR.load(str(tsir))
+        said = (wrote.meta or {}).get("gate_set")
+        other = sorted({i.gate for i in wrote.instructions if i.type == "gate"
+                        and i.gate in gate_sets.ENTANGLERS and i.gate != gate_sets.ENTANGLER[gate_set]})
+        if said != gate_set or other:
+            raise CompileFailed("crash", f"qccdc was asked for gate_set={gate_set!r} and wrote a programme that "
+                                         f"says {said!r}" + (f" and holds {', '.join(other)} pulses" if other else ""),
+                                log[-6000:])
     prog = tsir
     if cool:
         cooled = work / "prog.cooled.tsir.json"
