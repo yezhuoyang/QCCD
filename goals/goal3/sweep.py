@@ -1,7 +1,7 @@
 """Goal 3's sweep: one fixed code, every architecture family, every size the deck allows.
 
     python goals/goal3/sweep.py --code surface5 [--family C2LR WISE ...] [--workers 3]
-                                [--list] [--max-points N] [--cool-us 300] [--speed 4]
+                                [--list] [--max-points N] [--cool-us 300] [--speed 4] [--gate-set rzz]
 
 Each design point of each family (`families.py`) runs the code's experiment from its release
 (`boards.py`: the Z memory then the X memory on the same ions), minus the certificate chain:
@@ -22,6 +22,10 @@ stay in `work/<code>/<point>/`, and a point already in the results file is not r
 outputs go to `results/variants/cool<us>us/` and `work_cool<us>us/`.  The noise model's two cooling
 figures, 3 ms and Studio's 300 us, "use different reset assumptions"; the main figure takes its 3 ms.
 Every family cools by the same rule and time, Cyclone included (the team's feedback, Q2).
+
+`--gate-set rzz` compiles to Quantinuum's native set (one-qubit pulses, frame changes, RZZ) where the
+main figure uses the Molmer-Sorensen set (`qccd.ir.gate_sets`); its rows go to `results/variants/rzz/`.
+A family compiled by the released qccdc is refused until a qccdc release carries the option.
 
 `--speed` is the shuttling speed, in m/s: every straight rail then takes its length over that speed
 and heats as the speed's square (`qccd.arch.speed`), where the main figure takes each family's own
@@ -149,23 +153,25 @@ def census(point: dict, exp) -> dict:
 
 def compile_point(point: dict, exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
     from qccd.compile import c2lr_router, cyclone_router, helios_router, wise_router
+    # the native gate set: left out, each compiler's default (Molmer-Sorensen)
+    gs = {"gate_set": point["gate_set"]} if point.get("gate_set") else {}
     if point["generator"] == "helios":
-        return helios_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE)
+        return helios_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE, **gs)
     if point["generator"] in ("ring", "lattice"):
-        return conveyor_compile(exp, arch_p, work)
+        return conveyor_compile(exp, arch_p, work, **gs)
     if point["generator"] == "conveyor":
         from qccd.compile import conveyor_router
         return conveyor_router.compile_with_router(exp.qasm, arch_p, work, n_data=exp.n_data, table=TABLE,
-                                                   positions=True, lazy_cooling=True)
+                                                   positions=True, lazy_cooling=True, **gs)
     if point["generator"] == "grid":
         return c2lr_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE, reads_together=True,
-                                               positions=True, lazy_cooling=True)
+                                               positions=True, lazy_cooling=True, **gs)
     if point["generator"] == "wise":
-        return wise_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE)
-    return cyclone_router.compile_with_router(exp.qasm, arch_p, work, n_data=exp.n_data, table=TABLE)
+        return wise_router.compile_with_router(exp.qasm, arch_p, work, table=TABLE, **gs)
+    return cyclone_router.compile_with_router(exp.qasm, arch_p, work, n_data=exp.n_data, table=TABLE, **gs)
 
 
-def conveyor_compile(exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
+def conveyor_compile(exp, arch_p: Path, work: Path, gate_set: str | None = None) -> tuple[Path, Path]:
     """The conveyor loop, or the junction lattice, by the released qccdc (on a loop, rotation
     first), cooled as the other families are (lazily: heat since the last inserted cool,
     `CoolingPolicy(lazy=True)`)."""
@@ -177,8 +183,12 @@ def conveyor_compile(exp, arch_p: Path, work: Path) -> tuple[Path, Path]:
     from qccd.qec import CompileFailed, compile_with_qccdc
     from qccd.compile.laser_positions import split_by_position
     try:
-        tsir, cert = compile_with_qccdc(exp.qasm, arch_p, work, cool=False, timeout=3600.0, table=TABLE)
+        tsir, cert = compile_with_qccdc(exp.qasm, arch_p, work, cool=False, timeout=3600.0, table=TABLE,
+                                        **({"gate_set": gate_set} if gate_set else {}))
     except CompileFailed as exc:
+        if exc.kind == "gate_set_unsupported":      # said without the binary's path: a row is published
+            raise Refused(f"qccdc: the released compiler lowers to the Molmer-Sorensen set only; the {gate_set} "
+                          "set needs a qccdc release that carries the option") from exc
         if exc.kind == "refused":         # qccdc declined the pair (fewer docks than qubits), as before the deck
             raise Refused(f"qccdc: {exc}") from exc
         raise
@@ -208,7 +218,8 @@ def grade(code: str, point: dict, work_root: str) -> dict:
            "deck": point.get("deck") or {}, "compiler": COMPILERS[point["family"]],
            "rule_set": RULES[point["family"]],
            **({"cool_us": point["cool_us"]} if point.get("cool_us") is not None else {}),
-           **({"speed_m_s": point["speed_m_s"]} if point.get("speed_m_s") is not None else {})}
+           **({"speed_m_s": point["speed_m_s"]} if point.get("speed_m_s") is not None else {}),
+           **({"gate_set": point["gate_set"]} if point.get("gate_set") else {})}
     t0 = time.time()
     work = Path(work_root) / code / point["name"]
     work.mkdir(parents=True, exist_ok=True)
@@ -290,6 +301,8 @@ def main() -> int:
     ap.add_argument("--work", default=None)
     ap.add_argument("--cool-us", type=float, default=None, help="a sensitivity run at this cooling time")
     ap.add_argument("--speed", type=float, default=None, help="the shuttling speed along a straight rail, in m/s")
+    ap.add_argument("--gate-set", choices=("ms", "rzz"), default=None,
+                    help="the native gate set to compile to (default: each compiler's own, Molmer-Sorensen)")
     ap.add_argument("--ler-batch", type=int, default=None,
                     help="sample in batches of this many shots, not the release's (a point past threshold "
                          "otherwise decodes a whole batch of failing shots, for hours under BP-OSD)")
@@ -297,6 +310,8 @@ def main() -> int:
     tag = f"cool{a.cool_us:g}us" if a.cool_us is not None else None
     if a.speed is not None:
         tag = (tag + "_" if tag else "") + f"speed{a.speed:g}"
+    if a.gate_set and a.gate_set != "ms":
+        tag = (tag + "_" if tag else "") + a.gate_set
     a.work = a.work or str(HERE / (f"work_{tag}" if tag else "work"))
     meta = json.loads((HERE / "codes" / f"{a.code}_z" / "meta.json").read_text(encoding="utf-8"))
     pts = []
@@ -309,6 +324,8 @@ def main() -> int:
         pts = [{**p, "cool_us": a.cool_us} for p in pts]
     if a.speed is not None:
         pts = [{**p, "speed_m_s": a.speed} for p in pts]
+    if a.gate_set and a.gate_set != "ms":
+        pts = [{**p, "gate_set": a.gate_set} for p in pts]
     if a.ler_batch:
         pts = [{**p, "ler_batch": a.ler_batch} for p in pts]
     if a.list:
