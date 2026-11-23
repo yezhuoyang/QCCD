@@ -215,6 +215,185 @@ theorem cx_decomp :
     simp [cos_pi_div_four_sq, sqrtTwo_sq, sqrtTwo_pow_four, sqrtTwo_pow_six] <;>
     ring
 
+/-! ## The other entangler: `RZZ`
+
+The `rzz` gate set (Quantinuum's H-series and Helios, arXiv:2003.01293 and
+arXiv:2511.05465) has `RZZ θ = exp (-i·θ/2·Z⊗Z)` where the `ms` set has `MS θ`.  Three
+facts about it, each with its global phase:
+
+* `cz_decomp`, `cz_decomp_vz`: `RZZ(π/2)` is a controlled-Z up to a quarter-turn frame
+  change on each qubit, in the rotation convention `RZ` and in the hardware's `VZ`;
+* `cx_decomp_rzz`: so a CNOT is **one `RZZ`, two physical one-qubit pulses** (the target's
+  two Hadamards, one pulse each by `u3_decomp`) **and frame changes** -- against one `MS`
+  and four physical pulses in `cx_decomp`;
+* `MS_eq_conj_RZZ`: at every angle the two entanglers differ by a Hadamard on each
+  qubit, so anything one set can do the other can, with local basis changes.
+
+`RZZ` is diagonal in the computational basis.  A syndrome circuit lowered to it stays a
+CSS circuit up to one-qubit basis changes, the class Ellis (Hou and Ravi,
+arXiv:2611.26173) simulates under qubit loss and leakage with a Pauli frame and per-shot
+masks.  That is a reason to choose the set; nothing here simulates leakage. -/
+
+/-- `e^{iπ/4} = cos (π/4) + i·sin (π/4)`, in the casts the pulse definitions use. -/
+theorem exp_pi_div_four_mul_I :
+    Complex.exp (((Real.pi / 4 : ℝ) : ℂ) * Complex.I)
+      = ((Real.cos (Real.pi / 4) : ℝ) : ℂ)
+        + Complex.I * ((Real.sin (Real.pi / 4) : ℝ) : ℂ) := by
+  rw [Complex.exp_mul_I, ← Complex.ofReal_cos, ← Complex.ofReal_sin]
+  ring
+
+/-- `e^{-iπ/4} = cos (π/4) − i·sin (π/4)`. -/
+theorem exp_neg_pi_div_four_mul_I :
+    Complex.exp ((-((Real.pi / 4 : ℝ) : ℂ)) * Complex.I)
+      = ((Real.cos (Real.pi / 4) : ℝ) : ℂ)
+        - Complex.I * ((Real.sin (Real.pi / 4) : ℝ) : ℂ) := by
+  rw [Complex.exp_mul_I, Complex.cos_neg, Complex.sin_neg, ← Complex.ofReal_cos,
+    ← Complex.ofReal_sin]
+  ring
+
+/-- `RZ(-π/2) = diag (e^{iπ/4}, e^{-iπ/4})`, at its one used angle. -/
+theorem RZ_neg_pi_half :
+    RZ (-(Real.pi / 2)) =
+      !![Complex.exp (((Real.pi / 4 : ℝ) : ℂ) * Complex.I), 0;
+         0, Complex.exp ((-((Real.pi / 4 : ℝ) : ℂ)) * Complex.I)] := by
+  have h1 : -((-(Real.pi / 2) : ℝ) : ℂ) * Complex.I / 2
+      = ((Real.pi / 4 : ℝ) : ℂ) * Complex.I := by
+    push_cast; ring
+  have h2 : ((-(Real.pi / 2) : ℝ) : ℂ) * Complex.I / 2
+      = (-((Real.pi / 4 : ℝ) : ℂ)) * Complex.I := by
+    push_cast; ring
+  -- as in `R_pi_half_sub`: the angle is put in shape by `rw` before any `simp` sees it
+  unfold RZ
+  rw [h1, h2]
+
+/-- `VZ(-π/2) = diag (1, -i)`: the frame change that turns `RZZ(π/2)` into a CZ. -/
+theorem VZ_neg_pi_half : VZ (-(Real.pi / 2)) = !![1, 0; 0, -Complex.I] := by
+  have h : ((-(Real.pi / 2) : ℝ) : ℂ) * Complex.I
+      = (-((Real.pi / 2 : ℝ) : ℂ)) * Complex.I := by
+    push_cast; ring
+  unfold VZ
+  rw [h, exp_neg_pi_div_two_mul_I]
+
+/-- `RZZ(π/2)`, the maximally entangling operating point. -/
+theorem RZZ_pi_half :
+    RZZ (Real.pi / 2) =
+      (Real.cos (Real.pi / 4) : ℂ) • (1 : Matrix (Fin 4) (Fin 4) ℂ)
+        - (Complex.I * (Real.sin (Real.pi / 4) : ℂ)) • ZZ := by
+  have h1 : Real.pi / 2 / 2 = Real.pi / 4 := by ring
+  unfold RZZ
+  rw [h1]
+
+/-- **CZ = e^{−iπ/4} · [RZ(−π/2)⊗RZ(−π/2)] · RZZ(π/2)**
+
+`RZZ(π/2)` is a controlled-Z up to a quarter turn about Z on each qubit and a global
+phase.  Every factor is diagonal, so the order of the factors does not matter. -/
+theorem cz_decomp :
+    CZ =
+      Complex.exp ((-(Real.pi / 4) : ℝ) * Complex.I) •
+        (kron (RZ (-(Real.pi / 2))) (RZ (-(Real.pi / 2))) * RZZ (Real.pi / 2)) := by
+  have hphase : Complex.exp ((-(Real.pi / 4) : ℝ) * Complex.I)
+      = ((Real.cos (Real.pi / 4) : ℝ) : ℂ)
+        - Complex.I * ((Real.sin (Real.pi / 4) : ℝ) : ℂ) := by
+    rw [Complex.ofReal_neg, exp_neg_pi_div_four_mul_I]
+  rw [RZ_neg_pi_half, exp_pi_div_four_mul_I, exp_neg_pi_div_four_mul_I, RZZ_pi_half, hphase]
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [CZ, kron, hiBit, loBit, ZZ, PZ, Matrix.mul_apply, Fin.sum_univ_four,
+      Matrix.one_apply] <;>
+    ring_nf <;>
+    simp [sqrtTwo_pow_four] <;>
+    ring
+
+/-- **CZ = e^{iπ/4} · [VZ(−π/2)⊗VZ(−π/2)] · RZZ(π/2)**
+
+The same identity in the hardware's phase-gate convention, the one a compiler emits: one
+`RZZ` and one frame change per qubit.  The global phase is `+π/4` here and `−π/4` in
+`cz_decomp` because `VZ` and `RZ` differ by a phase themselves (`VZ_eq_smul_RZ`). -/
+theorem cz_decomp_vz :
+    CZ =
+      Complex.exp ((Real.pi / 4 : ℝ) * Complex.I) •
+        (kron (VZ (-(Real.pi / 2))) (VZ (-(Real.pi / 2))) * RZZ (Real.pi / 2)) := by
+  rw [VZ_neg_pi_half, exp_pi_div_four_mul_I, RZZ_pi_half]
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [CZ, kron, hiBit, loBit, ZZ, PZ, Matrix.mul_apply, Fin.sum_univ_four,
+      Matrix.one_apply] <;>
+    ring_nf <;>
+    simp [sqrtTwo_sq] <;>
+    ring
+
+/-- **CX = (1⊗H) · CZ · (1⊗H)**: a CNOT is a controlled-Z between two Hadamards on the
+target. -/
+theorem cx_from_cz : CX = kron 1 Had * CZ * kron 1 Had := by
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [CX, CZ, Had, kron, hiBit, loBit, Matrix.mul_apply, Fin.sum_univ_four,
+      Matrix.one_apply] <;>
+    ring_nf <;>
+    simp [sqrtTwo_sq]
+
+/-- The Hadamard is `u3 (π/2) 0 π`. -/
+theorem Had_eq_u3 : Had = u3 (Real.pi / 2) 0 Real.pi := by
+  have h1 : Real.pi / 2 / 2 = Real.pi / 4 := by ring
+  unfold u3 Had
+  rw [h1]
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [Complex.exp_pi_mul_I, Real.cos_pi_div_four, Real.sin_pi_div_four]
+
+/-- **H = VZ(π) · R(π/2, −π/2)**: one frame change and one physical pulse, by
+`u3_decomp`. -/
+theorem Had_decomp : Had = VZ Real.pi * R (Real.pi / 2) (-(Real.pi / 2)) := by
+  have h := u3_decomp (Real.pi / 2) 0 Real.pi
+  rw [zero_add, show Real.pi / 2 - Real.pi = -(Real.pi / 2) by ring] at h
+  rw [Had_eq_u3, h]
+
+/-- **CX = e^{iπ/4} · [1⊗H] · [VZ(−π/2)⊗VZ(−π/2)] · RZZ(π/2) · [1⊗H]**, with
+**H = VZ(π) · R(π/2, −π/2)**.
+
+Matrix order: the rightmost factor is the first pulse in time.  One `RZZ` gate, two
+physical one-qubit pulses (both on the target, qubit 1) and four frame changes -- where
+`cx_decomp` has one `MS` gate and four physical pulses. -/
+theorem cx_decomp_rzz :
+    CX =
+      Complex.exp ((Real.pi / 4 : ℝ) * Complex.I) •
+        (kron 1 (VZ Real.pi * R (Real.pi / 2) (-(Real.pi / 2)))
+          * kron (VZ (-(Real.pi / 2))) (VZ (-(Real.pi / 2)))
+          * RZZ (Real.pi / 2)
+          * kron 1 (VZ Real.pi * R (Real.pi / 2) (-(Real.pi / 2)))) := by
+  -- no entry is computed: fold the two pulses back into `Had`, bring the phase beside the
+  -- three diagonal factors, and the middle is `cz_decomp_vz`
+  rw [← Had_decomp, Matrix.mul_assoc (kron 1 Had), ← Matrix.smul_mul, ← Matrix.mul_smul,
+    ← cz_decomp_vz]
+  exact cx_from_cz
+
+/-- `(H⊗H)² = 1`. -/
+theorem HH_sq : kron Had Had * kron Had Had = 1 := by
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [Had, kron, hiBit, loBit, Matrix.mul_apply, Fin.sum_univ_four] <;>
+    ring_nf <;>
+    simp [sqrtTwo_pow_four]
+
+/-- `(H⊗H) · Z⊗Z · (H⊗H) = X⊗X`: a Hadamard on each qubit turns one generator into the
+other. -/
+theorem HH_ZZ_HH : kron Had Had * ZZ * kron Had Had = XX := by
+  ext i j
+  fin_cases i <;> fin_cases j <;>
+    simp [Had, ZZ, XX, PX, PZ, kron, hiBit, loBit, Matrix.mul_apply, Fin.sum_univ_four] <;>
+    ring_nf <;>
+    simp [sqrtTwo_pow_four]
+
+/-- **MS(θ) = (H⊗H) · RZZ(θ) · (H⊗H)**, at every angle.
+
+The two native gate sets differ by local basis changes.  No entry is computed: the
+closed forms of `MS` and `RZZ` are the same expression in their generators, and
+`HH_ZZ_HH` carries one generator to the other. -/
+theorem MS_eq_conj_RZZ (θ : ℝ) : MS θ = kron Had Had * RZZ θ * kron Had Had := by
+  unfold MS RZZ
+  simp only [mul_sub, sub_mul, Matrix.mul_smul, Matrix.smul_mul, Matrix.mul_one, HH_sq,
+    HH_ZZ_HH]
+
 /-! ## The trusted-base check
 
 `u3_decomp` is the statement the compiler's cost model and its decomposition table both
@@ -228,5 +407,12 @@ nothing. -/
 #print axioms XX_sq
 #print axioms VZ_eq_smul_RZ
 #print axioms cx_decomp
+#print axioms ZZ_sq
+#print axioms cz_decomp
+#print axioms cz_decomp_vz
+#print axioms cx_from_cz
+#print axioms Had_decomp
+#print axioms cx_decomp_rzz
+#print axioms MS_eq_conj_RZZ
 
 end QCCDC
