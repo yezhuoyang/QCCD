@@ -6,8 +6,9 @@ import QCCDC.Cert.Sound
 *Part G, lesson G8. You need lessons G1 to G4.*
 
 Lessons G2 to G4 used one native gate set: the pulse `R(θ, φ)`, the frame change `VZ(λ)` (those
-lessons say frame update) and the Mølmer-Sørensen pulse `MS(θ)`. Not every trapped-ion machine entangles with MS. Quantinuum's
-machines, the H-series and Helios ([arXiv:2003.01293](https://arxiv.org/abs/2003.01293),
+lessons say frame update) and the Mølmer-Sørensen pulse `MS(θ)`. Not every trapped-ion machine
+entangles with MS. Quantinuum's machines, the H-series and Helios
+([arXiv:2003.01293](https://arxiv.org/abs/2003.01293),
 [arXiv:2511.05465](https://arxiv.org/abs/2511.05465)), have the same one-ion pulse (there it is
 called U1q), a Z rotation done as a frame change, and a different two-ion pulse: `RZZ(θ)`, a
 rotation about Z⊗Z.
@@ -181,13 +182,17 @@ theorem zz_sq : ZZ * ZZ = I4 := by
 Look at the two matrices printed above. MS(π/2) has entries off its diagonal: it turns the state
 00 into a mix of 00 and 11. RZZ(π/2) has none. Each basis state stays the state it was and is
 multiplied by a phase: e^(−iπ/4) when its two bits agree, e^(iπ/4) when they differ.
+-/
 
+/-- The diagonal matrix with `a` where the two bits agree (00 and 11) and `b` where they differ. -/
+def onDiagonal (a b : Zω) : Mat := [[a, 0, 0, 0], [0, b, 0, 0], [0, 0, b, 0], [0, 0, 0, a]]
+
+/-!
 #### Exercise 2 (★) `rzz_diagonal`
 Prove RZZ(π/2) is that diagonal matrix.
 -/
 
-theorem rzz_diagonal :
-    RZZ 2 = [[cis (-1), 0, 0, 0], [0, cis 1, 0, 0], [0, 0, cis 1, 0], [0, 0, 0, cis (-1)]] := by
+theorem rzz_diagonal : RZZ 2 = onDiagonal (cis (-1)) (cis 1) := by
   decide +kernel
 
 /-!
@@ -299,20 +304,28 @@ theorem frame_past_pulse : R 2 (-2) * VZ 2 = VZ 2 * R 2 4 := by
 
 /-!
 So the compiler emits one frame change per ion, after the pulses. With `gate_set` set to `rzz`,
-its lowering of a CNOT, `decompose_cx`, emits these five in time order and records the phase π/4:
+its lowering of a CNOT is `decompose_cx_rzz`, beside lesson G4's `decompose_cx_ms`: five
+instructions in time order, and the phase π/4.
 
-| | instruction | on |
-|---|---|---|
-| 1 | `R(−π/2, π/2)` | the target |
-| 2 | `RZZ(π/2)` | both ions |
-| 3 | `R(π/2, π)` | the target |
-| 4 | `VZ(−π/2)` | the control |
-| 5 | `VZ(−π/2)` | the target |
+```
+let decompose_cx_rzz ~(control : int) ~(target : int) : decomposed =
+  {
+    pulses =
+      [
+        Beam { theta = -.pi /. 2.0; phi = pi /. 2.0; qubit = target };
+        Rzz { theta = pi /. 2.0; a = control; b = target };
+        Beam { theta = pi /. 2.0; phi = pi; qubit = target };
+        Frame { lam = -.pi /. 2.0; qubit = control };
+        Frame { lam = -.pi /. 2.0; qubit = target };
+      ];
+    phase = pi /. 4.0;
+  }
+```
 
-The first pulse is the Hadamard's own, written with the opposite sign and the opposite axis; the
-second is the Hadamard's with its axis turned, as in `frame_past_pulse`. `QCCDC.Pulse.Decompose`
-proves the sequence, in matrix order (the rightmost factor is the first pulse in time), beside
-lesson G4's `cx_decomp`:
+A `Beam` is an `R` and a `Frame` a `VZ`. The first pulse is the Hadamard's own, written with the
+opposite sign and the opposite axis; the second is the Hadamard's with its axis turned, as in
+`frame_past_pulse`. `QCCDC.Pulse.Decompose` proves the sequence, in matrix order (the rightmost
+factor is the first pulse in time), beside lesson G4's `cx_decomp`:
 
 ```
 theorem cx_decomp_rzz :
@@ -333,10 +346,6 @@ def cnotMS : Mat := kron (R (-2) 2) I2 * kron (R (-2) 0) (R (-2) 0) * MS 2 * kro
 /-- The CNOT's pulses and frame changes in the `rzz` set, multiplied out. -/
 def cnotRZZ : Mat := kron (VZ (-2)) (VZ (-2)) * kron I2 (R 2 4) * RZZ 2 * kron I2 (R (-2) 2)
 
-/-- Lesson G4's Exercise 1: the `ms` CNOT, with the phase e^(−iπ/4). -/
-theorem cx_decomp_exact : CX = cis (-1) • cnotMS := by
-  decide +kernel
-
 /-!
 #### Exercise 7 (★) `cx_decomp_rzz_exact`
 Prove `cx_decomp_rzz` over our numbers: the `rzz` CNOT, with the phase e^(iπ/4).
@@ -347,12 +356,14 @@ theorem cx_decomp_rzz_exact : CX = cis 1 • cnotRZZ := by
 
 /-!
 #### Exercise 8 (★★) `same_cnot`
-The two sequences make the same gate. Prove it without multiplying a matrix: each side is CX, by
-one of the two theorems above. Rewrite with them from right to left (`rw [← ...]`).
+The two sequences make the same gate. Lesson G4's Exercise 1 proved `CX = cis (-1) • cnotMS`; this
+page does not compute it again, so the exercise takes it as the hypothesis `g4`. Prove the claim
+without multiplying a matrix: each side is CX, by `g4` or by Exercise 7. Rewrite with them from
+right to left (`rw [← ...]`).
 -/
 
-theorem same_cnot : cis (-1) • cnotMS = cis 1 • cnotRZZ := by
-  rw [← cx_decomp_exact, ← cx_decomp_rzz_exact]
+theorem same_cnot (g4 : CX = cis (-1) • cnotMS) : cis (-1) • cnotMS = cis 1 • cnotRZZ := by
+  rw [← g4, ← cx_decomp_rzz_exact]
 
 /-!
 So `cnotMS` is i times `cnotRZZ`. A circuit compiled in either set is the same circuit, and each
@@ -379,18 +390,13 @@ are not, its two frame changes are six more.
 
 ## 5. The two sets differ by a change of basis
 
-H·Z·H = X. So a Hadamard on each ion turns the generator of RZZ into the generator of MS, and two
-Hadamards on each ion undo each other:
--/
+H·Z·H = X. So a Hadamard on each ion turns the generator of RZZ into the generator of MS:
+(H⊗H)·Z⊗Z·(H⊗H) = X⊗X. And two Hadamards on each ion undo each other: (H⊗H)·(H⊗H) = 1.
 
-theorem generators : kron H H * ZZ * kron H H = XX ∧ kron H H * kron H H = I4 := by
-  decide +kernel
-
-/-!
 Both pulses are cos(θ/2)·1 − i·sin(θ/2)·(their generator). So MS(θ) = (H⊗H)·RZZ(θ)·(H⊗H) at every
 angle: anything one set can do the other can, with basis changes on single ions.
-`QCCDC.Pulse.Decompose` proves it for every real θ from those two facts and the algebra of
-matrices, computing no entry:
+`QCCDC.Pulse.Decompose` proves it for every real θ from those two facts (`HH_ZZ_HH`, `HH_sq`) and
+the algebra of matrices, computing no entry:
 
 ```
 theorem MS_eq_conj_RZZ (θ : ℝ) : MS θ = kron Had Had * RZZ θ * kron Had Had := by
@@ -399,37 +405,17 @@ theorem MS_eq_conj_RZZ (θ : ℝ) : MS θ = kron Had Had * RZZ θ * kron Had Had
     HH_ZZ_HH]
 ```
 
-Our matrices are lists of lists, with no algebra proved about them. Here the proof goes through
-the cosine table instead, as lesson G2's Exercise 8 did: both sides depend on θ only through
-θ/2 mod 8.
+Our matrices are lists of lists, with no algebra proved about them, so here you compute.
+
+#### Exercise 9 (★) `ms_from_rzz`
+Prove the two facts about the generators, and the relation itself at the angle the compiler uses:
+MS(π/2) = (H⊗H)·RZZ(π/2)·(H⊗H).
 -/
 
-/-- `MS` and `RZZ` at the angle whose half is `k` eighths, read from the cosine table. The sine is
-the cosine a quarter turn earlier: 2 eighths back, which is 6 eighths on. -/
-def msT (k : Nat) : Mat := cosT k • I4 - (I * cosT ((k + 6) % 8)) • XX
-
-def rzzT (k : Nat) : Mat := cosT k • I4 - (I * cosT ((k + 6) % 8)) • ZZ
-
-/-!
-#### Exercise 9 (★★★) `ms_from_rzz`
-Prove MS(θ) = (H⊗H)·RZZ(θ)·(H⊗H) for every angle on the grid, in three steps. First the eight
-rows of the table, a computation: `∀ k < 8, msT k = kron H H * rzzT k * kron H H`. Then
-`MS θ = msT ((θ / 2) % 8).toNat`, and the same for `RZZ`: `unfold MS sinE cosE msT` leaves one
-fact about angles, `((θ / 2 - 2) % 8).toNat = (((θ / 2) % 8).toNat + 6) % 8`, which `omega`
-proves; hand it to `rw` as `show ... by omega`. Last, rewrite with both and apply the table row,
-whose `k < 8` is `omega`'s too.
--/
-
-theorem ms_from_rzz (θ : Int) : MS θ = kron H H * RZZ θ * kron H H := by
-  have key : ∀ k < 8, msT k = kron H H * rzzT k * kron H H := by decide +kernel
-  have hm : MS θ = msT ((θ / 2) % 8).toNat := by
-    unfold MS sinE cosE msT
-    rw [show ((θ / 2 - 2) % 8).toNat = (((θ / 2) % 8).toNat + 6) % 8 by omega]
-  have hr : RZZ θ = rzzT ((θ / 2) % 8).toNat := by
-    unfold RZZ sinE cosE rzzT
-    rw [show ((θ / 2 - 2) % 8).toNat = (((θ / 2) % 8).toNat + 6) % 8 by omega]
-  rw [hm, hr]
-  exact key _ (by omega)
+theorem ms_from_rzz :
+    kron H H * ZZ * kron H H = XX ∧ kron H H * kron H H = I4 ∧
+    MS 2 = kron H H * RZZ 2 * kron H H := by
+  decide +kernel
 
 /-!
 ## 6. Why choose RZZ
@@ -439,20 +425,38 @@ There are two reasons.
 **The machine.** A programme can only hold pulses its machine has. Quantinuum's machines have RZZ,
 so a programme for one of them, or for a design modelled on them, is compiled with `rzz`.
 
-**RZZ is diagonal.** It never changes a bit: Exercise 2 said so for basis states. The same fact
-for operators is that RZZ commutes with Z on either ion. MS does not.
-
-#### Exercise 10 (★) `rzz_keeps_z`
-Prove RZZ(π/2) commutes with Z on qubit 0 and with Z on qubit 1, and that MS(π/2) does not commute
-with Z on qubit 0.
+**RZZ is diagonal.** It never changes a bit. Exercise 2 said so at π/2, and it is so at every
+angle: RZZ(θ) multiplies a basis state by e^(−iθ/2) when its two bits agree and by e^(iθ/2) when
+they differ. That is Euler's formula, cos x ∓ i·sin x = e^(∓ix), on each entry. Over our numbers it is
+proved through the cosine table, as lesson G2's Exercise 8 was: both sides depend on θ only through
+θ/2 mod 8.
 -/
 
-theorem rzz_keeps_z :
-    RZZ 2 * kron PZ I2 = kron PZ I2 * RZZ 2 ∧ RZZ 2 * kron I2 PZ = kron I2 PZ * RZZ 2 ∧
-    MS 2 * kron PZ I2 ≠ kron PZ I2 * MS 2 := by
-  decide +kernel
+/-- `RZZ` at the angle whose half is `k` eighths, read from the cosine table. The sine is the
+cosine a quarter turn earlier: 2 eighths back, which is 6 eighths on. -/
+def rzzT (k : Nat) : Mat := cosT k • I4 - (I * cosT ((k + 6) % 8)) • ZZ
 
 /-!
+#### Exercise 10 (★★★) `rzz_diagonal_all`
+Prove RZZ(θ) is diagonal, with those entries, for every angle on the grid. Three steps. First the
+eight rows of the table, a computation: `∀ k < 8, rzzT k = onDiagonal (cisT ((8 - k) % 8)) (cisT k)`.
+Then `unfold RZZ sinE cosE cis` leaves two facts about angles, and `omega` proves both:
+`((θ / 2 - 2) % 8).toNat = (((θ / 2) % 8).toNat + 6) % 8` and
+`(-(θ / 2) % 8).toNat = (8 - ((θ / 2) % 8).toNat) % 8`. Hand each to `rw` as `show ... by omega`.
+What is left is the table's row at `((θ / 2) % 8).toNat`, whose `< 8` is `omega`'s too.
+-/
+
+theorem rzz_diagonal_all (θ : Int) : RZZ θ = onDiagonal (cis (-(θ / 2))) (cis (θ / 2)) := by
+  have key : ∀ k < 8, rzzT k = onDiagonal (cisT ((8 - k) % 8)) (cisT k) := by decide +kernel
+  unfold RZZ sinE cosE cis
+  rw [show ((θ / 2 - 2) % 8).toNat = (((θ / 2) % 8).toNat + 6) % 8 by omega,
+    show (-(θ / 2) % 8).toNat = (8 - ((θ / 2) % 8).toNat) % 8 by omega]
+  exact key _ (by omega)
+
+/-!
+A diagonal matrix commutes with Z on either ion, because Z is diagonal too. MS is not diagonal and
+does not.
+
 This matters for error-correcting codes. The syndrome circuit of a CSS code is made of CNOTs,
 preparations and readouts. Lowered to the `rzz` set, its only two-ion operation is diagonal in the
 computational basis, and everything else in it is a basis change on one ion: the circuit stays CSS
@@ -481,6 +485,6 @@ simulate leakage that way. The gate set is where such a simulation would start.
 RZZ(π/2) is a diagonal matrix, and with one frame change on each ion it is CZ, up to a phase. A
 CNOT is one RZZ, two pulses on the target and two frame changes, times e^(iπ/4): the sequence the
 compiler emits for `gate_set` `rzz`, and the same gate as lesson G4's five pulses. MS and RZZ are
-one pulse seen in two bases, at every angle. Which set to use is decided by the machine, and by
-what you want to simulate.
+one pulse seen in two bases, and RZZ is diagonal at every angle. Which set to use is decided by the
+machine, and by what you want to simulate.
 -/

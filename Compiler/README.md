@@ -89,7 +89,7 @@ point; the workflow above is the native compiler used by Studio.
 |---|---|
 | **C0** interface: OCaml ⇄ Python JSON, validated against the 397 184 / 8 808 oracle | ✅ done |
 | **C1** QASM front end + DAG, 507/507 vs `circuit_to_dag` | ✅ done |
-| **C2** native gate set + Lean pulse theorems (6 theorems, no `sorry`) | ✅ done |
+| **C2** native gate set + Lean pulse theorems (6 theorems for the `ms` set, 8 for `rzz`, no `sorry`) | ✅ done |
 | **C3** place + route + aggregate → end-to-end compile, R10 `partial` | ✅ done |
 | **C4** SAT routing + optimality oracle | ✅ done |
 | **C5** placement relaxation + the (runtime, error) frontier | ✅ done |

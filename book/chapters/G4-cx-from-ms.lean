@@ -185,11 +185,11 @@ theorem cx_decomp :
           * kron (Ry (Real.pi / 2)) 1)
 ```
 
-`Rx θ` is `R θ 0` and `Ry θ` is `R θ (π/2)`. The compiler's lowering, `decompose_cx`, emits
+`Rx θ` is `R θ 0` and `Ry θ` is `R θ (π/2)`. The compiler's lowering for this gate set, `decompose_cx_ms`, emits
 the same five pulses in time order, the reverse of the matrix order, and records the phase:
 
 ```
-let decompose_cx ~(control : int) ~(target : int) : decomposed =
+let decompose_cx_ms ~(control : int) ~(target : int) : decomposed =
   {
     pulses =
       [
@@ -352,7 +352,7 @@ and `q1`, `q0` (qubit 0) the control. The compiler wrote its pulses beside it in
           "R(-1.5708,0)@q1","R(-1.5708,1.5708)@q0"]
 ```
 
-These are `decompose_cx`'s five, with qubit 0 on ion `q0` and qubit 1 on `q1`. The programme
+These are `decompose_cx_ms`'s five, with qubit 0 on ion `q0` and qubit 1 on `q1`. The programme
 fires the two −π/2 beams as two instructions, one per ion, where the theorem has one `kron`. Here
 is the witness, at its cycle, in the studio: the proved checker's row says the two ions are
 together in a trap that can gate, and are the op's own. Which gate the five pulses make is
