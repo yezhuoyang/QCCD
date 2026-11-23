@@ -56,7 +56,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 __all__ = ["Point", "build", "write", "board_point", "write_board", "replay", "noisy_stim",
-           "decoder_config", "decoder_label", "decoder_labels", "link", "zip_name", "LABEL", "HINT",
+           "decoder_config", "decoder_label", "decoder_labels", "link", "zip_name", "LABEL",
            "REPO_URL", "ReproduceError"]
 
 REPO = Path(__file__).resolve().parents[2]
@@ -65,10 +65,6 @@ SITE_URL = "https://qccd.academy"
 
 #: the button, word for word, wherever it is drawn
 LABEL = "Download and reproduce"
-#: what the button gives, in words (a page never names a source file)
-HINT = ("Downloads one zip file with everything this number was made from: the input circuit, the "
-        "machine, the hardware program, the noisy stim circuit, and the Python scripts that run the "
-        "experiment again, with instructions.")
 #: the folder, beside a board's pages, its zips are served from
 FOLDER = "reproduce"
 
@@ -103,7 +99,8 @@ def decoder_config(ler: Mapping | None = None, budget: Mapping | None = None) ->
     the release asks for."""
     ler, budget = dict(ler or {}), dict(budget or {})
     given = ler.get("decoder_config") if isinstance(ler.get("decoder_config"), Mapping) else None
-    name = str(ler.get("decoder") or (given or {}).get("name") or budget.get("decoder") or "auto")
+    name = str(ler.get("decoder") or (given or {}).get("decoder") or (given or {}).get("name")
+               or budget.get("decoder") or "auto")
     if name == "pymatching":
         out = {"name": "pymatching", "label": "PyMatching 2 (minimum-weight perfect matching)",
                "package": "pymatching",
@@ -440,7 +437,8 @@ def build(point: Point) -> tuple[bytes, dict]:
         members["circuit.stim"] = stim_text
         dec = decoder_config(ler, budget)
         if dec["name"] not in ("pymatching", "bposd"):
-            raise ReproduceError(f"{point.board} {point.entry}: the published result names no decoder")
+            raise ReproduceError(f"{point.board} {point.entry}: the published result's decoder ({dec['name']}) is "
+                                 "not one the sampling script implements (pymatching, bposd)")
         record.update({
             "experiment": {**exp.summary(), "rounds_run": _rounds_run(exp),
                            "detectors_in_circuit": ex.stats.get("detectors"),
@@ -617,13 +615,14 @@ def _readme(point: Point, r: dict) -> str:
               "## What must match", "",
               "- **Exactly:** the replayed time, the rule verdicts, and the stim circuit (`regenerate.py` says "
               "`identical`). These are computed, not sampled.",
-              "- **Within the 95% interval:** the logical error rate. stim documents a seeded sample as the same "
-              "for one stim version on one machine architecture. With the versions in `requirements.txt` on the "
-              "same kind of machine `run.py` prints the published counts exactly (`REPRODUCED EXACTLY`). On another "
-              "machine, operating system or version the same seed draws another sample of the same distribution; "
-              "the point is then reproduced when **the published rate lies inside the 95% interval of your run, or "
-              "the two intervals overlap** (`REPRODUCED within the 95% interval`). `run.py` exits with status 1 "
-              "only when neither holds.", ""]
+              "- **Within the 95% interval:** the logical error rate. It is a sample. stim documents a seeded "
+              "sample as the same for one stim version on one machine architecture, so with the versions in "
+              "`requirements.txt` on the same kind of machine `run.py` normally prints the published counts exactly "
+              "(`REPRODUCED EXACTLY`). On another machine, operating system or version, or where the published row "
+              "was sampled from an earlier writing of the same circuit, the same seed draws another sample of the "
+              "same distribution; the point is then reproduced when **the published rate lies inside the 95% "
+              "interval of your run, or the two intervals overlap** (`REPRODUCED within the 95% interval`). "
+              "`run.py` exits with status 1 only when neither holds.", ""]
     else:
         why = (point.no_ler_reason[:1].upper() + point.no_ler_reason[1:] + "." if point.no_ler_reason else
                "This board ranks by the running time of one compiled program on its machine. No noise model is "

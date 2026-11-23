@@ -5419,6 +5419,7 @@ function sIndex(){
   let els = []; try { els = document.querySelectorAll('button, [data-hint], .pal-item, summary, select, input[placeholder], label'); } catch(e){ els = []; }
   for(const el of els){
     if(SRES && SRES.contains(el)) continue;
+    if(el.id === 'tbReproduce' && !el.getAttribute('href')) continue;   // this page has no zip: nothing to find
     const label = sTextOf(el), key = el.getAttribute('data-hint');
     let h = null; try { h = (key && window.EDITOR && EDITOR.hintFor) ? EDITOR.hintFor(key) : null; } catch(e){}
     const lab = label || (h ? h.t : '');

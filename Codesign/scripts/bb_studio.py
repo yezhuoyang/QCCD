@@ -1438,7 +1438,9 @@ def main(argv=None) -> int:
     print(f"-> {manifest}")
     print(f"-> {write_board_index(rows, out_dir)}")
     if not a.no_zips:
-        write_reproduce_zips(resolve(json.loads(manifest.read_text(encoding="utf-8"))), out_dir)
+        # the zips of the pages just built (one with --only: a ring's replay takes minutes)
+        write_reproduce_zips([r for r in resolve(json.loads(manifest.read_text(encoding="utf-8")))
+                              if not a.only or r["key"] == a.only], out_dir)
     return 0
 
 

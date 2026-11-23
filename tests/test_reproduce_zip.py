@@ -333,6 +333,10 @@ def test_the_decoder_is_named_with_its_parameters():
     said = {"decoder": "bposd", "decoder_config": {"label": "BP-OSD, as the report says it"}}
     assert R.decoder_label(said, {"bp_max_iter": 30}) == "BP-OSD, as the report says it"
     assert R.decoder_config(said, {"bp_max_iter": 30})["parameters"]["bp_max_iter"] == 30
+    # ... and when the result kept only that configuration, its decoder is read from it
+    only = {"decoder_config": {"decoder": "bposd", "label": "BP-OSD (ldpc 2.4.1: product-sum BP, 30 iterations; OSD-CS order 7)"}}
+    cfg = R.decoder_config(only, {"bp_max_iter": 30})
+    assert cfg["name"] == "bposd" and cfg["label"] == only["decoder_config"]["label"] and cfg["package"] == "ldpc"
     assert set(R.decoder_labels({"bp_max_iter": 30})) == {"pymatching", "bposd"}
     # the settings a label states are the ones the decoder is built with
     src = (ROOT / "qccd" / "qec" / "decode.py").read_text(encoding="utf-8")
@@ -411,6 +415,8 @@ def test_the_design_page_s_button_is_the_template_s_own(pages):
     assert '"reproduce":{"href":"reproduce/03_grid5x5.zip","name":"steane-03_grid5x5-reproduce.zip"}' in with_
     assert '"reproduce":{' not in without
     assert "dl.setAttribute('href', D.reproduce.href)" in with_
+    # a page without a zip does not offer the hidden link in its search either
+    assert "if(el.id === 'tbReproduce' && !el.getAttribute('href')) continue;" in without
     # the hover card: what the zip holds, in words (a page names no source file)
     from qccd.viz.render import EDITOR_JS  # noqa: F401
     hints = (ROOT / "qccd" / "viz" / "js" / "editor.js").read_text(encoding="utf-8")

@@ -5,6 +5,12 @@
    "name": "goal3-bb72-c2lr10x9-reproduce.zip",
    "reproduces": "ler",
    "zip": "bb72/c2lr10x9.zip"
+  },
+  "conveyor96_96d_j": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
+   "name": "goal3-bb72-conveyor96_96d_j-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/conveyor96_96d_j.zip"
   }
  },
  "color3": {
