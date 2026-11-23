@@ -25,7 +25,22 @@
 
    [Gateset_composites] holds everything that reduces to these two primitives -- the
    controlled and three-qubit gates, user-declared gate inlining -- together with the
-   n-qubit differential self-test that checks all of it against the defining unitaries. *)
+   n-qubit differential self-test that checks all of it against the defining unitaries.
+
+   {1 The second gate set}
+
+   That is the gate set "ms", the default.  `--gate-set rzz` selects Quantinuum's native set
+   (the H-series and Helios: arXiv:2003.01293, arXiv:2511.05465): the same one-qubit pulse
+   `R` (their U1q) and frame change `VZ`, and the entangler RZZ(θ) = exp(-i θ/2 Z⊗Z) in
+   place of MS(θ) = exp(-i θ/2 X⊗X).  Its CX is
+
+     CX = e^{iπ/4} · VZ(-π/2)⊗VZ(-π/2) · I⊗R(π/2, π) · RZZ(π/2) · I⊗R(-π/2, π/2)   [`decompose_cx`]
+
+   two one-qubit pulses, both on the target, where the MS form needs four.  The rzz forms
+   are NOT yet theorems of the Lean development, which knows MS only: each is checked
+   numerically, phase included, against its gate's defining unitary by
+   `qccdc pulses-selftest --gate-set rzz` ([Gateset_composites.check]) and, in the emitted
+   programme, by `bridge/check_cert.py`. *)
 
 type cx = Complex.t
 
@@ -40,19 +55,40 @@ let pi = 4.0 *. atan 1.0
 
 (* ------------------------------------------------------------------ pulses *)
 
-(* One entry of a compiled pulse sequence.  `Frame` carries no duration; the other two
-   are the only things that cost time on this hardware. *)
+(* The gate set the compiler lowers to: `qccdc ... --gate-set ms|rzz` (the CLI sets it once,
+   before any pass runs, as it does the rule set).  The two differ in the entangler only. *)
+type gate_set = Ms_set | Rzz_set
+
+let gate_set : gate_set ref = ref Ms_set
+let gate_set_names = [ ("ms", Ms_set); ("rzz", Rzz_set) ]
+let gate_set_name (g : gate_set) = fst (List.find (fun (_, x) -> x = g) gate_set_names)
+
+(* The entangler of the gate set in force, as a TSIR gate name, and the `meta.kind` its
+   instructions carry. *)
+let entangler () = match !gate_set with Ms_set -> "MS" | Rzz_set -> "RZZ"
+let entangler_kind () = match !gate_set with Ms_set -> "ms" | Rzz_set -> "rzz"
+
+(* What a programme (its `meta`) and its certificate (its `claims`) say of their gate set:
+   nothing in the default set, whose outputs are what they were before there was a second. *)
+let declared () =
+  match !gate_set with Ms_set -> [] | Rzz_set -> [ ("gate_set", `String "rzz") ]
+
+(* One entry of a compiled pulse sequence.  `Frame` carries no duration; the others are the
+   only things that cost time on this hardware.  A decomposition holds the entangler of the
+   gate set in force and never the other one's (`Gateset_composites.decompose_op`). *)
 type pulse =
   | Frame of { lam : float; qubit : int }             (* VZ: virtual, free *)
   | Beam of { theta : float; phi : float; qubit : int }  (* R: one physical pulse *)
-  | Ms of { theta : float; a : int; b : int }         (* the entangler *)
+  | Ms of { theta : float; a : int; b : int }         (* the entangler of "ms": exp(-iθ/2 XX) *)
+  | Rzz of { theta : float; a : int; b : int }        (* the entangler of "rzz": exp(-iθ/2 ZZ) *)
 
-let is_physical = function Frame _ -> false | Beam _ | Ms _ -> true
+let is_physical = function Frame _ -> false | Beam _ | Ms _ | Rzz _ -> true
 
 let pulse_to_string = function
   | Frame { lam; qubit } -> Printf.sprintf "VZ(%.6g)@q%d" lam qubit
   | Beam { theta; phi; qubit } -> Printf.sprintf "R(%.6g,%.6g)@q%d" theta phi qubit
   | Ms { theta; a; b } -> Printf.sprintf "MS(%.6g)@q%d,q%d" theta a b
+  | Rzz { theta; a; b } -> Printf.sprintf "RZZ(%.6g)@q%d,q%d" theta a b
 
 (* A decomposed gate: its pulses in TIME order, plus the global phase the identity
    carries.  The phase is tracked rather than dropped because a gate that later becomes
@@ -102,7 +138,7 @@ let decompose_u3 ~(qubit : int) (theta, phi, lam) : decomposed =
   }
 
 (* `cx_decomp`.  Time order is the reverse of the matrix order in the theorem. *)
-let decompose_cx ~(control : int) ~(target : int) : decomposed =
+let decompose_cx_ms ~(control : int) ~(target : int) : decomposed =
   {
     pulses =
       [
@@ -115,14 +151,36 @@ let decompose_cx ~(control : int) ~(target : int) : decomposed =
     phase = -.pi /. 4.0;
   }
 
+(* The CX of the rzz set: Quantinuum's CNOT from ZZ.  One entangler and two one-qubit
+   pulses, both on the target; the control takes a frame change only.  No CX is one
+   RZZ(±π/2) and a single one-qubit pulse, so this is the fewest physical pulses there are. *)
+let decompose_cx_rzz ~(control : int) ~(target : int) : decomposed =
+  {
+    pulses =
+      [
+        Beam { theta = -.pi /. 2.0; phi = pi /. 2.0; qubit = target };
+        Rzz { theta = pi /. 2.0; a = control; b = target };
+        Beam { theta = pi /. 2.0; phi = pi; qubit = target };
+        Frame { lam = -.pi /. 2.0; qubit = control };
+        Frame { lam = -.pi /. 2.0; qubit = target };
+      ];
+    phase = pi /. 4.0;
+  }
+
+let decompose_cx ~(control : int) ~(target : int) : decomposed =
+  match !gate_set with
+  | Ms_set -> decompose_cx_ms ~control ~target
+  | Rzz_set -> decompose_cx_rzz ~control ~target
+
 exception Unsupported of string
 
 (* ------------------------------------------------------------------ counting *)
 
 let pulse_count (d : decomposed) = List.length (List.filter is_physical d.pulses)
 
+(* the entangling pulses, of whichever gate set the decomposition is in *)
 let ms_count (d : decomposed) =
-  List.length (List.filter (function Ms _ -> true | _ -> false) d.pulses)
+  List.length (List.filter (function Ms _ | Rzz _ -> true | _ -> false) d.pulses)
 
 let beam_count (d : decomposed) = pulse_count d - ms_count d
 let frame_count (d : decomposed) = List.length d.pulses - pulse_count d

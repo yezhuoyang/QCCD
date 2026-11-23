@@ -9,7 +9,7 @@ let rejects name f =
 
 let circuit body = Circuit.build (Qasm.parse ("OPENQASM 2.0; include \"qelib1.inc\"; qreg q[3]; creg c[3]; "^body))
 let positions xs = let p=Hashtbl.create 8 in List.iter (fun (i,s)->Hashtbl.add p i s) xs;p
-let node id capacity can_gate = Arch.{id;pos=(0.,0.);kind="site";capacity;zone_type="trap";
+let node id capacity can_gate = Arch.{id;pos=(0.,0.);z=0.;kind="site";capacity;zone_type="trap";
   labels=[];degree=2;is_junction=false;can_gate;can_spam=true;can_cool=true}
 let arch =
   let nodes=Hashtbl.create 3 in
@@ -63,7 +63,7 @@ let () =
   let ps=List.map (function
     | Gateset.Frame {lam;_}->`Frame (lam,"q0")
     | Beam {theta;phi;_}->`Beam (theta,phi,"q0")
-    | Ms _->assert false) dc.pulses in
+    | Ms _ | Rzz _->assert false) dc.pulses in
   let native=[gate,"A",["q0"],ps] in
   accepts "native pulse numerical semantics" (fun ()->Stages.check_native c sited native);
   rejects "native pulse lost virtual-Z frame" (fun ()->Stages.check_native c sited [gate,"A",["q0"],List.filter (function `Frame _->false|_->true) ps]);
@@ -71,11 +71,38 @@ let () =
     "meta",`Assoc ["op",`List [`Int 0]];
     "gate",`String gate;"ions",`List [`String "q0"];"params",`List [`List (List.map (fun x->`Float x) params)]]) in
   let packed=List.mapi (fun id ->function `Frame (l,_)->instr id "VZ" [l]
-    | `Beam (t,p,_)->instr id "R" [t;p] | `Ms _->assert false) ps in
+    | `Beam (t,p,_)->instr id "R" [t;p] | `Ms _ | `Rzz _->assert false) ps in
   accepts "packing preserves ordered pulses" (fun ()->Stages.check_packing native packed);
   rejects "packing reordered a frame" (fun ()->Stages.check_packing native (List.rev packed));
   rejects "packing changed an angle" (fun ()->Stages.check_packing native
     (List.mapi (fun k (i:Tsir.instr)->if k=0 then {i with params=[[0.;0.]]} else i) packed));
   rejects "packing forged source-operation provenance" (fun ()->Stages.check_packing native
     (List.map (fun (i:Tsir.instr)->{i with meta=["op",`List [`Int 99]]}) packed));
+  (* the second gate set: a CX and a CZ lowered to RZZ, and the entangler held to its own axis *)
+  let two=circuit "cx q[0],q[1]; cz q[0],q[1];" in
+  let on name=List.find (fun (o:Circuit.op)->o.name=name) two.ops in
+  let ions=["q0";"q1"] in
+  let lower name=
+    let dc=Gateset_composites.decompose_op name [] [0;1] in
+    List.map (Stages.native_pulse_of (List.nth ions)) dc.pulses in
+  let sited2 name=[on name,Some ("A",ions)] in
+  let physical ps=List.length (List.filter (function `Frame _->false | _->true) ps) in
+  Gateset.gate_set := Gateset.Rzz_set;
+  let cx_rzz=lower "cx" and cz_rzz=lower "cz" in
+  Gateset.gate_set := Gateset.Ms_set;
+  let cx_ms=lower "cx" in
+  accepts "rzz CX numerical semantics" (fun ()->Stages.check_native two (sited2 "cx") [on "cx","A",ions,cx_rzz]);
+  accepts "rzz CZ numerical semantics" (fun ()->Stages.check_native two (sited2 "cz") [on "cz","A",ions,cz_rzz]);
+  accepts "ms CX numerical semantics" (fun ()->Stages.check_native two (sited2 "cx") [on "cx","A",ions,cx_ms]);
+  accepts "rzz CX is one RZZ and two beams, rzz CZ one RZZ and none; ms CX one MS and four beams" (fun ()->
+    Stages.require (physical cx_rzz=3 && physical cz_rzz=1 && physical cx_ms=5) "pulse counts changed";
+    Stages.require (List.exists (function `Rzz _->true | _->false) cx_rzz &&
+                    not (List.exists (function `Ms _->true | _->false) cx_rzz)) "rzz CX holds the wrong entangler");
+  rejects "an RZZ pulse read as MS is another gate" (fun ()->Stages.check_native two (sited2 "cx")
+    [on "cx","A",ions,List.map (function `Rzz (t,i,j)->`Ms (t,i,j) | p->p) cx_rzz]);
+  rejects "rzz CX with its frame changes dropped" (fun ()->Stages.check_native two (sited2 "cx")
+    [on "cx","A",ions,List.filter (function `Frame _->false | _->true) cx_rzz]);
+  accepts "rzz pulses survive their stage snapshot" (fun ()->
+    let native=[on "cx","A",ions,cx_rzz] in
+    Stages.require (Stages.native_of_json (Stages.native_json native)=native) "an RZZ pulse was not read back");
   Printf.printf "%d stage contract checks passed\n" !checks

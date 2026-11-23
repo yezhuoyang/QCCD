@@ -67,6 +67,14 @@ let usage () =
       Every rule of the set is checked on the output afterwards (qccd.ruleset); give the
       resolved file, with every rule written out.
 
+  qccdc compile|rotate|racetrack|decompose|pulses-selftest ... --gate-set ms|rzz
+      the native gate set the gates are lowered to: ms (R, VZ and the entangler MS; the
+      default) or rzz (R, VZ and RZZ: Quantinuum's native set).  A programme in rzz and its
+      certificate say so (`gate_set`); the default's outputs are unchanged.
+
+  qccdc gate-sets
+      the gate sets this binary lowers to, one a line
+
   qccdc check-stages <prefix.stages.json> --qasm <input.qasm> --arch <expanded.json> --program <prefix.tsir.json>
       independently replay the saved boundary checks without running the optimizers
 
@@ -189,9 +197,9 @@ let cmd_decompose inp =
     c.ops;
   Printf.printf "%s
 " (Qccdc.Circuit.summary c);
-  Printf.printf "  native: %d beams, %d MS gates, %d virtual-Z frame updates (free)
+  Printf.printf "  native: %d beams, %d %s gates, %d virtual-Z frame updates (free)
 "
-    !beams !ms !frames;
+    !beams !ms (Qccdc.Gateset.entangler ()) !frames;
   Printf.printf "  physical pulses: %d
 " (!beams + !ms);
   List.iter (fun m -> Printf.printf "  UNSUPPORTED: %s
@@ -200,7 +208,7 @@ let cmd_decompose inp =
 
 let cmd_selftest () =
   Printf.printf "%-28s %-12s %8s %8s
-" "gate" "max error" "beams" "MS";
+" "gate" "max error" "beams" (Qccdc.Gateset.entangler ());
   print_endline (String.make 60 '-');
   let worst = ref 0.0 in
   List.iter
@@ -281,9 +289,9 @@ let cmd_compile ?init inp arch_path out =
 " (Qccdc.Circuit.summary c) a.name
     (Qccdc.Arch.regime_name (Qccdc.Arch.regime a));
   Printf.printf
-    "  %d layers, %d transport cycles, %d beams, %d MS, %d virtual-Z, %d instructions
+    "  %d layers, %d transport cycles, %d beams, %d %s, %d virtual-Z, %d instructions
 "
-    r.stats.layers r.stats.transport_cycles r.stats.beams r.stats.ms_gates
+    r.stats.layers r.stats.transport_cycles r.stats.beams r.stats.ms_gates (Qccdc.Gateset.entangler ())
     r.stats.frames r.stats.instructions;
   List.iter (fun n -> Printf.printf "  - %s
 " n) r.notes;
@@ -502,8 +510,8 @@ let cmd_compile_split ?init inp arch_path out : int option =
     Printf.printf "%s -> %s (%s regime, split rounds)\n" (Qccdc.Circuit.summary c) a.name
       (Qccdc.Arch.regime_name (Qccdc.Arch.regime a));
     Printf.printf
-      "  %d layers, %d transport cycles, %d beams, %d MS, %d virtual-Z, %d instructions\n"
-      r.stats.layers r.stats.transport_cycles r.stats.beams r.stats.ms_gates r.stats.frames
+      "  %d layers, %d transport cycles, %d beams, %d %s, %d virtual-Z, %d instructions\n"
+      r.stats.layers r.stats.transport_cycles r.stats.beams r.stats.ms_gates (Qccdc.Gateset.entangler ()) r.stats.frames
       r.stats.instructions;
     List.iter (fun n -> Printf.printf "  - %s\n" n) r.notes;
     Printf.printf "  certificate: %d gate witnesses, self-check OK\n" (List.length r.cert.gates);
@@ -527,6 +535,22 @@ let try_split ?init inp arch_path out (k : unit -> 'a) : 'a =
 let () =
   try
   let argv = Array.to_list Sys.argv |> List.tl in
+  (* `--gate-set`: read once, before any pass runs, like `--rules`.  A name this binary does
+     not know is a usage error: compiling in another set than the one asked for would be a
+     wrong answer that looks like a right one. *)
+  (match arg_after "--gate-set" argv with
+   | Some name -> (
+     match List.assoc_opt name Qccdc.Gateset.gate_set_names with
+     | Some g -> Qccdc.Gateset.gate_set := g
+     | None ->
+       Printf.eprintf "--gate-set %s: the gate sets are %s\n" name
+         (String.concat ", " (List.map fst Qccdc.Gateset.gate_set_names));
+       exit 2)
+   | None ->
+     if List.mem "--gate-set" argv then begin
+       prerr_endline "--gate-set needs a name: ms or rzz";
+       exit 2
+     end);
   (match arg_after "--rules" argv with
    | Some path -> (
      try
@@ -652,6 +676,9 @@ let () =
 " inp m;
       exit 2)
   | "pulses-selftest" :: _ -> exit (cmd_selftest ())
+  | "gate-sets" :: _ ->
+    List.iter (fun (name, _) -> print_endline name) Qccdc.Gateset.gate_set_names;
+    exit 0
   | "parse" :: inp :: rest -> (
     try exit (cmd_parse inp (arg_after "-o" rest)) with
     | Qccdc.Qasm.Error m ->

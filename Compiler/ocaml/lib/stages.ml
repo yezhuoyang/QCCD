@@ -182,7 +182,25 @@ let placement_record ?rest a c pl =
 
 type sited = Circuit.op * (string * string list) option
 type native_pulse = [ `Frame of float * string | `Beam of float * float * string
-                    | `Ms of float * string * string ]
+                    | `Ms of float * string * string | `Rzz of float * string * string ]
+
+(* an entangling pulse of the gate set in force *)
+let entangler_pulse theta i j : native_pulse =
+  match !Gateset.gate_set with Gateset.Ms_set -> `Ms (theta,i,j) | Gateset.Rzz_set -> `Rzz (theta,i,j)
+
+(* a decomposition's pulse on named ions *)
+let native_pulse_of (name : int -> string) : Gateset.pulse -> native_pulse = function
+  | Gateset.Frame {lam;qubit} -> `Frame (lam,name qubit)
+  | Gateset.Beam {theta;phi;qubit} -> `Beam (theta,phi,name qubit)
+  | Gateset.Ms {theta;a;b} -> `Ms (theta,name a,name b)
+  | Gateset.Rzz {theta;a;b} -> `Rzz (theta,name a,name b)
+
+(* as the certificate's witnesses write it *)
+let pulse_string : native_pulse -> string = function
+  | `Beam (th,ph,i) -> Printf.sprintf "R(%.6g,%.6g)@%s" th ph i
+  | `Ms (th,x,y) -> Printf.sprintf "MS(%.6g)@%s,%s" th x y
+  | `Rzz (th,x,y) -> Printf.sprintf "RZZ(%.6g)@%s,%s" th x y
+  | `Frame (l,i) -> Printf.sprintf "VZ(%.6g)@%s" l i
 type native_op = Circuit.op * string * string list * native_pulse list
 
 let sited_json sited = `List (List.map (fun ((o : Circuit.op),site) ->
@@ -287,6 +305,7 @@ let pulse_json = function
   | `Frame (l,i) -> `Assoc ["gate",`String "VZ";"ions",strings [i];"params",`List [`Float l]]
   | `Beam (t,p,i) -> `Assoc ["gate",`String "R";"ions",strings [i];"params",`List [`Float t;`Float p]]
   | `Ms (t,i,j) -> `Assoc ["gate",`String "MS";"ions",strings [i;j];"params",`List [`Float t]]
+  | `Rzz (t,i,j) -> `Assoc ["gate",`String "RZZ";"ions",strings [i;j];"params",`List [`Float t]]
 
 let native_json (native : native_op list) = `List (List.map (fun (o,s,ions,ps) ->
   `Assoc ["operation",op_json o;"site",`String s;"ions",strings ions;
@@ -305,7 +324,8 @@ let check_native (c : Circuit.t) (sited : sited list) (native : native_op list) 
       let pulses=List.map (function
         | `Frame (lam,i) -> Gateset.Frame {lam;qubit=local i}
         | `Beam (theta,phi,i) -> Gateset.Beam {theta;phi;qubit=local i}
-        | `Ms (theta,i,j) -> Gateset.Ms {theta;a=local i;b=local j}) ps in
+        | `Ms (theta,i,j) -> Gateset.Ms {theta;a=local i;b=local j}
+        | `Rzz (theta,i,j) -> Gateset.Rzz {theta;a=local i;b=local j}) ps in
       let n=List.length ions in
       let actual=Gateset_composites.replay n Gateset.{pulses;phase=0.0} in
       let target=logical_matrix c.gates o.name o.params n in
@@ -329,11 +349,12 @@ let check_packing (native : native_op list) (instructions : Tsir.instr list) =
     List.iter (function
     | `Frame (l,i)->expect "VZ" [i] [l]
     | `Beam (t,p,i)->expect "R" [i] [t;p]
-    | `Ms (t,i,j)->expect "MS" [i;j] [t]) ps) native;
+    | `Ms (t,i,j)->expect "MS" [i;j] [t]
+    | `Rzz (t,i,j)->expect "RZZ" [i;j] [t]) ps) native;
   Hashtbl.iter (fun i os->Hashtbl.replace owners i (List.rev os)) owners;
   List.iter (fun (i : Tsir.instr) ->
     require (List.mem i.ityp ["gate";"measure";"reset"]) "packing emitted an unrelated command";
-    let groups=if i.gate=Some "MS" then List.map (fun (x,y)->[x;y]) i.pairs else List.map (fun x->[x]) i.ions in
+    let groups=if i.gate=Some "MS" || i.gate=Some "RZZ" then List.map (fun (x,y)->[x;y]) i.pairs else List.map (fun x->[x]) i.ions in
     let params=if i.ityp="gate" then i.params else List.map (fun _->[]) groups in
     require (List.length groups=List.length params) "packing parameter/operand arity mismatch";
     let flat=List.concat groups in
@@ -423,6 +444,7 @@ let native_of_json j = List.map (fun x ->
     | "VZ",[i],[l] -> `Frame (l,i)
     | "R",[i],[t;ph] -> `Beam (t,ph,i)
     | "MS",[i;j],[t] -> `Ms (t,i,j)
+    | "RZZ",[i;j],[t] -> `Rzz (t,i,j)
     | _ -> raise (Failed "invalid native pulse snapshot")) (list (field "pulses" x)) in
   op_of_json (field "operation" x),string (field "site" x),
   List.map string (list (field "ions" x)),ps) (list j)
