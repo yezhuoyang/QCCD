@@ -120,6 +120,15 @@ def decoder_config(ler: Mapping | None = None, budget: Mapping | None = None) ->
         out = {"name": "auto", "package": None, "parameters": {},
                "label": "PyMatching 2 where every error is graph-like, else BP-OSD (ldpc: product-sum BP; "
                         f"OSD-CS, order {_BPOSD['osd_order']})"}
+    if name in ("pymatching", "bposd", "beam"):
+        # one wording everywhere: the decoder module's own description of that name and budget,
+        # with the versions the result kept, where it kept any
+        from .decode import describe_decoder
+        said = describe_decoder(name, budget, versions=ler.get("tools") if isinstance(ler.get("tools"), Mapping) else None)
+        out["label"] = said["label"]
+        if name == "beam":
+            out = {"name": "beam", "label": said["label"], "package": "BeamSearchDecoder",
+                   "parameters": {k: v for k, v in said.items() if k not in ("label", "decoder")}}
     if given and given.get("label"):
         # a result that says its own decoder in words is taken at its word
         out["label"] = str(given["label"])
@@ -128,8 +137,8 @@ def decoder_config(ler: Mapping | None = None, budget: Mapping | None = None) ->
 
 
 def decoder_label(ler: Mapping | None = None, budget: Mapping | None = None) -> str:
-    """`decoder_config(...)["label"]`: "PyMatching 2 (minimum-weight perfect matching)",
-    "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)"."""
+    """`decoder_config(...)["label"]`: "Minimum-weight perfect matching (pymatching 2.4.0)",
+    "BP-OSD (ldpc 2.4.1: product-sum BP, 30 iterations; OSD-CS order 7)" (`qccd.qec.decode.describe_decoder`)."""
     return decoder_config(ler, budget)["label"]
 
 

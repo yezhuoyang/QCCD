@@ -292,7 +292,7 @@ def compiled(tmp_path_factory):
         physics, table, _ = SETUP[router]
         arch = Architecture.from_json(_device(router, physics))
         work = base / f"{router}_{circuit}_{gate_set or 'default'}"
-        work.mkdir()
+        work.mkdir(exist_ok=True)      # a skipped compile is asked for again by the next test
         qasm_path = work / "circuit.qasm"
         qasm_path.write_text(qasm, encoding="utf-8")
         kw = {} if gate_set is None else {"gate_set": gate_set}

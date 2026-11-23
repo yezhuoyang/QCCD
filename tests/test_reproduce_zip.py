@@ -104,7 +104,7 @@ def test_a_memory_point_s_zip_has_the_whole_experiment(memory_zip):
     assert spec["board"]["release"] == "surface3_mem@1" and spec["circuit"]["matches_release"] is True
     assert spec["noise"]["id"] == "qccd-noise@1" and spec["noise"]["digest"].startswith("sha256:")
     assert spec["decoder"]["name"] == "pymatching"
-    assert spec["decoder"]["label"] == "PyMatching 2 (minimum-weight perfect matching)"
+    assert spec["decoder"]["label"] == "Minimum-weight perfect matching (pymatching)"
     # the budget with every default written out: a script must not need one
     assert spec["sampling"] == {**spec["sampling"], "seed": 20260928, "max_shots": 200000, "max_errors": 200,
                                 "batch": 10000, "time_limit_s": None}
@@ -126,7 +126,7 @@ def test_a_memory_point_s_zip_has_the_whole_experiment(memory_zip):
     assert len((folder / "hardware_program.txt").read_text(encoding="utf-8").splitlines()) == spec["program"]["instructions"]
     readme = (folder / "README.md").read_text(encoding="utf-8")
     for needle in ("python run.py", "python regenerate.py", "pip install -r requirements.txt",
-                   "PyMatching 2 (minimum-weight perfect matching)", "20260928", "204 logical errors in 170,000 shots",
+                   "Minimum-weight perfect matching (pymatching)", "20260928", "204 logical errors in 170,000 shots",
                    "lies inside the 95% interval of your run, or the two intervals overlap", "**Exactly:**"):
         assert needle in readme, needle
     assert "stim==" in (folder / "requirements.txt").read_text(encoding="utf-8")
@@ -192,7 +192,7 @@ def test_run_py_counts_what_estimate_ler_counts(memory_zip, tmp_path):
     assert (got["errors"], got["shots"], got["stopped"]) == (est.errors, est.shots, est.stopped)
     for k in ("ler", "lo", "hi", "per_round", "per_round_lo", "per_round_hi"):
         assert got[k] == getattr(est, k), k
-    assert "PyMatching 2 (minimum-weight perfect matching)" in r.stdout
+    assert "Minimum-weight perfect matching (pymatching)" in r.stdout
     assert "REPRODUCED" in r.stdout and "NOT REPRODUCED" not in r.stdout
     # this point's published counts come out exactly on the machine class they were made on;
     # anywhere, they are inside the interval
@@ -223,7 +223,8 @@ def test_run_py_decodes_with_bp_osd_as_estimate_ler_does(tmp_path):
     data, info = R.build(replace(base, budget=budget, ler=est.to_json()))
     folder = _unzip(data, tmp_path / "z")
     spec = json.loads((folder / "experiment.json").read_text(encoding="utf-8"))
-    assert spec["decoder"]["label"] == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)"
+    assert spec["decoder"]["label"].startswith("BP-OSD (ldpc")
+    assert spec["decoder"]["label"].endswith(": product-sum BP, 30 iterations; OSD-CS order 7)")
     assert spec["decoder"]["parameters"] == {**spec["decoder"]["parameters"], "bp_method": "product_sum",
                                              "osd_method": "osd_cs", "osd_order": 7, "bp_max_iter": 30}
     assert "ldpc==" in (folder / "requirements.txt").read_text(encoding="utf-8")
@@ -321,13 +322,13 @@ def test_another_compile_of_the_point_is_refused():
 # ------------------------------------------------------------------ the decoder, in words
 
 def test_the_decoder_is_named_with_its_parameters():
-    assert R.decoder_label({"decoder": "pymatching"}) == "PyMatching 2 (minimum-weight perfect matching)"
+    assert R.decoder_label({"decoder": "pymatching"}) == "Minimum-weight perfect matching (pymatching)"
     assert (R.decoder_label({"decoder": "bposd"}, {"bp_max_iter": 30})
-            == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)")
+            == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)")
     assert (R.decoder_label({"decoder": "bposd"}, {"decoder": "bposd"})
-            == "BP-OSD (ldpc: product-sum BP, as many iterations as detectors, at least 100; OSD-CS, order 7)")
+            == "BP-OSD (ldpc: product-sum BP, as many iterations as detectors, at least 100; OSD-CS order 7)")
     # no result at hand: the release's budget says which decoder it asks for
-    assert R.decoder_label(None, {"decoder": "pymatching"}).startswith("PyMatching 2")
+    assert R.decoder_label(None, {"decoder": "pymatching"}).startswith("Minimum-weight perfect matching (pymatching")
     assert R.decoder_label(None, {"decoder": "bposd", "bp_max_iter": 30}).startswith("BP-OSD (ldpc: product-sum BP, 30")
     # a result that says its own decoder in words is taken at its word
     said = {"decoder": "bposd", "decoder_config": {"label": "BP-OSD, as the report says it"}}
@@ -339,9 +340,12 @@ def test_the_decoder_is_named_with_its_parameters():
     assert cfg["name"] == "bposd" and cfg["label"] == only["decoder_config"]["label"] and cfg["package"] == "ldpc"
     assert set(R.decoder_labels({"bp_max_iter": 30})) == {"pymatching", "bposd"}
     # the settings a label states are the ones the decoder is built with
+    from qccd.qec import decode
+    settings = {"bp_method": decode._BP_METHOD, "osd_method": decode._OSD_METHOD, "osd_order": decode._OSD_ORDER}
+    assert settings == {"bp_method": "product_sum", "osd_method": "osd_cs", "osd_order": 7}, settings
+    assert R._BPOSD == settings, "the decoder's BP-OSD settings changed: the zip's script and labels must follow"
     src = (ROOT / "qccd" / "qec" / "decode.py").read_text(encoding="utf-8")
-    for setting in ('bp_method="product_sum"', 'osd_method="osd_cs"', "osd_order: int = 7", "max_iter or max(nd, 100)"):
-        assert setting in src, f"qccd/qec/decode.py no longer says {setting}: the labels and run.py must follow"
+    assert "max_iter or max(self.nd, 100)" in src, "the iteration cap's rule changed: the zip's script must follow"
 
 
 def test_every_release_with_a_logical_error_rate_names_a_decoder():
@@ -353,7 +357,7 @@ def test_every_release_with_a_logical_error_rate_names_a_decoder():
             continue
         seen += 1
         label = R.decoder_label(None, q.get("ler"))
-        assert label.startswith(("PyMatching 2 (", "BP-OSD (ldpc:")), (rel.id, label)
+        assert label.startswith(("Minimum-weight perfect matching (pymatching", "BP-OSD (ldpc")), (rel.id, label)
     assert seen >= 20
 
 
@@ -453,7 +457,7 @@ def test_a_board_s_index_offers_the_zip_on_every_compiled_row(tmp_path):
     assert len(data) == 2
     for d, r in zip(data, rows):
         assert d["zip"] == f"reproduce/{r['key']}.zip" and d["zipname"] == f"surface3_mem-{r['key']}-reproduce.zip"
-        assert d["decoder"] == "PyMatching 2 (minimum-weight perfect matching)"
+        assert d["decoder"] == "Minimum-weight perfect matching (pymatching)"
     assert "z.textContent='Download and reproduce'" in page and "z.setAttribute('download', d.zipname||'')" in page
     assert "if (d.zip) btns.appendChild(zipLink(d, 'btn dl'));" in page
     assert "tb.appendChild(row('Logical error rate: decoder', d.decoder))" in page
@@ -511,31 +515,31 @@ def test_the_leaderboard_cards_and_the_noise_page_name_each_board_s_decoder():
     cards = lb.memory_section(ts) + lb.c2lr_section(ts)
     n_cards = cards.count('<div class="lb-card"')
     assert n_cards >= 6
-    assert cards.count('decoded by <a href="noise/#decoders">PyMatching 2 (minimum-weight perfect matching)</a>') == n_cards
+    assert cards.count('decoded by <a href="noise/#decoders">Minimum-weight perfect matching (pymatching)</a>') == n_cards
     assert "each with Download and reproduce" in cards
     page = lb.noise_page(build.PAGE, build.STYLE)
     assert '<h2 id="decoders">How each rate is decoded</h2>' in page
-    for label in ("PyMatching 2 (minimum-weight perfect matching)",
-                  "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
+    for label in ("Minimum-weight perfect matching (pymatching)",
+                  "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
                   # a release that sets no cap (the Steane memory's)
-                  "BP-OSD (ldpc: product-sum BP, as many iterations as detectors, at least 100; OSD-CS, order 7)"):
+                  "BP-OSD (ldpc: product-sum BP, as many iterations as detectors, at least 100; OSD-CS order 7)"):
         assert f"<td>{label}</td>" in page, label
     assert "<b>Download and reproduce</b>" in page
     # one row per board with a rate
-    assert page.count("<td>PyMatching 2") + page.count("<td>BP-OSD") == len(lb.memory_boards())
+    assert page.count("<td>Minimum-weight perfect matching") + page.count("<td>BP-OSD") == len(lb.memory_boards())
 
 
 def test_an_official_entry_s_panel_names_its_decoder():
     """Official rows carry their decoder's name; the page reads it with the release's budget."""
     from qccd.site import leaderboard
     d = leaderboard.decoders()
-    assert d["surface5xz_mem@1"]["pymatching"] == "PyMatching 2 (minimum-weight perfect matching)"
-    assert d["bb18xz_mem@1"]["bposd"] == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)"
+    assert d["surface5xz_mem@1"]["pymatching"] == "Minimum-weight perfect matching (pymatching)"
+    assert d["bb18xz_mem@1"]["bposd"] == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)"
     assert d["steanexz_mem@1"]["bposd"].startswith("BP-OSD (ldpc: product-sum BP, as many iterations as detectors")
     assert set(d["*"]) == {"pymatching", "bposd"}
     seed = (ROOT / "MemoryBoard" / "surface3_mem" / "index.html").read_text(encoding="utf-8")
     page = leaderboard.with_submissions(seed, "surface3_mem", "Surface code memory, distance 3")
-    assert "DECODERS = {" in page and '"surface3_mem@1": {"pymatching": "PyMatching 2 (minimum-weight' in page
+    assert "DECODERS = {" in page and '"surface3_mem@1": {"pymatching": "Minimum-weight perfect matching (pymatching' in page
     assert "tb.appendChild(row('decoder', decoderOf(d)))" in page
     assert "if (cfg && cfg.label) return cfg.label;" in page, "a result that says its decoder in words is taken at its word"
     assert "__DECODERS__" not in page
@@ -563,17 +567,17 @@ def test_goal_3_links_every_built_point_and_names_each_code_s_decoder():
             assert z["reproduces"] in ("ler", "time")
             linked += 1
     assert linked >= 21
-    assert by["goal3_surface3_mem"]["decoder"] == "PyMatching 2 (minimum-weight perfect matching)"
+    assert by["goal3_surface3_mem"]["decoder"] == "Minimum-weight perfect matching (pymatching)"
     for code in ("color3", "bb72", "hgp58"):
-        assert by[f"goal3_{code}_mem"]["decoder"] == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)"
+        assert by[f"goal3_{code}_mem"]["decoder"] == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)"
     page = goal3.page(build.PAGE, build.STYLE)
     assert '<details id="g3-reproduce"><summary>Every point: download and reproduce</summary>' in page
     assert 'id="g3-zips"' in page and "H('a', null, 'Download and reproduce')" in page
     assert "'Decoded by ' + c.decoder" in page, "the tooltip of a point"
     assert "'Every rate of this code is decoded by ' + c.decoder" in page, "under each family's best"
     # About this goal: which codes by which decoder
-    assert "by PyMatching 2 (minimum-weight perfect matching); " in page
-    assert "by BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)." in page
+    assert "by Minimum-weight perfect matching (pymatching); " in page
+    assert "by BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)." in page
 
 
 def test_a_goal_3_point_s_page_gets_its_button_once_its_zip_is_built():
