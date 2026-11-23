@@ -299,7 +299,7 @@ CHART_SCRIPT = r"""
   // detail opens the studio page the server drew, the bundle's files, and the command that grades
   // it again on the reader's computer.  On a board's page they join the QCCD study's designs; on a
   // goal's page (B.goal) they are the whole chart, every code's entries ranked together.
-  var B = __BOARD__, API = '/official/v1', FILES = __FILES__;
+  var B = __BOARD__, API = '/official/v1', FILES = __FILES__, DECODERS = __DECODERS__;
   if (!B || typeof fetch !== 'function' || typeof DATA === 'undefined' || typeof draw !== 'function') return;
   var FAM = 'submitted to the official leaderboard', COLOR = '#c2185b';
   // which entries: those that keep the board's rules (the default), or every one (?rules=all), each tagged
@@ -349,6 +349,14 @@ CHART_SCRIPT = r"""
              T_quantinuum: 'T_quantinuum', T_jones: 'T_jones', T_transport: 'T_transport', dacs: 'dacs',
              ions_per_instruction: 'ions_per_instruction'};
   function key(name){ return SCALE[name] ? SCALE[name][0] : name; }
+  // the decoder that produced an entry's logical error rate, with its parameters: the result's own
+  // words when it carries them, else its decoder's name read with its release's budget
+  // (DECODERS, written at build time by qccd.qec.reproduce.decoder_labels)
+  function decoderOf(d){
+    var l = d.ler || {}, cfg = l.decoder_config;
+    if (cfg && cfg.label) return cfg.label;
+    return (DECODERS[d.rel] || {})[l.decoder] || DECODERS['*'][l.decoder] || l.decoder || '';
+  }
   function E(t, c, x){ var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
   function day(t){ return t ? new Date(t * 1000).toISOString().slice(0, 10) : '-'; }
   function link(text, href, cls){ var a = E('a', cls || null, text); a.href = href; return a; }
@@ -414,7 +422,7 @@ CHART_SCRIPT = r"""
       var fam = B.goal ? code : (own ? OWNFAM : FAM);
       if (codes.indexOf(fam) < 0) { codes.push(fam); relOf[fam] = r.release; FAMHEX[fam] = B.goal ? PALETTE[(codes.length - 1) % PALETTE.length] : (own ? OWNCOLOR : COLOR); }
       DATA.push({key: 'c-' + r.id, sid: r.id, community: true, by: r.by || '', when: r.created_at, ler: r.ler || null,
-                 conf: r.conformance || null,
+                 conf: r.conformance || null, rel: r.release || B.id || '',
                  place: i + 1, title: name, short: name + ' · ' + (r.by || 'unnamed'), family: fam, compiled: true,
                  code: code, exp: r.experiment || null, numbers: n, marks: [], rules_failed: [], claim: ''});
     });
@@ -502,6 +510,7 @@ CHART_SCRIPT = r"""
           Math.floor(TARGET.ions / TARGET.logical_qubits) + ' or fewer)', d.exp.ions / d.exp.k <= TARGET.ions / TARGET.logical_qubits ? 'ok' : ''));
       }
       if (d.ler && d.ler.shots) tb.appendChild(row('sample', d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() + ' shots'));
+      if (d.ler && decoderOf(d)) tb.appendChild(row('decoder', decoderOf(d)));
       METRICS.forEach(function(m){
         if (val(d, m.k) == null || (d.exp && SIZE.indexOf(m.k) >= 0)) return;
         var tr = row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m));
@@ -525,6 +534,8 @@ CHART_SCRIPT = r"""
         if (c) { th.onclick = function(){ ysel.value = c.k; logbox.checked = !!c.log; draw(); pushState(); };
                  th.title = 'rank by this'; if (c.k === yk) th.style.color = '#0b0b0b'; }
         tr.appendChild(th); });
+      var zips = DATA.some(function(d){ return d.zip; });
+      if (zips) { var zh = E('th', null, 'files'); zh.style.cursor = 'default'; tr.appendChild(zh); }
       t.appendChild(tr);
       var rk = ranked(yk), all = rk.concat(DATA.filter(function(d){ return d.compiled && val(d, yk) == null; }),
                                            DATA.filter(function(d){ return !d.compiled; }));
@@ -534,6 +545,10 @@ CHART_SCRIPT = r"""
                     d.community ? d.by : 'the QCCD study'];
         head = head.concat(B.goal ? [d.code || '', d.exp ? String(d.exp.ions) : ''] : [d.community ? 'submitted' : d.family]);
         head.concat(cols.map(function(m){ return fmt(val(d, m.k), m); })).forEach(function(v){ r.appendChild(E('td', null, v)); });
+        if (zips) { var zc = E('td');
+          if (d.zip && typeof zipLink === 'function') { var zl = zipLink(d, 'dl'); zl.onclick = function(ev){ ev.stopPropagation(); }; zc.appendChild(zl); }
+          else zc.textContent = '–';
+          r.appendChild(zc); }
         r.onclick = function(){ select(d.key); }; t.appendChild(r);
       });
       w.appendChild(t);
@@ -553,8 +568,27 @@ CHART_SCRIPT = r"""
 _DETAIL = re.compile(r'(<div class="detail empty" id="detail">[^<]*</div>)')
 
 
+def decoders() -> dict:
+    """release id -> {decoder name: its label with every parameter} (qccd.qec.reproduce), for the
+    releases with a logical error rate; "*" is the label without a release's budget.  An
+    official row carries its decoder's name (`ler.decoder`); the budget it ran under is its
+    release's."""
+    from ..qec.reproduce import decoder_labels
+    out = {"*": decoder_labels(None)}
+    try:
+        from ..workspace.tasks import list_releases
+        for r in list_releases():
+            q = r.manifest.get("qec")
+            if q:
+                out[r.id] = decoder_labels(q.get("ler"))
+    except Exception:                       # the workspace package is optional for a site build
+        pass
+    return out
+
+
 def _with_layer(page: str, board: dict, block: str, task: str) -> str:
-    js = (CHART_SCRIPT.replace("__BOARD__", json.dumps(board)).replace("__FILES__", json.dumps(BUNDLE_FILES)))
+    js = (CHART_SCRIPT.replace("__BOARD__", json.dumps(board)).replace("__FILES__", json.dumps(BUNDLE_FILES))
+          .replace("__DECODERS__", json.dumps(decoders())))
     page, n = _DETAIL.subn(lambda m: m.group(1) + block, page, count=1)
     if not n:
         page = page.replace("</main>", block + "</main>", 1)

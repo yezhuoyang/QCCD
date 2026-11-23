@@ -505,6 +505,33 @@ def release_of(out_dir: Path) -> str | None:
     return _RELEASE_OF.get(key)
 
 
+def task_of(out_dir: Path) -> dict | None:
+    """The task whose board is written to `out_dir` (tasks/<id>/task.json, by its `seed`)."""
+    key = Path(out_dir).resolve()
+    for f in sorted((ROOT / "tasks").glob("*/task.json")):
+        t = json.loads(f.read_text(encoding="utf-8"))
+        if isinstance(t.get("seed"), str) and (ROOT / t["seed"]).resolve() == key:
+            return t
+    return None
+
+
+def write_reproduce_zips(rows: list[dict], out_dir: Path) -> dict | None:
+    """The board's "Download and reproduce" zips, beside its seed pages (`<out_dir>/reproduce/`).
+
+    The BB board's programs live in Compiler/build/, which is not in the repository, so the
+    site build cannot make their zips from a clean checkout: they are made here, where the
+    programs are, and the site build copies them (`qccd.qec.reproduce.write_board`).  A board
+    whose programs are committed (SmallCode, MemoryBoard) needs none of this."""
+    task = task_of(out_dir)
+    if task is None:
+        return None
+    done = reproduce_zip.write_board(task, rows, out_dir, log=print)
+    lost = sorted(set(done["missing"]) | set(done["failed"]))
+    print(f"-> {Path(out_dir) / reproduce_zip.FOLDER}: {done['built']} zips, {done['bytes'] / 1e6:.1f} MB"
+          + (f"; NO ZIP for {', '.join(lost)} (its program is not here)" if lost else ""))
+    return done
+
+
 def over_budget(arch, release_id: str | None) -> list[str]:
     """What the official grader refuses this device for (DEVICE.OVER_BUDGET, #15): the
     release's budget against `hardware_report` with every number the device declares about
@@ -1366,10 +1393,19 @@ def main(argv=None) -> int:
     ap.add_argument("--max-frames", type=int, default=20000)
     ap.add_argument("--index-only", action="store_true",
                     help="rewrite index.html from manifest.json without re-rendering pages")
+    ap.add_argument("--no-zips", action="store_true",
+                    help="do not write the Download-and-reproduce zips beside the pages")
+    ap.add_argument("--zips-only", action="store_true",
+                    help="write the Download-and-reproduce zips from manifest.json and nothing else")
     a = ap.parse_args(argv)
     out_dir = Path(a.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     drafts = set() if a.drafts else {e["key"] for e in CATALOG if e.get("draft")}
+    if a.zips_only:
+        rows = [r for r in resolve(json.loads((out_dir / "manifest.json").read_text(encoding="utf-8")))
+                if not a.only or r["key"] == a.only]
+        done = write_reproduce_zips(rows, out_dir)
+        return 1 if done is None or done["failed"] else 0
     if a.index_only:
         rows = [r for r in resolve(json.loads((out_dir / "manifest.json").read_text(encoding="utf-8")))
                 if r["key"] not in drafts]
@@ -1401,6 +1437,8 @@ def main(argv=None) -> int:
     manifest.write_text(json.dumps(to_repo(rows), indent=1, default=str), encoding="utf-8")
     print(f"-> {manifest}")
     print(f"-> {write_board_index(rows, out_dir)}")
+    if not a.no_zips:
+        write_reproduce_zips(resolve(json.loads(manifest.read_text(encoding="utf-8"))), out_dir)
     return 0
 
 

@@ -175,6 +175,7 @@ class Point:
     url: str = ""                           # the board's page on the site
     numbers: Mapping = field(default_factory=dict)   # other published numbers, as the board shows them
     note: str = ""                          # one more sentence for the README
+    no_ler_reason: str = ""                 # why a point of a board with rates has none (it broke a rule)
 
     @property
     def name(self) -> str:
@@ -261,6 +262,20 @@ def source_commit() -> str | None:
         return None
     out = r.stdout.strip()
     return out if r.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", out) else None
+
+
+@functools.lru_cache(maxsize=1)
+def source_dirty() -> bool:
+    """Whether the package the zips are built by differs from `source_commit()`: uncommitted
+    changes under `qccd/`.  A zip then says so, since the commit it names is not quite its code."""
+    if (os.environ.get("QCCD_COMMIT") or "").strip():
+        return False
+    try:
+        r = subprocess.run(["git", "-C", str(REPO), "status", "--porcelain", "--untracked-files=no", "--", "qccd"],
+                           capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0 and bool(r.stdout.strip())
 
 
 # ------------------------------------------------------------------ what regenerate.py calls
@@ -439,7 +454,7 @@ def build(point: Point) -> tuple[bytes, dict]:
         })
     else:
         record["experiment"] = None
-        record["why_no_noise_experiment"] = (
+        record["why_no_noise_experiment"] = point.no_ler_reason or (
             "this board ranks by the running time of one compiled program on its machine; no noise model is "
             "applied and nothing is decoded, so there is no stim circuit: replaying the hardware program is "
             "the whole reproduction")
@@ -460,7 +475,8 @@ def build(point: Point) -> tuple[bytes, dict]:
     record["circuit"]["qubits"] = (exp.n_data + exp.n_ancilla) if exp is not None else None
     record["program"] = {"instructions": len(prog.instructions),
                          "provenance_paths_removed": bool(scrubbed)}
-    record["built"] = {"repository": REPO_URL, "commit": source_commit(), "builder": "qccd/qec/reproduce.py"}
+    record["built"] = {"repository": REPO_URL, "commit": source_commit(), "builder": "qccd/qec/reproduce.py",
+                       **({"uncommitted_changes": True} if source_dirty() else {})}
     tools = {**TESTED, **{k: v for k, v in (point.tools or {}).items() if v and k in TESTED}}
     record["requirements"] = tools
 
@@ -525,7 +541,7 @@ def _requirements(record: dict) -> str:
 
 
 def _fmt(x) -> str:
-    return "-" if x is None else (f"{x:.4g}" if isinstance(x, float) else str(x))
+    return "-" if x is None else (f"{x:.7g}" if isinstance(x, float) else str(x))
 
 
 def _readme(point: Point, r: dict) -> str:
@@ -609,10 +625,12 @@ def _readme(point: Point, r: dict) -> str:
               "the two intervals overlap** (`REPRODUCED within the 95% interval`). `run.py` exits with status 1 "
               "only when neither holds.", ""]
     else:
+        why = (point.no_ler_reason[:1].upper() + point.no_ler_reason[1:] + "." if point.no_ler_reason else
+               "This board ranks by the running time of one compiled program on its machine. No noise model is "
+               "applied and nothing is decoded, so there is no stim circuit and no sampling script: replaying the "
+               "hardware program on the machine is the whole reproduction.")
         L += ["## Reproduce the time", "",
-              "This board ranks by the running time of one compiled program on its machine. No noise model is "
-              "applied and nothing is decoded, so there is no stim circuit and no sampling script: replaying the "
-              "hardware program on the machine is the whole reproduction. `regenerate.py` uses the QCCD package "
+              why + " `regenerate.py` uses the QCCD package "
               "(standard-library Python), from the public repository at the commit this zip was built from.", "",
               "```", "pip install -r requirements.txt", "python regenerate.py", "```", "",
               "## What must match", "",
@@ -641,7 +659,9 @@ def _readme(point: Point, r: dict) -> str:
     L += ["| `regenerate.py` | replays the program" + (" and rebuilds `circuit.stim`" if ler is not None else "")
           + " with the QCCD package |",
           "| `requirements.txt` | the tested versions |", "",
-          f"Source: {REPO_URL} at commit `{commit}`. The zip is built by `qccd/qec/reproduce.py`"
+          f"Source: {REPO_URL} at commit `{commit}`"
+          + (" (built from a working tree with changes not yet committed)" if b.get("uncommitted_changes") else "")
+          + ". The zip is built by `qccd/qec/reproduce.py`"
           + ("; the sampling procedure `run.py` implements is `qccd/qec/decode.py::estimate_ler`." if ler is not None
              else "; the replay is `qccd/verify`'s."), ""]
     return "\n".join(L)

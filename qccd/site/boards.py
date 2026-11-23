@@ -181,6 +181,13 @@ def architecture_intro() -> str:
         '<a href="noise/">The noise model</a></nav>')
 
 
+def _decoded_by(q: dict) -> str:
+    """A memory board's decoder with its parameters (`qccd.qec.reproduce.decoder_label`), linked
+    to where the noise page says how every board is decoded."""
+    from ..qec.reproduce import decoder_label
+    return f'decoded by <a href="noise/#decoders">{_e(decoder_label(None, q.get("ler")))}</a>'
+
+
 def _ler_bars(t: dict) -> str:
     """One memory board's ranking, as the time boards show theirs: the three designs with the
     lowest logical error rate per round, each bar a link to its page (the ion animation and
@@ -208,7 +215,7 @@ def _ler_bars(t: dict) -> str:
     refused = sum(1 for r in t.get("rows", []) if r.get("status") != "ok" or r.get("refusal"))
     return (f'<div class="lb-rank"><p class="lb-rkh">The study&rsquo;s designs, with 95% intervals{note}</p>{"".join(bars)}'
             f'<p class="lb-more"><a href="{_e(t["id"])}/">All {len(rows)} ranked'
-            f'{f", {refused} refused" if refused else ""} &rarr;</a></p></div>')
+            f'{f", {refused} refused" if refused else ""}, each with Download and reproduce &rarr;</a></p></div>')
 
 
 def memory_section(ts: list | None = None) -> str:
@@ -230,7 +237,7 @@ def memory_section(ts: list | None = None) -> str:
             + (' <a class="lb-goaltag" href="goal1/">Goal 1</a>' if goal else "") + '</h3>'
             f'<p class="lb-meta">logical error rate per round, lower is better &middot; '
             f'<a href="noise/#{dict(NOISE_MODELS).get(q["noise"], "")}">{_e(q["noise"])}</a> &middot; up to '
-            f'{int(q["ler"].get("max_shots", 0)):,} shots</p>'
+            f'{int(q["ler"].get("max_shots", 0)):,} shots &middot; {_decoded_by(q)}</p>'
             + (_ler_bars(built[b.id]) if b.id in built else "")
             + _board_block(b.manifest["task"], b.title) + '</div>')
     how = "" if not noise else '<p class="lb-note"><a href="noise/">How the number is made &rarr;</a></p>'
@@ -256,7 +263,7 @@ def c2lr_section(ts: list | None = None) -> str:
             f'<p class="lb-meta">logical error rate per round, lower is better &middot; '
             f'<a href="noise/#{dict(NOISE_MODELS).get(q["noise"], "")}">{_e(q["noise"])}</a> &middot; '
             f'<a href="../rules/#set-{_e(rules)}">rule set {_e(rules)}</a> &middot; up to '
-            f'{int(q["ler"].get("max_shots", 0)):,} shots</p>'
+            f'{int(q["ler"].get("max_shots", 0)):,} shots &middot; {_decoded_by(q)}</p>'
             + (_ler_bars(built[b.id]) if b.id in built else "")
             + _board_block(b.manifest["task"], b.title) + '</div>')
     return ('<h2 id="c2lr">C2LR boards: swap-or-stay lattices</h2>'
@@ -484,6 +491,7 @@ def noise_page(PAGE: str, STYLE: str) -> str:
                     "pitch, 375 µm. A design entered on a board with this physics takes it unless it set its own.</p>"
                     '<div style="overflow-x:auto"><table class="lb-t"><thead><tr><th>primitive</th><th>value</th>'
                     f'<th>source</th><th>note</th></tr></thead><tbody>{prow}</tbody></table></div>')
+    body += _decoders_section()
     body += [
         '<h2 id="check">What counts as running the experiment</h2>',
         "<p>Before any sampling, the noiseless circuit is checked. Every detector and observable must be "
@@ -499,6 +507,45 @@ def noise_page(PAGE: str, STYLE: str) -> str:
         "charged.</p>",
     ]
     return PAGE.format(title="Noise models - QCCD studio", style=STYLE, extra_css=CSS, body="\n".join(body))
+
+
+def _decoders_section() -> list:
+    """The noise page's account of the decoders: one row per board with a logical error rate,
+    its decoder with every parameter and its sampling budget, read from the board's release."""
+    from ..qec.reproduce import decoder_config
+    rows = []
+    for b in memory_boards():
+        q = b.manifest["qec"]
+        bud = q.get("ler") or {}
+        d = decoder_config(None, bud)
+        where = ("goal3/#" + b.manifest["task"] if _goal3(b) else
+                 "goal1/?code=" + b.id if _goal1(b) else "#" + b.manifest["task"])
+        rows.append(f'<tr><td><a href="../{_e(where)}">{_e(b.title)}</a></td><td>{_e(d["label"])}</td>'
+                    f'<td class="n">{int(bud.get("max_shots", 0)):,}</td><td class="n">{int(bud.get("max_errors", 0))}</td>'
+                    f'<td class="n">{int(bud.get("batch", 10000)):,}</td><td class="n">{_e(bud.get("seed", ""))}</td></tr>')
+    if not rows:
+        return []
+    return [
+        '<h2 id="decoders">How each rate is decoded</h2>',
+        "<p>A logical error rate is a count: the noisy stim circuit is sampled with a fixed seed, in batches, until "
+        "the board's number of logical errors has been seen or its shots are spent; each shot's syndrome is decoded, "
+        "and the shot is an error when any logical observable is predicted wrong. Every board fixes its decoder "
+        "and its parameters. <b>PyMatching 2</b> is minimum-weight perfect matching on stim's detector error model "
+        "with every error decomposed into graph edges: the surface and repetition codes. <b>BP-OSD</b> is the "
+        "ldpc package's decoder on the error model's check matrix: product-sum belief propagation, capped at the "
+        "iterations shown (as many as there are detectors, at least 100, where none is shown), then "
+        "combination-sweep ordered-statistics decoding of order 7: the colour, bivariate-bicycle and "
+        "hypergraph-product codes. The interval beside every rate is Wilson's 95% interval. The sweep of Goal 3 "
+        "draws some sizes in smaller batches; each point's own files say which.</p>",
+        '<div style="overflow-x:auto"><table class="lb-t"><thead><tr><th>board</th><th>decoder</th><th>shots, at most</th>'
+        '<th>stops at errors</th><th>batch</th><th>seed</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table></div>",
+        "<p>Every data point has a <b>Download and reproduce</b> button, on its row and on its page: one zip file "
+        "with the input circuit, the machine, the hardware program, the noisy stim circuit and two Python scripts. "
+        "The first samples and decodes the stim circuit with nothing but stim, numpy and the decoder; the second "
+        "rebuilds the stim circuit from the hardware program. The times and the stim circuit come out exactly; a "
+        "sampled rate comes out exactly with the same versions on the same kind of computer, and otherwise within "
+        "its 95% interval.</p>",
+    ]
 
 
 # ---------------------------------------------------------------------- declarations for the seed pages
