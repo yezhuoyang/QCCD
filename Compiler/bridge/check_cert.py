@@ -23,7 +23,8 @@ circuit.  `check_binding` checks it against the QASM op by op, together with the
 count and the qubit->ion map, and a disagreement fails R10.
 
 **O2/O3 -- semantics.**  The compiled program's meaning is recovered *from the emitted
-hardware program itself*: the native pulses (`R`, `VZ`, `MS`) are read out of the TSIR,
+hardware program itself*: the native pulses (`R`, `VZ`, and the entangling pulse of the
+program's gate set: `MS`, or `RZZ`) are read out of the TSIR,
 composed over the logical qubits through the certificate's qubit->ion map, and compared
 with the SOURCE circuit as parsed from the QASM (`load_source`) -- never with
 `circuit_ops`, which is the compiler's account of what it compiled.  For a Clifford
@@ -63,11 +64,21 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from qccd.arch import Architecture  # noqa: E402
+from qccd.ir.gate_sets import ALL_NATIVE, ENTANGLERS  # noqa: E402
 from qccd.ir.tsir import TSIR  # noqa: E402
 
 PI = math.pi
-#: the pulses the hardware executes, and so the only gates the semantic half can compose
-NATIVE = ("R", "VZ", "MS")
+#: the pulses the hardware executes, and so the only gates the semantic half can compose: the
+#: one-qubit pulse, the frame change, and the entangling pulse of either gate set
+#: (`qccd.ir.gate_sets`: `MS` of "ms", `RZZ` of "rzz")
+NATIVE = ALL_NATIVE
+#: the entangling pulses among them: two ions each, one angle
+ENTANGLING = ENTANGLERS
+#: a layer with no pulse (WISE's shim charge, `qccd.compile.wise_router._Build.settle`): the
+#: identity on the ion it names, so it adds nothing to either semantic route.  Reading it as the
+#: identity hides nothing: a real gate written as `I` leaves the tableau, or the unitary, short
+#: of that gate.
+NO_PULSE = "I"
 #: what both semantic routes skip: readout, re-preparation and fences are not unitaries
 NON_UNITARY = ("measure", "reset", "barrier")
 
@@ -428,7 +439,7 @@ def is_right_angle(x: float, eps: float = 1e-9) -> bool:
 
 
 #: the parameters a pulse carries when the program writes none
-_NO_PARAMS = {"R": (0.0, 0.0), "VZ": (0.0,), "MS": (0.0,)}
+_NO_PARAMS = {"R": (0.0, 0.0), "VZ": (0.0,), "MS": (0.0,), "RZZ": (0.0,)}
 
 
 def program_steps(prog: TSIR, qubit_of: dict[str, int]):
@@ -450,9 +461,11 @@ def program_steps(prog: TSIR, qubit_of: dict[str, int]):
             continue
         if instr.type != "gate":
             continue
+        if instr.gate == NO_PULSE:
+            continue
         if instr.gate not in NATIVE:
             raise NotImplementedError(f"gate {instr.gate!r} is not a native pulse {NATIVE}")
-        width = 2 if instr.gate == "MS" else 1
+        width = 2 if instr.gate in ENTANGLING else 1
         params = list(instr.params)
         for k, operand in enumerate(iter_operands(instr)):
             if len(operand) != width:
@@ -500,8 +513,8 @@ def tableau_from_program(prog: TSIR, cert: dict, n: int, anc: dict | None = None
         else:
             (th,) = p
             if not is_right_angle(th):
-                raise NotImplementedError(f"non-Clifford MS({th})")
-            _emit_ms(circ, qs[0], qs[1], th)
+                raise NotImplementedError(f"non-Clifford {gate}({th})")
+            (_emit_rzz if gate == "RZZ" else _emit_ms)(circ, qs[0], qs[1], th)
     return stim.Tableau.from_circuit(circ)
 
 
@@ -556,6 +569,18 @@ def _emit_ms(circ, a: int, b: int, theta: float) -> None:
     circ.append("SQRT_XX" if k == 1 else "SQRT_XX_DAG", [a, b])
 
 
+def _emit_rzz(circ, a: int, b: int, theta: float) -> None:
+    """RZZ(theta) = exp(-i theta/2 Z⊗Z), for theta a multiple of pi/2."""
+    k = round(theta / (PI / 2)) % 4
+    if k == 0:
+        return
+    if k == 2:
+        circ.append("Z", [a])
+        circ.append("Z", [b])
+        return
+    circ.append("SQRT_ZZ" if k == 1 else "SQRT_ZZ_DAG", [a, b])
+
+
 def program_unitary(prog: TSIR, cert: dict, n: int, anc: dict | None = None):
     """Compose the EMITTED pulses into the exact unitary over the logical qubits, through
     the same reading of the program and the same qubit->ion map as `tableau_from_program`;
@@ -581,7 +606,7 @@ def program_unitary(prog: TSIR, cert: dict, n: int, anc: dict | None = None):
         elif gate == "VZ":
             M = U.apply_gate(M, U.vz(*p), list(qs), width)
         else:
-            M = U.apply_gate(M, U.ms(*p), list(qs), width)
+            M = U.apply_gate(M, U.ENTANGLING[gate](*p), list(qs), width)
     return M
 
 

@@ -36,8 +36,9 @@ from __future__ import annotations
 
 from typing import Mapping, Sequence
 
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, ENTANGLERS, KIND, resolve as resolve_gate_set
 from ..ir.tsir import TSIR, Instruction, Participant
-from .c2lr_router import GATES_2Q, U3, SourceOp, _parse, layers, pulses
+from .c2lr_router import GATES_2Q, U3, SourceOp, _parse, layers, pulse_claims, pulses
 
 __all__ = ["compile_tiled", "device", "TiledError", "COMPILER_NAME"]
 
@@ -97,9 +98,10 @@ def _route(i: int, j: int, r: int, c: int) -> tuple[str, ...]:
 
 
 class _Build:
-    def __init__(self, prog: TSIR, pos: dict):
+    def __init__(self, prog: TSIR, pos: dict, gate_set: str = DEFAULT_GATE_SET):
         self.prog = prog
         self.pos = pos
+        self.gate_set = gate_set
         self.moves: list = []
         self.gates: list = []
         self.cycle: dict = {}
@@ -119,22 +121,25 @@ class _Build:
     def play(self, ops: Sequence[SourceOp], ion: Mapping[int, str]) -> None:
         """The ops' pulses, slot by slot, one instruction per gate kind (as the C2LR router
         plays them); each op's witness names its last pulse."""
-        seqs = {op.i: pulses(op, ion) for op in ops}
+        seqs = {op.i: pulses(op, ion, self.gate_set) for op in ops}
         last: dict = {}
+        order = ("R", "VZ") + ENTANGLERS
         for k in range(max((len(s) for s in seqs.values()), default=0)):
             by_gate: dict = {}
             for op in ops:
                 if k < len(seqs[op.i]):
                     by_gate.setdefault(seqs[op.i][k][0], []).append((op, seqs[op.i][k]))
-            for gate in ("R", "VZ", "MS"):
+            if set(by_gate) - set(order):
+                raise TiledError(f"the lowering gave the pulses {sorted(set(by_gate) - set(order))}, "
+                                 f"which are not native ({', '.join(order)})")
+            for gate in order:
                 group = by_gate.get(gate)
                 if not group:
                     continue
-                kind = {"R": "beam", "VZ": "virtual_z", "MS": "ms"}[gate]
-                meta = {"kind": kind, "op": [op.i for op, _ in group]}
+                meta = {"kind": KIND[gate], "op": [op.i for op, _ in group]}
                 params = tuple(tuple(float(x) for x in p) for _, (_, _, p) in group)
-                if gate == "MS":
-                    ins = self.emit(type="gate", gate="MS", mode="intra", params=params,
+                if gate in ENTANGLERS:
+                    ins = self.emit(type="gate", gate=gate, mode="intra", params=params,
                                     pairs=tuple(tuple(o) for _, (_, o, _) in group), meta=meta)
                 else:
                     ins = self.emit(type="gate", gate=gate, mode="intra", arity=1, params=params,
@@ -163,7 +168,8 @@ def _face(touched: set, basis: str | None) -> tuple[int, int] | None:
 
 
 def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: str = "circuit",
-                  arch=None, coords=None, faces=None, resting=()) -> tuple:
+                  arch=None, coords=None, faces=None, resting=(),
+                  gate_set: str = DEFAULT_GATE_SET) -> tuple:
     """`(program, certificate, architecture)` for a circuit of surface-code checks on a lattice of
     rows x cols data points -- uncooled.  The data qubits come first: by default q0 ..
     q[rows*cols - 1] row-major, a rotated surface patch (`qccd.gadget.surface.patch`; cols =
@@ -177,7 +183,9 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
     needed when a face's checkerboard is the other one, after a transversal H, or its ion also
     carries data states, as H̄'s does).  Any set of faces plays: a face's junctions are its own,
     whichever others are there.  `resting`: traps that hold an ion the circuit does not name, there from start to end (what the rest
-    of the machine leaves on this program's device)."""
+    of the machine leaves on this program's device).  `gate_set`: the native gate set the gates are
+    lowered to (`qccd.ir.gate_sets`: "ms", the default, or "rzz")."""
+    gate_set = resolve_gate_set(gate_set)
     cols = cols or rows
     arch = arch or device(rows, cols)
     n, ops, _ = _parse(qasm_text)
@@ -225,7 +233,9 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
     held.update({f"rest{k}": t for k, t in enumerate(resting)})
     if len(set(held.values())) != len(held):
         raise TiledError("an ion at rest on a trap another ion holds")
-    b = _Build(prog, dict(held))
+    if gate_set != DEFAULT_GATE_SET:
+        prog.meta["gate_set"] = gate_set
+    b = _Build(prog, dict(held), gate_set)
     b.emit(type="init", placement=dict(held), quanta={i: 0.0 for i in held},
            meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     b.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -264,10 +274,7 @@ def compile_tiled(qasm_text: str, rows: int, cols: int | None = None, *, name: s
         "circuit_ops": [o.to_json() for o in ops],
         "map": {str(q): ion[q] for q in range(n)}, "init": dict(place),
         "moves": b.moves, "gates": b.gates, "rotations": [], "unrealised": [],
-        "claims": {"cycles": len(prog.instructions),
-                   "beams": sum(len(i.ions) for i in prog.instructions if i.gate == "R"),
-                   "ms_gates": sum(len(i.pairs) for i in prog.instructions if i.gate == "MS"),
-                   "frames": sum(len(i.ions) for i in prog.instructions if i.gate == "VZ")},
+        "claims": pulse_claims(prog, gate_set),
         "compiler": COMPILER_NAME,
     }
     return prog, cert, arch

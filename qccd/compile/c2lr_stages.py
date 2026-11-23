@@ -48,6 +48,7 @@ from typing import Any, Mapping, Sequence
 
 from ..arch import Architecture
 from ..arch.c2lr import geometry, is_c2lr
+from ..ir.gate_sets import ENTANGLERS
 from ..ir.tsir import TSIR, Instruction, validate_program
 
 ENGINE = "c2lr-router"
@@ -347,8 +348,8 @@ def check_manifest(doc: Mapping, *, circuit_path, arch_path, expanded_arch_path,
                                 m = u.r_pulse(*par)
                             elif g == "VZ" and len(on) == 1 and len(par) == 1:
                                 m = u.vz(par[0])
-                            elif g == "MS" and len(on) == 2 and len(par) == 1:
-                                m = u.ms(par[0])
+                            elif g in u.ENTANGLING and len(on) == 2 and len(par) == 1:
+                                m = u.ENTANGLING[g](par[0])
                             else:
                                 raise Failed(f"op {o['i']}: an invalid native pulse {g}")
                             U = u.apply_gate(U, m, [local[x] for x in on], len(ions))
@@ -438,7 +439,7 @@ def _check_packing(native: Sequence[Mapping], cmds: Sequence[Instruction]) -> No
     consumed: dict[str, int] = {}
     for ins in cmds:
         _require(ins.type in ("gate", "measure", "reset"), "packing emitted an unrelated command")
-        groups = [list(p) for p in ins.pairs] if ins.gate == "MS" else [[i] for i in ins.ions]
+        groups = [list(p) for p in ins.pairs] if ins.gate in ENTANGLERS else [[i] for i in ins.ions]
         params = [tuple(float(x) for x in p) for p in ins.params] if ins.type == "gate" else [()] * len(groups)
         _require(len(groups) == len(params), "packing parameter/operand arity mismatch")
         flat = [i for g in groups for i in g]

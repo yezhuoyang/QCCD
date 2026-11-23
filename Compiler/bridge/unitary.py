@@ -8,9 +8,9 @@ unitary, and compare them entry by entry, up to one global phase.
 
 Two things make it honest:
 
-* The program's unitary is built from the **emitted TSIR** -- `R`, `VZ` and `MS`
-  instructions with their parameters -- through the certificate's qubit→ion map. Nothing
-  the compiler asserts about its own output is consulted.
+* The program's unitary is built from the **emitted TSIR** -- `R`, `VZ` and the entangling
+  pulse of its gate set (`MS`, or `RZZ`) with their parameters -- through the certificate's
+  qubit→ion map. Nothing the compiler asserts about its own output is consulted.
 * Both sides are built here, in one convention (qubit 0 is the most significant bit,
   matching `QCCDC.kron` in Lean). Comparing against qiskit's `Operator` instead would
   invite an endianness mismatch to masquerade as a compiler bug, or vice versa.
@@ -56,6 +56,15 @@ def vz(lam: float) -> np.ndarray:
 
 def ms(theta: float) -> np.ndarray:
     return np.cos(theta / 2) * np.eye(4) - 1j * np.sin(theta / 2) * np.kron(X, X)
+
+
+def rzz(theta: float) -> np.ndarray:
+    """RZZ(theta) = exp(-i theta/2 Z(x)Z): the entangling pulse of the `rzz` gate set."""
+    return np.cos(theta / 2) * np.eye(4) - 1j * np.sin(theta / 2) * np.kron(Z, Z)
+
+
+#: the entangling pulses a program may hold (`qccd.ir.gate_sets.ENTANGLERS`), by TSIR gate name
+ENTANGLING = {"MS": ms, "RZZ": rzz}
 
 
 SWAP = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], dtype=complex)
@@ -157,7 +166,9 @@ def circuit_unitary(ops: list[dict], n: int) -> np.ndarray:
 
 
 def program_unitary(instrs, qubit_of: dict[str, int], n: int) -> np.ndarray:
-    """The unitary the EMITTED pulses actually realise."""
+    """The unitary the EMITTED pulses actually realise.  A gate that is not a native pulse is
+    refused by name: a pulse skipped here would be a program compared with that pulse taken
+    out."""
     U = np.eye(1 << n, dtype=complex)
     for instr in instrs:
         if instr.type != "gate":
@@ -171,10 +182,13 @@ def program_unitary(instrs, qubit_of: dict[str, int], n: int) -> np.ndarray:
             for k, ion in enumerate(instr.ions):
                 (lam,) = params[k] if k < len(params) else (0.0,)
                 U = apply_gate(U, vz(lam), [qubit_of[ion]], n)
-        elif instr.gate == "MS":
+        elif instr.gate in ENTANGLING:
             for k, (a, b) in enumerate(instr.pairs):
                 (th,) = params[k] if k < len(params) else (0.0,)
-                U = apply_gate(U, ms(th), [qubit_of[a], qubit_of[b]], n)
+                U = apply_gate(U, ENTANGLING[instr.gate](th), [qubit_of[a], qubit_of[b]], n)
+        else:
+            raise NotImplementedError(f"gate {instr.gate!r} is not a native pulse "
+                                      f"(R, VZ, {', '.join(ENTANGLING)})")
     return U
 
 

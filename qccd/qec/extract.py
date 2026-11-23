@@ -127,6 +127,16 @@ def resolve_qubit_map(prog, qubit_map=None, cert: Mapping | None = None,
 # ------------------------------------------------------------------ why each line is there
 
 
+def _entangler(op) -> str:
+    """What a two-ion gate is called in its `why` line: its own name when it is another gate set's
+    entangling pulse (`RZZ`), else "MS" -- the name the noise panels have always printed for the
+    machine's two-ion gate, an authored `CX` included."""
+    from .native import ENTANGLING
+
+    gate = str(getattr(op, "gate", "") or "")
+    return gate if gate in ENTANGLING else "MS"
+
+
 def _explainer(nm: NoiseModel):
     """The `why` line for one written channel, in the words the Noise panels have always used."""
     rate = getattr(nm, "memory_rate_per_s", None)
@@ -141,7 +151,7 @@ def _explainer(nm: NoiseModel):
             a, b = g.ions[0], g.ions[1]
             nbar = max(float(g.step.nbar0.get(a, 0.0)), float(g.step.nbar0.get(b, 0.0)))
             chain = int(g.step.occ0.get(g.site, 2) or 2)
-            return f"MS {a},{b}: n-bar {nbar:.3g}, chain of {chain} -> p = {p:.3g}"
+            return f"{_entangler(g)} {a},{b}: n-bar {nbar:.3g}, chain of {chain} -> p = {p:.3g}"
         if name == "gate_1q":
             return f"one-qubit gate: p = {p:.3g} each" + (" (3r/2 computational channel)" if helios_text else " (1 - fidelity)")
         if name in ("readout_z", "readout_x"):

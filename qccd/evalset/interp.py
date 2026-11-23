@@ -465,16 +465,16 @@ def _label(v) -> str:
 
 def _translate(c, op: Op, sq: dict[str, int]) -> None:
     """`TRANSLATION`: one operation as stabilizer operations on its ions' qubits."""
-    from ..qec.native import emit_abstract, emit_ms, emit_r, emit_vz, canonical_abstract
+    from ..qec.native import ENTANGLING, emit_abstract, emit_r, emit_vz, canonical_abstract
 
     if op.kind == "prepare":
         c.append("R", sorted(sq[i] for i in op.ions))
     elif op.kind == "gate2":
         a, b = (sq[i] for i in op.ions)
-        if op.gate == "MS":
+        if op.gate in ENTANGLING:
             if not op.params:
-                raise EvalError(f"{op.label()}: MS carries no angle")
-            emit_ms(c, a, b, op.params[0])
+                raise EvalError(f"{op.label()}: {op.gate} carries no angle")
+            ENTANGLING[op.gate](c, a, b, op.params[0])
         else:
             emit_abstract(c, canonical_abstract(op.gate), [a, b])
     elif op.kind == "gate1":
@@ -501,6 +501,8 @@ TRANSLATION = (
     ("the preparation", "R on every qubit", "every ion starts in |0⟩"),
     ("gate MS(θ) on a, b", "SQRT_XX a b for θ = π/2, SQRT_XX_DAG for −π/2, X a and X b for π, "
      "nothing for 0", "MS(θ) = exp(−iθ/2 X⊗X)"),
+    ("gate RZZ(θ) on a, b", "SQRT_ZZ a b for θ = π/2, SQRT_ZZ_DAG for −π/2, Z a and Z b for π, "
+     "nothing for 0", "RZZ(θ) = exp(−iθ/2 Z⊗Z), the entangling pulse of the rzz gate set"),
     ("gate R(θ, φ) on a", "by quarter turns of θ about the axis φ: X or Y for a half turn, "
      "SQRT_X / SQRT_X_DAG / SQRT_Y / SQRT_Y_DAG for a quarter, nothing for none",
      "R(θ, φ) = exp(−iθ/2 (cos φ X + sin φ Y))"),

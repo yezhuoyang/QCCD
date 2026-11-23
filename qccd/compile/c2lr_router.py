@@ -40,6 +40,11 @@ programme; a gate's witness names its op's last pulse.
 Pulses are qccdc's (`Compiler/ocaml/lib/gateset.ml`): a one-qubit gate is its u3 triple as
 one beam and one frame change (`QCCDC.u3_decomp`), a CX is R, MS, R, R, R (`QCCDC.cx_decomp`),
 a CZ is a CX between two Hadamards on its target.  Anything else is refused by name.
+
+That is the default gate set, "ms".  With `gate_set="rzz"` (`qccd.ir.gate_sets`: Quantinuum's
+native set) the entangling pulse is RZZ(theta) = exp(-i theta/2 Z(x)Z) and a two-qubit gate goes
+straight to it: a CX is R, RZZ, R on its target and two frame changes, a CZ one RZZ and two frame
+changes (`pulses`).
 """
 
 from __future__ import annotations
@@ -57,10 +62,13 @@ from typing import Mapping, Sequence
 
 from ..arch import Architecture
 from ..arch.c2lr import DIAGONALS, NotC2LR, Variation, declared, geometry, is_c2lr
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, ENTANGLER, ENTANGLERS, GATE_SETS, KIND
+from ..ir.gate_sets import resolve as resolve_gate_set
 from ..ir.tsir import TSIR, Instruction, swap_or_stay
 
-__all__ = ["Refused", "RouteError", "SourceOp", "parse_qasm", "compile_c2lr", "compile_with_router",
-           "compile_with_stages", "write_stages", "COMPILER_NAME", "STAGE_ENGINE", "main"]
+__all__ = ["Refused", "RouteError", "SourceOp", "parse_qasm", "pulses", "pulse_claims", "compile_c2lr",
+           "compile_with_router", "compile_with_stages", "write_stages", "COMPILER_NAME", "STAGE_ENGINE",
+           "main"]
 
 COMPILER_NAME = "c2lr-router (baseline)"
 PI = math.pi
@@ -183,8 +191,21 @@ def _parse(text: str) -> tuple[int, list[SourceOp], int]:
     return count["qreg"], ops, count["creg"]
 
 
-def pulses(op: SourceOp, ion: Mapping[int, str]) -> list[tuple[str, tuple[str, ...], tuple]]:
-    """The native pulses of one gate, in time order: `(gate, operands, params)`."""
+def pulses(op: SourceOp, ion: Mapping[int, str],
+           gate_set: str = DEFAULT_GATE_SET) -> list[tuple[str, tuple[str, ...], tuple]]:
+    """The native pulses of one gate in `gate_set`, in time order: `(gate, operands, params)`.
+
+    A one-qubit gate is the same in both sets: one beam and one frame change.  A two-qubit gate
+    is one entangling pulse, dressed for the set:
+
+        ms    cx(c, t) = R c, MS c t, R c, R t, R c                  (qccdc's `cx_decomp`)
+              cz(c, t) = H t, cx(c, t), H t
+        rzz   cx(c, t) = R(-pi/2, pi/2) t, RZZ(pi/2) c t, R(pi/2, pi) t, VZ(-pi/2) c, VZ(-pi/2) t
+              cz(a, b) = RZZ(pi/2) a b, VZ(-pi/2) a, VZ(-pi/2) b
+
+    The rzz forms are Quantinuum's (the H-series' CNOT from ZZ, arXiv:2003.01293) and the fewest
+    physical pulses there are: no CX is one RZZ(+-pi/2) and a single one-qubit pulse.  Every
+    form is held to its gate's unitary, up to a global phase, by `tests/test_gate_set.py`."""
     if op.name in U3:
         theta, phi, lam = U3[op.name]
         q = ion[op.qubits[0]]
@@ -196,12 +217,35 @@ def pulses(op: SourceOp, ion: Mapping[int, str]) -> list[tuple[str, tuple[str, .
         # `id` emits no pulse; a frame change by nothing is still an instruction its witness names
         return out or [("VZ", (q,), (0.0,))]
     a, b = ion[op.qubits[0]], ion[op.qubits[1]]
+    if gate_set == "rzz":
+        frames = [("VZ", (a,), (-PI / 2,)), ("VZ", (b,), (-PI / 2,))]
+        if op.name == "cz":
+            return [("RZZ", (a, b), (PI / 2,))] + frames
+        return [("R", (b,), (-PI / 2, PI / 2)), ("RZZ", (a, b), (PI / 2,)), ("R", (b,), (PI / 2, PI))] + frames
+    if gate_set != DEFAULT_GATE_SET:
+        resolve_gate_set(gate_set)                  # an unknown set: say which there are
     cx = [("R", (a,), (PI / 2, PI / 2)), ("MS", (a, b), (PI / 2,)), ("R", (a,), (-PI / 2, 0.0)),
           ("R", (b,), (-PI / 2, 0.0)), ("R", (a,), (-PI / 2, PI / 2))]
     if op.name == "cx":
         return cx
     h = pulses(SourceOp(-1, "h", (op.qubits[1],), 0), ion)
     return h + cx + h
+
+
+def pulse_claims(prog: TSIR, gate_set: str = DEFAULT_GATE_SET) -> dict:
+    """What a certificate claims of its programme's pulses.  The default set's are the claims
+    qccdc has always written (`beams`, `ms_gates`, `frames`); another set's say which set it is
+    and count its own entangling pulse beside them."""
+    def pairs(gate: str) -> int:
+        return sum(len(i.pairs) for i in prog.instructions if i.gate == gate)
+    out = {"cycles": len(prog.instructions),
+           "beams": sum(len(i.ions) for i in prog.instructions if i.gate == "R"),
+           "ms_gates": pairs("MS"),
+           "frames": sum(len(i.ions) for i in prog.instructions if i.gate == "VZ")}
+    if gate_set != DEFAULT_GATE_SET:
+        out["gate_set"] = gate_set
+        out[f"{ENTANGLER[gate_set].lower()}_gates"] = pairs(ENTANGLER[gate_set])
+    return out
 
 
 def layers(ops: Sequence[SourceOp]) -> list[list[SourceOp]]:
@@ -441,6 +485,8 @@ class _Build:
     #: pack a layer's pulses by the chain position they address (R34), keeping the order inside
     #: every leg (`qccd.verify.chains`); off for the C2LR boards
     positions: bool = False
+    #: the native gate set the gates are lowered to (`qccd.ir.gate_sets`)
+    gate_set: str = DEFAULT_GATE_SET
 
     def __post_init__(self) -> None:
         from ..verify.c2lr import C2LRTracker
@@ -478,7 +524,8 @@ class _Build:
         native = [{"operation": op.stage_json(), "site": s["assignment"]["site"],
                    "ions": s["assignment"]["ions"],
                    "pulses": [{"gate": g, "ions": list(o), "params": [float(x) for x in p]}
-                              for g, o, p in (pulses(op, ion) if op.name not in ("measure", "reset") else ())]}
+                              for g, o, p in (pulses(op, ion, self.gate_set)
+                                              if op.name not in ("measure", "reset") else ())]}
                   for op, s in zip(ops, sited)]
         self.record("interaction_placement", {"positions": dict(self.pos),
                                               "operations": [op.stage_json() for op in ops]},
@@ -536,7 +583,7 @@ class _Build:
         self.batch(ops, ion, lambda: self._play(ops, ion))
 
     def _play(self, ops: Sequence[SourceOp], ion: Mapping[int, str]) -> None:
-        seqs = {op.i: pulses(op, ion) for op in ops}
+        seqs = {op.i: pulses(op, ion, self.gate_set) for op in ops}
         last: dict[int, Instruction] = {}
         for k in range(max((len(s) for s in seqs.values()), default=0)):
             by_gate: dict[str, list] = {}
@@ -544,11 +591,10 @@ class _Build:
                 if k < len(seqs[op.i]):
                     by_gate.setdefault(seqs[op.i][k][0], []).append((op, seqs[op.i][k]))
             for gate, group in self._by_position(by_gate):
-                kind = {"R": "beam", "VZ": "virtual_z", "MS": "ms"}[gate]
-                meta = {"kind": kind, "op": [op.i for op, _ in group]}
+                meta = {"kind": KIND[gate], "op": [op.i for op, _ in group]}
                 params = tuple(tuple(float(x) for x in p) for _, (_, _, p) in group)
-                if gate == "MS":
-                    ins = self.emit(type="gate", gate="MS", mode="intra", params=params,
+                if gate in ENTANGLERS:
+                    ins = self.emit(type="gate", gate=gate, mode="intra", params=params,
                                     pairs=tuple(tuple(o) for _, (_, o, _) in group), meta=meta)
                 else:
                     ins = self.emit(type="gate", gate=gate, mode="intra", arity=1, params=params,
@@ -559,10 +605,15 @@ class _Build:
             self.witness(op, last[op.i], [ion[q] for q in op.qubits])
 
     def _by_position(self, by_gate: Mapping[str, list]):
-        """Each gate kind's pulses in the order R, VZ, MS, one instruction per chain position
-        they address when `positions` is on (R34), the first in the circuit first.  A frame
-        change addresses none."""
-        for gate in ("R", "VZ", "MS"):
+        """Each gate kind's pulses in the order R, VZ, the entangling pulse, one instruction per
+        chain position they address when `positions` is on (R34), the first in the circuit
+        first.  A frame change addresses none.  A pulse of a kind unknown here is a fault of the
+        lowering and is said, never left out of the programme."""
+        order = ("R", "VZ") + ENTANGLERS
+        unknown = sorted(set(by_gate) - set(order))
+        if unknown:
+            raise RouteError(f"the lowering gave the pulses {unknown}, which are not native ({', '.join(order)})")
+        for gate in order:
             group = by_gate.get(gate)
             if not group:
                 continue
@@ -680,14 +731,19 @@ class _Build:
 
 def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
                  seed: int = 0, stages: list[dict] | None = None,
-                 reads_together: bool = False, positions: bool = False) -> tuple[TSIR, dict]:
+                 reads_together: bool = False, positions: bool = False,
+                 gate_set: str = DEFAULT_GATE_SET) -> tuple[TSIR, dict]:
     """`(programme, certificate)` for `qasm_text` on the C2LR device `arch`, uncooled: the
     certified programme (`compile_with_router` inserts the cooling).  Raises `Refused` for a
     pair it cannot compile, `RouteError` if what it built does not replay cleanly.  A list
     passed as `stages` receives the native stages' evidence (`write_stages` saves it).
     `reads_together` lays the ops out by `layers_reading_together`, as Goal 3's compilers do;
     the C2LR boards keep `layers`.  `positions` packs each layer's pulses, readouts and resets by
-    the chain position they address (R34), as Goal 3's do; the C2LR boards pack them by kind."""
+    the chain position they address (R34), as Goal 3's do; the C2LR boards pack them by kind.
+    `gate_set` is the native set the gates are lowered to (`qccd.ir.gate_sets`: "ms", the default,
+    or "rzz"); a programme in another set than the default says so in its `meta` and in its
+    certificate's claims."""
+    gate_set = resolve_gate_set(gate_set)
     if not is_c2lr(arch):
         raise Refused(f"{arch.name} does not declare C2LR control; this router plays only "
                       f"swap-or-stay steps")
@@ -699,7 +755,9 @@ def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
     placement = {ion[q]: at[q] for q in range(n)}
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)}})
-    b = _Build(arch, lat, prog, dict(placement), stages=stages, positions=positions)
+    if gate_set != DEFAULT_GATE_SET:
+        prog.meta["gate_set"] = gate_set
+    b = _Build(arch, lat, prog, dict(placement), stages=stages, positions=positions, gate_set=gate_set)
     # the router's normalization is the parse: every op it accepts is one it lowers itself
     circuit = {"n_qubits": n, "n_clbits": n_clbits, "ops": [o.stage_json() for o in ops]}
     b.record("circuit_normalization", circuit, circuit,
@@ -727,10 +785,7 @@ def compile_c2lr(qasm_text: str, arch: Architecture, *, name: str = "circuit",
         "circuit_ops": [o.to_json() for o in ops],
         "map": {str(q): ion[q] for q in range(n)}, "init": dict(placement),
         "moves": b.moves, "gates": b.gates, "rotations": [], "unrealised": [],
-        "claims": {"cycles": len(prog.instructions),
-                   "beams": sum(len(i.ions) for i in prog.instructions if i.gate == "R"),
-                   "ms_gates": sum(len(i.pairs) for i in prog.instructions if i.gate == "MS"),
-                   "frames": sum(len(i.ions) for i in prog.instructions if i.gate == "VZ")},
+        "claims": pulse_claims(prog, gate_set),
         "compiler": COMPILER_NAME,
     }
     return prog, cert
@@ -753,7 +808,7 @@ def write_stages(records: list[dict], prefix, *, circuit, arch, expanded) -> Pat
     return out
 
 
-def compile_with_stages(work, *, name: str = "circuit") -> int:
+def compile_with_stages(work, *, name: str = "circuit", gate_set: str = DEFAULT_GATE_SET) -> int:
     """The staged pipeline's native compile of `work/circuit.qasm` onto `work/device.arch.json`
     (expanded beside it as `device.expanded.json`): writes `prog.tsir.json`, `prog.qcert.json`
     and `prog.stages.json`, as `qccdc compile -o work/prog` does, for the staged driver
@@ -765,7 +820,7 @@ def compile_with_stages(work, *, name: str = "circuit") -> int:
     arch = Architecture.from_json(json.loads((work / "device.arch.json").read_text(encoding="utf-8")))
     records: list[dict] = []
     prog, cert = compile_c2lr((work / "circuit.qasm").read_text(encoding="utf-8"), arch, name=name,
-                              stages=records)
+                              stages=records, gate_set=gate_set)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     write_stages(records, work / "prog", circuit=work / "circuit.qasm", arch=work / "device.arch.json",
@@ -775,13 +830,15 @@ def compile_with_stages(work, *, name: str = "circuit") -> int:
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qccdsim_jones",
                         name: str = "circuit", reads_together: bool = False, positions: bool = False,
-                        lazy_cooling: bool = False) -> tuple[Path, Path]:
+                        lazy_cooling: bool = False, gate_set: str = DEFAULT_GATE_SET) -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs, from this router: `prog.tsir.json` (certified),
     `prog.qcert.json`, `prog.cooled.tsir.json` (the cooling pass at `table`, the final
     programme), `device.expanded.json`, `circuit.qasm` and `compile.json` in `workdir`.
     Returns (final programme, certificate).  The final programme is checked against every
     rule before it is returned.  `positions` is `compile_c2lr`'s; `lazy_cooling` counts each gate's
-    heat from the last cool (`CoolingPolicy.lazy`), as Goal 3's compilers do."""
+    heat from the last cool (`CoolingPolicy.lazy`), as Goal 3's compilers do.  `gate_set` is the
+    native gate set the gates are lowered to ("ms", the default, or "rzz": `qccd.ir.gate_sets`);
+    `compile.json` names it when it is not the default."""
     import subprocess
     import time
 
@@ -800,7 +857,9 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qcc
                          str(work / "device.expanded.json")], capture_output=True, text=True)
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
-    prog, cert = compile_c2lr(qasm_text, arch, name=name, reads_together=reads_together, positions=positions)
+    gate_set = resolve_gate_set(gate_set)
+    prog, cert = compile_c2lr(qasm_text, arch, name=name, reads_together=reads_together, positions=positions,
+                              gate_set=gate_set)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     model = corrected_model(table)
@@ -816,7 +875,8 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "qcc
     (work / "compile.json").write_text(json.dumps({
         "mode": "c2lr-router", "cool": True, "table": table, "compile_s": round(time.time() - t0, 3),
         "instructions": len(cooled.instructions), "steps": sum(1 for i in cooled.instructions
-                                                               if i.type == "simd")}, indent=1),
+                                                               if i.type == "simd"),
+        **({"gate_set": gate_set} if gate_set != DEFAULT_GATE_SET else {})}, indent=1),
         encoding="utf-8")
     return final, work / "prog.qcert.json"
 
@@ -832,12 +892,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--expanded", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--table", default="qccdsim_jones", help="the operating-point table cooling is priced at")
+    ap.add_argument("--gate-set", default=DEFAULT_GATE_SET, choices=GATE_SETS,
+                    help="the native gate set the gates are lowered to: ms (R, VZ, MS; the default) or "
+                         "rzz (R, VZ, RZZ: Quantinuum's)")
     a = ap.parse_args(argv)
     from ..bench.contract import REFUSED_EXIT
     out = Path(a.out)
     try:
         final, cert = compile_with_router(Path(a.circuit).read_text(encoding="utf-8"), a.device,
-                                          out / "work", table=a.table)
+                                          out / "work", table=a.table, gate_set=a.gate_set)
     except Refused as exc:
         print(f"c2lr-router cannot compile this pair: {exc}", file=sys.stderr)
         return REFUSED_EXIT

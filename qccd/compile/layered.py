@@ -14,13 +14,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping, Sequence
 
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, ENTANGLERS, KIND as _KIND
 from ..ir.tsir import TSIR, Instruction
-from .c2lr_router import SourceOp, pulses
+from .c2lr_router import SourceOp, pulse_claims, pulses
 
 __all__ = ["Emitter", "certificate"]
-
-#: the native kinds, as a batch's instructions are tagged (`c2lr_router._Build._play`'s words)
-_KIND = {"R": "beam", "VZ": "virtual_z", "MS": "ms"}
 
 
 @dataclass
@@ -38,6 +36,17 @@ class Emitter:
     #: the order inside every chain (`qccd.verify.chains`), kept as instructions are written, so a
     #: layer's pulses can be packed by the chain position they address (R34); None keeps no order
     chains: object = None
+    #: the native gate set the gates are lowered to (`qccd.ir.gate_sets`); a programme in another
+    #: set than the default says so in its `meta`
+    gate_set: str = DEFAULT_GATE_SET
+
+    def __post_init__(self) -> None:
+        if self.gate_set != DEFAULT_GATE_SET:
+            self.prog.meta["gate_set"] = self.gate_set
+
+    def pulses(self, op: SourceOp, ion: Mapping[int, str]) -> list:
+        """The op's native pulses in this programme's gate set (`c2lr_router.pulses`)."""
+        return pulses(op, ion, self.gate_set)
 
     def emit(self, **kw) -> Instruction:
         ins = Instruction(id=self.prog.next_id(), **kw)
@@ -68,8 +77,8 @@ class Emitter:
         """One native instruction: `group` holds each operand's `(operands, params)`."""
         meta = {"kind": _KIND[gate], "op": sorted(set(ops))}
         params = tuple(tuple(float(x) for x in p) for _, p in group)
-        if gate == "MS":
-            return self.emit(type="gate", gate="MS", mode="intra", params=params,
+        if gate in ENTANGLERS:
+            return self.emit(type="gate", gate=gate, mode="intra", params=params,
                              pairs=tuple(tuple(o) for o, _ in group), meta=meta)
         return self.emit(type="gate", gate=gate, mode="intra", arity=1, params=params,
                          ions=tuple(o[0] for o, _ in group), meta=meta)
@@ -79,7 +88,8 @@ class Emitter:
         """The ops' pulses, each op's in its own order, packed into as few instructions as the
         layer's rule allows.  A frame change takes no time, so a ready one goes first.  Returns
         each op's last pulse; `witness` names it as the op's witness."""
-        seqs = {op.i: list((seqs or {}).get(op.i, pulses(op, ion))) for op in ops}
+        given = seqs or {}
+        seqs = {op.i: list(given[op.i] if op.i in given else self.pulses(op, ion)) for op in ops}
         at = {op.i: 0 for op in ops}
         last: dict[int, Instruction] = {}
         while True:
@@ -118,7 +128,7 @@ class Emitter:
                 if op.name in ("measure", "reset"):
                     seqs[op.i] = [(op.name, (ion[op.qubits[0]],), ())]
                 else:
-                    seqs[op.i] = list(pulses(op, ion))
+                    seqs[op.i] = list(self.pulses(op, ion))
         head = [0] * len(queues)          # the op each queue is on
         at = [0] * len(queues)            # its next pulse
         last: dict[int, Instruction] = {}
@@ -164,9 +174,6 @@ def certificate(prog: TSIR, ops: Sequence[SourceOp], name: str, arch_name: str, 
         "circuit_ops": [o.to_json() for o in ops],
         "map": {str(q): ion[q] for q in range(n)}, "init": dict(init),
         "moves": em.moves, "gates": em.gates, "rotations": [], "unrealised": [],
-        "claims": {"cycles": len(prog.instructions),
-                   "beams": sum(len(i.ions) for i in prog.instructions if i.gate == "R"),
-                   "ms_gates": sum(len(i.pairs) for i in prog.instructions if i.gate == "MS"),
-                   "frames": sum(len(i.ions) for i in prog.instructions if i.gate == "VZ")},
+        "claims": pulse_claims(prog, em.gate_set),
         "compiler": compiler,
     }

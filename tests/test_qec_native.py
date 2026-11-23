@@ -4,7 +4,8 @@ The copy exists so a library imported by a server never edits `sys.path`; this t
 what keeps it a copy.  Two independent statements are checked:
 
 * the copy emits exactly what the bridge emits, for all 16 `(quarter turns, axis)` cases
-  of `R` and all 4 of `MS` -- so a sign fixed in one place and not the other fails here;
+  of `R` and all 4 of each entangling pulse, `MS` and `RZZ` (the two gate sets'
+  `qccd.ir.gate_sets`) -- so a sign fixed in one place and not the other fails here;
 * each emitted Clifford IS the rotation the TSIR names, compared with the unitary written
   from its definition -- so the two cannot agree on something wrong.
 """
@@ -54,6 +55,7 @@ def _tableau(fn, n, *args):
 
 X = np.array([[0, 1], [1, 0]], dtype=complex)
 Y = np.array([[0, -1j], [1j, 0]], dtype=complex)
+Z = np.array([[1, 0], [0, -1]], dtype=complex)
 I2 = np.eye(2, dtype=complex)
 
 
@@ -91,6 +93,29 @@ def test_ms_agrees_with_check_cert_and_is_the_rotation(check_cert, k):
 
 
 @pytest.mark.parametrize("k", range(4))
+def test_rzz_agrees_with_check_cert_and_is_the_rotation(check_cert, k):
+    th = k * PI / 2
+    assert _circ(native.emit_rzz, 0, 1, th) == _circ(check_cert._emit_rzz, 0, 1, th)
+    assert _circ(native.emit_rzz, 0, 1, th - 2 * PI) == _circ(check_cert._emit_rzz, 0, 1, th - 2 * PI)
+    U = _expm_pauli(th, np.kron(Z, Z))
+    assert _tableau(native.emit_rzz, 2, 0, 1, th) == \
+        stim.Tableau.from_unitary_matrix(U, endian="little")
+
+
+def test_the_entangling_pulses_are_the_gate_sets_and_the_bridges(check_cert):
+    """One table of entangling pulses in three places: the gate sets, the copy, the bridge."""
+    from qccd.ir import gate_sets
+
+    assert tuple(native.ENTANGLING) == gate_sets.ENTANGLERS == tuple(check_cert.ENTANGLING) == ("MS", "RZZ")
+    assert check_cert.NATIVE == gate_sets.ALL_NATIVE == ("R", "VZ", "MS", "RZZ")
+    assert gate_sets.NATIVE == {"ms": ("R", "VZ", "MS"), "rzz": ("R", "VZ", "RZZ")}
+    for gate, fn in native.ENTANGLING.items():
+        assert _circ(native.emit_entangler, gate, 0, 1, PI / 2) == _circ(fn, 0, 1, PI / 2)
+    # the two pulses are different Cliffords: neither table may stand in for the other
+    assert _tableau(native.emit_ms, 2, 0, 1, PI / 2) != _tableau(native.emit_rzz, 2, 0, 1, PI / 2)
+
+
+@pytest.mark.parametrize("k", range(4))
 def test_vz_is_the_phase_it_names(k):
     lam = k * PI / 2
     U = np.diag([1, cmath.exp(1j * lam)])
@@ -109,6 +134,8 @@ def test_non_clifford_is_refused_not_rounded():
         native.emit_r(c, 0, PI / 4, 0.0)
     with pytest.raises(native.NotClifford):
         native.emit_ms(c, 0, 1, 0.3)
+    with pytest.raises(native.NotClifford):
+        native.emit_rzz(c, 0, 1, 0.3)
     with pytest.raises(native.NotClifford):
         native.canonical_abstract("T")
 

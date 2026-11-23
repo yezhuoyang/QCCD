@@ -4,7 +4,9 @@ The checks, in order; the first that fails decides the pair's status:
 
   program      the file is a well-formed TSIR within the suite's limits
   native       every gate is one the hardware runs (R, VZ, MS): an abstract CX would escape the
-               cost of its decomposition, and the semantic checks below read native pulses
+               cost of its decomposition, and the semantic checks below read native pulses.  A
+               suite whose manifest names `gate_sets` takes programs in any one of them (the
+               rzz set's are R, VZ, RZZ: `qccd.ir.gate_sets`)
   qubit_map    `meta.qubit_map` names one distinct ion per circuit qubit, all placed by `init`
   rules        the replay under the suite's physics passes every rule it can check (the same
                allowed skips as a board's grade: R7b, R9, and R10 -- decided here instead)
@@ -36,9 +38,13 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
-__all__ = ["grade_pair", "NATIVE_GATES", "MAX_UNITARY_QUBITS"]
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, NATIVE as NATIVE_BY_SET
 
-NATIVE_GATES = {"R", "VZ", "MS"}
+__all__ = ["grade_pair", "NATIVE_GATES", "NATIVE_BY_SET", "MAX_UNITARY_QUBITS"]
+
+#: the default gate set's pulses: what a suite's programs are written in unless its manifest
+#: names the sets it takes (`gate_sets`, e.g. ["ms", "rzz"]; `qccd.ir.gate_sets`)
+NATIVE_GATES = set(NATIVE_BY_SET[DEFAULT_GATE_SET])
 MAX_UNITARY_QUBITS = 10
 _BRIDGE = Path(__file__).resolve().parents[2] / "Compiler" / "bridge"
 
@@ -59,8 +65,11 @@ def _wrong(checks: dict, stage: str, reason: str) -> dict:
 
 
 def grade_pair(pair, program_path: Path, *, physics: Mapping, ler: Mapping | None,
-               limits: Mapping | None = None, workdir: Path | None = None) -> dict:
-    """Grade one compiled program.  Never raises for a bad program: a bad program is a verdict."""
+               limits: Mapping | None = None, workdir: Path | None = None,
+               gate_sets=(DEFAULT_GATE_SET,)) -> dict:
+    """Grade one compiled program.  Never raises for a bad program: a bad program is a verdict.
+    `gate_sets`: the native gate sets the suite takes (its manifest's `gate_sets`; the default
+    one alone when it names none).  A program is in ONE of them."""
     from ..arch.device import Architecture
     from ..ir.tsir import TSIR, validate_program
     checks: dict[str, Any] = {}
@@ -78,10 +87,23 @@ def grade_pair(pair, program_path: Path, *, physics: Mapping, ler: Mapping | Non
         return _wrong(checks, "program", f"{len(prog)} instructions exceeds {limits.get('max_instructions')}")
     checks["program"] = {"ok": True, "instructions": len(prog)}
     # ---- native gate set
-    foreign = sorted({i.gate for i in prog.instructions if i.type == "gate" and i.gate not in NATIVE_GATES})
+    gate_sets = tuple(gate_sets) or (DEFAULT_GATE_SET,)
+    unknown = [g for g in gate_sets if g not in NATIVE_BY_SET]
+    if unknown:
+        raise ValueError(f"the suite names gate sets {unknown}; the sets are {', '.join(NATIVE_BY_SET)}")
+    names = "; or ".join(", ".join(NATIVE_BY_SET[g]) for g in gate_sets)
+    allowed = {x for g in gate_sets for x in NATIVE_BY_SET[g]}
+    foreign = sorted({i.gate for i in prog.instructions if i.type == "gate" and i.gate not in allowed})
     if foreign:
-        return _wrong(checks, "native", f"gates {foreign} are not native (R, VZ, MS)")
+        return _wrong(checks, "native", f"gates {foreign} are not native ({names})")
+    used = {i.gate for i in prog.instructions if i.type == "gate"}
+    fits = [g for g in gate_sets if used <= set(NATIVE_BY_SET[g])]
+    if not fits:
+        return _wrong(checks, "native", f"gates {sorted(used)} are of more than one gate set ({names}): "
+                                        f"a program is written in one")
     checks["native"] = {"ok": True}
+    if fits[0] != DEFAULT_GATE_SET:
+        checks["native"]["gate_set"] = fits[0]
     # ---- qubit map
     qm = (prog.meta or {}).get("qubit_map") if isinstance(prog.meta, Mapping) else None
     if not isinstance(qm, Mapping):

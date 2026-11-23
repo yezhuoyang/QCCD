@@ -163,12 +163,12 @@ class Run:
 
 def _gate_ops(ins) -> list[tuple[str, tuple[str, ...], tuple]]:
     """(kind, ions, params) for every operand of a gate instruction, read as the stim
-    translation reads it (`qccd.qec.extract`): MS and the two-ion abstract gates by pair,
-    R, VZ and the one-ion abstract gates by ion."""
-    from ..qec.native import ABSTRACT_2Q, NotClifford, canonical_abstract
+    translation reads it (`qccd.qec.extract`): the entangling pulses (MS, RZZ) and the two-ion
+    abstract gates by pair, R, VZ and the one-ion abstract gates by ion."""
+    from ..qec.native import ABSTRACT_2Q, ENTANGLING, NotClifford, canonical_abstract
 
     g = str(ins.gate)
-    two = g == "MS"
+    two = g in ENTANGLING
     if not two and g not in ("R", "VZ"):
         try:
             two = canonical_abstract(g) in ABSTRACT_2Q

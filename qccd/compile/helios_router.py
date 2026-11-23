@@ -40,6 +40,7 @@ from typing import Sequence
 
 from ..arch import Architecture
 from ..cost.models import corrected_model
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, resolve as resolve_gate_set
 from ..ir.tsir import Participant, TSIR
 from ..verify import verify
 from ..verify.chains import Chains
@@ -265,9 +266,13 @@ def _batch(queues: dict[int, deque], zones: int) -> list[tuple[int, ...]]:
     return units
 
 
-def compile_helios(qasm_text: str, arch: Architecture, *, name: str = "circuit") -> tuple[TSIR, dict]:
+def compile_helios(qasm_text: str, arch: Architecture, *, name: str = "circuit",
+                   gate_set: str = DEFAULT_GATE_SET) -> tuple[TSIR, dict]:
     """Compile OpenQASM onto Helios: qubits rest in the storage ring, which turns to bring each batch
-    to the X junction, and up to sixteen at a time run in the eight operation zones."""
+    to the X junction, and up to sixteen at a time run in the eight operation zones.  `gate_set` is
+    the native gate set the gates are lowered to (`qccd.ir.gate_sets`): "ms", the default, or "rzz",
+    the set Helios itself runs (arXiv:2511.05465)."""
+    gate_set = resolve_gate_set(gate_set)
     if (arch.device.params or {}).get("family") != "helios":
         raise Refused(f"{arch.name} is not a Helios functional floorplan")
     if RING not in arch.device.loops or any(z not in arch.device.nodes for _, zs in LEGS.values() for z in zs):
@@ -285,7 +290,7 @@ def compile_helios(qasm_text: str, arch: Architecture, *, name: str = "circuit")
     placement = {ion[q]: slots[home[q]] for q in range(n)}
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)}})
-    em = Emitter(prog, dict(placement), chains=Chains(arch.device))
+    em = Emitter(prog, dict(placement), chains=Chains(arch.device), gate_set=gate_set)
     em.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
             meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     em.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -327,8 +332,9 @@ def compile_helios(qasm_text: str, arch: Architecture, *, name: str = "circuit")
 
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "helios",
-                        name: str = "circuit") -> tuple[Path, Path]:
-    """Write, cool, replay, and check a certified Helios compilation."""
+                        name: str = "circuit", gate_set: str = DEFAULT_GATE_SET) -> tuple[Path, Path]:
+    """Write, cool, replay, and check a certified Helios compilation.  `gate_set`: the native gate
+    set ("ms", the default, or "rzz")."""
     from .cooling import CoolingPolicy, insert_cooling
     t0 = time.time()
     work = Path(workdir)
@@ -341,7 +347,7 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "hel
                          str(work / "device.expanded.json")], capture_output=True, text=True)
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
-    prog, cert = compile_helios(qasm_text, arch, name=name)
+    prog, cert = compile_helios(qasm_text, arch, name=name, gate_set=gate_set)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     model = corrected_model(table)
