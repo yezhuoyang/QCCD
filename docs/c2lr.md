@@ -248,6 +248,10 @@ the full corpus).
   used: its programmes pass `c2lr-demonstrated` too. Pulses are qccdc's (u3 as one beam and one
   frame change; CX as R, MS, R, R, R). The certificate's moves are the replay's own expansion,
   its cycle clock the instruction's position, each witness the op's last pulse.
+  `gate_set="rzz"` (`--gate-set rzz` on the command line) lowers to Quantinuum's set instead: a
+  CX is R, RZZ, R on its target and two frame changes, a CZ one RZZ and two frame changes
+  (docs/tsir.md, "Native pulses and the two gate sets"); the transport is the same, and the
+  merge + gate + split around the entangling pulse is priced and checked as it is around an MS.
 - **What a layer costs.** Enter and exit are forced (C1: only the crystal that entered leaves,
   by the variation it entered by), so a layer of gates is at least two steps. The repetition
   code's chain fits one row of legs (5 x 2: one diagonal per layer, 4 steps a round); the surface

@@ -133,7 +133,9 @@ class CompileFailed(RuntimeError):
 
     `kind` is "refused" (the compiler declined: the device cannot hold or route the
     circuit), "timeout", "crash" (a non-zero exit that was not a refusal, or a missing
-    output) or "toolchain_missing".  `log` is the tail of what the tools printed.
+    output), "toolchain_missing", or "gate_set_unsupported" (the binary found was built before
+    the gate-set option and lowers to MS only: the message names the way out).  `log` is the
+    tail of what the tools printed.
     """
 
     def __init__(self, kind: str, message: str, log: str = ""):
@@ -175,8 +177,15 @@ def _reason(log: str) -> str:
 
 def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
                        timeout: float = 600.0, mode: str = "auto",
-                       table: str = "qccdsim_jones") -> tuple[Path, Path]:
+                       table: str = "qccdsim_jones", gate_set: str = "ms") -> tuple[Path, Path]:
     """Compile `qasm_text` for `arch` with qccdc, then insert cooling: (program, certificate).
+
+    `gate_set` is the native gate set the gates are lowered to (`qccd.ir.gate_sets`): "ms" (R, VZ,
+    MS; the default, and every output is what it was before the option existed) or "rzz" (R, VZ,
+    RZZ: Quantinuum's native set), passed to qccdc as `--gate-set`.  A qccdc built before the
+    option ignores the flag, so the binary is asked first (`qccdc_cli gate-sets`) and one that
+    cannot is refused with `CompileFailed("gate_set_unsupported")` -- never run to compile MS --
+    and the programme that comes back is checked to be in the set asked for.
 
     `arch` is a path to an `.arch.json`, its parsed document, or an `Architecture`.
     `mode` is qccdc's verb:
@@ -192,6 +201,15 @@ def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
     if qccdc is None:
         raise CompileFailed("toolchain_missing", "the compiler (qccdc_cli) is not installed: "
                             "run `qccd toolchain install`, or build Compiler/ocaml")
+    from ..ir import gate_sets
+
+    gate_set = gate_sets.resolve(gate_set)
+    set_args: list = []
+    if gate_set != gate_sets.DEFAULT:
+        why = gate_sets.binary_refusal(qccdc, gate_set)
+        if why:
+            raise CompileFailed("gate_set_unsupported", why)
+        set_args = ["--gate-set", gate_set]
     if isinstance(arch, (str, Path)):
         arch_path = Path(arch).resolve()
         arch_doc = json.loads(arch_path.read_text(encoding="utf-8"))
@@ -239,7 +257,7 @@ def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
     for m in modes:
         for stale in (tsir, cert):
             stale.unlink(missing_ok=True)
-        cp = run([qccdc, m, qasm_path, "--arch", expanded, "-o", prefix], f"qccdc {m}")
+        cp = run([qccdc, m, qasm_path, "--arch", expanded, "-o", prefix, *set_args], f"qccdc {m}")
         log += f"--- qccdc_cli {m} (exit {cp.returncode})\n" + (cp.stdout + "\n" + cp.stderr)[-4000:]
         if cp.returncode == 0 and tsir.exists() and cert.exists():
             unrealised = json.loads(cert.read_text(encoding="utf-8")).get("unrealised")
@@ -250,6 +268,14 @@ def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
     t_compile = time.time() - t0
     if used is None:
         raise CompileFailed("refused", _reason(log), log[-6000:])
+    if set_args:
+        # the binary said it knows the set; hold what it wrote to that all the same
+        from ..ir.tsir import TSIR
+
+        got = gate_sets.of_program(TSIR.load(str(tsir)))
+        if got != gate_set:
+            raise CompileFailed("crash", f"qccdc was asked for gate_set={gate_set!r} and wrote a programme "
+                                         f"in {got or 'a mix of gate sets'}", log[-6000:])
     prog = tsir
     if cool:
         cooled = work / "prog.cooled.tsir.json"
@@ -262,5 +288,6 @@ def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
         prog = cooled
     (work / "compile.json").write_text(json.dumps({
         "mode": used, "cool": cool, "compile_s": round(t_compile, 3),
-        "total_s": round(time.time() - t0, 3), "log": log[-6000:]}, indent=1), encoding="utf-8")
+        "total_s": round(time.time() - t0, 3), "log": log[-6000:],
+        **({"gate_set": gate_set} if set_args else {})}, indent=1), encoding="utf-8")
     return prog, cert

@@ -12,7 +12,10 @@
     qccd agent connect --client cursor       a NEW Cursor chat the Studio's messages run in
     qccd mcp --client codex|claude|cursor|generic [--channel]     (launched by the agent client)
     qccd validate [--json]                   draft grade of the head revision
-    qccd compile --board TITLE [--adopt]     the real compiler on a board's circuit
+    qccd compile --board TITLE [--adopt] [--gate-set ms|rzz]
+                                             the real compiler on a board's circuit; --gate-set: the
+                                             native gate set it lowers to (ms: R, VZ, MS, the default;
+                                             rzz: R, VZ, RZZ, Quantinuum's)
     qccd submit --local --board "BB [[144,12,12]]" [--design NAME] [--wait]
                                              compile for the board, adopt, freeze, grade
     qccd boards                              the leaderboards a design can be submitted to
@@ -20,7 +23,7 @@
     qccd publish --approval AP --server URL  upload an approved bundle
     qccd import design/studio.json           a file written outside Studio, as a change set
     qccd export [--design NAME | --run ID]   save a design's (or a run's) files into exports/<name>/
-    qccd ler --experiment surface3 [--design NAME] [--shots N]
+    qccd ler --experiment surface3 [--design NAME] [--shots N] [--gate-set ms|rzz]
                                              the logical error rate of a design (memory experiment,
                                              reference compiler, the machine's noise model)
     qccd leaderboard [--board T] [--official] [--track compiler]   local or published rankings
@@ -49,6 +52,11 @@ import webbrowser
 from pathlib import Path
 
 __all__ = ["main", "COMMANDS"]
+
+#: what `--gate-set` says of itself wherever a command compiles (`qccd.ir.gate_sets`)
+GATE_SET_HELP = ("the native gate set the compiler lowers to: ms (R, VZ and the entangling pulse MS; the "
+                 "default) or rzz (R, VZ and RZZ: Quantinuum's native set).  rzz needs a compiler built from "
+                 "this source or a toolchain release that has it (`qccdc_cli gate-sets`)")
 
 COMMANDS = ("init", "studio", "web", "toolchain", "serve", "status", "stop", "agent", "mcp", "validate", "compile", "submit",
             "publish", "import", "export", "releases", "boards", "leaderboard", "trace", "ler", "bench", "login",
@@ -397,7 +405,10 @@ def cmd_validate(a) -> int:
 
 def cmd_compile(a) -> int:
     info = _svc(a)
-    j = _call(info, "POST", "/api/jobs", {"kind": "compile", "params": {"compiler": a.compiler, "board": a.board}})
+    params = {"compiler": a.compiler, "board": a.board}
+    if a.gate_set != "ms":
+        params["gate_set"] = a.gate_set
+    j = _call(info, "POST", "/api/jobs", {"kind": "compile", "params": params})
     j = _wait_job(info, j["job_id"])
     res = j.get("result") or {}
     print(f"{j['status']}: {res.get('summary')}")
@@ -679,6 +690,8 @@ def cmd_ler(a) -> int:
     params = {"experiment": a.experiment, "max_shots": a.shots}
     if a.design:
         params["branch"] = a.design
+    if a.gate_set != "ms":
+        params["gate_set"] = a.gate_set
     j = _call(info, "POST", "/api/jobs", {"kind": "ler", "params": params})
     j = _wait_job(info, j["job_id"])
     res = j.get("result") or {}
@@ -1014,6 +1027,7 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "compile":
             q.add_argument("--adopt", action="store_true")
             q.add_argument("--compiler", default="auto", choices=["auto", "compile", "rotate"])
+            q.add_argument("--gate-set", default="ms", choices=["ms", "rzz"], help=GATE_SET_HELP)
         if name == "submit":
             q.add_argument("--local", action="store_true")
             q.add_argument("--rules", default=None,
@@ -1076,6 +1090,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--experiment", required=True, help="a memory board's title, or rep3|rep5|surface3|steane|...")
     p.add_argument("--design", default=None, help="the design's name (default: the current design)")
     p.add_argument("--shots", type=int, default=100000, help="the most shots to sample")
+    p.add_argument("--gate-set", default="ms", choices=["ms", "rzz"], help=GATE_SET_HELP)
     p.add_argument("--json", action="store_true")
     p.add_argument("--root", default=None)
     p = sub.add_parser("bench", help="the Compiler board: run a compiler over the benchmark suite, locally")

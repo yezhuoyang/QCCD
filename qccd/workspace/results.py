@@ -64,6 +64,34 @@ def _now() -> float:
     return time.time()
 
 
+def _gate_set_args(params: Mapping, tc, arch, *, router: bool = True) -> tuple[str, list]:
+    """A job's gate set (`params["gate_set"]`, the default when it names none) and the flags that
+    ask qccdc for it.  A qccdc from before the option ignores `--gate-set` and compiles to MS, so
+    the binary is asked what it lowers to first, and the job is refused -- saying how to get a
+    compiler that can -- rather than run to give a programme in the wrong set.  A C2LR lattice is
+    compiled by the Python router (`router`: where the job has one), which needs no binary for
+    any set."""
+    from ..arch.c2lr import is_c2lr
+    from ..ir import gate_sets
+    from .core import WorkspaceError
+    gate_set = gate_sets.resolve(params.get("gate_set"))
+    if gate_set == gate_sets.DEFAULT:
+        return gate_set, []
+    if not (router and arch is not None and is_c2lr(arch)):
+        why = gate_sets.binary_refusal(tc.qccdc, gate_set) if tc.qccdc is not None else None
+        if why:
+            raise WorkspaceError("toolchain_missing", why, status=424)
+    return gate_set, ["--gate-set", gate_set]
+
+
+def _gate_set_words(gate_set: str) -> str:
+    """How a summary says a compile was in another gate set than the default: nothing for the default."""
+    from ..ir import gate_sets
+    if gate_set == gate_sets.DEFAULT:
+        return ""
+    return f"; gate set {gate_set} (R, VZ, {gate_sets.ENTANGLER[gate_set]})"
+
+
 class ResultsMixin:
 
     def _results_init(self) -> None:
@@ -133,6 +161,27 @@ class ResultsMixin:
         if not isinstance(rev, int) or not 0 <= rev <= b["head"]:
             raise WorkspaceError("bad_request", f"revision {rev!r} is not a revision of {branch}", status=422)
         params["branch"], params["revision"] = branch, rev
+        if "gate_set" in params:
+            # the native gate set a compile lowers to (qccd.ir.gate_sets).  The default is kept as
+            # no parameter at all, so a job that names it is the job it always was.
+            from ..ir import gate_sets
+            try:
+                chosen = gate_sets.resolve(params["gate_set"])
+            except ValueError as exc:
+                raise WorkspaceError("bad_request", str(exc), status=422) from None
+            if kind not in ("compile", "run", "ler"):
+                raise WorkspaceError("bad_request", f"a {kind} job compiles nothing: gate_set is for compile, "
+                                                    "run and ler", status=422)
+            if chosen == gate_sets.DEFAULT:
+                params.pop("gate_set")
+            else:
+                params["gate_set"] = chosen
+                # refused HERE, with the way out, when the compiler installed is older than the option:
+                # the caller hears it at once, not from a job that failed
+                from .evaluator import Toolchain
+                design = self.replayed(branch, rev)
+                _gate_set_args(params, Toolchain.discover(), design.arch if design.ok else None,
+                               router=kind != "ler")
         if kind == "evaluate":
             prof = params.get("profile", "draft")
             if prof not in ("draft", "reference"):
@@ -259,6 +308,7 @@ class ResultsMixin:
         r = self.replayed(branch, rev)
         if not r.ok:
             raise WorkspaceError("design_invalid", "the design at that revision does not build", status=422)
+        gate_set, set_args = _gate_set_args(params, tc, r.arch)
         work = self.root / ".qccd" / "runs" / jid
         work.mkdir(parents=True, exist_ok=True)
         rel = self.board(params.get("board"))
@@ -324,7 +374,7 @@ class ResultsMixin:
             self._progress(jid, "compile", f"compiling {rel.title} with the C2LR router")
             modes = []
             try:
-                n = compile_with_stages(work, name=rel.manifest["task"])
+                n = compile_with_stages(work, name=rel.manifest["task"], gate_set=gate_set)
                 log = f"--- {COMPILER_NAME}: {n} instructions\n"
                 got = finish("c2lr-router")
                 if isinstance(got, dict):
@@ -340,7 +390,7 @@ class ResultsMixin:
                           "prog.native.tsir.json", "prog.cooled.tsir.json", "prog.compilation.json"):
                 (work / stale).unlink(missing_ok=True)
             cp = run_limited([tc.qccdc, m, work / "circuit.qasm", "--arch", work / "device.expanded.json", "-o",
-                              work / "prog"], cwd=work, timeout=budget, mem_mb=8192, cancel=cancel)
+                              work / "prog", *set_args], cwd=work, timeout=budget, mem_mb=8192, cancel=cancel)
             log += f"--- qccdc_cli {m}\n" + (cp.stdout + "\n" + cp.stderr)[-4000:]
             if cp.status in ("cancelled", "timeout"):
                 return {"_status": cp.status, "summary": f"compile {cp.status}", "log": log[-6000:]}
@@ -396,10 +446,12 @@ class ResultsMixin:
                      "compiled_for": r.arch_digest(), "compiler": mode,
                      "board": rel.id, "circuit_digest": rel.manifest["circuit"]["digest"], "compilation": d_compilation,
                      "label": f"{rel.title}: {_compiler_label(mode)}, "
-                              f"r{rev}, {n_instr} instructions"}
-        return {"summary": f"compiled {rel.title} at r{rev}: {n_instr} instructions; stage checks passed",
+                              f"r{rev}, {n_instr} instructions" + _gate_set_words(gate_set)}
+        return {"summary": f"compiled {rel.title} at r{rev}: {n_instr} instructions; stage checks passed"
+                           + _gate_set_words(gate_set),
                 "final_program": final_ref, "log": log[-2000:],
                 "compilation": stage_ref,
+                **({"gate_set": gate_set, "compiler": mode} if set_args else {}),
                 "adopt_with": {"type": "set_final_program", **final_ref}}
 
     # ------------------------------------------------------------------ snapshots

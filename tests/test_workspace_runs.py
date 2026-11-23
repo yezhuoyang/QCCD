@@ -134,3 +134,36 @@ def test_the_conversation_is_one_stream(ws):
     assert said["text"] == "Adding it next to C3." and said["author"] == "Codex"
     assert change["change_set_id"] == cs["change_set_id"] and change["status"] == "undone"   # linked to the working request
     assert conv["working"] == [{"prompt_id": pid, "state": "working"}]
+
+
+def test_a_run_in_the_rzz_gate_set_says_which_compiler_ran(ws, monkeypatch):
+    """`gate_set: rzz` (docs/workspace.md): QCCDCert lowers to MS only, so under `compiler: auto`
+    the run is compiled by qccdc, with `--gate-set rzz`, and says so; every acceptance step reads
+    the RZZ pulses.  Needs a qccdc that has the option (one built from this source)."""
+    import json
+
+    from qccd.ir import gate_sets
+    from qccd.repo_paths import REPO
+    built = next((p for p in (REPO / "Compiler" / "ocaml" / "_build" / "default" / "bin" / n
+                              for n in ("qccdc_cli.exe", "qccdc_cli")) if p.is_file()), None)
+    if built is None or "rzz" not in gate_sets.binary_gate_sets(built):
+        pytest.skip("no qccdc_cli built from this source with the gate-set option")
+    monkeypatch.setenv("QCCD_QCCDC", str(built))
+    j = _wait(ws, ws.start_job(HUMAN, "run", {"program": "ghz4", "gate_set": "rzz", "animate": False})["job_id"])
+    assert j["status"] == "succeeded", j
+    run = ws.run(j["id"])
+    assert run["gate_set"] == "rzz" and run["compiler"] in ("compile", "rotate")
+    assert "qccdc_cli" in j["result"]["summary"] and "gate set rzz (R, VZ, RZZ)" in j["result"]["summary"]
+    prog = json.loads(ws.get_artifact(run["artifacts"]["program"]))
+    used = {i.get("gate") for i in prog["instructions"] if i["type"] == "gate"}
+    assert "RZZ" in used and "MS" not in used and prog["meta"]["gate_set"] == "rzz"
+    perf = run["performance"]
+    assert perf["counts"]["two_qubit_gates"] == 3 and perf["rules"]["failed"] == []
+    assert run["compilation"]["status"] == "passed"          # the staged acceptance, RZZ pulses and all
+    # the default set names nothing: a run that asks for ms is the run it always was
+    j = _wait(ws, ws.start_job(HUMAN, "run", {"program": "ghz4", "gate_set": "ms", "animate": False})["job_id"])
+    assert j["status"] == "succeeded", j
+    run = ws.run(j["id"])
+    assert "gate_set" not in run and "gate set" not in j["result"]["summary"]
+    prog = json.loads(ws.get_artifact(run["artifacts"]["program"]))
+    assert "MS" in {i.get("gate") for i in prog["instructions"] if i["type"] == "gate"} and "gate_set" not in prog.get("meta", {})

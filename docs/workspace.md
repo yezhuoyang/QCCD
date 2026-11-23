@@ -209,6 +209,23 @@ page keeps its self-containment scan. What it does:
   A design too small for the program, or one the compiler cannot route, fails with the
   reason. Measured on this machine: BB144 on a 2×72 ring with 24 docks takes about 12 s end
   to end and gives 522 ms per round.
+- **The gate set** is a parameter of every job that compiles (`run`, `compile`, `ler`):
+  `gate_set`, `ms` (the default: `R`, `VZ`, `MS`) or `rzz` (`R`, `VZ`, `RZZ`: Quantinuum's
+  native set; docs/tsir.md, "Native pulses and the two gate sets"). The default is kept as no
+  parameter, so a job that does not ask is the job it always was. For `rzz`:
+  - the compiler must have the option. A `qccdc_cli` built before it would ignore the flag
+    and compile MS, so the job asks the binary (`qccdc_cli gate-sets`) and fails at once with
+    `toolchain_missing` and the way out (build `Compiler/ocaml`, or a toolchain release that
+    has `rzz`) rather than compile;
+  - QCCDCert lowers to `ms` only. A run under `compiler: auto` goes to qccdc (`rotate`, then
+    `compile`), or to the C2LR router on a C2LR lattice, and the run's `compiler` and
+    `gate_set` say what ran; `compiler: qccdcert` with `gate_set: rzz` is refused (422);
+  - the stage evidence, the cooling pass, the rules and R10 read the `RZZ` pulses as they
+    read `MS`: the same acceptance, nothing skipped.
+
+  From the terminal: `qccd compile --board T --gate-set rzz` and
+  `qccd ler --experiment surface3 --gate-set rzz`; from an agent, `gate_set` on
+  `qccd_run_program`, `qccd_start_job` (kind `compile`) and `qccd_estimate_ler`.
 - **The performance report** (`perf.performance`) is read off that replay:
   - the round time, and time by category (transport, cooling, gates, measurement, reset)
     with shares;
@@ -1016,6 +1033,8 @@ qccd submit --local --board "BB [[144,12,12]]" --design "Two triangles" --wait
                                          #   -> "Local result - not published"
 qccd leaderboard --board "BB [[144,12,12]]"
 qccd compile --board surface --adopt     # the steps one by one, when wanted
+qccd compile --board surface --gate-set rzz   # ...lowered to Quantinuum's set (R, VZ, RZZ) instead of MS
+qccd ler --experiment surface3 --gate-set rzz # a memory's logical error rate, compiled in that set
 qccd validate --board surface --json     # a draft grade of the head revision
 qccd login                               # sign this computer in with YOUR qccd.academy account (once)
 qccd publish --submission <sub_id>       # review, type the digest, submit it in your name
