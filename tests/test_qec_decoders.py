@@ -111,6 +111,28 @@ def test_describe_decoder_is_pure_and_reads_an_old_row():
     assert describe_decoder("something-else")["label"] == "something-else"
 
 
+def test_published_rows_load_and_are_described_from_what_they_kept():
+    """Goal 3's published rows: each `ler` still loads, and its decoder is described from the
+    row's own name and budget (the rows from before the configuration was recorded have no more)."""
+    files = sorted((ROOT / "goals" / "goal3" / "results").glob("*.jsonl"))
+    if not files:
+        pytest.skip("no published rows in this checkout")
+    seen = set()
+    for path in files:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            row = json.loads(line) if line.strip() else {}
+            if not row.get("ler"):
+                continue
+            est = LerEstimate(**row["ler"])
+            budget = row.get("ler_budget") or {}
+            cfg = est.decoder_config or describe_decoder(est.decoder, budget)
+            assert cfg["decoder"] == est.decoder and cfg["label"], (path.name, row["point"])
+            if est.decoder == "bposd" and budget.get("bp_max_iter") and not est.decoder_config:
+                assert f"{budget['bp_max_iter']} iterations; OSD-CS order 7" in cfg["label"]
+            seen.add(est.decoder)
+    assert seen >= {"bposd", "pymatching"}
+
+
 def test_describe_decoder_matches_what_ran(bb18):
     est = estimate_ler(bb18, decoder="bposd", seed=2, bp_max_iter=30, **FEW)
     told = describe_decoder("bposd", {"bp_max_iter": 30}, bb18.num_detectors,
