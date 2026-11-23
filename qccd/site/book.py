@@ -235,6 +235,12 @@ _TOKEN = re.compile(r"`([^`]+)`|\[((?:[^\]`]|`[^`]*`)+)\]\(([^)\s]+)\)")
 
 
 def _inline(s: str) -> str:
+    # A note that is italic as a whole may hold code spans ("*Lessons G1 to G3 are restated ...
+    # `cis` ... `kron A B` ...*").  Emphasis is found piece by piece between the spans, so the
+    # note's own two asterisks, one on either side of a span, would be printed as they are.
+    note = re.fullmatch(r"\*(?![*\s])(.+)(?<![*\s])\*", s, flags=re.S)
+    if note and "`" in note.group(1) and "*" not in re.sub(r"`[^`]*`", "", note.group(1)):
+        return "<i>" + _inline(note.group(1)) + "</i>"
     out, i = [], 0
     for m in _TOKEN.finditer(s):
         out.append(_emph(html.escape(s[i:m.start()], quote=False)))
