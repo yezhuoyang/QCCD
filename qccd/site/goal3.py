@@ -109,6 +109,9 @@ def data() -> dict | None:
     zips = json.loads(zf.read_text(encoding="utf-8")) if zf.exists() else {}
     from ..qec.reproduce import decoder_label
     judged = _judged()
+    # the same shots decoded a second way (goals/goal3/results/decoders.json), where it was tried
+    tf = GOAL / "results" / "decoders.json"
+    tried = json.loads(tf.read_text(encoding="utf-8")) if tf.exists() else {}
     codes = []
     for b in rels:
         task = b.manifest["task"]
@@ -150,9 +153,10 @@ def data() -> dict | None:
                       "decoder": decoder_label(None, (b.manifest.get("qec") or {}).get("ler")),
                       "counts": counts, "points": pts, "failed": failed,
                       **({"speed": sp} if (sp := _speed(code, fams)) else {}),
+                      **({"tried": tried["codes"][code]} if code in tried.get("codes", {}) else {}),
                       **({"rules": _code_rules(code, b.manifest.get("rules") or "standard", judged)}
                          if judged and code in judged["codes"] else {})})
-    out = {"families": fams, "caveats": caveats, "codes": codes,
+    out = {"families": fams, "caveats": caveats, "codes": codes, "tried_about": tried.get("about", ""),
            "series": {f: SERIES[i % len(SERIES)] for i, f in enumerate(fams)}}
     if judged:
         out["rules"] = _rules_key(judged, {c["rules"]["board"] for c in codes if c.get("rules")})
@@ -631,17 +635,39 @@ SCRIPT = r"""
     tw.appendChild(t); tb.appendChild(tw);
   }
 
+  // the same shots of one point, decoded a second way: the ranking decoder's row first
+  function secondDecoder(c){
+    var boxEl = document.getElementById('g3-decbox'), host = document.getElementById('g3-dec'), X = c.tried;
+    boxEl.hidden = !X; host.textContent = '';
+    if (!X) return;
+    host.appendChild(H('p', null, X.says));
+    var tw = H('div', 'tw'), t = H('table'), hd = H('tr');
+    ['decoder', 'logical errors / shots', 'LER / round (95%)', 'decode, ms a shot'].forEach(function(h){ hd.appendChild(H('th', null, h)); });
+    t.appendChild(hd);
+    X.rows.forEach(function(r){
+      var tr = H('tr');
+      tr.appendChild(H('td', null, r.label + (r.ranks ? ' (the charts rank by this)' : '')));
+      tr.appendChild(H('td', 'n', r.errors + ' / ' + Number(r.shots).toLocaleString()));
+      tr.appendChild(H('td', 'n', sci(r.per_round) + '  (' + sci(r.lo) + ' to ' + sci(r.hi) + ')'));
+      tr.appendChild(H('td', 'n', String(r.ms)));
+      t.appendChild(tr);
+    });
+    tw.appendChild(t); host.appendChild(tw);
+    host.appendChild(H('p', 'g3r-why', X.family + ', ' + X.point + '. ' + D.tried_about));
+  }
+
   function draw(i){
     cur = i; var c = D.codes[i];
     [].forEach.call(tabs.querySelectorAll('button'), function(b, j){ b.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
     [].forEach.call(document.querySelectorAll('.g3-try'), function(el){ el.hidden = el.getAttribute('data-task') !== c.task; });
     document.getElementById('g3-code').textContent = c.ions + ' ions: ' + c.rounds + ' rounds of a Z memory, then ' +
-      c.rounds + ' of an X memory on the same ions.';
+      c.rounds + ' of an X memory on the same ions.' + (c.decoder ? ' Decoded by ' + c.decoder + '.' : '');
     document.getElementById('g3-about').textContent = c.about;
     var pan = document.getElementById('g3-panels'); pan.textContent = '';
     panel(pan, c, 't', 'Time per syndrome round');
     panel(pan, c, 'l', 'Logical error rate per round (Z and X memories)');
     speed(c);
+    secondDecoder(c);
     var tb = document.getElementById('g3-table'); tb.textContent = ''; table(tb, c);
     var zl = document.getElementById('g3-zips'); zl.textContent = ''; zips(zl, c);
     var fl = document.getElementById('g3-failed'); fl.textContent = ''; failures(fl, c);
@@ -755,6 +781,8 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "submitted entry</span>"
         "<span>Bars: 95% interval</span><span>Click any point to open its page</span></div>"
         '<details><summary>Each family&rsquo;s best, as a table</summary><div id="g3-table"></div></details>'
+        '<details id="g3-decbox" hidden><summary>A second decoder, tried on the same shots: beam search</summary>'
+        '<div id="g3-dec"></div></details>'
         '<details id="g3-speedbox" open hidden><summary>Against the shuttling speed</summary>'
         "<p>Each family&rsquo;s lowest-error size, with every straight rail carried at one speed in metres per "
         "second: slower costs idle time, faster costs heat.</p>"

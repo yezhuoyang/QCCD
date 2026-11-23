@@ -1,0 +1,81 @@
+{
+ "about": "The same sampled shots of one point (the published run's own: its seed and batches), decoded by each decoder in turn on one core, 2026-11-23. The machine was busy, so read the times as ratios. The beam search is IonQ's own code (arXiv:2512.07057), at the paper's settings for each width.",
+ "codes": {
+  "bb72": {
+   "point": "c2lr15x14",
+   "family": "C2LR",
+   "says": "On this code the beam search at width 8 makes fewer logical errors than BP-OSD on the same shots and decodes about four times faster; width 32 does no better than width 8. BP-OSD stays the decoder the charts rank by.",
+   "rows": [
+    {
+     "decoder": "bposd",
+     "ranks": true,
+     "label": "BP-OSD (ldpc 2.4.1: product-sum BP, 30 iterations; OSD-CS order 7)",
+     "errors": 242,
+     "shots": 30000,
+     "per_round": 0.00135,
+     "lo": 0.00119,
+     "hi": 0.00153,
+     "ms": 31.3
+    },
+    {
+     "decoder": "beam",
+     "label": "Beam search (IonQ BeamSearchDecoder 5100dc0: width 8; min-sum BP, 30 iterations then up to 10 rounds of 20)",
+     "errors": 206,
+     "shots": 30000,
+     "per_round": 0.00115,
+     "lo": 0.001,
+     "hi": 0.00132,
+     "ms": 8.2
+    },
+    {
+     "decoder": "beam",
+     "label": "Beam search (IonQ BeamSearchDecoder 5100dc0: width 32; min-sum BP, 40 iterations then up to 10 rounds of 30)",
+     "errors": 207,
+     "shots": 30000,
+     "per_round": 0.00115,
+     "lo": 0.00101,
+     "hi": 0.00132,
+     "ms": 16.1
+    }
+   ]
+  },
+  "color5": {
+   "point": "c2lr7x7",
+   "family": "C2LR",
+   "says": "On the colour code the beam search makes nearly twice as many logical errors as BP-OSD at width 8, and more at width 32, so it is not used here.",
+   "rows": [
+    {
+     "decoder": "bposd",
+     "ranks": true,
+     "label": "BP-OSD (ldpc 2.4.1: product-sum BP, 30 iterations; OSD-CS order 7)",
+     "errors": 205,
+     "shots": 90000,
+     "per_round": 0.000456,
+     "lo": 0.000398,
+     "hi": 0.000523,
+     "ms": 0.37
+    },
+    {
+     "decoder": "beam",
+     "label": "Beam search (IonQ BeamSearchDecoder 5100dc0: width 8; min-sum BP, 30 iterations then up to 10 rounds of 20)",
+     "errors": 378,
+     "shots": 90000,
+     "per_round": 0.000841,
+     "lo": 0.000761,
+     "hi": 0.000931,
+     "ms": 0.19
+    },
+    {
+     "decoder": "beam",
+     "label": "Beam search (IonQ BeamSearchDecoder 5100dc0: width 32; min-sum BP, 40 iterations then up to 10 rounds of 30)",
+     "errors": 569,
+     "shots": 90000,
+     "per_round": 0.00127,
+     "lo": 0.00117,
+     "hi": 0.00138,
+     "ms": 0.28
+    }
+   ]
+  }
+ }
+}
