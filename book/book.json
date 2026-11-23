@@ -99,7 +99,7 @@
     {
       "part": "G",
       "title": "Semantics: which gate the pulses make",
-      "about": "Exact numbers, the native pulses as matrices, u3 from two pulses, CX from one entangling pulse, stabilizer tableaux, and measurement -- without Mathlib.",
+      "about": "Exact numbers, the native pulses as matrices, u3 from two pulses, CX from one entangling pulse, stabilizer tableaux, measurement, and the second native gate set, RZZ -- without Mathlib.",
       "lessons": [
         {
           "id": "G1",
@@ -156,6 +156,15 @@
           "slug": "G7-semantic-check",
           "source": "chapters/G7-semantic-check.lean",
           "ids": "book:G7"
+        },
+        {
+          "id": "G8",
+          "title": "CX from RZZ: the other native gate set",
+          "status": "live",
+          "slug": "G8-cx-from-rzz",
+          "source": "chapters/G8-cx-from-rzz.lean",
+          "ids": "book:G8",
+          "story": "Quantinuum's machines entangle with RZZ where the lessons so far used MS. Prove that one RZZ is a CZ, build the CNOT from it, and see that the two gate sets are one pulse in two bases."
         }
       ]
     },

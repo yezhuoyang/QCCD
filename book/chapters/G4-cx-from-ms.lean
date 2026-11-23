@@ -5,11 +5,12 @@ import QCCDC.Cert.Sound
 
 *Part G, lesson G4. You need lessons G1 to G3.*
 
-The only entangling operation of the machine is the Mølmer-Sørensen pulse. Every CNOT of a
-circuit becomes four one-ion pulses around one MS(π/2). This
+In the gate set `ms`, the compiler's default, the only entangling operation of the machine is the
+Mølmer-Sørensen pulse. Every CNOT of a circuit becomes four one-ion pulses around one MS(π/2). This
 lesson proves that exactly, including the phase e^(−iπ/4) the identity carries; says what
 "equal up to a global phase" means, and why it is the right equality for a whole programme and the
 wrong one for a building block; and proves the CNOT that the Bell certificate's witness stands for.
+Lesson G8 does the same for the other gate set, `rzz`.
 -/
 
 -- setup

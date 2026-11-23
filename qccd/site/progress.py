@@ -613,6 +613,17 @@ def _diagrams() -> dict[str, str]:
                + text(98, 14, "swap_operands", 5.2, "#182230", weight=700, mono=True)
                + good(98, 30, 5.5) + text(98, 44, "checker", 5.8, GOOD, weight=700)
                + bad(98, 56, 5.5) + text(98, 70, "semantics", 5.8, BAD, weight=700))
+    # the other gate set: R on the target, one RZZ, R on the target, a frame change on each ion
+    d["G8"] = (lines(24, 50, x0=14, x1=72)
+               + tile(16, 45, 10, 2) + tile(29, 19, 16, 4, c="#1f7fa8", fill="#e3f1f7", h=36)
+               + tile(48, 45, 10, 2)
+               + tile(61, 19, 8, 2, c="#e8890c", fill="#fdf0e2") + tile(61, 46, 8, 2, c="#e8890c", fill="#fdf0e2")
+               + text(37, 64, "RZZ(π/2)", 5.6, "#1f7fa8", weight=800)
+               + text(80, 40, "=", 11, "#182230", weight=700)
+               + '<path d="M92 24H112M92 50H112M102 24V56" stroke="#182230" stroke-width="1.3"/>'
+               + '<circle cx="102" cy="24" r="3" fill="#182230"/><circle cx="102" cy="50" r="6" fill="#fff" stroke="#182230" stroke-width="1.3"/>'
+               + '<path d="M96 50h12M102 44v12" stroke="#182230" stroke-width="1.3"/>'
+               + text(60, 75, "R, RZZ, R, VZ, VZ", 5.6, "#667085"))
     # ---- I: build your own verified compiler ---------------------------------------------------
     def strip(x, y, w=28, faded=1.0):
         """A circuit: two wires, h, two cx, a measurement."""
