@@ -418,6 +418,7 @@ def noise_panel(row: dict, release, exp) -> str:
     block by block, each block one hardware instruction with what its noise was priced from."""
     from qccd.compile.decode import insert_decodes
     from qccd.qec import extract
+    from qccd.qec.reproduce import decoder_label
     q = release.manifest["qec"]
     cert = json.loads(Path(row["prefix"] + ".qcert.json").read_text(encoding="utf-8"))
     ex = extract(row["cooled"], row["arch"], exp, noise=q["noise"], cert=cert)
@@ -448,7 +449,8 @@ def noise_panel(row: dict, release, exp) -> str:
     summary = (
         f'<div class="big">LER per round {est["per_round"]:.2e} '
         f'<small>(95%: {est["per_round_lo"]:.2e} to {est["per_round_hi"]:.2e})</small></div>'
-        f'<small>{est["errors"]} logical errors in {est["shots"]:,} shots of {est["rounds"]} rounds, decoder {html.escape(est["decoder"])}, '
+        f'<small>{est["errors"]} logical errors in {est["shots"]:,} shots of {est["rounds"]} rounds, decoded by '
+        f'{html.escape(decoder_label(est, q.get("ler")))}, '
         f'seed {est["seed"]}; noise model {html.escape(q["noise"])}. The stim circuit below has {st.get("detectors")} detectors '
         f'and {st.get("ions")} qubits, one per ion. Highest n&#772; at a two-qubit gate: {st.get("nbar_max", 0):.3g}; '
         f'longest chain at a gate: {st.get("chain_max")}.</small>'
@@ -535,6 +537,7 @@ def pages(board: str, release, exp, rows: list[dict], out: Path, *,
     # repo-relative: a committed manifest must not spell out the disk it was built on
     (out / "manifest.json").write_text(json.dumps(to_repo(manifest), indent=1, default=str), encoding="utf-8")
     q = release.manifest["qec"]["ler"]
+    from qccd.qec.reproduce import decoder_label
     title = f"{release.title} on QCCD — every design, ranked"
     from qccd.api import _template_doc
     from qccd.workspace.tasks import FIXED_BLOCKS, physics_mismatch
@@ -547,8 +550,9 @@ def pages(board: str, release, exp, rows: list[dict], out: Path, *,
                  f"{compiled_by}; its hardware program was turned into a noisy stim circuit by the noise model "
                  f"{release.manifest['qec']['noise']} (a text, on the Evaluation page) read over {physics}, and sampled "
                  f"(up to {int(q['max_shots']):,} shots or {int(q['max_errors'])} logical "
-                 f"errors, decoder {q['decoder']}, fixed seed). Ranked by the logical error rate per round, lower is better; "
-                 f"click a dot to watch the ions and read the stim program that was sampled."
+                 f"errors, fixed seed) and decoded by {decoder_label(None, q)}. Ranked by the logical error rate "
+                 f"per round, lower is better; click a dot to watch the ions and read the stim program that was "
+                 f"sampled, and Download and reproduce for the files and scripts behind its number."
                  + (" At this budget the designs give at most a few logical errors each, so their 95% intervals "
                     "overlap: the order among them is not significant." if few else ""))
     s = idx.read_text(encoding="utf-8")

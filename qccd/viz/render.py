@@ -1565,6 +1565,10 @@ code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:12px}
 .tools .tb{background:var(--panel);border:1px solid var(--line);border-radius:6px;
   padding:4px 10px;cursor:pointer;color:var(--ink)}
 .tools .tb[aria-expanded="true"]{background:var(--soft);border-color:var(--navy);color:var(--navy)}
+/* "Download and reproduce": the page's one download, a plain link (`render_html(reproduce=)`) */
+.tools a.tb.dl{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600;
+  text-decoration:none;white-space:nowrap}
+.tools a.tb.dl:hover{filter:brightness(1.15)}
 .tools .sw{position:relative;margin-left:auto;display:flex;align-items:center;gap:6px}
 #search{width:min(360px,40vw);padding:5px 9px;border:1px solid var(--line);border-radius:6px;
   font:12.5px ui-sans-serif,system-ui,sans-serif;background:var(--panel);color:var(--ink)}
@@ -1897,6 +1901,10 @@ textarea.src.out{min-height:120px;opacity:.85}
     <button class="tb" id="tbRows" aria-expanded="false" data-pop="row" data-hint="tools:rows">Append a row</button>
     <button class="tb" id="tbMachine" aria-expanded="false" data-pop="block" data-hint="tools:machine">Machine settings</button>
     <button class="tb" id="tbComponents" aria-expanded="false" data-pop="component" data-hint="tools:components">Components</button>
+    <!-- DOWNLOAD AND REPRODUCE: one zip with what this page's number was made from and the
+         scripts that make it again (qccd/qec/reproduce.py).  A plain download link, shown
+         only on a page that was given one (`render_html(reproduce=)`), through `style.display`. -->
+    <a class="tb dl" id="tbReproduce" data-hint="reproduce" style="display:none" download>Download and reproduce</a>
     <!-- NO "Selection" BUTTON.  Its popover showed `#palInspect`, which is the same DOM
          node the rail already carries, and `window.onInspector` popped it open on every
          selection -- the busiest thing on the page.  Per-element actions are the
@@ -4014,6 +4022,12 @@ const fmt=(x,d=0)=>(x==null)?'-':Number(x).toLocaleString(undefined,{maximumFrac
 document.getElementById('kicker').textContent = D.kicker || 'ROUTING SCHEME';
 document.getElementById('title').textContent = D.headline || (A.name+' · '+P.name);
 document.getElementById('lede').textContent = D.lede || A.description || '';
+// "Download and reproduce": where this page's zip is (relative to the page) and its file name
+if(D.reproduce && D.reproduce.href){
+  const dl = document.getElementById('tbReproduce');
+  if(dl){ dl.setAttribute('href', D.reproduce.href); dl.setAttribute('download', D.reproduce.name || '');
+    dl.style.display = ''; }
+}
 // WHAT PYTHON SHIPPED for the head: the two denominators and the metric chips describe
 // the shipped programme on the shipped device.  Kept, so `paintHead` can put them back.
 // ONE CHIP, either way it is rendered: the label is its hint key, and the four a
@@ -5405,6 +5419,7 @@ function sIndex(){
   let els = []; try { els = document.querySelectorAll('button, [data-hint], .pal-item, summary, select, input[placeholder], label'); } catch(e){ els = []; }
   for(const el of els){
     if(SRES && SRES.contains(el)) continue;
+    if(el.id === 'tbReproduce' && !el.getAttribute('href')) continue;   // this page has no zip: nothing to find
     const label = sTextOf(el), key = el.getAttribute('data-hint');
     let h = null; try { h = (key && window.EDITOR && EDITOR.hintFor) ? EDITOR.hintFor(key) : null; } catch(e){}
     const lab = label || (h ? h.t : '');
@@ -5803,6 +5818,7 @@ def render_html(
     ruleset: dict | None = None,
     notes: dict | None = None,
     stage3d: "str | bool" = "auto",
+    reproduce: dict | None = None,
 ) -> Path:
     """Write the self-contained page.  Returns the path written.
 
@@ -5816,7 +5832,10 @@ def render_html(
     and `source=None` only for a programme no circuit stands behind.  `notes` is a page's
     study notes: {title, index (a link back), facts: [str], claim, marks: [{frame, id,
     label, note, kind}]}.  `open_pane` names the dock pane the page opens on (`"L"` for the
-    course); the default is none -- the page opens on the canvas.  `stage3d` says whether
+    course); the default is none -- the page opens on the canvas.  `reproduce` is the page's
+    "Download and reproduce" link, drawn in the tools bar: {href (the zip, relative to the
+    page), name (the file it is saved as)}, as `qccd.qec.reproduce.link` gives it; a page
+    without one shows no such button.  `stage3d` says whether
     the page carries the 3-D stage (`js/stage3d.js` and the vendored three.js, 0.6 MB):
     `"auto"` gives it to a machine built in layers and to no other, `"always"` and
     `"never"` say so outright."""
@@ -5831,6 +5850,8 @@ def render_html(
         view["ruleset"] = ruleset
     if notes:
         view["notes"] = notes
+    if reproduce and reproduce.get("href"):
+        view["reproduce"] = {"href": str(reproduce["href"]), "name": str(reproduce.get("name") or "")}
     # names come from the device and programme files, which can be anyone's (a leaderboard entry)
     html = _TEMPLATE.replace("__TITLE__", _escape_text(f"{arch.name} - {prog.name}"))
     html = html.replace("__STAMP__", page_stamp())

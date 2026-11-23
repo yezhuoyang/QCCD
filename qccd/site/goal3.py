@@ -104,6 +104,10 @@ def data() -> dict | None:
     # every point's own studio page (goals/goal3/pages.py), served under board/goal3/p/
     pf = GOAL / "pages.json"
     pages = json.loads(pf.read_text(encoding="utf-8")) if pf.exists() else {}
+    # every point's "Download and reproduce" zip (goals/goal3/bundles.py), served under board/goal3/z/
+    zf = GOAL / "bundles.json"
+    zips = json.loads(zf.read_text(encoding="utf-8")) if zf.exists() else {}
+    from ..qec.reproduce import decoder_label
     judged = _judged()
     codes = []
     for b in rels:
@@ -123,6 +127,9 @@ def data() -> dict | None:
             c = counts.setdefault(fam, {"tried": 0, "failed": 0})
             c["tried"] += 1
             u = {"u": "p/" + mine[name]["page"]} if name in mine else {}
+            zz = zips.get(code, {}).get(name)
+            if zz:
+                u = {**u, "z": "z/" + zz["zip"], "zn": zz["name"]}
             if r.get("status") != "ok":
                 c["failed"] += 1
                 why = ("breaks " + ", ".join(r["rules_failed"]) + ": " if r.get("rules_failed") else "") + (r.get("why") or "")
@@ -139,6 +146,8 @@ def data() -> dict | None:
             "under the team's Helios nominal noise model (qccd-noise@3)")
         codes.append({"task": task, "id": b.id, "title": name, "short": short, "about": about,
                       "ions": (b.manifest.get("qec") or {}).get("n_ions"), "rounds": spec.get("rounds"),
+                      # the decoder of every rate of this code, with its parameters (the release's budget)
+                      "decoder": decoder_label(None, (b.manifest.get("qec") or {}).get("ler")),
                       "counts": counts, "points": pts, "failed": failed,
                       **({"speed": sp} if (sp := _speed(code, fams)) else {}),
                       **({"rules": _code_rules(code, b.manifest.get("rules") or "standard", judged)}
@@ -300,7 +309,7 @@ SCRIPT = r"""
   function sup(n){ var s = '⁰¹²³⁴⁵⁶⁷⁸⁹'; return String(n).replace('-', '⁻').replace(/\d/g, function(d){ return s[+d]; }); }
   function ms(v){ return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2); }
   function pts(c){ return c.points.map(function(p){ return {f: p.f, n: p.n, s: p.s, t: p.t, l: p.l, lo: p.lo, hi: p.hi,
-      e: p.e, sh: p.sh, u: p.u, ref: true}; }).concat(live[c.id] || []); }
+      e: p.e, sh: p.sh, u: p.u, z: p.z, zn: p.zn, ref: true}; }).concat(live[c.id] || []); }
   // a point's own page: a reference size's studio page here, an entry's on the official server
   function href(p){ return p.sid ? API + '/submissions/' + encodeURIComponent(p.sid) + '/page' : (p.u || null); }
   function famsOf(c, ps){ var have = {}; ps.forEach(function(p){ have[p.f] = 1; });
@@ -387,6 +396,7 @@ SCRIPT = r"""
     tip.appendChild(H('div', null, ms(p.t) + ' ms per round'));
     tip.appendChild(H('div', null, sci(p.l) + ' per round' + (p.hi ? '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')' : '')));
     if (p.e != null) tip.appendChild(H('div', 'm', p.e + ' logical errors in ' + Number(p.sh).toLocaleString() + ' shots'));
+    if (p.e != null && c.decoder) tip.appendChild(H('div', 'm', 'Decoded by ' + c.decoder));
     if (href(p)) tip.appendChild(H('div', 'm', 'Click to open its page: the ions moving, the program against the circuit, the rules and the noise.'));
     tip.style.display = 'block'; move(ev);
   }
@@ -409,6 +419,31 @@ SCRIPT = r"""
       t.appendChild(tr);
     });
     tw.appendChild(t); host.appendChild(tw);
+    if (c.decoder) host.appendChild(H('p', 'g3r-why', 'Every rate of this code is decoded by ' + c.decoder + '.'));
+  }
+  // every point with its numbers and its "Download and reproduce" zip: the circuit, the machine, the
+  // hardware program, the noisy stim circuit and the scripts that sample and decode it again
+  function zipLink(p){ var a = H('a', null, 'Download and reproduce'); a.href = p.z; a.setAttribute('download', p.zn || ''); return a; }
+  function zips(host, c){
+    var ps = pts(c).filter(function(p){ return p.ref; }), fams = famsOf(c, ps), tw = H('div', 'tw'), t = H('table'), hd = H('tr');
+    ['family', 'size', 'ms / round', 'LER / round (95%)', 'sample', 'files'].forEach(function(s){ hd.appendChild(H('th', null, s)); });
+    t.appendChild(hd);
+    var have = 0, all = 0;
+    function line(f, p, bad){
+      var tr = H('tr'), td = H('td'); all++;
+      tr.appendChild(H('td', null, f)); tr.appendChild(named(p));
+      tr.appendChild(H('td', 'n', bad ? '' : ms(p.t)));
+      tr.appendChild(H('td', 'n', bad ? 'broke a rule' : sci(p.l) + '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')'));
+      tr.appendChild(H('td', 'n', bad ? '' : p.e + ' in ' + Number(p.sh).toLocaleString()));
+      if (p.z) { td.appendChild(zipLink(p)); have++; } else td.textContent = 'not built yet';
+      tr.appendChild(td); t.appendChild(tr);
+    }
+    fams.forEach(function(f){
+      ps.filter(function(p){ return p.f === f; }).sort(function(a, b){ return (a.s || 0) - (b.s || 0); }).forEach(function(p){ line(f, p, false); });
+      (c.failed || []).filter(function(p){ return p.f === f && p.u; }).forEach(function(p){ line(f, p, true); });
+    });
+    tw.appendChild(t); host.appendChild(tw);
+    host.appendChild(H('p', 'g3r-why', have + ' of ' + all + ' points of this code have their files here.'));
   }
   function named(p){ var td = H('td'), to = href(p);
     if (!to) { td.textContent = p.n; return td; }
@@ -608,6 +643,7 @@ SCRIPT = r"""
     panel(pan, c, 'l', 'Logical error rate per round (Z and X memories)');
     speed(c);
     var tb = document.getElementById('g3-table'); tb.textContent = ''; table(tb, c);
+    var zl = document.getElementById('g3-zips'); zl.textContent = ''; zips(zl, c);
     var fl = document.getElementById('g3-failed'); fl.textContent = ''; failures(fl, c);
     var rl = document.getElementById('g3-rules'); rl.textContent = ''; rules(rl, c);
     if (location.hash !== '#' + c.task) history.replaceState(null, '', '#' + c.task);
@@ -633,6 +669,14 @@ SCRIPT = r"""
   }, function(){});
 })();
 """
+
+
+def _decoders(d: dict) -> str:
+    """Which decoder decodes which codes, in one sentence: "the surface codes by PyMatching 2 (...)"."""
+    by: dict = {}
+    for c in d["codes"]:
+        by.setdefault(c.get("decoder") or "", []).append(c["short"])
+    return "; ".join(f"{_e(', '.join(codes))} by {_e(label)}" for label, codes in by.items() if label)
 
 
 def page(PAGE: str, STYLE: str) -> str | None:
@@ -695,6 +739,9 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "server, which ran every check on the board&rsquo;s own physics. "
         "Click any point to open its page: the ions moving on the machine, the program against the circuit, the "
         "rules, and the noise model&rsquo;s stim program block by block.</p>"
+        f"<p>Every rate is sampled with a fixed seed and decoded: {_decoders(d)}. "
+        "Each point&rsquo;s files and the scripts that run it again are under "
+        "&ldquo;Every point: download and reproduce&rdquo;, below the charts.</p>"
         f"<div class=\"tw\"><table><tr><th>family</th><th>the machine</th><th>swept</th></tr>{fams}</table></div></details>"
         '<div class="g3" id="g3">'
         '<div class="g3-tabs" id="g3-tabs" role="tablist" aria-label="Code"></div>'
@@ -732,6 +779,14 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "leakage and background heating all grow with time), and a faster rail is more heat for the next two-ion "
         "gate to meet, or one more cooling before it. It is a simulation assumption, not a measurement of one "
         "machine.</p></details></details>"
+        '<details id="g3-reproduce"><summary>Every point: download and reproduce</summary>'
+        "<p>One zip file per point: the code&rsquo;s circuit, the point&rsquo;s machine, its hardware program, the "
+        "noisy stim circuit the rate was sampled from, and two Python scripts. The first samples and decodes the "
+        "stim circuit again with the point&rsquo;s seed, budget and decoder, and needs only stim, numpy and the "
+        "decoder; the second replays the program and rebuilds the stim circuit. The time and the stim circuit come "
+        "out exactly; the rate comes out exactly with the same versions on the same kind of computer, and "
+        "otherwise within its 95% interval.</p>"
+        '<div id="g3-zips"></div></details>'
         + goal3_costs.section() +
         '<details><summary>The sizes that failed, and why</summary><div id="g3-failed"></div></details>'
         "<details hidden><summary>The rules each submission is judged by</summary>"

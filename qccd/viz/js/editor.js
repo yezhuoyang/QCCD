@@ -4629,6 +4629,7 @@ var HINTS = {
   'qlabels': { t: 'q labels', d: 'Write each ion’s virtual qubit above it, in the circuit’s spelling: ion q45 carries q[45]. Off by default; the choice is remembered.' },
   'notes:pill': { t: 'Study notes', d: 'This page’s own remarks on its programme: the facts it was judged by and the steps worth stopping at. Click a note to jump to its step; #step=N in the address opens any step.' },
   'notes:box': { t: 'Study notes', d: 'The steps worth stopping at, in order. Click one to jump there; prev and next walk them.' },
+  'reproduce': { t: 'Download and reproduce', d: 'Downloads one zip file with everything this page’s number was made from: the input circuit, the machine, the hardware program, the noisy stim circuit when the board measures a logical error rate, and the Python scripts that run the experiment again, with instructions.' },
   'ruleset': { t: 'The paper’s rules', d: 'This schedule was written for another machine model: a paper’s. Its rule set, judged rule by rule when the page was built, comes first; hover a rule for its first counterexample or for why it does not apply. The badges after it are this website’s own rules, which the paper did not assume.' },
   // the picture, element by element
   'el:site':       { t: 'Trapping site', d: 'A pocket in the electric field where ions sit still. Each site holds a few ions (its capacity), and its zone says what may happen there: a gate, a measurement, cooling.', k: 'press the tile, then click the canvas' },

@@ -1,0 +1,152 @@
+{
+ "bb72": {
+  "c2lr10x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
+   "name": "goal3-bb72-c2lr10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr10x9.zip"
+  },
+  "conveyor96_96d_j": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
+   "name": "goal3-bb72-conveyor96_96d_j-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/conveyor96_96d_j.zip"
+  }
+ },
+ "color3": {
+  "c2lr4x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
+   "name": "goal3-color3-c2lr4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/c2lr4x3.zip"
+  }
+ },
+ "surface3": {
+  "c2lr4x4": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-c2lr4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/c2lr4x4.zip"
+  },
+  "c2lr5x4": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-c2lr5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/c2lr5x4.zip"
+  },
+  "c2lr5x5": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-c2lr5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/c2lr5x5.zip"
+  },
+  "c2lr6x5": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-c2lr6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/c2lr6x5.zip"
+  },
+  "conveyor12_8d_j": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-conveyor12_8d_j-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/conveyor12_8d_j.zip"
+  },
+  "conveyor16_8d_j": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-conveyor16_8d_j-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/conveyor16_8d_j.zip"
+  },
+  "conveyor22_11d_j": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-conveyor22_11d_j-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/conveyor22_11d_j.zip"
+  },
+  "cyclone10_n2": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-cyclone10_n2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/cyclone10_n2.zip"
+  },
+  "cyclone2_n9": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-cyclone2_n9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/cyclone2_n9.zip"
+  },
+  "cyclone4_n5": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-cyclone4_n5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/cyclone4_n5.zip"
+  },
+  "cyclone6_n4": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-cyclone6_n4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/cyclone6_n4.zip"
+  },
+  "cyclone8_n3": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-cyclone8_n3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/cyclone8_n3.zip"
+  },
+  "helios98": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-helios98-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/helios98.zip"
+  },
+  "wise_h3_3x3": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h3_3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h3_3x3.zip"
+  },
+  "wise_h3_4x3": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h3_4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h3_4x3.zip"
+  },
+  "wise_h3_4x4": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h3_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h3_4x4.zip"
+  },
+  "wise_h5_2x2": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h5_2x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h5_2x2.zip"
+  },
+  "wise_h5_3x2": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h5_3x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h5_3x2.zip"
+  },
+  "wise_h5_3x3": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h5_3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h5_3x3.zip"
+  },
+  "wise_h7_2x2": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h7_2x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h7_2x2.zip"
+  },
+  "wise_h7_3x2": {
+   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "name": "goal3-surface3-wise_h7_3x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/wise_h7_3x2.zip"
+  }
+ }
+}

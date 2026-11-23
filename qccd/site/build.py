@@ -2033,7 +2033,8 @@ def build(out: Path) -> int:
     put("board/compiler/index.html", lb.compiler_page(PAGE, STYLE), 2, "board")
     put("board/noise/index.html", lb.noise_page(PAGE, STYLE), 2, "board")
     from . import qec_cycle
-    n_pages = 0
+    from ..qec import reproduce as repro
+    n_pages = n_zips = 0
     for t in ts:
         src = t["seed_dir"]
         if not (src / "index.html").exists():
@@ -2055,6 +2056,7 @@ def build(out: Path) -> int:
                 if r.get("status") == "ok" and r.get("page"):
                     put(f"{full}/{r['page']}", (src / r["page"]).read_text(encoding="utf-8"), 2, perm,
                         app=True, extra=qec_cycle.studio_block())
+            repro.write_board(t, t["all_rows"], out / full, prebuilt=src / repro.FOLDER, log=print)
         # the chart's controls are declared as the page is copied (qccd/site/boards.py), and the
         # official leaderboard's entries join its chart, live (qccd/site/leaderboard.py)
         put(f"board/{t['id']}/index.html",
@@ -2084,7 +2086,16 @@ def build(out: Path) -> int:
             gif = r.get("gif")
             if gif and (src.parent / gif).exists():
                 shutil.copy2(src.parent / gif, out / "board" / gif)
-        print(f"  {t['id']:12s} {sum(1 for r in t['rows'] if r.get('status') == 'ok'):3d} entries from {src.relative_to(ROOT)}")
+        # "Download and reproduce": every compiled entry's zip beside its page, built here from the
+        # entry's tracked files (qccd/qec/reproduce.py); for a board whose programs are not in the
+        # repository, the zips its generator left beside the seed pages.  An entry that has neither
+        # is named: its page's button would lead nowhere.
+        zz = repro.write_board(t, t["rows"] + t["disqualified"], dst, prebuilt=src / repro.FOLDER, log=print)
+        n_zips += zz["built"] + zz["copied"]
+        lost = sorted(set(zz["missing"]) | set(zz["failed"]))
+        print(f"  {t['id']:12s} {sum(1 for r in t['rows'] if r.get('status') == 'ok'):3d} entries from {src.relative_to(ROOT)}"
+              f", {zz['built'] + zz['copied']} reproduce zips ({zz['bytes'] / 1e6:.1f} MB)"
+              + (f"; NO ZIP for {', '.join(lost)}" if lost else ""))
     # Goal 1: every implementation under 200 ions on one ranking, every code's official entries
     # together (qccd/site/leaderboard.py goal_page), drawn in a memory board's chart
     g = leaderboard.goal_info("goal1")
@@ -2105,7 +2116,8 @@ def build(out: Path) -> int:
     n_debug = debugpage.write(out, put, PAGE, STYLE, app_pages, index)
     print(f"  debug        {n_debug} programs to open, the rule language and its Python runtime")
     total = sum(p.stat().st_size for p in out.rglob("*") if p.is_file())
-    print(f"wrote {out}  ({n_pages} entry pages, {len(index)} search entries, {total / 1e6:.0f} MB)")
+    print(f"wrote {out}  ({n_pages} entry pages, {n_zips} reproduce zips, {len(index)} search entries, "
+          f"{total / 1e6:.0f} MB)")
     return 0
 
 

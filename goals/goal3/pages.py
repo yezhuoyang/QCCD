@@ -52,6 +52,15 @@ def find_work(code: str, point: str, roots: list[Path]) -> Path | None:
     return None
 
 
+def reproduce_link(row: dict) -> dict | None:
+    """The point's "Download and reproduce" zip as its page links it, or None while the zip is
+    not built: bundles.py writes the zips (served as board/goal3/z/<code>/<point>.zip, two
+    folders up from this page and down) and records each in bundles.json."""
+    f = HERE / "bundles.json"
+    z = (json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}).get(row["code"], {}).get(row["point"])
+    return {"href": "../../z/" + z["zip"], "name": z["name"]} if z else None
+
+
 def build(row: dict, work: Path, rel, exp, out: Path, *, max_frames: int = 20000, gz: bool = False) -> dict:
     import bb_studio as B
     import memory_boards as M
@@ -105,7 +114,8 @@ def build(row: dict, work: Path, rel, exp, out: Path, *, max_frames: int = 20000
                                  "website's machine, for comparison."},
                 # the page is served as board/goal3/p/<code>/<point>.html: Goal 3's page is two folders up
                 notes=B.study_notes({"key": row["point"], "claim": claim}, [], numbers,
-                                    f"../../#{rel.manifest['task']}"))
+                                    f"../../#{rel.manifest['task']}"),
+                reproduce=reproduce_link(row))
     if row["status"] == "ok":
         lr = json.loads((work / "ler_report.json").read_text(encoding="utf-8"))
         # the sweep's noise model, on the experiment the release fixes

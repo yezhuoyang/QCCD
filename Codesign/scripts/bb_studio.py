@@ -48,6 +48,7 @@ from qccd.ir.source_map import build as build_source  # noqa: E402
 from qccd.ir.tsir import TSIR, iter_pairs  # noqa: E402
 from qccd.verify import verify  # noqa: E402
 from qccd.viz.render import render_html  # noqa: E402
+from qccd.qec import reproduce as reproduce_zip  # noqa: E402
 from qccd.repo_paths import resolve, to_repo  # noqa: E402
 
 BUILD = ROOT / "Compiler" / "build"
@@ -504,6 +505,33 @@ def release_of(out_dir: Path) -> str | None:
     return _RELEASE_OF.get(key)
 
 
+def task_of(out_dir: Path) -> dict | None:
+    """The task whose board is written to `out_dir` (tasks/<id>/task.json, by its `seed`)."""
+    key = Path(out_dir).resolve()
+    for f in sorted((ROOT / "tasks").glob("*/task.json")):
+        t = json.loads(f.read_text(encoding="utf-8"))
+        if isinstance(t.get("seed"), str) and (ROOT / t["seed"]).resolve() == key:
+            return t
+    return None
+
+
+def write_reproduce_zips(rows: list[dict], out_dir: Path) -> dict | None:
+    """The board's "Download and reproduce" zips, beside its seed pages (`<out_dir>/reproduce/`).
+
+    The BB board's programs live in Compiler/build/, which is not in the repository, so the
+    site build cannot make their zips from a clean checkout: they are made here, where the
+    programs are, and the site build copies them (`qccd.qec.reproduce.write_board`).  A board
+    whose programs are committed (SmallCode, MemoryBoard) needs none of this."""
+    task = task_of(out_dir)
+    if task is None:
+        return None
+    done = reproduce_zip.write_board(task, rows, out_dir, log=print)
+    lost = sorted(set(done["missing"]) | set(done["failed"]))
+    print(f"-> {Path(out_dir) / reproduce_zip.FOLDER}: {done['built']} zips, {done['bytes'] / 1e6:.1f} MB"
+          + (f"; NO ZIP for {', '.join(lost)} (its program is not here)" if lost else ""))
+    return done
+
+
 def over_budget(arch, release_id: str | None) -> list[str]:
     """What the official grader refuses this device for (DEVICE.OVER_BUDGET, #15): the
     release's budget against `hardware_report` with every number the device declares about
@@ -808,6 +836,10 @@ def build_one(entry: dict, out_dir: Path, *, max_frames: int) -> dict:
     page = out_dir / f"{entry['key']}.html"
     source = None
     marks: list[dict] = []
+    # "Download and reproduce": a compiled entry of a board has a zip (qccd/qec/reproduce.py),
+    # served beside its page; the page's button and the index's row both lead to it
+    board = (release_of(out_dir) or "").split("@")[0]
+    zip_link = reproduce_zip.link(board, entry["key"]) if (board and entry.get("prefix")) else None
     if entry.get("prefix"):
         prefix = Path(entry["prefix"])
         tsir = Path(str(prefix) + ".cooled.tsir.json")
@@ -859,8 +891,9 @@ def build_one(entry: dict, out_dir: Path, *, max_frames: int) -> dict:
     render_html(_publishable(arch), prog, report.result, model, page, kicker=entry.get("kicker") or "BB CODESIGN",
                 headline=headline, lede=lede, source=source,
                 template_stems="*", max_frames=max_frames,
-                notes=study_notes(entry, marks, numbers, "index.html"))
+                notes=study_notes(entry, marks, numbers, "index.html"), reproduce=zip_link)
     return {**{k: (str(v) if isinstance(v, Path) else v) for k, v in entry.items()},
+            **({"reproduce": zip_link} if zip_link else {}),
             "status": "ok", "page": page.name, "instructions": len(prog),
             "rules_failed": rules["failed"], "rules_passed": len(rules["passed"]),
             "disqualified": bool(rules["failed"]),
@@ -901,6 +934,7 @@ def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
     every value, which the aqua slot's contrast requires.
     """
     records = []
+    budget = _ler_budget(out_dir)
     for r in rows:
         if r.get("status") != "ok":
             continue
@@ -924,6 +958,10 @@ def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
             "drc": sum((n.get("drc") or {}).values()) if n.get("drc") else None,
             "marks": [{"step": m["step"], "label": m["label"], "kind": m["kind"]}
                       for m in (r.get("marks") or [])],
+            # "Download and reproduce": the row's zip, beside the pages; and, where the row is a
+            # logical error rate, the decoder that produced it, with its parameters
+            **({"zip": r["reproduce"]["href"], "zipname": r["reproduce"]["name"]} if r.get("reproduce") else {}),
+            **({"decoder": reproduce_zip.decoder_label(r["ler"], budget)} if r.get("ler") else {}),
         })
     data = json.dumps(records, separators=(",", ":")).replace("</", "<\\/")
     page = _INDEX_TEMPLATE.replace("__DATA__", data)
@@ -943,6 +981,19 @@ def write_index(rows: list[dict], out_dir: Path, *, title: str | None = None,
     p = out_dir / name
     p.write_text(page, encoding="utf-8")
     return p
+
+
+def _ler_budget(out_dir: Path) -> dict:
+    """The sampling budget of the board written to `out_dir` (its release's), or {}: what a
+    decoder's label reads BP-OSD's iteration cap from."""
+    rid = release_of(out_dir)
+    if not rid:
+        return {}
+    try:
+        from qccd.workspace.tasks import find_release
+        return dict((find_release(rid).manifest.get("qec") or {}).get("ler") or {})
+    except Exception:  # noqa: BLE001 -- a board without a release names no budget
+        return {}
 
 
 def _disqualified_html(rows: list[dict]) -> str:
@@ -1033,6 +1084,7 @@ svg{display:block;width:100%;height:auto}
 .btns{display:flex;gap:10px;margin:8px 0 14px;flex-wrap:wrap}
 .btn{display:inline-block;padding:7px 12px;border-radius:6px;border:1px solid #cfceca;background:#fff;color:var(--ink);text-decoration:none;font-size:13px}
 .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.dl{border-color:var(--accent);color:var(--accent);font-weight:600} .tbl td a.dl{color:var(--accent);font-weight:600}
 .steps{list-style:none;margin:0;padding:0;font-size:13px}
 .steps li{padding:3px 0;border-bottom:1px solid var(--grid)}
 .steps a{color:var(--accent);text-decoration:none;font-variant-numeric:tabular-nums;margin-right:8px}
@@ -1178,6 +1230,9 @@ function tip(ev, d, yk, xk){ var t=$('tip'), ym=metric(yk), xm=xk==='rank'?null:
   var w=$('chartwrap').getBoundingClientRect(); t.style.display='block'; t.style.left=(ev.clientX-w.left+14)+'px'; t.style.top=(ev.clientY-w.top+14)+'px'; }
 function hideTip(){ $('tip').style.display='none'; }
 function select(key){ SEL=key; draw(); detail(DATA.filter(function(d){return d.key===key;})[0]); pushState(); }
+// "Download and reproduce": one zip with the row's circuit, machine, hardware program, noisy stim circuit and scripts
+function zipLink(d, cls){ var z=document.createElement('a'); z.className=cls; z.href=d.zip; z.setAttribute('download', d.zipname||''); z.textContent='Download and reproduce';
+  z.title='one zip: the input circuit, the machine, the hardware program, ' + (d.decoder ? 'the noisy stim circuit, ' : '') + 'and the scripts that reproduce this number'; return z; }
 function row(k,v,cls){ var tr=document.createElement('tr'), a=document.createElement('td'), b=document.createElement('td'); a.textContent=k; if (cls) b.className=cls; b.textContent=v; tr.appendChild(a); tr.appendChild(b); return tr; }
 function detail(d){ var el=$('detail'); el.className='detail'; el.innerHTML='';
   var left=document.createElement('div'), right=document.createElement('div');
@@ -1188,11 +1243,13 @@ function detail(d){ var el=$('detail'); el.className='detail'; el.innerHTML='';
   var btns=document.createElement('div'); btns.className='btns';
   var a=document.createElement('a'); a.className='btn primary'; a.href=d.page; a.textContent=d.compiled?'Open in studio — step every instruction':'Open in studio — inspect the device'; btns.appendChild(a);
   if (d.gif){ var g=document.createElement('a'); g.className='btn'; g.href='../'+d.gif; g.textContent='animated clip'; btns.appendChild(g); }
+  if (d.zip) btns.appendChild(zipLink(d, 'btn dl'));
   left.appendChild(btns);
   if (d.marks && d.marks.length){ var sh=document.createElement('div'); sh.style.cssText='font-size:12.5px;color:#52514e;margin-bottom:4px'; sh.textContent='Check each claim on its step:'; left.appendChild(sh);
     var ul=document.createElement('ul'); ul.className='steps'; d.marks.forEach(function(m){ var li=document.createElement('li'); li.setAttribute('data-kind',m.kind); var la=document.createElement('a'); la.href=d.page+'#step='+m.step; la.textContent='step '+m.step; li.appendChild(la); li.appendChild(document.createTextNode(m.label)); ul.appendChild(li); }); left.appendChild(ul); }
   if (d.compiled){ var tb=document.createElement('table'); var n=d.numbers;
     METRICS.forEach(function(m){ if (val(d,m.k)!=null) tb.appendChild(row(m.name.replace(' — ',': '), fmt(val(d,m.k),m))); });
+    if (d.decoder) tb.appendChild(row('Logical error rate: decoder', d.decoder));
     // what the programme asks of the control hardware: the waveform census (qccd/cost/waveforms.py)
     if (n.waveforms_max!=null) tb.appendChild(row('Control: waveforms played at once', n.waveforms_max + ' (' + n.motions_max + ' motion' + (n.motions_max===1?'':'s') + (n.waveforms_max>n.motions_max?' + the hold':'') + ')'));
     if (n.dacs_census!=null) tb.appendChild(row('Control: DACs with the census', fmt(n.dacs_census,{nd:0})));
@@ -1211,10 +1268,12 @@ function detail(d){ var el=$('detail'); el.className='detail'; el.innerHTML='';
 function table(){ var w=$('tablewrap'); w.innerHTML=''; var yk=ysel.value;
   var cols=['T_jones','T_transport','p_eff_vs_threshold','dacs','select_bits_per_cycle','shim_charge_ms','shim_charge_m16_ms','area_mm2','pads_per_trap','ions_per_instruction','batches','hops'].map(metric).filter(Boolean);
   var t=document.createElement('table'); t.className='tbl'; var tr=document.createElement('tr');
-  ['design','family','buildable'].concat(cols.map(function(m){ return m.name.split(' — ')[1]||m.name; })).forEach(function(h,i){ var th=document.createElement('th'); th.textContent=h; if (i>=3){ th.onclick=function(){ ysel.value=cols[i-3].k; draw(); }; th.title='rank by this'; if (cols[i-3].k===yk) th.style.color='#0b0b0b'; } tr.appendChild(th); }); t.appendChild(tr);
+  ['design','family','buildable'].concat(cols.map(function(m){ return m.name.split(' — ')[1]||m.name; })).forEach(function(h,i){ var th=document.createElement('th'); th.textContent=h; if (i>=3){ th.onclick=function(){ ysel.value=cols[i-3].k; draw(); }; th.title='rank by this'; if (cols[i-3].k===yk) th.style.color='#0b0b0b'; } tr.appendChild(th); });
+  var zh=document.createElement('th'); zh.textContent='files'; zh.style.cursor='default'; tr.appendChild(zh); t.appendChild(tr);
   var rows = ranked(yk).concat(DATA.filter(function(d){ return d.compiled && val(d,yk)==null; }), DATA.filter(function(d){ return !d.compiled; }));
   rows.forEach(function(d){ var r=document.createElement('tr'); if (SEL===d.key) r.className='sel';
     [shortName(d), d.family, d.compiled ? (d.numbers.buildable?'yes':(d.numbers.drc_clean?'no wells':'no')) : 'refused'].concat(cols.map(function(m){ return fmt(val(d,m.k),m); })).forEach(function(v){ var td=document.createElement('td'); td.textContent=v; r.appendChild(td); });
+    var zc=document.createElement('td'); if (d.zip){ var zl=zipLink(d, 'dl'); zl.onclick=function(ev){ ev.stopPropagation(); }; zc.appendChild(zl); } else zc.textContent='–'; r.appendChild(zc);
     r.onclick=function(){ select(d.key); }; t.appendChild(r); });
   w.appendChild(t); }
 function setView(v){ VIEW=v; if (typeof pushState==='function') setTimeout(pushState,0); $('vchart').setAttribute('aria-pressed', v==='chart'); $('vtable').setAttribute('aria-pressed', v==='table'); $('chartwrap').hidden = v!=='chart'; $('legend').hidden = v!=='chart'; $('tablewrap').hidden = v!=='table'; if (v==='table') table(); }
@@ -1334,10 +1393,19 @@ def main(argv=None) -> int:
     ap.add_argument("--max-frames", type=int, default=20000)
     ap.add_argument("--index-only", action="store_true",
                     help="rewrite index.html from manifest.json without re-rendering pages")
+    ap.add_argument("--no-zips", action="store_true",
+                    help="do not write the Download-and-reproduce zips beside the pages")
+    ap.add_argument("--zips-only", action="store_true",
+                    help="write the Download-and-reproduce zips from manifest.json and nothing else")
     a = ap.parse_args(argv)
     out_dir = Path(a.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     drafts = set() if a.drafts else {e["key"] for e in CATALOG if e.get("draft")}
+    if a.zips_only:
+        rows = [r for r in resolve(json.loads((out_dir / "manifest.json").read_text(encoding="utf-8")))
+                if not a.only or r["key"] == a.only]
+        done = write_reproduce_zips(rows, out_dir)
+        return 1 if done is None or done["failed"] else 0
     if a.index_only:
         rows = [r for r in resolve(json.loads((out_dir / "manifest.json").read_text(encoding="utf-8")))
                 if r["key"] not in drafts]
@@ -1369,6 +1437,10 @@ def main(argv=None) -> int:
     manifest.write_text(json.dumps(to_repo(rows), indent=1, default=str), encoding="utf-8")
     print(f"-> {manifest}")
     print(f"-> {write_board_index(rows, out_dir)}")
+    if not a.no_zips:
+        # the zips of the pages just built (one with --only: a ring's replay takes minutes)
+        write_reproduce_zips([r for r in resolve(json.loads(manifest.read_text(encoding="utf-8")))
+                              if not a.only or r["key"] == a.only], out_dir)
     return 0
 
 
