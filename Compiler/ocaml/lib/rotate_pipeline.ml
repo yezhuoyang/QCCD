@@ -328,7 +328,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref [
   in
 
   let prog = ref Tsir.{ name = c.name; arch_spec = arch_path; instructions = [];
-                        metrics = []; prog_meta = []; id_seq = 0 } in
+                        metrics = []; prog_meta = Gateset.declared (); id_seq = 0 } in
   let fresh () = let n, p = Tsir.next_id !prog in prog := p; n in
   (* The instruction a gate witness names ought to be one that actually performs the
      operation.  It used to be `id_seq - 1` -- the last instruction of the whole LAYER --
@@ -588,7 +588,8 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref [
                   match p with
                   | Gateset.Beam { theta; phi; qubit } -> `Beam (theta, phi, name qubit)
                   | Gateset.Frame { lam; qubit } -> `Frame (lam, name qubit)
-                  | Gateset.Ms { theta; a = u; b = v } -> `Ms (theta, name u, name v))
+                  | Gateset.Ms { theta; a = u; b = v } -> `Ms (theta, name u, name v)
+                  | Gateset.Rzz { theta; a = u; b = v } -> `Rzz (theta, name u, name v))
                 dc.pulses ))
           pairs4
       in
@@ -606,7 +607,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref [
             if k < List.length ps then
               match List.nth ps k with
               | `Beam (th, ph, i) -> beams := (i, d.site, [ th; ph ], dag) :: !beams
-              | `Ms (th, u, v) -> mss := ((u, v), d.site, [ th ], dag) :: !mss
+              | `Ms (th, u, v) | `Rzz (th, u, v) -> mss := ((u, v), d.site, [ th ], dag) :: !mss
               | `Frame (l, i) -> vzs := (i, d.site, [ l ], dag) :: !vzs)
           seqs;
         let emit_batch gate arity items pairs_of =
@@ -627,7 +628,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref [
         emit_batch "R" (Some 1) !beams (fun _ -> []);
         emit_batch "VZ" (Some 1) !vzs (fun _ -> []);
         if !mss <> [] then begin
-          add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some "MS";
+          add Tsir.{ blank with ityp = "gate"; id = fresh (); gate = Some (Gateset.entangler ());
                      mode = Some "intra";
                      pairs = List.rev_map (fun (p, _, _, _) -> p) !mss;
                      params = List.rev_map (fun (_, _, p, _) -> p) !mss;
@@ -730,7 +731,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref [
       let native = List.map (fun (o,i,(dk:Conveyor.dock),ps) ->
         let ps=List.map (function Gateset.Beam {theta;phi;_}->`Beam (theta,phi,i)
           | Gateset.Frame {lam;_}->`Frame (lam,i)
-          | Gateset.Ms _->raise (Not_applicable "one-qubit gate lowered to MS")) ps in
+          | Gateset.Ms _ | Gateset.Rzz _->raise (Not_applicable "one-qubit gate lowered to an entangler")) ps in
         o,dk.site,[i],ps) seqs in
       native_lowering sited native;
       let first_id = !prog.id_seq in
@@ -744,7 +745,7 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref [
               match List.nth ps k with
               | Gateset.Beam { theta; phi; _ } -> beams := (i, [ theta; phi ], o.index) :: !beams
               | Gateset.Frame { lam; _ } -> vzs := (i, [ lam ], o.index) :: !vzs
-              | Gateset.Ms _ ->
+              | Gateset.Ms _ | Gateset.Rzz _ ->
                 raise (Not_applicable "a one-qubit gate decomposed to an entangler"))
           seqs;
         let emit gate kind its =
@@ -1007,7 +1008,8 @@ let run ?(sweep = Greedy) ?placement ?(dock_all = false) ?(stage_records = ref [
         unrealised = [];
         claims =
           [ ("rotations", `Int !n_rot); ("hops", `Int !n_hops);
-            ("contacts", `Int !n_contacts); ("batches", `Int !n_batches) ];
+            ("contacts", `Int !n_contacts); ("batches", `Int !n_batches) ]
+          @ Gateset.declared ();
       }
   in
   stage_records := List.rev !evidence;

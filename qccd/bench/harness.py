@@ -137,7 +137,8 @@ def run_suite(suite: Suite, compiler: CompilerSpec, *, workdir: Path, split: str
             rec.update(status=inv.status, reason=_first_line(inv.log) or inv.status)
             return rec
         with grading:
-            g = grade_pair(pair, inv.program, physics=physics_ref, ler=ler, limits=limits, workdir=pdir)
+            g = grade_pair(pair, inv.program, physics=physics_ref, ler=ler, limits=limits, workdir=pdir,
+                           gate_sets=tuple(suite.manifest.get("gate_sets") or ("ms",)))
         rec.update(g)
         return rec
 

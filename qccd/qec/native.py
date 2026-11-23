@@ -2,10 +2,11 @@
 
 Two vocabularies reach this module, and both have to mean exactly one Clifford:
 
-* **qccdc's native pulses** -- `R(θ, φ)` per ion, the frame change `VZ(λ)`, and `MS(θ)` per
-  pair.  The table below MIRRORS `Compiler/bridge/check_cert.py` (`_emit_r`, `_emit_ms`,
+* **qccdc's native pulses** -- `R(θ, φ)` per ion, the frame change `VZ(λ)`, and the entangling
+  pulse of the programme's gate set per pair: `MS(θ)`, or `RZZ(θ)` (`qccd.ir.gate_sets`).  The
+  table below MIRRORS `Compiler/bridge/check_cert.py` (`_emit_r`, `_emit_ms`, `_emit_rzz`,
   `is_right_angle`) line for line, and `tests/test_qec_native.py` asserts the two agree on
-  all 16 `(quarter turns, axis)` cases of `R` and all 4 of `MS`.  It is a copy rather than
+  all 16 `(quarter turns, axis)` cases of `R` and all 4 of `MS` and of `RZZ`.  It is a copy rather than
   an import because the bridge is a script directory, not a package: reaching into it
   means editing `sys.path`, which a library imported by a server must not do.  The test is
   what keeps the copy honest -- a sign fixed in one place and not the other fails it.
@@ -29,6 +30,9 @@ __all__ = [
     "emit_r",
     "emit_vz",
     "emit_ms",
+    "emit_rzz",
+    "emit_entangler",
+    "ENTANGLING",
     "ABSTRACT_1Q",
     "ABSTRACT_2Q",
     "canonical_abstract",
@@ -98,6 +102,27 @@ def emit_ms(circ, a: int, b: int, theta: float) -> None:
     circ.append("SQRT_XX" if k == 1 else "SQRT_XX_DAG", [a, b])
 
 
+def emit_rzz(circ, a: int, b: int, theta: float) -> None:
+    """RZZ(θ) = exp(-i θ/2 Z⊗Z), θ a multiple of π/2.  Mirrors `check_cert._emit_rzz`."""
+    k = quarter_turns(theta, "RZZ angle")
+    if k == 0:
+        return
+    if k == 2:
+        circ.append("Z", [a])
+        circ.append("Z", [b])
+        return
+    circ.append("SQRT_ZZ" if k == 1 else "SQRT_ZZ_DAG", [a, b])
+
+
+#: The entangling pulse of each gate set (`qccd.ir.gate_sets.ENTANGLERS`), by TSIR gate name.
+ENTANGLING = {"MS": emit_ms, "RZZ": emit_rzz}
+
+
+def emit_entangler(circ, gate: str, a: int, b: int, theta: float) -> None:
+    """One entangling pulse, `MS(θ)` or `RZZ(θ)`, by its TSIR gate name."""
+    ENTANGLING[gate](circ, a, b, theta)
+
+
 # ------------------------------------------------------------------ abstract gates
 
 #: One-qubit Clifford names the gadget layer emits, as stim gates.  `I` is kept so a
@@ -105,7 +130,7 @@ def emit_ms(circ, a: int, b: int, theta: float) -> None:
 #: gate noise.
 ABSTRACT_1Q = {"I": "I", "X": "X", "Y": "Y", "Z": "Z", "H": "H", "S": "S", "S_DAG": "S_DAG"}
 #: Two-qubit names.  Each stands for ONE entangling gate on the hardware, so each is
-#: charged one MS gate's error; operand order is (control, target) for CX.
+#: charged one entangling pulse's error; operand order is (control, target) for CX.
 ABSTRACT_2Q = {"CX": "CX", "CZ": "CZ", "SWAP": "SWAP"}
 
 _ALIASES = {"CNOT": "CX", "SDG": "S_DAG", "SDAG": "S_DAG", "ID": "I", "IDLE": "I"}
@@ -118,7 +143,7 @@ def canonical_abstract(name: str) -> str:
     key = _ALIASES.get(key, key)
     if key in ABSTRACT_1Q or key in ABSTRACT_2Q:
         return key
-    raise NotClifford(f"gate {name!r} has no Clifford meaning here (known: native R, VZ, MS; "
+    raise NotClifford(f"gate {name!r} has no Clifford meaning here (known: native R, VZ, MS, RZZ; "
                       f"abstract {', '.join(list(ABSTRACT_1Q) + list(ABSTRACT_2Q))})")
 
 

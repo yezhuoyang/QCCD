@@ -236,7 +236,7 @@ type kind = Barrier | One | Two | Meas | Reset
 type item =
   | IBeam of int * float * float * int        (* qubit, theta, phi, op *)
   | IFrame of int * float * int               (* qubit, lambda, op *)
-  | IMs of int * int * float * int            (* qubits a b, theta, op *)
+  | IMs of int * int * float * int            (* qubits a b, theta, op: the entangler of the gate set in force *)
   | IMeas of int * int                        (* qubit, op *)
   | IReset of int * int
 
@@ -582,7 +582,7 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
       let ps=List.filter_map (function
         | IBeam (q,t,p,_)->Some (`Beam (t,p,ion q))
         | IFrame (q,l,_)->Some (`Frame (l,ion q))
-        | IMs (x,y,t,_)->Some (`Ms (t,ion x,ion y))
+        | IMs (x,y,t,_)->Some (Stages.entangler_pulse t (ion x) (ion y))
         | IMeas _ | IReset _->None) items in
       o,s,List.map ion o.Circuit.qubits,ps) assigned in
     Stages.check_native c sited native;
@@ -642,10 +642,10 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
                                 ions = List.map (fun (_, _, it) -> match it with IReset (q, _) -> ion q | _ -> assert false) these;
                                 meta = [ ("kind", `String "reset") ] @ op_meta opl }
         | _ ->
-          add Tsir.{ blank with ityp = "gate"; id; gate = Some "MS"; mode = Some "intra";
+          add Tsir.{ blank with ityp = "gate"; id; gate = Some (Gateset.entangler ()); mode = Some "intra";
                                 pairs = List.map (fun (_, _, it) -> match it with IMs (x, y, _, _) -> (ion x, ion y) | _ -> assert false) these;
                                 params = List.map (fun (_, _, it) -> match it with IMs (_, _, t, _) -> [ t ] | _ -> assert false) these;
-                                sites; meta = [ ("kind", `String "ms") ] @ op_meta opl };
+                                sites; meta = [ ("kind", `String (Gateset.entangler_kind ())) ] @ op_meta opl };
           incr n_rounds);
         (* an op is witnessed by the instruction that carries its LAST pulse *)
         List.iter
@@ -666,6 +666,7 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
                                match p with
                                | Beam { theta; phi; qubit } -> Printf.sprintf "R(%.6g,%.6g)@%s" theta phi (nm qubit)
                                | Ms { theta; a = x; b = y } -> Printf.sprintf "MS(%.6g)@%s,%s" theta (nm x) (nm y)
+                               | Rzz { theta; a = x; b = y } -> Printf.sprintf "RZZ(%.6g)@%s,%s" theta (nm x) (nm y)
                                | Frame { lam; qubit } -> Printf.sprintf "VZ(%.6g)@%s" lam (nm qubit))
                              pulses.(o) }
                   :: !cert_gates
@@ -699,7 +700,7 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
           match p with
           | Beam { theta; phi; qubit } -> IBeam (q qubit, theta, phi, o)
           | Frame { lam; qubit } -> IFrame (q qubit, lam, o)
-          | Ms { theta; a = x; b = y } -> IMs (q x, q y, theta, o))
+          | Ms { theta; a = x; b = y } | Rzz { theta; a = x; b = y } -> IMs (q x, q y, theta, o))
         pulses.(o)
   in
   (* What can run at `site` on qubit `q` now, in order: its next ops while they are one-qubit
@@ -1076,7 +1077,7 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
 
   let prog =
     Tsir.{ name = c.name; arch_spec = arch_path; instructions = List.rev !instrs; metrics = [];
-           prog_meta = []; id_seq = !nid }
+           prog_meta = Gateset.declared (); id_seq = !nid }
   in
   let cert =
     Cert.
@@ -1100,7 +1101,8 @@ let run ?init ?(stage_records = ref []) (a : Arch.t) (c : Circuit.t) ~(arch_path
         unrealised = [];
         claims =
           [ ("cycles", `Int !cyc); ("rounds", `Int !n_rounds); ("rotations", `Int !n_rot);
-            ("rotation_hops", `Int !n_hops); ("moves", `Int !n_moves); ("swaps", `Int !n_swaps) ];
+            ("rotation_hops", `Int !n_hops); ("moves", `Int !n_moves); ("swaps", `Int !n_swaps) ]
+          @ Gateset.declared ();
       }
   in
   let st =

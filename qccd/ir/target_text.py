@@ -20,6 +20,8 @@ studio needs beyond QCCDCert is an EXTENSION in the same syntax, never a differe
     rotate L0 +13;                      a closed loop turned 13 slots (QCCDCert: 13 transports
                                          of every ion on the loop's mandatory channel)
     gate CX d0,a0 @S2;                  a named gate: the pulses QCCDCert's stage 4 emits for it
+    pulse RZZ(pi/2) d0,a0 @S2;          the entangling pulse of the rzz gate set (`qccd.ir.gate_sets`;
+                                         QCCDCert's own is MS)
     readout a0;   pump a0;              the site and the calibration are optional
     cool;   cool d0,a0;                 sympathetic cooling: every ion, or the ones named
     decode a0,a1;                       the classical decoder, on these outcomes
@@ -61,6 +63,11 @@ KEYWORDS = {"init": "init", "transport": "simd", "shuttle": "shuttle", "rotate":
 KEYWORD_OF = {**{m: k for k, m in KEYWORDS.items()}, "move": "transport"}
 
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.†'\-]*")
+
+#: the physical pulses, printed `pulse NAME(angles) ions @site;` (`broadcast` for several): the
+#: one-qubit pulse and the entangling pulse of either gate set (`qccd.ir.gate_sets`).  A frame
+#: change is no pulse and prints as a `gate`.
+PULSES = ("R", "MS", "RZZ")
 
 
 # ------------------------------------------------------------------------------- angles
@@ -400,7 +407,7 @@ def instruction_text(ins, device=None) -> str:
         def word(i):
             p = params[i] if i < len(params) else (params[0] if params else ())
             return f"{g}(" + ",".join(fmt_angle(x) for x in p) + ")" if p else g
-        if g in ("R", "MS") and params:
+        if g in PULSES and params:
             ops = [(f"{word(i)} {_ions(pr)}", sites[i] if i < len(sites) else (sites[0] if sites else None))
                    for i, pr in enumerate(pairs)] or \
                   [(f"{word(i)} {q}", sites[i] if i < len(sites) else (sites[0] if sites else None))

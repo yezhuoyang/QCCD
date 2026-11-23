@@ -370,6 +370,38 @@ bash Compiler/run_c6.sh
 bash Compiler/run_all.sh
 ```
 
+### The gate set: `--gate-set ms|rzz`
+
+`qccdc compile | rotate | racetrack | decompose | pulses-selftest` take `--gate-set`. `ms`, the
+default, is `R`, `VZ` and the Mølmer–Sørensen entangler `MS(θ) = exp(−iθ/2 X⊗X)`; with it every
+output is what it was before the option existed. `rzz` is Quantinuum's native set (H-series and
+Helios): the same `R` and `VZ`, and `RZZ(θ) = exp(−iθ/2 Z⊗Z)`.
+
+```bash
+EXE=ocaml/_build/default/bin/qccdc_cli.exe
+$EXE gate-sets                                   # ms, rzz: what this binary lowers to
+$EXE pulses-selftest --gate-set rzz              # every form against its defining unitary, phase included
+$EXE compile bench/ghz8.qasm --arch build/grid9x9.expanded.json -o build/out/ghz8_rzz --gate-set rzz
+```
+
+| gate | `ms`: beams + MS | `rzz`: beams + RZZ |
+|---|---|---|
+| `cx` | 4 + 1 | 2 + 1 (`R t, RZZ, R t`, two frame changes) |
+| `cz` | 6 + 1 | 0 + 1 |
+| `crz`, `cp`, `cu1` | 10–11 + 2 | 0 + 1 |
+| `rzz` / `rxx` | 9 + 2 / 0 + 1 | 0 + 1 / 4 + 1 |
+| `swap` | 12 + 3 | 6 + 3 |
+| `ccx` | 33 + 6 | 14 + 6 |
+
+In `rzz` a zero-angle beam (the one `u3_decomp` writes for a `z`, `s` or `t`) is not emitted.
+A programme compiled in `rzz` carries `"gate_set": "rzz"` in its `meta` and in its certificate's
+`claims`, and its stage evidence names `RZZ` pulses, which `check-stages` multiplies out like
+any other. The rzz forms are numerically checked (`pulses-selftest`, `check-stages`,
+`bridge/check_cert.py` on the emitted programme); the Lean pulse theorems of C2 are about the
+`ms` set. A binary from before the option has no `gate-sets` command and ignores `--gate-set`:
+`qccd.qec.compile_with_qccdc(..., gate_set="rzz")` asks it first and refuses rather than let it
+compile MS.
+
 Lean is pinned to `leanprover/lean4:v4.29.0-rc2` with Mathlib rev `3542f17d`, matching the
 **prebuilt** cache in `LeanQEC/.lake/packages` (7,676 `.olean`). Do not bump either without
 intending a multi-hour rebuild. Only the pulse proofs (`QCCDC/Pulse`, the C2 gate) need

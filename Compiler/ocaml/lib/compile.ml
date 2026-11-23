@@ -304,7 +304,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                       arch_spec = arch_path;
                       instructions = [];
                       metrics = [];
-                      prog_meta = [];
+                      prog_meta = Gateset.declared ();
                       id_seq = 0;
                     }) in
   (* Which circuit operation is this instruction for?
@@ -1049,7 +1049,9 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                       | Beam { theta; phi; qubit } ->
                         `Beam (theta, phi, idx_to_ion qubit)
                       | Ms { theta; a = x; b = y } ->
-                        `Ms (theta, idx_to_ion x, idx_to_ion y))
+                        `Ms (theta, idx_to_ion x, idx_to_ion y)
+                      | Rzz { theta; a = x; b = y } ->
+                        `Rzz (theta, idx_to_ion x, idx_to_ion y))
                     dc.pulses
                 in
                 Some (o, s, ions, ps)
@@ -1101,7 +1103,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
           if k < List.length ps then
             match List.nth ps k with
             | `Beam (th, ph, ion) -> beams := (ion, s, o.index, [ th; ph ]) :: !beams
-            | `Ms (th, x, y) -> mss := ((x, y), s, o.index, [ th ]) :: !mss
+            | `Ms (th, x, y) | `Rzz (th, x, y) -> mss := ((x, y), s, o.index, [ th ]) :: !mss
             | `Frame (lam, ion) -> vzs := (ion, s, o.index, [ lam ]) :: !vzs)
         phys;
       if !vzs <> [] then
@@ -1151,13 +1153,13 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
               blank with
               ityp = "gate";
               id;
-              gate = Some "MS";
+              gate = Some (Gateset.entangler ());
               mode = Some "intra";
               pairs = List.rev_map (fun (p, _, _, _) -> p) !mss;
               params = List.rev_map (fun (_, _, _, p) -> p) !mss;
               sites =
                 List.sort_uniq compare (List.rev_map (fun (_, s, _, _) -> s) !mss);
-              meta = [ ("kind", `String "ms"); ("round", `Int k) ]
+              meta = [ ("kind", `String (Gateset.entangler_kind ())); ("round", `Int k) ]
                 @ op_meta (List.rev_map (fun (_, _, oi, _) -> oi) !mss);
             };
         n_ms := !n_ms + List.length !mss
@@ -1180,13 +1182,7 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
                 cycle = !cyc - 1;
                 site = s;
                 operands = ions;
-                pulses =
-                  List.map
-                    (function
-                      | `Beam (th, ph, i) -> Printf.sprintf "R(%.6g,%.6g)@%s" th ph i
-                      | `Ms (th, x, y) -> Printf.sprintf "MS(%.6g)@%s,%s" th x y
-                      | `Frame (l, i) -> Printf.sprintf "VZ(%.6g)@%s" l i)
-                    ps;
+                pulses = List.map Stages.pulse_string ps;
               }
             :: !cert_gates)
       phys;
@@ -1395,9 +1391,12 @@ let run_once ?(policy = default_policy) ?(record : Yojson.Safe.t list ref option
           [
             ("cycles", `Int !cyc);
             ("beams", `Int !n_beams);
-            ("ms_gates", `Int !n_ms);
+            ("ms_gates", `Int (if !Gateset.gate_set = Gateset.Ms_set then !n_ms else 0));
             ("frames", `Int !n_frames);
-          ];
+          ]
+          @ (match !Gateset.gate_set with
+             | Gateset.Ms_set -> []
+             | Gateset.Rzz_set -> Gateset.declared () @ [ ("rzz_gates", `Int !n_ms) ]);
       }
   in
   {

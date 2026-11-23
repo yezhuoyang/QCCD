@@ -37,8 +37,9 @@ from typing import Mapping, Sequence
 
 from ..arch import Architecture
 from ..arch.wise import Edge, NotWise, Zones
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, ENTANGLER, ENTANGLERS, resolve as resolve_gate_set
 from ..ir.tsir import TSIR, Participant
-from .c2lr_router import GATES_2Q, U3, Refused, RouteError, SourceOp, _parse, layers_reading_together, pulses
+from .c2lr_router import GATES_2Q, U3, Refused, RouteError, SourceOp, _parse, layers_reading_together
 from .layered import Emitter, certificate
 
 __all__ = ["compile_wise", "compile_with_router", "COMPILER_NAME"]
@@ -264,15 +265,16 @@ class _Build:
                 placed[op.i] = (e, stay, mover)
             self.route(want)
             mine = [op for op, _ in got]
-            seqs = {op.i: pulses(op, ion) for op in mine}
-            first = {i: next(k for k, p in enumerate(s) if p[0] == "MS") for i, s in seqs.items()}
+            seqs = {op.i: self.em.pulses(op, ion) for op in mine}
+            first = {i: next(k for k, p in enumerate(s) if p[0] in ENTANGLERS) for i, s in seqs.items()}
             self.em.play(mine, ion, {i: s[:first[i]] for i, s in seqs.items()}, witness=False)
             for kind in ("h0", "h1"):
                 parts = [Participant(m, e.v, e.u) for op in mine for e, _, m in [placed[op.i]] if e.kind == kind]
                 if parts:
                     self.em.emit(type="simd", cls=f"wise_{kind}_a", mode="inter", participants=tuple(parts),
                                  meta={"kind": "merge_for_gate", "pair_kind": kind, "half": "a"})
-            ms = self.em.pulse_group("MS", [(seqs[op.i][first[op.i]][1], seqs[op.i][first[op.i]][2]) for op in mine],
+            ms = self.em.pulse_group(ENTANGLER[self.em.gate_set],
+                                     [(seqs[op.i][first[op.i]][1], seqs[op.i][first[op.i]][2]) for op in mine],
                                      [op.i for op in mine])
             for op in mine:
                 self.em.witness(op, ms, [ion[q] for q in op.qubits])
@@ -286,8 +288,11 @@ class _Build:
             pending = later
 
 
-def compile_wise(qasm_text: str, arch: Architecture, *, name: str = "circuit", seed: int = 0) -> tuple[TSIR, dict]:
-    """`(programme, certificate)` for `qasm_text` on the chip `arch`, uncooled."""
+def compile_wise(qasm_text: str, arch: Architecture, *, name: str = "circuit", seed: int = 0,
+                 gate_set: str = DEFAULT_GATE_SET) -> tuple[TSIR, dict]:
+    """`(programme, certificate)` for `qasm_text` on the chip `arch`, uncooled.  `gate_set` is the
+    native gate set the gates are lowered to (`qccd.ir.gate_sets`: "ms", the default, or "rzz")."""
+    gate_set = resolve_gate_set(gate_set)
     try:
         z = Zones(arch)
     except NotWise as exc:
@@ -299,7 +304,7 @@ def compile_wise(qasm_text: str, arch: Architecture, *, name: str = "circuit", s
     placement = {ion[q]: at[q] for q in range(n)}
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)}})
-    em = Emitter(prog, dict(placement), one_kind=True)
+    em = Emitter(prog, dict(placement), one_kind=True, gate_set=gate_set)
     em.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
             meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     em.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -316,8 +321,9 @@ def compile_wise(qasm_text: str, arch: Architecture, *, name: str = "circuit", s
 
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "helios",
-                        name: str = "circuit") -> tuple[Path, Path]:
-    """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate)."""
+                        name: str = "circuit", gate_set: str = DEFAULT_GATE_SET) -> tuple[Path, Path]:
+    """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate).
+    `gate_set`: the native gate set ("ms", the default, or "rzz")."""
     from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model
     t0 = time.time()
@@ -331,7 +337,7 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, table: str = "hel
                          str(work / "device.expanded.json")], capture_output=True, text=True)
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
-    prog, cert = compile_wise(qasm_text, arch, name=name)
+    prog, cert = compile_wise(qasm_text, arch, name=name, gate_set=gate_set)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     # one broadcast cool before a batch over the budget, counted from the last cool (R7, the

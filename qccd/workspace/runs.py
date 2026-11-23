@@ -169,6 +169,11 @@ class RunsMixin:
         if mode not in ("auto", "qccdcert", "rotate", "compile"):
             raise WorkspaceError("bad_request", "compiler must be auto, qccdcert, rotate or compile", status=422)
         params["compiler"] = mode
+        if params.get("gate_set") and mode == "qccdcert":
+            # QCCDCert, the verified compiler, lowers to MS and nothing else
+            raise WorkspaceError("bad_request", f"QCCDCert, the verified compiler, lowers to the gate set ms only: "
+                                 f"for gate_set {params['gate_set']!r} use compiler auto, rotate or compile",
+                                 status=422)
         # whether the person's tab plays the run or opens it at its result (run_eval.py)
         params["animate"] = params.get("animate", True) is not False
 
@@ -181,7 +186,8 @@ class RunsMixin:
         from ..verify.replay import replay
         from .core import WorkspaceError
         from .evaluator import Toolchain
-        from .results import _compiler_fault, _compiler_reason, _refuse_withdrawn_compiler
+        from .results import (_compiler_fault, _compiler_reason, _gate_set_args, _gate_set_words,
+                              _refuse_withdrawn_compiler)
         from .metrics import replay_time
         from .perf import performance
         from .procs import run_limited
@@ -190,6 +196,12 @@ class RunsMixin:
         tc = Toolchain.discover()
         mode = params["compiler"]
         cert_installed = cert_toolchain.available()
+        if params.get("gate_set"):
+            # QCCDCert, the verified compiler, lowers to MS and nothing else.  A run in another gate
+            # set goes to the compilers that take the option -- qccdc, or the C2LR router -- and the
+            # run says which one compiled it (asking for QCCDCert AND another set was refused when
+            # the job was started: `_check_run_params`).
+            cert_installed = False
         if mode == "qccdcert" and not cert_installed:
             raise WorkspaceError("toolchain_missing", "QCCDCert, the verified compiler, is not installed: set "
                                  "QCCD_CERT to a checkout of it on which `lake build` has run", status=424)
@@ -204,6 +216,7 @@ class RunsMixin:
         r = self.replayed(branch, rev)
         if not r.ok:
             raise WorkspaceError("design_invalid", f"the design on {branch} at r{rev} does not build", status=422)
+        gate_set, set_args = _gate_set_args(params, tc, r.arch)
         q = _qubits(qasm)
         cap, n_sites = _capacity(r.arch)
         # what the person calls them: the board's title and the design's name, never an internal id
@@ -272,11 +285,11 @@ class RunsMixin:
                     cert_result = None
                     continue
             if m == "c2lr-router":
-                cp = _c2lr_compile(work, name)
+                cp = _c2lr_compile(work, name, gate_set)
                 log += f"--- {cp.stdout}\n{cp.stderr}"[-4000:]
             else:
                 cp = run_limited([tc.qccdc, m, work / "circuit.qasm", "--arch", work / "device.expanded.json",
-                                  "-o", work / "prog"], cwd=work, timeout=compile_budget,
+                                  "-o", work / "prog", *set_args], cwd=work, timeout=compile_budget,
                                  mem_mb=8192, cancel=cancel)
                 log += f"--- qccdc_cli {m}\n" + (cp.stdout + "\n" + cp.stderr)[-4000:]
             if cp.status in ("cancelled", "timeout"):
@@ -375,10 +388,16 @@ class RunsMixin:
             "program": d_prog, "certified": d_raw, "certificate": d_cert,
         }
         headline = perf["bottleneck"][0] if perf["bottleneck"] else ""
+        said = ""
+        if set_args:
+            # which compiler ran, and in which set: an `auto` run in another set is not QCCDCert's
+            said = (f" Compiled by {'the C2LR router' if used == 'c2lr-router' else 'qccdc_cli ' + used}"
+                    f"{_gate_set_words(gate_set)}.")
         return {"summary": f"{shown} on {dname} (r{rev}): {perf['total']['ms']:g} ms per round. "
-                           + headline,
+                           + headline + said,
                 "run": {"run_id": jid, "program": {"name": name, "qubits": q, "source": source},
                         "design": design, "compiler": used, "performance": perf,
+                        **({"gate_set": gate_set} if set_args else {}),
                         "compilation": compilation_ref,
                         "animate": params.get("animate", True) is not False,
                         "artifacts": {"device": d_dev, "program": d_prog, "times": d_times,
@@ -503,7 +522,7 @@ def _qccdcert_compile(work: Path, table: str, budget: float = 900) -> dict:
                             "theorem": "verified_compilation: Meaning, Legality and Time hold for this target code"}}
 
 
-def _c2lr_compile(work: Path, name: str):
+def _c2lr_compile(work: Path, name: str, gate_set: str = "ms"):
     """The C2LR router's native compile of `work`, as a `RunResult` the run job reads as it
     reads qccdc's: ok with the programme's length, or nonzero with the router's refusal."""
     import time
@@ -511,7 +530,7 @@ def _c2lr_compile(work: Path, name: str):
     from .procs import RunResult
     t0 = time.time()
     try:
-        n = compile_with_stages(work, name=name)
+        n = compile_with_stages(work, name=name, gate_set=gate_set)
     except Refused as exc:
         return RunResult("nonzero", 4, COMPILER_NAME, str(exc), time.time() - t0)
     return RunResult("ok", 0, f"{COMPILER_NAME}: {n} instructions", "", time.time() - t0)

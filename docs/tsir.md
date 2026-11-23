@@ -64,6 +64,69 @@ red failure that means nothing.
   "pairs": [["d108", "a120"]], "sites": ["A120"] }
 ```
 
+### Native pulses and the two gate sets
+
+An authored program may name a whole gate (`CX`, as above); a compiled one holds only the
+pulses the machine fires, and there are two sets of them (`qccd/ir/gate_sets.py`):
+
+| gate set | pulses | the entangling pulse |
+|---|---|---|
+| `ms` (the default) | `R`, `VZ`, `MS` | `MS(θ) = exp(−iθ/2 X⊗X)` |
+| `rzz` | `R`, `VZ`, `RZZ` | `RZZ(θ) = exp(−iθ/2 Z⊗Z)`: Quantinuum's native set (H-series and Helios; arXiv:2003.01293, arXiv:2511.05465) |
+
+`R(θ, φ) = exp(−iθ/2 (cos φ X + sin φ Y))` is the one-qubit pulse (Quantinuum's U1q) and
+`VZ(λ) = diag(1, e^{iλ})` the frame change, which fires no laser; both are the same in the two
+sets. A one-qubit pulse and a frame change name `ions` (`arity: 1`, one `params` entry per ion:
+`[θ, φ]` or `[λ]`); an entangling pulse names `pairs`, with `[θ]` for each.
+
+```jsonc
+{ "type": "gate", "id": 9, "gate": "RZZ", "mode": "intra",
+  "pairs": [["q0", "q1"]], "params": [[1.5707963267948966]], "meta": { "kind": "rzz", "op": [4] } }
+```
+
+The gate set is a compiler option (`gate_set`), never a property a reader has to be told: the
+replay, the rules, the noise texts and `check_cert.py` read every pulse by its own name, and
+price and noise either entangling pulse as the machine's one two-qubit primitive (`ms_gate`,
+the `ms*` noise channels). What changes with the set is the one-qubit dressing of a circuit gate:
+
+| circuit gate | `ms` | `rzz` |
+|---|---|---|
+| `cx c,t` | `R c, MS c t, R c, R t, R c`: 1 MS + 4 R | `R(−π/2, π/2) t, RZZ(π/2) c t, R(π/2, π) t, VZ(−π/2) c, VZ(−π/2) t`: 1 RZZ + 2 R |
+| `cz a,b` | `H b, cx a,b, H b`: 1 MS + 6 R | `RZZ(π/2) a b, VZ(−π/2) a, VZ(−π/2) b`: 1 RZZ, no R |
+
+The `VZ` is priced by the machine's physics, as before: it takes no time where the machine
+declares a free frame change (`z_gate` at 0 µs, as the Helios nominal physics qccd-physics@3
+does), and three one-qubit pulses where it declares none (`CostModel.gate_1q`: on a machine
+whose beams are shared a Z is turned by three pulses). So in one-qubit pulse times a `cx` is 4
+in `ms`, and in `rzz` 2 with a free frame change but 8 without; a `cz` is 6 (12 without) in
+`ms` against 0 (6 without) in `rzz`. The rzz set is the faster one for a CX only on a machine
+with a free frame change, which is the machine it was built for.
+
+A program compiled in `rzz` says so in its `meta` (`"gate_set": "rzz"`) and in its
+certificate's `claims`; a program in the default set says nothing, and is byte for byte what it
+was before the second set existed. Every compiler takes the option:
+
+```python
+from qccd.qec import compile_with_qccdc                       # qccdc: needs a binary that has the option
+compile_with_qccdc(qasm, arch, workdir, gate_set="rzz")
+from qccd.compile import c2lr_router, wise_router, cyclone_router, helios_router, conveyor_router
+wise_router.compile_with_router(qasm, arch_path, workdir, gate_set="rzz")     # and the other routers alike
+```
+
+```bash
+qccdc_cli compile circuit.qasm --arch device.expanded.json -o prog --gate-set rzz
+qccdc_cli gate-sets                     # what this binary lowers to: "ms", "rzz"
+python -m qccd.compile.c2lr_router --circuit C --device D --expanded E --out DIR --gate-set rzz
+qccd compile --board surface --gate-set rzz        # in a workspace; also `qccd ler ... --gate-set rzz`
+```
+
+A `qccdc_cli` built before the option ignores `--gate-set` and would compile to MS, so the
+Python side asks the binary first (`qccdc_cli gate-sets`) and refuses, naming the way out,
+rather than run it: build `Compiler/ocaml` from this source, or install a toolchain release
+that lists `rzz`. QCCDCert, the verified compiler, lowers to `ms` only; a workspace run that
+asks for `rzz` under `compiler: auto` is compiled by qccdc (or the C2LR router) instead, and
+its result says which compiler ran.
+
 ## Calling the decoder
 
 `decode` is the instruction that says where a measurement's outcome goes: down the wire

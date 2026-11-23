@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from ..ir.gate_sets import ENTANGLERS
 from .model import Site, Step
 from .vocabulary import Ctx, EvalError, NotApplicable, term
 
@@ -189,7 +190,7 @@ def _pairs_only(ctx: Ctx, k):
     if not st["holds_two"]:
         return True
     ins = st["instruction"]
-    return _half(ins.cls) is not None or ins.type == "cool" or (ins.type == "gate" and ins.gate == "MS")
+    return _half(ins.cls) is not None or ins.type == "cool" or (ins.type == "gate" and ins.gate in ENTANGLERS)
 
 
 @term("shim_opens(k)", "true or false", "Whether swap step k, if it opens a reconfiguration, comes "

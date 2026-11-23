@@ -53,8 +53,8 @@ from typing import Any, Mapping
 
 from .experiments import MemoryExperiment, append_readout
 from .extract import Extraction, ExtractionError, load_arch, load_program, resolve_qubit_map
-from .native import (ABSTRACT_2Q, NotClifford, canonical_abstract, emit_abstract,
-                     emit_ms, emit_r, emit_vz)
+from .native import (ABSTRACT_2Q, ENTANGLING, NotClifford, canonical_abstract, emit_abstract,
+                     emit_r, emit_vz)
 from .noise import NoiseModel, get as get_noise
 from .qasm import parse_qasm
 from .stimtext import StimText, declare
@@ -185,7 +185,7 @@ def extract_legacy(prog, arch, exp_or_spec, qasm: str | None = None, *,
     nbars: list[float] = []
     chains: list[int] = []
 
-    def ms_noise(a: str, b: str, view) -> None:
+    def ms_noise(a: str, b: str, view, gate: str = "MS") -> None:
         quanta, pos, occ = view
         nbar = max(float(quanta.get(a, 0.0)), float(quanta.get(b, 0.0)))
         n_chain = int(occ.get(pos.get(a), 2) or 2)
@@ -194,7 +194,7 @@ def extract_legacy(prog, arch, exp_or_spec, qasm: str | None = None, *,
         budget["ms_base"] += e.base
         budget["ms_heating"] += e.heating
         budget["ms_chain"] += e.chain
-        why.append(f"MS {a},{b}: n-bar {nbar:.3g}, chain of {n_chain} -> p = {e.total:.3g} "
+        why.append(f"{gate} {a},{b}: n-bar {nbar:.3g}, chain of {n_chain} -> p = {e.total:.3g} "
                    f"(base {e.base:.3g} + heating {e.heating:.3g} + chain {e.chain:.3g})")
         nbars.append(nbar)
         chains.append(n_chain)
@@ -239,11 +239,11 @@ def extract_legacy(prog, arch, exp_or_spec, qasm: str | None = None, *,
                 raise ExtractionError(f"instruction {ins.id} names unplaced ion(s) {unknown[:5]}")
             if ins.type == "gate":
                 g = str(ins.gate)
-                if g == "MS":
+                if g in ENTANGLING:
                     prs = _pairs(ins)
                     for k, (a, b) in enumerate(prs):
-                        emit_ms(c, sq[a], sq[b], _param(ins, k, len(prs), 1)[0])
-                        ms_noise(a, b, view)
+                        ENTANGLING[g](c, sq[a], sq[b], _param(ins, k, len(prs), 1)[0])
+                        ms_noise(a, b, view, g)
                 elif g in ("R", "VZ"):
                     if ins.pairs:
                         raise ExtractionError(f"instruction {ins.id}: {g} is a one-qubit "

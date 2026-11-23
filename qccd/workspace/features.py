@@ -199,7 +199,7 @@ def _run_program(be, a: dict) -> dict:
     params = {"program": a["program"]}
     if a.get("draft"):
         params["branch"] = a["draft"]
-    for k in ("revision", "compiler", "animate"):
+    for k in ("revision", "compiler", "animate", "gate_set"):
         if k in a:
             params[k] = a[k]
     j = be.call("POST", "/api/jobs", {"kind": "run", "params": params, "request_id": a.get("request_id"),
@@ -221,6 +221,13 @@ def _run_program(be, a: dict) -> dict:
             "log_tail": (res.get("log") or "")[-1500:]}
 
 
+#: what every compiling tool says of its `gate_set` parameter (`qccd.ir.gate_sets`)
+_GATE_SET = ("the native gate set the compiler lowers to -- ms (R, VZ and the entangling pulse MS) or rzz (R, VZ and "
+             "RZZ = exp(-i theta/2 ZZ): Quantinuum's native set, where a CX is one RZZ and two one-qubit pulses "
+             "and a CZ one RZZ and none); rzz needs a qccdc built from this source or a release that has it, and "
+             "is refused with the way out when the installed one is older.")
+
+
 SHOW_RUN = "the person watches this run: while it compiled their Studio showed its program, and their tab now opens the run's own page (circuit and compiled program beside the animation), which PLAYS BY ITSELF (or, with animate false, opens at its result), with its Evaluation panel counting the round's time up as it plays. Do not press Play or wait for it: say in one line what they are watching, with the numbers from `evaluation` (the panel's own), and go on with the next step in the same turn -- for a design meant for a board, submit it now (qccd_submit_local), in the same response as that line."
 
 
@@ -231,7 +238,8 @@ def _run_result(be, jid: str, res: dict, wait_s: float = 20.0) -> dict:
     page open (no Studio connected), the evaluator's report, labelled as such."""
     run = res["run"]
     out = {"run_id": jid, "status": "succeeded", "summary": res.get("summary"),
-           **{k: run[k] for k in ("program", "design", "compiler", "view", "note")}, "show": SHOW_RUN}
+           **{k: run[k] for k in ("program", "design", "compiler", "view", "note")},
+           **({"gate_set": run["gate_set"]} if run.get("gate_set") else {}), "show": SHOW_RUN}
     watched = False
     try:
         watched = any(v.get("connected") and not v.get("closed") for v in be.call("GET", "/api/views").get("views", []))
@@ -255,7 +263,7 @@ def _run_result(be, jid: str, res: dict, wait_s: float = 20.0) -> dict:
 
 def _estimate_ler(be, a: dict) -> dict:
     """Start an `ler` job and wait (bounded) for it, so one call usually answers."""
-    params = {k: a[k] for k in ("experiment", "max_shots", "noise", "seed", "revision") if k in a}
+    params = {k: a[k] for k in ("experiment", "max_shots", "noise", "seed", "revision", "gate_set") if k in a}
     if a.get("design"):
         params["branch"] = a["design"]
     j = be.call("POST", "/api/jobs", {"kind": "ler", "params": params, "request_id": a.get("request_id"),
@@ -391,14 +399,17 @@ FEATURES: tuple[Feature, ...] = (
         "qccd_start_job",
         "Start a job and return its id at once: kind compile (the real compiler on a board's "
         "circuit for a revision of a design; result carries adopt_with for set_final_program) or evaluate (profile "
-        "draft|reference on a frozen snapshot of the revision). board: its title. To submit a design, use "
+        "draft|reference on a frozen snapshot of the revision). board: its title. gate_set (compile only; default "
+        "ms): " + _GATE_SET + " To submit a design, use "
         "qccd_submit_local instead: it does all of this in one go.",
         _obj({"kind": {"type": "string", "enum": ["compile", "evaluate"]}, "branch": _S, "revision": _I, "board": _S,
               "profile": {"type": "string", "enum": ["draft", "reference"]},
-              "compiler": {"type": "string", "enum": ["auto", "compile", "rotate"]}, "request_id": _S,
+              "compiler": {"type": "string", "enum": ["auto", "compile", "rotate"]},
+              "gate_set": {"type": "string", "enum": ["ms", "rzz"]}, "request_id": _S,
               "origin_prompt_id": _S}, ["kind"]),
         lambda be, a: be.call("POST", "/api/jobs", {
-            "kind": a["kind"], "params": {k: a[k] for k in ("branch", "revision", "profile", "compiler", "board")
+            "kind": a["kind"], "params": {k: a[k] for k in ("branch", "revision", "profile", "compiler", "board",
+                                                            "gate_set")
                                           if k in a},
             "request_id": a.get("request_id"), "origin_prompt_id": a.get("origin_prompt_id")}),
         ("POST /api/jobs",), cli=("compile", "validate"), job_kinds=("compile", "evaluate"), group="jobs"),
@@ -431,11 +442,13 @@ FEATURES: tuple[Feature, ...] = (
         "or a draft's name. Waits up to wait_s (default 45, max 50); if the run is still going, poll "
         "qccd_get_job(run_id). compiler (default auto): QCCDCert, the verified compiler, with this project's "
         "extensions (routes it checks, cooling) when it is installed, else the legacy compiler; qccdcert, rotate "
-        "or compile force one. "
+        "or compile force one. gate_set (default ms): " + _GATE_SET + " QCCDCert lowers to ms only, so an auto run "
+        "in rzz is compiled by the legacy compiler (the result's `compiler` and `gate_set` say which ran). "
         "A run is an experiment, never a submission.",
         _obj({"program": {"anyOf": [_S, {"type": "object", "properties": {"name": _S, "qasm": _S},
                                          "required": ["qasm"]}]},
               "draft": _S, "revision": _I, "compiler": {"type": "string", "enum": ["auto", "qccdcert", "rotate", "compile"]},
+              "gate_set": {"type": "string", "enum": ["ms", "rzz"]},
               "animate": {"type": "boolean"}, "wait_s": _I, "request_id": _S, "origin_prompt_id": _S}, ["program"]),
         _run_program, ("POST /api/jobs", "GET /api/jobs/{jid}", "GET /api/views",
                        "GET /api/runs/{run_id}/evaluation"), job_kinds=("run",), group="runs"),
@@ -605,9 +618,11 @@ FEATURES: tuple[Feature, ...] = (
         "(heating- and chain-dependent MS error, gate, measurement, reset and idle errors). experiment: a memory "
         "board's title, or one of rep3, rep5, rep9, surface3, surface5, steane, bb18, bb72 "
         "(qccd_read_reference section='noise' explains each and the model). design: its name (default the "
-        "current design). Returns the LER with its 95% interval and per round, and the error channels that "
+        "current design). gate_set (default ms): " + _GATE_SET + " Returns the LER with its 95% interval and per "
+        "round, and the error channels that "
         "dominate; waits up to wait_s (default 45, max 50), else follow it once with qccd_get_job.",
         _obj({"experiment": _S, "design": _S, "revision": _I, "max_shots": _I, "noise": _S, "seed": _I,
+              "gate_set": {"type": "string", "enum": ["ms", "rzz"]},
               "wait_s": _I, "request_id": _S, "origin_prompt_id": _S}, ["experiment"]),
         _estimate_ler, ("POST /api/jobs", "GET /api/jobs/{jid}"), cli=("ler",), job_kinds=("ler",), group="boards"),
     Feature(

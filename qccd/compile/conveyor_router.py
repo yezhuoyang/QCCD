@@ -41,6 +41,7 @@ from typing import Mapping, Sequence
 
 from ..arch import Architecture
 from ..arch.sandwich import CONVEYOR, HOP, sandwich_roles
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, resolve as resolve_gate_set
 from ..ir.tsir import TSIR, Participant
 from ..verify.chains import Chains
 from ..verify.replay import bend_vias
@@ -552,12 +553,16 @@ def compile_conveyor(qasm_text: str, arch: Architecture, n_data: int, *, name: s
                      per_layer: bool | None = None, align: str = "best",
                      wait: float | None = None,
                      data_at: Mapping[int, int] | None = None,
-                     positions: bool = False) -> tuple[TSIR, dict]:
+                     positions: bool = False,
+                     gate_set: str = DEFAULT_GATE_SET) -> tuple[TSIR, dict]:
     """`(programme, certificate)` for `qasm_text` on the sandwich `arch`, uncooled.
 
     `positions`: pack every laser step by the chain position it addresses (R34, the team's
     feedback F2): a pulse, readout or reset reaches the ions at one position of chains of one
     length, and the others wait for the next step.  Off by default: the boards keep their packing.
+
+    `gate_set`: the native gate set the gates are lowered to (`qccd.ir.gate_sets`: "ms", the
+    default, or "rzz").
 
     `per_layer`: one waveform a layer (a sandwich built in layers) or one waveform (the same
     machine in a plane).  Read off the machine when left out.
@@ -572,6 +577,7 @@ def compile_conveyor(qasm_text: str, arch: Architecture, n_data: int, *, name: s
     waiting a cooling's worth of steps -- and the programme that is cheapest on the
     machine's own prices is kept (`_proxy`).  `meta["placement"]` and `meta["wait_steps"]`
     say which it was."""
+    gate_set = resolve_gate_set(gate_set)
     dev = arch.device
     roles = sandwich_roles(arch)
     if per_layer is None:
@@ -609,7 +615,7 @@ def compile_conveyor(qasm_text: str, arch: Architecture, n_data: int, *, name: s
                           "qubit_map": {str(q): ion[q] for q in range(n)},
                           "data_ions": [ion[q] for q in range(n_data)],
                           "waveforms": "one a layer" if per_layer else "one"})
-        em = Emitter(prog, dict(placement), chains=Chains(dev) if positions else None)
+        em = Emitter(prog, dict(placement), chains=Chains(dev) if positions else None, gate_set=gate_set)
         em.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
                 meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
         em.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -634,9 +640,11 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int,
                         per_layer: bool | None = None, align: str = "best",
                         wait: float | None = None,
                         data_at: Mapping[int, int] | None = None,
-                        positions: bool = False, lazy_cooling: bool = False) -> tuple[Path, Path]:
+                        positions: bool = False, lazy_cooling: bool = False,
+                        gate_set: str = DEFAULT_GATE_SET) -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate).
-    `lazy_cooling` counts a gate's heat from the last cool the pass put in, as Goal 3's families do."""
+    `lazy_cooling` counts a gate's heat from the last cool the pass put in, as Goal 3's families do.
+    `gate_set`: the native gate set ("ms", the default, or "rzz")."""
     from ..compile.cooling import CoolingPolicy, insert_cooling
     from ..cost.models import corrected_model
     t0 = time.time()
@@ -651,7 +659,8 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int,
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
     prog, cert = compile_conveyor(qasm_text, arch, n_data, name=name, per_layer=per_layer,
-                                  align=align, wait=wait, data_at=data_at, positions=positions)
+                                  align=align, wait=wait, data_at=data_at, positions=positions,
+                                  gate_set=gate_set)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     cooled = (insert_cooling(prog, arch, corrected_model(table), policy=CoolingPolicy(lazy=True)) if lazy_cooling

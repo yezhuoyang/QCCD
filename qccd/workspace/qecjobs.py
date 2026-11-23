@@ -94,7 +94,8 @@ class QecMixin:
         self._progress(jid, "compile", f"compiling {label} onto the design with the reference compiler")
         try:
             prog, cert = compile_with_qccdc(exp.qasm, device, work, cool=True,
-                                            timeout=float(params.get("timeout_s", 900)), table=nm.table)
+                                            timeout=float(params.get("timeout_s", 900)), table=nm.table,
+                                            gate_set=params.get("gate_set", "ms"))
         except CompileFailed as exc:
             return {"_status": "failed", "summary": f"the reference compiler could not compile {label} onto this "
                     f"design: {exc}", "refusal": str(exc), "log": exc.log[-2000:]}
@@ -118,12 +119,15 @@ class QecMixin:
             summary = (f"{label} on {r.arch_doc.get('name') or branch} r{rev}: LER {est['ler']:.2e} "
                        f"({est['per_round']:.2e} per round; {est['errors']} errors in {est['shots']} shots, "
                        f"{est['decoder']}), noise {rep['noise']['id']}")
+            if params.get("gate_set"):
+                summary += f", gate set {params['gate_set']}"
             if failed:
                 summary += f"; the program breaks rules {failed}, so a board would not accept it"
         top = sorted(((k, v) for k, v in (rep.get("budget") or {}).items() if k != "total"), key=lambda kv: -kv[1])[:3]
         return {"summary": summary, "ler_report": rep, "rules_failed": failed,
                 "dominant_channels": [{"channel": k, "sum_p": v} for k, v in top],
-                "program": {"path": str(prog), "compiler": "qccdc (reference) + cooling"}}
+                "program": {"path": str(prog), "compiler": "qccdc (reference) + cooling",
+                            **({"gate_set": params["gate_set"]} if params.get("gate_set") else {})}}
 
     # ------------------------------------------------------------------ the Compiler board (local)
 

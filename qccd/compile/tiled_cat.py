@@ -36,8 +36,9 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, resolve as resolve_gate_set
 from ..ir.tsir import TSIR, Participant
-from .c2lr_router import _parse
+from .c2lr_router import _parse, pulse_claims
 from .tiled_surface import COMPILER_NAME, TiledError, _Build, _data_trap, _face_trap
 
 __all__ = ["Target", "Grid", "Walker", "rep_circuit", "play_rep", "anneal", "play_wide", "wide_homes", "certificate",
@@ -118,8 +119,9 @@ def _adjacent(dev) -> dict:
 class Walker(_Build):
     """The writer: free ions walk the seams, one hop a cycle, one waveform per motion."""
 
-    def __init__(self, prog: TSIR, pos: dict, arch, taken: set = frozenset()):
-        super().__init__(prog, pos)
+    def __init__(self, prog: TSIR, pos: dict, arch, taken: set = frozenset(),
+                 gate_set: str = DEFAULT_GATE_SET):
+        super().__init__(prog, pos, gate_set)
         self.dev = arch.device
         self.taken = taken
         self.adj = _adjacent(self.dev)
@@ -286,19 +288,19 @@ def certificate(name: str, arch, n: int, ops, ion: Mapping, place: Mapping, b: _
         "circuit_ops": [o.to_json() for o in ops],
         "map": {str(q): ion[q] for q in range(n)}, "init": dict(place),
         "moves": b.moves, "gates": b.gates, "rotations": [], "unrealised": [],
-        "claims": {"cycles": len(prog.instructions),
-                   "beams": sum(len(i.ions) for i in prog.instructions if i.gate == "R"),
-                   "ms_gates": sum(len(i.pairs) for i in prog.instructions if i.gate == "MS"),
-                   "frames": sum(len(i.ions) for i in prog.instructions if i.gate == "VZ")},
+        "claims": pulse_claims(prog, b.gate_set),
         "compiler": COMPILER_NAME,
     }
 
 
-def _start(name: str, arch, n: int, place: Mapping, taken: set) -> tuple:
+def _start(name: str, arch, n: int, place: Mapping, taken: set, gate_set: str = DEFAULT_GATE_SET) -> tuple:
+    gate_set = resolve_gate_set(gate_set)
     ion = {q: f"q{q}" for q in range(n)}
     prog = TSIR(name=name, arch_spec=f"arch/{arch.name}.arch.json",
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)}})
-    b = Walker(prog, dict(place), arch, taken)
+    if gate_set != DEFAULT_GATE_SET:
+        prog.meta["gate_set"] = gate_set
+    b = Walker(prog, dict(place), arch, taken, gate_set)
     b.emit(type="init", placement=dict(place), quanta={i: 0.0 for i in place},
            meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     b.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -409,8 +411,10 @@ class _Play:
         return [o for o in self.ops if o.name == name and o.i not in self.done]
 
 
-def play_rep(targets: Sequence[Target], grid: Grid, arch, homes: Sequence[str], taken: set, name: str = "cat_rep") -> tuple:
+def play_rep(targets: Sequence[Target], grid: Grid, arch, homes: Sequence[str], taken: set, name: str = "cat_rep",
+             gate_set: str = DEFAULT_GATE_SET) -> tuple:
     """The repetition's program: homes are the cat ions', then the flag's, then the verifier's.
+    `gate_set`: the native gate set the gates are lowered to (`qccd.ir.gate_sets`).
     Returns (walker, certificate, qasm)."""
     d = grid.d
     at, _faces, place = _home(grid, targets)
@@ -420,7 +424,7 @@ def play_rep(targets: Sequence[Target], grid: Grid, arch, homes: Sequence[str], 
     for i, c in enumerate(cat):
         place[f"q{c}"] = homes[i]
     place[f"q{flag}"], place[f"q{ver}"] = homes[k], homes[k + 1]
-    b, ion = _start(name, arch, n, place, taken)
+    b, ion = _start(name, arch, n, place, taken, gate_set)
     p = _Play(b, ion, ops)
     hm = {c: b.pos[ion[c]] for c in cat}
     p.record("reset", p.rest("reset"))
@@ -624,7 +628,8 @@ def wide_homes(grid: Grid, targets: Sequence[Target], taken: set, lane_row: int)
     return homes, flag_at, ver_at
 
 
-def play_wide(targets: Sequence[Target], grid: Grid, arch, name: str = "wide_rep", mask=None) -> tuple:
+def play_wide(targets: Sequence[Target], grid: Grid, arch, name: str = "wide_rep", mask=None,
+              gate_set: str = DEFAULT_GATE_SET) -> tuple:
     """One repetition of the register-wide cat over X̄ of `targets`: targets[0] the control (by cat 0), the
     others in a row of tiles, each by its own cat ion, all walking their columns at once.  `mask` names the row's
     tiles a masked cat acts on (the listing's `prepMaskedP`): every ion is in the tree, the others stay home.
@@ -657,7 +662,7 @@ def play_wide(targets: Sequence[Target], grid: Grid, arch, name: str = "wide_rep
     for i, c in enumerate(cat):
         place[f"q{c}"] = homes[i]
     place[f"q{flag}"], place[f"q{ver}"] = flag_at, ver_at
-    b, ion = _start(name, arch, n, place, taken)
+    b, ion = _start(name, arch, n, place, taken, gate_set)
     p = _Play(b, ion, ops)
     hm = {c: b.pos[ion[c]] for c in cat}
     p.record("reset", p.rest("reset"))

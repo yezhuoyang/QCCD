@@ -34,6 +34,29 @@ let rz t q = { (u1 t q) with phase = -.t /. 2.0 }
 let named n q = decompose_u3 ~qubit:q (Option.get (u3_of_gate n []))
 let cxg c t = decompose_cx ~control:c ~target:t
 
+(* ------------------------------------------------------------------ the rzz set
+ *
+ * A two-qubit gate that is diagonal in Z is ONE RZZ and frame changes -- no laser on
+ * either ion beyond the entangler -- where the ms set reaches it through CX:
+ *
+ *     cz        = e^{ iπ/4} · VZ(-π/2)⊗VZ(-π/2) · RZZ(π/2)
+ *     cp(λ)     = e^{-iλ/4} · VZ(λ/2)⊗VZ(λ/2)   · RZZ(-λ/2)          (cu1 is cp)
+ *     crz(θ)    = e^{-iθ/4} · I⊗VZ(θ/2)          · RZZ(-θ/2)
+ *     rzz(θ)    =                                   RZZ(θ)
+ *     rxx(θ)    = R(-π/2, π/2)⊗R(-π/2, π/2) · RZZ(θ) · R(π/2, π/2)⊗R(π/2, π/2)
+ *
+ * Each is checked by `check`, phase included, against the gate's defining unitary. *)
+let frame lam q = { pulses = [ Frame { lam; qubit = q } ]; phase = 0.0 }
+let beam theta phi q = { pulses = [ Beam { theta; phi; qubit = q } ]; phase = 0.0 }
+let zz theta a b = { pulses = [ Rzz { theta; a; b } ]; phase = 0.0 }
+let with_phase phase (d : decomposed) = { d with phase = d.phase +. phase }
+
+(* A zero-angle beam is the identity and no laser need fire for it.  The ms set keeps the
+   beam `u3_decomp` writes for a `z`, `s` or `t` (a programme compiled before the second
+   gate set existed compiles to the same bytes); the rzz set does not emit it. *)
+let drop_idle_beams (d : decomposed) =
+  { d with pulses = List.filter (function Beam { theta; _ } -> theta <> 0.0 | _ -> true) d.pulses }
+
 (* Toffoli: six CX and a handful of T gates.  Worth having rather than refusing -- a
    reversible-arithmetic circuit is nothing but Toffolis. *)
 let ccx a b c =
@@ -46,7 +69,21 @@ let ccx a b c =
 
 let rec decompose_named ~(gates : (string * Qasm_ast.gate_def) list) (name : string)
     (params : float list) (qubits : int list) : decomposed =
+  let rzz_set = !gate_set = Rzz_set in
   match (name, qubits, params) with
+  (* the rzz set's own forms come first: what follows is the ms set's table, which also
+     serves the rzz set wherever it reduces to `cxg` *)
+  | "cz", [ c; t ], _ when rzz_set ->
+    with_phase (pi /. 4.0) (seq [ zz (pi /. 2.0) c t; frame (-.pi /. 2.0) c; frame (-.pi /. 2.0) t ])
+  | ("cu1" | "cp"), [ c; t ], [ l ] when rzz_set ->
+    with_phase (-.l /. 4.0) (seq [ zz (-.l /. 2.0) c t; frame (l /. 2.0) c; frame (l /. 2.0) t ])
+  | "crz", [ c; t ], [ th ] when rzz_set ->
+    with_phase (-.th /. 4.0) (seq [ zz (-.th /. 2.0) c t; frame (th /. 2.0) t ])
+  | "rzz", [ a; b ], [ th ] when rzz_set -> zz th a b
+  | "rxx", [ a; b ], [ th ] when rzz_set ->
+    seq
+      [ beam (pi /. 2.0) (pi /. 2.0) a; beam (pi /. 2.0) (pi /. 2.0) b; zz th a b;
+        beam (-.pi /. 2.0) (pi /. 2.0) a; beam (-.pi /. 2.0) (pi /. 2.0) b ]
   (* A single-qubit call is a builtin `u3` if the table knows it -- but if not, it may
      still be a user-declared gate, so this branch must fall THROUGH to inlining rather
      than refusing.  Matching on arity first and giving up inside the branch is what made
@@ -103,8 +140,23 @@ let rec decompose_named ~(gates : (string * Qasm_ast.gate_def) list) (name : str
              decompose_named ~gates c.cname ps qs)
            g.gbody))
 
+(* The decomposition in the gate set in force.  It holds that set's entangler only: the
+   passes name the entangling instruction they emit by the set (`Gateset.entangler`), so a
+   pulse of the other set would be emitted under the wrong name. *)
 let decompose_op ?(gates = []) name params qubits =
-  decompose_named ~gates name params qubits
+  let d = decompose_named ~gates name params qubits in
+  let d = if !gate_set = Rzz_set then drop_idle_beams d else d in
+  let foreign =
+    List.exists
+      (function Ms _ -> !gate_set <> Ms_set | Rzz _ -> !gate_set <> Rzz_set | _ -> false)
+      d.pulses
+  in
+  if foreign then
+    raise
+      (Unsupported
+         (Printf.sprintf "%s: its pulses are not all in the gate set %s" name
+            (gate_set_name !gate_set)));
+  d
 
 (* ------------------------------------------------------------------ matrices
  *
@@ -161,6 +213,14 @@ let mat_MS theta : mat =
   done;
   m
 
+let mat_RZZ theta : mat =
+  let m = eye 4 in
+  m.(0).(0) <- expi (-.theta /. 2.0);
+  m.(1).(1) <- expi (theta /. 2.0);
+  m.(2).(2) <- expi (theta /. 2.0);
+  m.(3).(3) <- expi (-.theta /. 2.0);
+  m
+
 let mat_u3 theta phi lam : mat =
   let c = ci (cos (theta /. 2.0)) 0.0 and s = ci (sin (theta /. 2.0)) 0.0 in
   [| [| c; Complex.neg (expi lam *: s) |];
@@ -176,6 +236,7 @@ let replay n (d : decomposed) : mat =
           | Frame { lam; qubit } -> embed1 n qubit (mat_VZ lam)
           | Beam { theta; phi; qubit } -> embed1 n qubit (mat_R theta phi)
           | Ms { theta; a; b } -> embed2 n a b (mat_MS theta)
+          | Rzz { theta; a; b } -> embed2 n a b (mat_RZZ theta)
         in
         mmul m acc)
       (eye (dim n)) d.pulses
@@ -230,13 +291,7 @@ let target n name params : mat option =
     let m = eye 4 in
     m.(3).(3) <- expi l;
     Some (embed2 n 0 1 m)
-  | "rzz", [ th ] ->
-    let m = eye 4 in
-    m.(0).(0) <- expi (-.th /. 2.0);
-    m.(1).(1) <- expi (th /. 2.0);
-    m.(2).(2) <- expi (th /. 2.0);
-    m.(3).(3) <- expi (-.th /. 2.0);
-    Some (embed2 n 0 1 m)
+  | "rzz", [ th ] -> Some (embed2 n 0 1 (mat_RZZ th))
   | "rxx", [ th ] -> Some (embed2 n 0 1 (mat_MS th))
   | "ccx", _ ->
     let m = eye 8 in
@@ -254,12 +309,15 @@ let target n name params : mat option =
     Some m
   | _ -> mat_of_named name params
 
+(* `ms` counts the entangling pulses, of the gate set in force *)
 type report = { name : string; worst : float; beams : int; ms : int }
 
 (* The comparison is EXACT, not up-to-phase: the global phase is part of the claim, so
-   `replay` applies it and any phase error shows up as an error. *)
+   `replay` applies it and any phase error shows up as an error.  It runs in the gate set in
+   force, through `decompose_op`: what is checked is what the passes emit. *)
 let check ?(trials = 10000) ?(seed = 20260823) () : report list =
   Random.init seed;
+  let decompose_named ~gates name params qubits = decompose_op ~gates name params qubits in
   let out = ref [] in
   let add name worst d =
     out := { name; worst; beams = beam_count d; ms = ms_count d } :: !out

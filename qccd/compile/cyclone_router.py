@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 from ..arch import Architecture
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, resolve as resolve_gate_set
 from ..ir.tsir import TSIR, Participant
 from ..verify.chains import Chains
 from ..verify.replay import bend_vias
@@ -190,8 +191,10 @@ def level(pl: Plan, capacity: int) -> Plan:
 
 
 def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: str = "circuit",
-                    seed: int = 0) -> tuple[TSIR, dict]:
-    """`(programme, certificate)` for `qasm_text` on the ring `arch`, uncooled."""
+                    seed: int = 0, gate_set: str = DEFAULT_GATE_SET) -> tuple[TSIR, dict]:
+    """`(programme, certificate)` for `qasm_text` on the ring `arch`, uncooled.  `gate_set` is the
+    native gate set the gates are lowered to (`qccd.ir.gate_sets`: "ms", the default, or "rzz")."""
+    gate_set = resolve_gate_set(gate_set)
     dev = arch.device
     if not dev.loops:
         raise Refused(f"{arch.name} has no loop; Cyclone rotates its ancillas round one")
@@ -217,7 +220,7 @@ def compile_cyclone(qasm_text: str, arch: Architecture, n_data: int, *, name: st
                 meta={"compiler": COMPILER_NAME, "qubit_map": {str(q): ion[q] for q in range(n)},
                       "data_ions": [ion[q] for q in range(n_data)] + sorted(pl.spare_data, key=lambda s: int(s[1:])),
                       **({"spare_ions": spare} if spare else {})})
-    em = Emitter(prog, dict(placement), chains=Chains(dev))
+    em = Emitter(prog, dict(placement), chains=Chains(dev), gate_set=gate_set)
     em.emit(type="init", placement=dict(placement), quanta={i: 0.0 for i in placement},
             meta={"compiler": COMPILER_NAME, "circuit": name, "arch": arch.name})
     em.emit(type="cool", broadcast=True, meta={"kind": "state_prep"})
@@ -261,8 +264,9 @@ def _run_step(em: Emitter, ops: Sequence[SourceOp], pl: Plan, t: int, ion: Mappi
 
 
 def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int, table: str = "helios",
-                        name: str = "circuit") -> tuple[Path, Path]:
+                        name: str = "circuit", gate_set: str = DEFAULT_GATE_SET) -> tuple[Path, Path]:
     """`compile_with_qccdc`'s outputs from this router; returns (final programme, certificate).
+    `gate_set`: the native gate set ("ms", the default, or "rzz").
     The cooling pass runs as for any machine: a rotation's splits heat the ancillas past the
     budget, so a step's gates follow a cooling (the team's feedback Q2)."""
     from ..compile.cooling import CoolingPolicy, insert_cooling
@@ -278,7 +282,7 @@ def compile_with_router(qasm_text: str, arch_path, workdir, *, n_data: int, tabl
                          str(work / "device.expanded.json")], capture_output=True, text=True)
     if ex.returncode:
         raise RouteError(f"export_arch failed: {(ex.stdout + ex.stderr)[-400:]}")
-    prog, cert = compile_cyclone(qasm_text, arch, n_data, name=name)
+    prog, cert = compile_cyclone(qasm_text, arch, n_data, name=name, gate_set=gate_set)
     prog.save(str(work / "prog.tsir.json"), indent=None)
     (work / "prog.qcert.json").write_text(json.dumps(cert), encoding="utf-8")
     # one broadcast cool before a batch over the budget, counted from the last cool (R7, the
