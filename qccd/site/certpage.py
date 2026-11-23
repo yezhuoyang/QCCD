@@ -33,8 +33,8 @@ IDS = {"question": "question", "inputs": "inputs", "hardware": "hardware", "rule
        "frame": "frame", "core": "core", "rules": "rules", "observations": "observations",
        "elaboration": "elaboration", "stages": "stages", "theorem": "theorem", "meaning": "meaning",
        "legality": "legality", "time": "time", "parallel": "parallel", "chain": "chain", "ex1": "ex1",
-       "ex2": "ex2", "ex3": "ex3", "studio": "studio", "loops": "loops", "gates": "gates", "proof": "proof",
-       "trust": "trust", "extensions": "extensions", "conclusion": "conclusion"}
+       "ex2": "ex2", "ex3": "ex3", "studio": "studio", "loops": "loops", "gates": "gates", "gate-sets": "gate-sets",
+       "proof": "proof", "trust": "trust", "extensions": "extensions", "conclusion": "conclusion"}
 
 #: (anchor, heading) for the search index
 HEADINGS = [("question", "What must a compiler know?"), ("inputs", "The three inputs"),
@@ -46,6 +46,7 @@ HEADINGS = [("question", "What must a compiler know?"), ("inputs", "The three in
             ("ex3", "Example 3: broadcast transport, parallel time, chain order"),
             ("studio", "On a studio machine"), ("loops", "A machine with a loop, and a router that proposes"),
             ("gates", "Every basic gate, compiled by QCCDCert"),
+            ("gate-sets", "Two native gate sets: MS and RZZ"),
             ("proof", "How the proof is built"), ("extensions", "The compiler of this site: QCCDCert, extended")]
 
 esc = html.escape
@@ -368,6 +369,10 @@ def body(rows: list[dict], device_svg: Callable) -> str:
          "R(&minus;&pi;/2,0) on up to two ions of G at once; readout (<code>acquire</code>) and optical pumping "
          "(<code>pump</code>) at G; and the controller latch. It says what the machine <i>can</i> do. It does not say where "
          "ions start.</p>"))
+    W("<p>R and MS are a <b>native gate set</b>: the laser operations a machine really has. This one is called "
+      "<code>ms</code>, and it is the set QCCDCert compiles to. Quantinuum&rsquo;s machines have another, <code>rzz</code>, "
+      "with the two-ion gate RZZ(&theta;) where this one has MS(&theta;). <a href=\"#gate-sets\">&sect;10</a> gives both "
+      "sets and says how to choose.</p>")
     W(df("Definition 2 (rule program)",
          "<p>A rule program is a list of named assertions <code>assert a: &phi;;</code>. Each must hold in the initial "
          "frame and in every later frame of the target code. &sect;4 says what &phi; may read.</p>", "rules-program"))
@@ -480,8 +485,8 @@ def body(rows: list[dict], device_svg: Callable) -> str:
     stage_notes = [
         ("effects", "Stages 1–3: Effects", "Includes are resolved, angles checked, gate definitions and registers expanded. "
          "<i>Correct because</i> each operation is kept, in order."),
-        ("pulses", "Stage 4: Pulses", "The CX becomes five native pulses. <i>Correct because</i> the five act as CX on every "
-         "state, up to a global phase (&sect;7)."),
+        ("pulses", "Stage 4: Pulses", "The CX becomes five native pulses, one MS between four R. <i>Correct because</i> the "
+         "five act as CX on every state, up to a global phase (&sect;7)."),
         ("bound", "Stage 5: Bound", "Each pulse gets the declared controls with exactly its waveform. <i>Correct because</i> a "
          "missing control fails here, not later."),
         ("placed", "Stage 6: Placed", "An initial site per ion. <i>Correct because</i> it fits every capacity and the rule "
@@ -728,6 +733,29 @@ def body(rows: list[dict], device_svg: Callable) -> str:
                       f"{r['instructions']} / {r['finish_us']} µs",
                       f'<a href="{r["page"]}#step=1">play</a>' if r.get("page") else ""])
     W(tbl(["source", "what", "stage 4: the pulses", "target code: events / time", ""], grows, "ct gates"))
+    W('<h3 id="gate-sets">Two native gate sets: MS and RZZ</h3>')
+    W("<p>R and MS are one native gate set, <code>ms</code>. Quantinuum&rsquo;s H-series and Helios machines have another, "
+      "<code>rzz</code>: the same one-ion pulse R, a frame change VZ for every turn about Z, and the two-ion gate "
+      "RZZ(&theta;) = exp(&minus;i&theta;/2 &middot; Z&otimes;Z), written R<sub>ZZ</sub> in their papers, where "
+      "<code>ms</code> has MS(&theta;) = exp(&minus;i&theta;/2 &middot; X&otimes;X). A frame change is virtual on machines "
+      "that track each qubit&rsquo;s phase (Quantinuum&rsquo;s do); where the beams are shared it is real laser work, "
+      "priced as three R pulses unless the machine declares a faster Z gate.</p>")
+    W(tbl(["", "gate set <code>ms</code>", "gate set <code>rzz</code>"], [
+        ["two-ion gate", "MS(&theta;)", "RZZ(&theta;)"],
+        ["one CX", "one MS(&pi;/2) between four R pulses",
+         "one RZZ(&pi;/2), two R pulses on the target, and a frame change VZ(&minus;&pi;/2) on each ion"],
+        ["one CZ", "a CX between two Hadamards on the target",
+         "one RZZ(&pi;/2) and a frame change VZ(&minus;&pi;/2) on each ion"],
+    ], "ct gatesets"))
+    W("<p>Every entry is an identity between operators, proved in Lean with its global phase. The two gates are one gate "
+      "in two bases: MS(&theta;) = (H&otimes;H) &middot; RZZ(&theta;) &middot; (H&otimes;H).</p>")
+    W("<p><b>Choosing.</b> QCCDCert compiles to <code>ms</code>. The project&rsquo;s earlier compiler (&sect;12) takes the "
+      "set as an option, <code>gate_set</code>: <code>ms</code>, the default, or <code>rzz</code> "
+      "(<code>--gate-set rzz</code> on its command line). Choose <code>rzz</code> for a machine that has RZZ. It also "
+      "suits one kind of simulation: RZZ is diagonal in the computational basis, so an error-correction circuit stays CSS "
+      "up to single-qubit basis changes, the class that Ellis (Hou and Ravi, "
+      "<a href=\"https://arxiv.org/abs/2611.26173\">arXiv:2611.26173</a>) simulates fast under qubit loss and leakage. "
+      "This site does not simulate leakage that way yet.</p>")
 
     # ------------------------------------------------------------------ 11 proof
     W('<h2 id="proof">11. How the proof is built</h2>')
@@ -787,8 +815,10 @@ def body(rows: list[dict], device_svg: Callable) -> str:
         ["the studio&rsquo;s replay", "judges the played programme under every studio rule and prices it", "no: a second, "
          "independent check"],
     ]))
-    W("<p>The project&rsquo;s earlier compiler is kept only as a fallback for a design this pipeline cannot compile, outside "
-      "the theorem; a programme it wrote says so where it is shown.</p>")
+    W("<p>The project&rsquo;s earlier compiler is kept for two things, both outside the theorem: as a fallback for a design "
+      "this pipeline cannot compile, and for the gate set <code>rzz</code> (<a href=\"#gate-sets\">&sect;10</a>), which "
+      "QCCDCert does not compile to. A programme it wrote says so where it is shown, and is checked against its circuit "
+      "afterwards (rule R10).</p>")
     W(f"<p class=\"note\">Compiler build used for this page: QCCDCert, Lean sources {esc(fp.get('sources_sha256', '?'))} "
       f"({fp.get('files', '?')} files, {esc(fp.get('lean', '?'))}).</p>")
 
