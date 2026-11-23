@@ -396,9 +396,9 @@ $EXE compile bench/ghz8.qasm --arch build/grid9x9.expanded.json -o build/out/ghz
 In `rzz` a zero-angle beam (the one `u3_decomp` writes for a `z`, `s` or `t`) is not emitted.
 A programme compiled in `rzz` carries `"gate_set": "rzz"` in its `meta` and in its certificate's
 `claims`, and its stage evidence names `RZZ` pulses, which `check-stages` multiplies out like
-any other. The rzz forms are numerically checked (`pulses-selftest`, `check-stages`,
-`bridge/check_cert.py` on the emitted programme); the Lean pulse theorems of C2 are about the
-`ms` set. A binary from before the option has no `gate-sets` command and ignores `--gate-set`:
+any other. The rzz forms of CX and CZ are Lean theorems as the `ms` forms are (`cx_decomp_rzz`,
+`cz_decomp_vz`), and every rzz form is numerically checked (`pulses-selftest`, `check-stages`,
+`bridge/check_cert.py` on the emitted programme). A binary from before the option has no `gate-sets` command and ignores `--gate-set`:
 `qccd.qec.compile_with_qccdc(..., gate_set="rzz")` asks it first and refuses rather than let it
 compile MS.
 

@@ -36,9 +36,10 @@
 
      CX = e^{iπ/4} · VZ(-π/2)⊗VZ(-π/2) · I⊗R(π/2, π) · RZZ(π/2) · I⊗R(-π/2, π/2)   [`decompose_cx`]
 
-   two one-qubit pulses, both on the target, where the MS form needs four.  The rzz forms
-   are NOT yet theorems of the Lean development, which knows MS only: each is checked
-   numerically, phase included, against its gate's defining unitary by
+   two one-qubit pulses, both on the target, where the MS form needs four.  Both are
+   theorems of the Lean development, phase included (`cx_decomp_rzz` and `cz_decomp_vz` in
+   QCCDC/Pulse/Decompose.lean, beside the MS set's `cx_decomp`); every form of the table,
+   those two among them, is also checked numerically against its gate's defining unitary by
    `qccdc pulses-selftest --gate-set rzz` ([Gateset_composites.check]) and, in the emitted
    programme, by `bridge/check_cert.py`. *)
 

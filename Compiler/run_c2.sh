@@ -30,7 +30,7 @@ echo
 echo "=== 3. the OCaml table vs the defining unitaries ==="
 (cd ocaml && dune build)
 (cd ocaml && dune exec --no-build bin/qccdc_cli.exe -- pulses-selftest)
-echo "--- the same table in the rzz gate set (R, VZ, RZZ: numerically checked; the Lean theorems are the ms set's)"
+echo "--- the same table in the rzz gate set (R, VZ, RZZ: numerically checked; CX and CZ are Lean theorems too)"
 (cd ocaml && dune exec --no-build bin/qccdc_cli.exe -- pulses-selftest --gate-set rzz)
 
 echo
