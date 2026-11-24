@@ -92,14 +92,21 @@
    },
    "Conveyor": {
     "points": {
-     "conveyor144_96d_j": {
+     "conveyor36_2L": {
       "skip": [
        "R10",
        "R7b",
        "R9"
       ]
      },
-     "conveyor96_96d_j": {
+     "conveyor72_1L": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     },
+     "conveyor72_2L": {
       "skip": [
        "R10",
        "R7b",
@@ -111,10 +118,10 @@
    },
    "Cyclone": {
     "points": {
-     "cyclone10_n16": {},
-     "cyclone16_n10": {},
-     "cyclone26_n6": {},
-     "cyclone44_n4": {},
+     "cyclone12_n12": {},
+     "cyclone18_n8": {},
+     "cyclone24_n6": {},
+     "cyclone36_n4": {},
      "cyclone6_n24": {},
      "cyclone72_n2": {}
     },
@@ -468,28 +475,28 @@
    },
    "Conveyor": {
     "points": {
-     "conveyor36_18d_j": {
+     "conveyor20_1L": {
       "skip": [
        "R10",
        "R7b",
        "R9"
       ]
      },
-     "conveyor36_24d_j": {
+     "conveyor20_2L": {
       "skip": [
        "R10",
        "R7b",
        "R9"
       ]
      },
-     "conveyor45_18d_j": {
+     "conveyor38_1L": {
       "skip": [
        "R10",
        "R7b",
        "R9"
       ]
      },
-     "conveyor48_24d_j": {
+     "conveyor38_2L": {
       "skip": [
        "R10",
        "R7b",
@@ -501,14 +508,44 @@
    },
    "Cyclone": {
     "points": {
-     "cyclone12_n6": {},
-     "cyclone22_n3": {},
+     "cyclone18_n4": {},
      "cyclone2_n28": {},
-     "cyclone38_n2": {},
-     "cyclone4_n15": {},
      "cyclone6_n10": {}
     },
     "set": "cyclone-deck"
+   },
+   "Grid": {
+    "points": {
+     "grid10x9": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     },
+     "grid7x6": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     },
+     "grid8x7": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     },
+     "grid9x8": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     }
+    },
+    "set": "grid-deck"
    },
    "Helios": {
     "points": {
@@ -1061,28 +1098,21 @@
    },
    "Conveyor": {
     "points": {
-     "conveyor64_64d_j": {
+     "conveyor26_2L": {
       "skip": [
        "R10",
        "R7b",
        "R9"
       ]
      },
-     "conveyor72_48d_j": {
+     "conveyor50_1L": {
       "skip": [
        "R10",
        "R7b",
        "R9"
       ]
      },
-     "conveyor96_48d_j": {
-      "skip": [
-       "R10",
-       "R7b",
-       "R9"
-      ]
-     },
-     "conveyor96_64d_j": {
+     "conveyor50_2L": {
       "skip": [
        "R10",
        "R7b",
@@ -1094,14 +1124,47 @@
    },
    "Cyclone": {
     "points": {
-     "cyclone10_n10": {},
-     "cyclone18_n6": {},
-     "cyclone30_n4": {},
+     "cyclone12_n9": {},
+     "cyclone16_n7": {},
+     "cyclone24_n5": {},
+     "cyclone48_n3": {},
      "cyclone4_n25": {},
-     "cyclone50_n2": {},
      "cyclone6_n17": {}
     },
     "set": "cyclone-deck"
+   },
+   "Grid": {
+    "points": {
+     "grid10x9": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     },
+     "grid11x11": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     },
+     "grid13x12": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     },
+     "grid8x8": {
+      "skip": [
+       "R10",
+       "R7b",
+       "R9"
+      ]
+     }
+    },
+    "set": "grid-deck"
    },
    "WISE": {
     "points": {
