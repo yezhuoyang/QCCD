@@ -33,6 +33,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/01_stationary_chain.zip",
+   "name": "steane-01_stationary_chain-reproduce.zip"
+  },
   "status": "ok",
   "page": "01_stationary_chain.html",
   "instructions": 133,
@@ -57,7 +61,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1769865,
+  "bytes": 1773006,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -97,6 +101,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/02_cyclone_base_j.zip",
+   "name": "steane-02_cyclone_base_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "02_cyclone_base_j.html",
   "instructions": 124,
@@ -129,7 +137,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1824559,
+  "bytes": 1827696,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -169,6 +177,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/03_grid5x5.zip",
+   "name": "steane-03_grid5x5-reproduce.zip"
+  },
   "status": "ok",
   "page": "03_grid5x5.html",
   "instructions": 119,
@@ -193,7 +205,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1837407,
+  "bytes": 1840530,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -235,6 +247,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/04_torus4x4.zip",
+   "name": "steane-04_torus4x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "04_torus4x4.html",
   "instructions": 116,
@@ -278,7 +294,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1825352,
+  "bytes": 1828477,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -320,6 +336,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/05_cylinder6x4.zip",
+   "name": "steane-05_cylinder6x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "05_cylinder6x4.html",
   "instructions": 118,
@@ -352,7 +372,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1840458,
+  "bytes": 1843589,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -394,6 +414,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/06_grid9x9.zip",
+   "name": "steane-06_grid9x9-reproduce.zip"
+  },
   "status": "ok",
   "page": "06_grid9x9.html",
   "instructions": 122,
@@ -426,7 +450,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1902404,
+  "bytes": 1905527,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -468,6 +492,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/07_deck_unit_cell.zip",
+   "name": "steane-07_deck_unit_cell-reproduce.zip"
+  },
   "status": "ok",
   "page": "07_deck_unit_cell.html",
   "instructions": 122,
@@ -500,7 +528,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1907896,
+  "bytes": 1911033,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -529,6 +557,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/08_random16.zip",
+   "name": "steane-08_random16-reproduce.zip"
+  },
   "status": "ok",
   "page": "08_random16.html",
   "instructions": 120,
@@ -564,7 +596,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1864900,
+  "bytes": 1868025,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -606,6 +638,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/09_tanner.zip",
+   "name": "steane-09_tanner-reproduce.zip"
+  },
   "status": "ok",
   "page": "09_tanner.html",
   "instructions": 119,
@@ -642,7 +678,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1872065,
+  "bytes": 1875186,
   "over_budget": [
    "dacs 1480 > max_dacs 128"
   ],
@@ -684,6 +720,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/10_h2_racetrack.zip",
+   "name": "steane-10_h2_racetrack-reproduce.zip"
+  },
   "status": "ok",
   "page": "10_h2_racetrack.html",
   "instructions": 317,
@@ -716,7 +756,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1842754,
+  "bytes": 1845887,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -756,6 +796,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/11_cyclone_dual_loop_j.zip",
+   "name": "steane-11_cyclone_dual_loop_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "11_cyclone_dual_loop_j.html",
   "instructions": 509,
@@ -788,7 +832,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1959696,
+  "bytes": 1962843,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -828,6 +872,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/12_ring24_8_j.zip",
+   "name": "steane-12_ring24_8_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "12_ring24_8_j.html",
   "instructions": 163,
@@ -860,7 +908,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1822712,
+  "bytes": 1825841,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -900,6 +948,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/13_ladder_2x72.zip",
+   "name": "steane-13_ladder_2x72-reproduce.zip"
+  },
   "status": "ok",
   "page": "13_ladder_2x72.html",
   "instructions": 183,
@@ -932,7 +984,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1975971,
+  "bytes": 1979102,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -972,6 +1024,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/14_ring144_24v_j.zip",
+   "name": "steane-14_ring144_24v_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "14_ring144_24v_j.html",
   "instructions": 532,
@@ -996,7 +1052,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1978733,
+  "bytes": 1981868,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -1022,7 +1078,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1761166,
+  "bytes": 1764200,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="qccd-page" content="43c9b67e3db068b0">
+<meta name="qccd-page" content="3e79b97149a16bca">
 <title>grid5x5 - not compiled</title>
 <style>
 :root{
@@ -544,6 +544,10 @@ code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:12px}
 .tools .tb{background:var(--panel);border:1px solid var(--line);border-radius:6px;
   padding:4px 10px;cursor:pointer;color:var(--ink)}
 .tools .tb[aria-expanded="true"]{background:var(--soft);border-color:var(--navy);color:var(--navy)}
+/* "Download and reproduce": the page's one download, a plain link (`render_html(reproduce=)`) */
+.tools a.tb.dl{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600;
+  text-decoration:none;white-space:nowrap}
+.tools a.tb.dl:hover{filter:brightness(1.15)}
 .tools .sw{position:relative;margin-left:auto;display:flex;align-items:center;gap:6px}
 #search{width:min(360px,40vw);padding:5px 9px;border:1px solid var(--line);border-radius:6px;
   font:12.5px ui-sans-serif,system-ui,sans-serif;background:var(--panel);color:var(--ink)}
@@ -876,6 +880,10 @@ textarea.src.out{min-height:120px;opacity:.85}
     <button class="tb" id="tbRows" aria-expanded="false" data-pop="row" data-hint="tools:rows">Append a row</button>
     <button class="tb" id="tbMachine" aria-expanded="false" data-pop="block" data-hint="tools:machine">Machine settings</button>
     <button class="tb" id="tbComponents" aria-expanded="false" data-pop="component" data-hint="tools:components">Components</button>
+    <!-- DOWNLOAD AND REPRODUCE: one zip with what this page's number was made from and the
+         scripts that make it again (qccd/qec/reproduce.py).  A plain download link, shown
+         only on a page that was given one (`render_html(reproduce=)`), through `style.display`. -->
+    <a class="tb dl" id="tbReproduce" data-hint="reproduce" style="display:none" download>Download and reproduce</a>
     <!-- NO "Selection" BUTTON.  Its popover showed `#palInspect`, which is the same DOM
          node the rail already carries, and `window.onInspector` popped it open on every
          selection -- the busiest thing on the page.  Per-element actions are the
@@ -13388,6 +13396,12 @@ const fmt=(x,d=0)=>(x==null)?'-':Number(x).toLocaleString(undefined,{maximumFrac
 document.getElementById('kicker').textContent = D.kicker || 'ROUTING SCHEME';
 document.getElementById('title').textContent = D.headline || (A.name+' · '+P.name);
 document.getElementById('lede').textContent = D.lede || A.description || '';
+// "Download and reproduce": where this page's zip is (relative to the page) and its file name
+if(D.reproduce && D.reproduce.href){
+  const dl = document.getElementById('tbReproduce');
+  if(dl){ dl.setAttribute('href', D.reproduce.href); dl.setAttribute('download', D.reproduce.name || '');
+    dl.style.display = ''; }
+}
 // WHAT PYTHON SHIPPED for the head: the two denominators and the metric chips describe
 // the shipped programme on the shipped device.  Kept, so `paintHead` can put them back.
 // ONE CHIP, either way it is rendered: the label is its hint key, and the four a
@@ -13857,7 +13871,7 @@ function opText(f){
   if(f.moves || f.type==='simd') return 'transport';
   if(f.type==='gate'){
     const g=f.gate||'', n=gateOps(f).length;
-    if((g==='R'||g==='MS') && f.params && f.params.length) return n>1?'broadcast':'pulse';
+    if((g==='R'||g==='MS'||g==='RZZ') && f.params && f.params.length) return n>1?'broadcast':'pulse';
     return 'gate';
   }
   return {measure:'readout', reset:'pump', cool:'cool', init:'init', barrier:'barrier',
@@ -14779,6 +14793,7 @@ function sIndex(){
   let els = []; try { els = document.querySelectorAll('button, [data-hint], .pal-item, summary, select, input[placeholder], label'); } catch(e){ els = []; }
   for(const el of els){
     if(SRES && SRES.contains(el)) continue;
+    if(el.id === 'tbReproduce' && !el.getAttribute('href')) continue;   // this page has no zip: nothing to find
     const label = sTextOf(el), key = el.getAttribute('data-hint');
     let h = null; try { h = (key && window.EDITOR && EDITOR.hintFor) ? EDITOR.hintFor(key) : null; } catch(e){}
     const lab = label || (h ? h.t : '');
@@ -14981,7 +14996,8 @@ const OPS = {
   'SORT.S': { name: 'transport [sort_split] — the other half of the transposition', what: 'The partner splits back out.', formal: 'transport d0:S2->S1[sort_split];', costk: 'splitmerge' },
   R:     { name: 'pulse R(θ,φ) — one single-qubit laser pulse', what: 'A rotation by θ about an axis at angle φ in the equatorial plane of the Bloch sphere: the one physical single-qubit pulse this hardware has. Every single-qubit gate of the circuit (h, x, s, t, u3…) compiles to exactly one R plus one VZ — the identity u3(θ,φ,λ) = VZ(φ+λ)·R(θ, π/2−λ), proved in Lean. Many R pulses on different ions are driven together in one instruction.', formal: 'pulse R(pi/2,0) q0 @S0;   broadcast R(pi/2,0) q0@S0, q1@S1;', costk: 'gate' },
   VZ:    { name: 'gate VZ(λ) — a frame update this site\'s earlier compiler emits', what: 'Advances the phase reference of every later pulse on that ion by λ. No laser fires, so it takes no time and adds no heating; it is what makes a single-qubit gate cost one pulse rather than three.', formal: 'gate VZ(pi/4) q0;', costk: '' },
-  MS:    { name: 'pulse MS(θ) — the Mølmer–Sørensen entangling pulse', what: 'The only two-qubit primitive: a shared motional mode couples two ions that sit in the SAME trap, so the pair must already be co-located (R6b checks this). A circuit CX compiles to four R pulses around one MS(π/2), proved in Lean (cx_decomp). Every pair listed is driven in the same instruction, one pair per trap.', formal: 'pulse MS(pi/2) q0,q1 @S0;   gate CX q0,q1 @S0;', costk: 'gate' },
+  MS:    { name: 'pulse MS(θ) — the Mølmer–Sørensen entangling pulse', what: 'The two-qubit primitive of the gate set ms, the default: a shared motional mode couples two ions that sit in the SAME trap, so the pair must already be co-located (R6b checks this). A circuit CX compiles to four R pulses around one MS(π/2), proved in Lean (cx_decomp). Every pair listed is driven in the same instruction, one pair per trap.', formal: 'pulse MS(pi/2) q0,q1 @S0;   gate CX q0,q1 @S0;', costk: 'gate' },
+  RZZ:   { name: 'pulse RZZ(θ) — the ZZ entangling pulse of the rzz gate set', what: 'The two-qubit primitive of the gate set rzz, the native set of Quantinuum’s machines: exp(−iθ/2·Z⊗Z) on two ions that sit in the SAME trap (R6b checks this). It stands where MS stands in the gate set ms, and is priced and noised as the machine’s native two-qubit gate. A circuit CX compiles to one RZZ(π/2), two R pulses on the target and one frame change VZ(−π/2) on each ion; a CZ to one RZZ(π/2) and the two frame changes. Both are proved in Lean (cx_decomp_rzz, cz_decomp_vz). Every pair listed is driven in the same instruction, one pair per trap.', formal: 'pulse RZZ(pi/2) q0,q1 @S0;   gate CX q0,q1 @S0;', costk: 'gate' },
   COOL:  { name: 'cool — remove motional quanta', what: 'Sympathetic cooling of the listed ions (or every ion, when broadcast). Transport heats an ion, so the cooling pass inserts one before the gates that need it. The first cool is the state preparation.', formal: 'cool;   cool q0,q1;', costk: 'gate' },
   RESET: { name: 'pump — prepare ions in |0⟩ (reset)', what: 'Re-initialises the listed ions, mid-circuit; an ancilla is reset before every check it serves.', formal: 'pump q153;', costk: 'gate' },
   MEAS:  { name: 'readout — read ions out (measure)', what: 'Projective readout of the listed ions into classical bits; the syndrome.', formal: 'readout q153 -> c0;', costk: 'gate' },
@@ -19783,6 +19799,7 @@ var HINTS = {
   'qlabels': { t: 'q labels', d: 'Write each ion’s virtual qubit above it, in the circuit’s spelling: ion q45 carries q[45]. Off by default; the choice is remembered.' },
   'notes:pill': { t: 'Study notes', d: 'This page’s own remarks on its programme: the facts it was judged by and the steps worth stopping at. Click a note to jump to its step; #step=N in the address opens any step.' },
   'notes:box': { t: 'Study notes', d: 'The steps worth stopping at, in order. Click one to jump there; prev and next walk them.' },
+  'reproduce': { t: 'Download and reproduce', d: 'Downloads one zip file with everything this page’s number was made from: the input circuit, the machine, the hardware program, the noisy stim circuit when the board measures a logical error rate, and the Python scripts that run the experiment again, with instructions.' },
   'ruleset': { t: 'The paper’s rules', d: 'This schedule was written for another machine model: a paper’s. Its rule set, judged rule by rule when the page was built, comes first; hover a rule for its first counterexample or for why it does not apply. The badges after it are this website’s own rules, which the paper did not assume.' },
   // the picture, element by element
   'el:site':       { t: 'Trapping site', d: 'A pocket in the electric field where ions sit still. Each site holds a few ions (its capacity), and its zone says what may happen there: a gate, a measurement, cooling.', k: 'press the tile, then click the canvas' },
@@ -27856,7 +27873,7 @@ var QCCD_TUTORIAL = {
       page: 'micro_grid9x9',
       text: [
         'The compiler of this site is **QCCDCert**, written and proved in Lean. It takes three inputs: a **hardware program** (the machine: sites with capacities, paths between them with their durations, and calibrations that bind each exact laser pulse to a site), a **rule program** (assertions such as `forall s:Sites. Ntr(s) <= cap(s)`, true on every step), and the circuit, here `micro.qasm`: four qubits, seven statements.',
-        'It returns **target code**: where the ions start, every transport, every pulse, every readout, each with its duration. This machine was translated into a hardware program, QCCDCert compiled `micro.qasm` for it, and cooling was added afterwards by this site.',
+        'It returns **target code**: where the ions start, every transport, every pulse, every readout, each with its duration. This machine was translated into a hardware program, QCCDCert compiled `micro.qasm` for it, and cooling was added afterwards by this site. Its pulses are `R` and `MS`: the native gate set `ms`. There is a second set, `rzz` (lesson D4).',
         'One theorem covers every result, on every machine: **Meaning** (erase the transports and waits and you get back the circuit’s pulses, in order; the result is the circuit’s), **Legality** (every step passes the capacity, position and channel checks and every rule) and **Time** (every step takes its declared duration; the finish is the latest end). That is why [[R10|rule:R10]] holds here without a certificate.',
         'The [[Circuit|tab:Q]] tab shows the circuit next to the animation. Click a statement, and the animation jumps to the instruction that carries it out: each instruction says which statement it serves.'
       ],
@@ -27888,7 +27905,7 @@ var QCCD_TUTORIAL = {
         answer: ['Read the theorem again in the text above: Meaning, Legality, Time.'],
         'default': ['Not there yet. Press Hint to be shown the next step.']
       },
-      praise: 'The CNOT is five pulses at one trap, and the theorem says why they are the right five, why every step was allowed, and why the clock is honest. Every CNOT you wrote by hand in Part B was this, with the compiler doing the trip.',
+      praise: 'The CNOT is five pulses at one trap, one MS between four R, and the theorem says why they are the right five, why every step was allowed, and why the clock is honest. Every CNOT you wrote by hand in Part B was this, with the compiler doing the trip. In the other native gate set, rzz, it would be one RZZ, two R and two frame changes: lesson D4 says how to choose.',
       solution: { stages: [[['seekTo', 'realises:1']], [['setAnswer', 'erase']], [['setAnswer', 'code']], [['setAnswer', 'overlap']]] } },
 
     // =============================================================== D2
@@ -27969,6 +27986,7 @@ var QCCD_TUTORIAL = {
         '**Save your work:** press **Ctrl+S** to save it as `<name>.studio.json`. To copy the machine or the programme, open **Machine**, press **Source**, choose `as .arch.json` or `as .tsir.json` under the text, and press **Copy**.',
         '**Check everything:** `python -m qccd open <name>.studio.json` runs the full checker on what you built, including the rules the [[Report|tab:R]] lists as not checked here.',
         '**Compile a circuit with QCCDCert:** `python -m qccd cert compile <circuit>.qasm --arch <name>.arch.json --html x.html` translates the machine into a hardware program, compiles, prints the target code with its times, adds cooling, and writes the page with the circuit beside it. Lesson D1 uses such a page. A machine with a closed loop is compiled by this site’s own compiler instead.',
+        '**Choose the native gate set:** a native gate set is the laser operations a machine really has, and there are two. `ms` is the pulse `R` and the two-ion Mølmer–Sørensen pulse `MS`; a CNOT is one `MS` between four `R` (lesson D1). `rzz`, the set of Quantinuum’s machines, is `R`, a frame change `VZ` and the two-ion pulse `RZZ`; a CNOT is one `RZZ`, two `R` and two frame changes. QCCDCert compiles to `ms`. This site’s own compiler takes either: its option `gate_set` is `ms` unless you write `--gate-set rzz` on its command line. Lesson G8 proves both CNOTs in Lean.',
         '**Open a compiled programme:** `python -m qccd studio --tsir <compiled>.tsir.json --qasm <circuit>.qasm -o x.html` opens any compiled programme with its circuit beside it.',
         '**Build this course:** `python -m qccd tutorial -o tutorial` builds this page and its companion page.',
         'The Compilation page of the website explains QCCDCert from its inputs to its theorem, on the paper’s own examples. A programme of your own goes in the [[Write|tab:W]] tab.'

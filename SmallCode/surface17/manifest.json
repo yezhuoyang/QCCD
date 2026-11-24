@@ -33,6 +33,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/01_stationary_chain.zip",
+   "name": "surface17-01_stationary_chain-reproduce.zip"
+  },
   "status": "ok",
   "page": "01_stationary_chain.html",
   "instructions": 149,
@@ -57,7 +61,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1774556,
+  "bytes": 1777700,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -97,6 +101,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/02_grid5x5.zip",
+   "name": "surface17-02_grid5x5-reproduce.zip"
+  },
   "status": "ok",
   "page": "02_grid5x5.html",
   "instructions": 114,
@@ -121,7 +129,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1836124,
+  "bytes": 1839250,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -163,6 +171,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/03_grid9x9.zip",
+   "name": "surface17-03_grid9x9-reproduce.zip"
+  },
   "status": "ok",
   "page": "03_grid9x9.html",
   "instructions": 114,
@@ -187,7 +199,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1900496,
+  "bytes": 1903622,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -229,6 +241,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/04_deck_unit_cell.zip",
+   "name": "surface17-04_deck_unit_cell-reproduce.zip"
+  },
   "status": "ok",
   "page": "04_deck_unit_cell.html",
   "instructions": 114,
@@ -253,7 +269,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1906005,
+  "bytes": 1909145,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -293,6 +309,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/05_cylinder6x4.zip",
+   "name": "surface17-05_cylinder6x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "05_cylinder6x4.html",
   "instructions": 115,
@@ -325,7 +345,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1839425,
+  "bytes": 1842559,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -367,6 +387,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/06_torus4x4.zip",
+   "name": "surface17-06_torus4x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "06_torus4x4.html",
   "instructions": 117,
@@ -410,7 +434,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1824232,
+  "bytes": 1827360,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -452,6 +476,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/07_tanner.zip",
+   "name": "surface17-07_tanner-reproduce.zip"
+  },
   "status": "ok",
   "page": "07_tanner.html",
   "instructions": 126,
@@ -487,7 +515,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1882045,
+  "bytes": 1885169,
   "over_budget": [
    "dacs 1640 > max_dacs 128"
   ],
@@ -529,6 +557,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/08_cyclone_base_j.zip",
+   "name": "surface17-08_cyclone_base_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "08_cyclone_base_j.html",
   "instructions": 186,
@@ -561,7 +593,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1837406,
+  "bytes": 1840546,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -601,6 +633,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/09_ladder_2x72.zip",
+   "name": "surface17-09_ladder_2x72-reproduce.zip"
+  },
   "status": "ok",
   "page": "09_ladder_2x72.html",
   "instructions": 146,
@@ -633,7 +669,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1963910,
+  "bytes": 1967044,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -662,6 +698,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/10_random16.zip",
+   "name": "surface17-10_random16-reproduce.zip"
+  },
   "status": "ok",
   "page": "10_random16.html",
   "instructions": 126,
@@ -697,7 +737,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1865932,
+  "bytes": 1869060,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -739,6 +779,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/11_cyclone_dual_loop_j.zip",
+   "name": "surface17-11_cyclone_dual_loop_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "11_cyclone_dual_loop_j.html",
   "instructions": 355,
@@ -763,7 +807,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1922197,
+  "bytes": 1925347,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -803,6 +847,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/12_h2_racetrack.zip",
+   "name": "surface17-12_h2_racetrack-reproduce.zip"
+  },
   "status": "ok",
   "page": "12_h2_racetrack.html",
   "instructions": 333,
@@ -835,7 +883,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1838316,
+  "bytes": 1841452,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -875,6 +923,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/13_ring144_24v_j.zip",
+   "name": "surface17-13_ring144_24v_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "13_ring144_24v_j.html",
   "instructions": 556,
@@ -899,7 +951,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1984052,
+  "bytes": 1987190,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -939,6 +991,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/14_ring24_8_j.zip",
+   "name": "surface17-14_ring24_8_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "14_ring24_8_j.html",
   "instructions": 197,
@@ -971,7 +1027,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1828318,
+  "bytes": 1831450,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -997,7 +1053,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1761185,
+  "bytes": 1764219,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"

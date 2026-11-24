@@ -11,6 +11,10 @@
    "note": "qccdc compile (split rounds), then insert_cooling"
   },
   "claim": "Shorter still: 196 traps. The general router alone does not route it; its fallback does, by running each round it cannot route in halves and deferring the rest, still in the circuit's order: 1,694 transport cycles and 7 cools, after 1,462 s of compiling.",
+  "reproduce": {
+   "href": "reproduce/cyc100_h2.zip",
+   "name": "bb144-cyc100_h2-reproduce.zip"
+  },
   "status": "ok",
   "page": "cyc100_h2.html",
   "instructions": 1744,
@@ -87,15 +91,15 @@
    "shim_dacs_m16": 98,
    "shim_dacs_m16_wise": 105,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc compile (split rounds), then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "general-split",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4345267,
-  "r10": true,
+  "bytes": 4348498,
+  "r10": false,
   "over_budget": [],
   "sites": 196,
   "junctions": 0,
@@ -113,6 +117,10 @@
    "note": "qccdc compile, then insert_cooling"
   },
   "claim": "The same kind of loop with 236 traps, so the ions start up to four to a trap. The general router still serves it directly, in 1,850 transport cycles, with 7 cools.",
+  "reproduce": {
+   "href": "reproduce/cyc120_h2.zip",
+   "name": "bb144-cyc120_h2-reproduce.zip"
+  },
   "status": "ok",
   "page": "cyc120_h2.html",
   "instructions": 1900,
@@ -189,15 +197,15 @@
    "shim_dacs_m16": 118,
    "shim_dacs_m16_wise": 126,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc compile, then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "general",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4273786,
-  "r10": true,
+  "bytes": 4277017,
+  "r10": false,
   "over_budget": [],
   "sites": 236,
   "junctions": 0,
@@ -215,6 +223,10 @@
    "note": "qccdc compile, then insert_cooling"
   },
   "claim": "No docks: one loop of 292 traps that hold up to four ions each and can all gate, so a data ion and its check meet in a trap on the loop itself. Rotation needs docks and refuses; the general router serves it in 2,289 transport cycles, and the heating model asks for only 7 cools.",
+  "reproduce": {
+   "href": "reproduce/cyc148_h2.zip",
+   "name": "bb144-cyc148_h2-reproduce.zip"
+  },
   "status": "ok",
   "page": "cyc148_h2.html",
   "instructions": 2339,
@@ -291,15 +303,15 @@
    "shim_dacs_m16": 146,
    "shim_dacs_m16_wise": 156,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc compile, then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "general",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4507489,
-  "r10": true,
+  "bytes": 4510720,
+  "r10": false,
   "over_budget": [],
   "sites": 292,
   "junctions": 0,
@@ -317,6 +329,10 @@
    "note": "qccdc compile, then insert_cooling"
   },
   "claim": "The 292-trap loop drawn on a rectangle of height 3, which adds a trap on each short side: 294 traps. The general router serves it in 2,215 transport cycles, with 7 cools.",
+  "reproduce": {
+   "href": "reproduce/cyc148_h3.zip",
+   "name": "bb144-cyc148_h3-reproduce.zip"
+  },
   "status": "ok",
   "page": "cyc148_h3.html",
   "instructions": 2265,
@@ -393,15 +409,15 @@
    "shim_dacs_m16": 147,
    "shim_dacs_m16_wise": 157,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc compile, then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "general",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4469919,
-  "r10": true,
+  "bytes": 4473150,
+  "r10": false,
   "over_budget": [],
   "sites": 294,
   "junctions": 0,
@@ -424,7 +440,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1814738,
+  "bytes": 1817772,
   "r10": null,
   "over_budget": [],
   "sites": 148,
@@ -448,7 +464,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 2020652,
+  "bytes": 2023686,
   "r10": null,
   "over_budget": [],
   "sites": 312,
@@ -472,7 +488,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1899514,
+  "bytes": 1902548,
   "r10": null,
   "over_budget": [],
   "sites": 300,
@@ -491,6 +507,10 @@
    "note": "qccdc rotate, then insert_cooling"
   },
   "claim": "The same loop and docks again, on a rectangle of height 4: once more the same programme, instruction for instruction and cool for cool, on a different machine. Drawn at height 4, some dock rails cross without a junction (V100 and V142 among them), so R21 refuses the machine and it is listed under Disqualified, never ranked.",
+  "reproduce": {
+   "href": "reproduce/ring144_h4_d144.zip",
+   "name": "bb144-ring144_h4_d144-reproduce.zip"
+  },
   "status": "ok",
   "page": "ring144_h4_d144.html",
   "instructions": 3929,
@@ -611,15 +631,15 @@
    "shim_dacs_m16": 216,
    "shim_dacs_m16_wise": 231,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc rotate, then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "rotate",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": false
   },
-  "bytes": 3498385,
-  "r10": true,
+  "bytes": 3501628,
+  "r10": false,
   "over_budget": [],
   "sites": 432,
   "junctions": 144,
@@ -637,6 +657,10 @@
    "note": "qccdc rotate, then insert_cooling"
   },
   "claim": "The same loop of 288 slots and the same 144 docks, drawn on a rectangle of height 3. The compiler writes the same programme as for ring(146, 2, 144), instruction for instruction and cool for cool (411 rotations, 11,640 hops, 411 batches); what differs is the machine: where its corners turn, and its die.",
+  "reproduce": {
+   "href": "reproduce/ring145_h3_d144.zip",
+   "name": "bb144-ring145_h3_d144-reproduce.zip"
+  },
   "status": "ok",
   "page": "ring145_h3_d144.html",
   "instructions": 3929,
@@ -747,15 +771,15 @@
    "shim_dacs_m16": 216,
    "shim_dacs_m16_wise": 231,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc rotate, then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "rotate",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3498222,
-  "r10": true,
+  "bytes": 3501465,
+  "r10": false,
   "over_budget": [],
   "sites": 432,
   "junctions": 144,
@@ -773,6 +797,10 @@
    "note": "qccdc rotate, then insert_cooling"
   },
   "claim": "The release's starter. Each of the 144 check ions waits in a dock of its own, and the 144 data ions ride a loop of 288 slots, one in every second slot. Rigid rotation turns the whole loop to bring each data ion past its checks' docks in the schedule's order: 411 rotations, 11,640 hops, and 864 contacts in 411 batches -- about two a batch, since each check takes its CNOTs one at a time, in the schedule's order. The heating model asks for 411 cools. It is the programme the workspace's compile job writes for the starter, instruction for instruction.",
+  "reproduce": {
+   "href": "reproduce/ring146_h2_d144.zip",
+   "name": "bb144-ring146_h2_d144-reproduce.zip"
+  },
   "status": "ok",
   "page": "ring146_h2_d144.html",
   "instructions": 3929,
@@ -883,15 +911,15 @@
    "shim_dacs_m16": 216,
    "shim_dacs_m16_wise": 231,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc rotate, then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "rotate",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3498701,
-  "r10": true,
+  "bytes": 3501944,
+  "r10": false,
   "over_budget": [],
   "sites": 432,
   "junctions": 144,
@@ -914,7 +942,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1937054,
+  "bytes": 1940088,
   "r10": null,
   "over_budget": [],
   "sites": 360,
@@ -933,6 +961,10 @@
    "note": "qccdc rotate, then insert_cooling"
   },
   "claim": "A roomier loop: 432 slots for the same 144 docks, so the data ions ride every third slot. The schedule keeps its 411 batches, but each rotation has farther to go: 18,885 hops instead of 11,640.",
+  "reproduce": {
+   "href": "reproduce/ring218_h2_d144.zip",
+   "name": "bb144-ring218_h2_d144-reproduce.zip"
+  },
   "status": "ok",
   "page": "ring218_h2_d144.html",
   "instructions": 3938,
@@ -1043,15 +1075,15 @@
    "shim_dacs_m16": 288,
    "shim_dacs_m16_wise": 308,
    "compiled": "compiled 2026-11-02 with qccdc cd3efedbbc10 (qccdc rotate, then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "rotate",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3587348,
-  "r10": true,
+  "bytes": 3590591,
+  "r10": false,
   "over_budget": [],
   "sites": 576,
   "junctions": 144,
@@ -1074,6 +1106,10 @@
    "note": "then insert_cooling"
   },
   "claim": "The same machine as a planar one: nested racetracks. One broadcast, so the two loops take turns, and a hop from the top row and one from the bottom row are two waveforms: 213 transport cycles and 19 cools. What the layers of the two entries above add is the difference from this one.",
+  "reproduce": {
+   "href": "reproduce/sandwich72_L1.zip",
+   "name": "bb144-sandwich72_L1-reproduce.zip"
+  },
   "status": "ok",
   "page": "sandwich72_L1.html",
   "instructions": 334,
@@ -1142,15 +1178,15 @@
    "shim_dacs_m16": 108,
    "shim_dacs_m16_wise": 116,
    "compiled": "compiled 2026-11-10 with the conveyor router (then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "conveyor",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2752587,
-  "r10": true,
+  "bytes": 2755826,
+  "r10": false,
   "over_budget": [],
   "sites": 216,
   "junctions": 144,
@@ -1173,6 +1209,10 @@
    "note": "then insert_cooling"
   },
   "claim": "The same machine with the X checks' loop in the data traps' own plane, inside their ring, and the Z checks' loop a layer above. The loops still turn together; the hops of the loop in the plane are a planar machine's: 151 transport cycles and 19 cools.",
+  "reproduce": {
+   "href": "reproduce/sandwich72_L2.zip",
+   "name": "bb144-sandwich72_L2-reproduce.zip"
+  },
   "status": "ok",
   "page": "sandwich72_L2.html",
   "instructions": 272,
@@ -1231,15 +1271,15 @@
    "shim_dacs_m16": 108,
    "shim_dacs_m16_wise": 116,
    "compiled": "compiled 2026-11-10 with the conveyor router (then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "conveyor",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3340769,
-  "r10": true,
+  "bytes": 3344008,
+  "r10": false,
   "over_budget": [],
   "sites": 216,
   "junctions": 144,
@@ -1262,6 +1302,10 @@
    "note": "then insert_cooling"
   },
   "claim": "The data ions never move: L and R ion k share trap k. The X checks ride a conveyor loop on the layer below and the Z checks one on the layer above, with a riser from every slot to the trap it faces. A layer of CNOTs is a turn of a loop and a hop, whatever the number of checks, and each layer has a broadcast of its own, so the two loops turn in the same cycle: 118 transport cycles and 19 cools. Compiled by a router written for this machine, in under a second. Press 3D on its page to turn it.",
+  "reproduce": {
+   "href": "reproduce/sandwich72_L3.zip",
+   "name": "bb144-sandwich72_L3-reproduce.zip"
+  },
   "status": "ok",
   "page": "sandwich72_L3.html",
   "instructions": 239,
@@ -1320,15 +1364,15 @@
    "shim_dacs_m16": 108,
    "shim_dacs_m16_wise": 116,
    "compiled": "compiled 2026-11-10 with the conveyor router (then insert_cooling)",
-   "r10": true,
-   "r10_verdict": "-> R10 passed: O1 by the proved Lean checker (QCCDC.Cert.check_sound); O2 by stabilizer tableau, composed from the emitted pulses, against the source QASM",
+   "r10": false,
+   "r10_verdict": "-> R10 partial: O1 and O2 both check out, but only the fast OCaml/Python checker ran; pass --qcheck to have the proved Lean checker decide it",
    "engine": "conveyor",
    "order_violations": 0,
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3334827,
-  "r10": true,
+  "bytes": 3338066,
+  "r10": false,
   "over_budget": [],
   "sites": 216,
   "junctions": 144,

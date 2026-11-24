@@ -33,6 +33,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/01_stationary_chain.zip",
+   "name": "five_qubit-01_stationary_chain-reproduce.zip"
+  },
   "status": "ok",
   "page": "01_stationary_chain.html",
   "instructions": 139,
@@ -57,7 +61,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1771733,
+  "bytes": 1774878,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -97,6 +101,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/02_h2_racetrack.zip",
+   "name": "five_qubit-02_h2_racetrack-reproduce.zip"
+  },
   "status": "ok",
   "page": "02_h2_racetrack.html",
   "instructions": 191,
@@ -129,7 +137,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1805183,
+  "bytes": 1808320,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -169,6 +177,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/03_cyclone_base_j.zip",
+   "name": "five_qubit-03_cyclone_base_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "03_cyclone_base_j.html",
   "instructions": 148,
@@ -201,7 +213,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1829361,
+  "bytes": 1832502,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -241,6 +253,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/04_grid5x5.zip",
+   "name": "five_qubit-04_grid5x5-reproduce.zip"
+  },
   "status": "ok",
   "page": "04_grid5x5.html",
   "instructions": 132,
@@ -273,7 +289,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1841368,
+  "bytes": 1844495,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -315,6 +331,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/05_tanner.zip",
+   "name": "five_qubit-05_tanner-reproduce.zip"
+  },
   "status": "ok",
   "page": "05_tanner.html",
   "instructions": 132,
@@ -350,7 +370,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1849501,
+  "bytes": 1852626,
   "over_budget": [
    "dacs 1000 > max_dacs 128"
   ],
@@ -392,6 +412,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/06_cyclone_dual_loop_j.zip",
+   "name": "five_qubit-06_cyclone_dual_loop_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "06_cyclone_dual_loop_j.html",
   "instructions": 402,
@@ -424,7 +448,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1936042,
+  "bytes": 1939193,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -464,6 +488,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/07_torus4x4.zip",
+   "name": "five_qubit-07_torus4x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "07_torus4x4.html",
   "instructions": 133,
@@ -507,7 +535,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1828553,
+  "bytes": 1831682,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -549,6 +577,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/08_grid9x9.zip",
+   "name": "five_qubit-08_grid9x9-reproduce.zip"
+  },
   "status": "ok",
   "page": "08_grid9x9.html",
   "instructions": 133,
@@ -581,7 +613,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1905914,
+  "bytes": 1909041,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -623,6 +655,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/09_deck_unit_cell.zip",
+   "name": "five_qubit-09_deck_unit_cell-reproduce.zip"
+  },
   "status": "ok",
   "page": "09_deck_unit_cell.html",
   "instructions": 133,
@@ -655,7 +691,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1911408,
+  "bytes": 1914549,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -684,6 +720,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/10_random16.zip",
+   "name": "five_qubit-10_random16-reproduce.zip"
+  },
   "status": "ok",
   "page": "10_random16.html",
   "instructions": 135,
@@ -719,7 +759,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1869776,
+  "bytes": 1872905,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -761,6 +801,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/11_cylinder6x4.zip",
+   "name": "five_qubit-11_cylinder6x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "11_cylinder6x4.html",
   "instructions": 137,
@@ -793,7 +837,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1845917,
+  "bytes": 1849052,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -835,6 +879,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/12_ladder_2x72.zip",
+   "name": "five_qubit-12_ladder_2x72-reproduce.zip"
+  },
   "status": "ok",
   "page": "12_ladder_2x72.html",
   "instructions": 166,
@@ -859,7 +907,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1965083,
+  "bytes": 1968218,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -899,6 +947,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/13_ring24_8_j.zip",
+   "name": "five_qubit-13_ring24_8_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "13_ring24_8_j.html",
   "instructions": 215,
@@ -931,7 +983,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1831105,
+  "bytes": 1834238,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -971,6 +1023,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/14_ring144_24v_j.zip",
+   "name": "five_qubit-14_ring144_24v_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "14_ring144_24v_j.html",
   "instructions": 460,
@@ -1003,7 +1059,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1960328,
+  "bytes": 1963467,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -1029,7 +1085,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1761171,
+  "bytes": 1764205,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"

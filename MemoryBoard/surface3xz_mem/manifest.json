@@ -51,6 +51,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/01_grid9x9.zip",
+   "name": "surface3xz_mem-01_grid9x9-reproduce.zip"
+  },
   "status": "ok",
   "page": "01_grid9x9.html",
   "instructions": 378,
@@ -83,7 +87,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2338609,
+  "bytes": 2341777,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -172,6 +176,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/02_deck_unit_cell.zip",
+   "name": "surface3xz_mem-02_deck_unit_cell-reproduce.zip"
+  },
   "status": "ok",
   "page": "02_deck_unit_cell.html",
   "instructions": 378,
@@ -204,7 +212,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2344097,
+  "bytes": 2347279,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -291,6 +299,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/03_grid5x5.zip",
+   "name": "surface3xz_mem-03_grid5x5-reproduce.zip"
+  },
   "status": "ok",
   "page": "03_grid5x5.html",
   "instructions": 454,
@@ -323,7 +335,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2293626,
+  "bytes": 2296794,
   "over_budget": [],
   "sites": 40,
   "junctions": 21,
@@ -410,6 +422,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/04_cyclone_base_j.zip",
+   "name": "surface3xz_mem-04_cyclone_base_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "04_cyclone_base_j.html",
   "instructions": 646,
@@ -442,7 +458,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2393364,
+  "bytes": 2396546,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -529,6 +545,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/05_ladder_2x72.zip",
+   "name": "surface3xz_mem-05_ladder_2x72-reproduce.zip"
+  },
   "status": "ok",
   "page": "05_ladder_2x72.html",
   "instructions": 1213,
@@ -561,7 +581,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2838388,
+  "bytes": 2841564,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -648,6 +668,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/06_h2_racetrack.zip",
+   "name": "surface3xz_mem-06_h2_racetrack-reproduce.zip"
+  },
   "status": "ok",
   "page": "06_h2_racetrack.html",
   "instructions": 1976,
@@ -680,7 +704,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 3081229,
+  "bytes": 3084407,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -767,6 +791,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/07_ring144_24v_j.zip",
+   "name": "surface3xz_mem-07_ring144_24v_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "07_ring144_24v_j.html",
   "instructions": 2864,
@@ -799,7 +827,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 3710987,
+  "bytes": 3714167,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -886,6 +914,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/08_torus4x4.zip",
+   "name": "surface3xz_mem-08_torus4x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "08_torus4x4.html",
   "instructions": 482,
@@ -929,7 +961,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2315099,
+  "bytes": 2318269,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1007,6 +1039,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/09_random16.zip",
+   "name": "surface3xz_mem-09_random16-reproduce.zip"
+  },
   "status": "ok",
   "page": "09_random16.html",
   "instructions": 574,
@@ -1050,7 +1086,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 2366007,
+  "bytes": 2369177,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -1108,7 +1144,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1764842,
+  "bytes": 1767876,
   "r10": null,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
@@ -1138,7 +1174,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1723087,
+  "bytes": 1726121,
   "r10": null,
   "over_budget": [],
   "sites": 2,
@@ -1166,7 +1202,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1821916,
+  "bytes": 1824950,
   "r10": null,
   "over_budget": [],
   "sites": 144,
@@ -1194,7 +1230,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1755882,
+  "bytes": 1758916,
   "r10": null,
   "over_budget": [],
   "sites": 32,

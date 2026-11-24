@@ -33,6 +33,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/01_stationary_chain.zip",
+   "name": "rep9-01_stationary_chain-reproduce.zip"
+  },
   "status": "ok",
   "page": "01_stationary_chain.html",
   "instructions": 95,
@@ -57,7 +61,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1757487,
+  "bytes": 1760626,
   "over_budget": [],
   "sites": 2,
   "junctions": 0,
@@ -97,6 +101,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/02_h2_racetrack.zip",
+   "name": "rep9-02_h2_racetrack-reproduce.zip"
+  },
   "status": "ok",
   "page": "02_h2_racetrack.html",
   "instructions": 138,
@@ -121,7 +129,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1795778,
+  "bytes": 1798909,
   "over_budget": [],
   "sites": 40,
   "junctions": 0,
@@ -161,6 +169,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/03_cyclone_dual_loop_j.zip",
+   "name": "rep9-03_cyclone_dual_loop_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "03_cyclone_dual_loop_j.html",
   "instructions": 138,
@@ -185,7 +197,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1867474,
+  "bytes": 1870619,
   "over_budget": [],
   "sites": 144,
   "junctions": 0,
@@ -225,6 +237,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/04_chain.zip",
+   "name": "rep9-04_chain-reproduce.zip"
+  },
   "status": "ok",
   "page": "04_chain.html",
   "instructions": 131,
@@ -249,7 +265,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1807576,
+  "bytes": 1810693,
   "over_budget": [
    "dacs 1728 > max_dacs 128"
   ],
@@ -291,6 +307,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/05_ladder_2x72.zip",
+   "name": "rep9-05_ladder_2x72-reproduce.zip"
+  },
   "status": "ok",
   "page": "05_ladder_2x72.html",
   "instructions": 131,
@@ -315,7 +335,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1947215,
+  "bytes": 1950344,
   "over_budget": [],
   "sites": 288,
   "junctions": 46,
@@ -355,6 +375,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/06_cylinder6x4.zip",
+   "name": "rep9-06_cylinder6x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "06_cylinder6x4.html",
   "instructions": 136,
@@ -379,7 +403,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1840217,
+  "bytes": 1843346,
   "over_budget": [
    "dacs 1680 > max_dacs 128"
   ],
@@ -410,6 +434,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/07_random16.zip",
+   "name": "rep9-07_random16-reproduce.zip"
+  },
   "status": "ok",
   "page": "07_random16.html",
   "instructions": 132,
@@ -445,7 +473,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1865284,
+  "bytes": 1868407,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -487,6 +515,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/08_torus4x4.zip",
+   "name": "rep9-08_torus4x4-reproduce.zip"
+  },
   "status": "ok",
   "page": "08_torus4x4.html",
   "instructions": 133,
@@ -522,7 +554,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1823581,
+  "bytes": 1826704,
   "over_budget": [
    "dacs 1280 > max_dacs 128"
   ],
@@ -564,6 +596,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/09_grid9x9.zip",
+   "name": "rep9-09_grid9x9-reproduce.zip"
+  },
   "status": "ok",
   "page": "09_grid9x9.html",
   "instructions": 135,
@@ -588,7 +624,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1900865,
+  "bytes": 1903986,
   "over_budget": [
    "dacs 5760 > max_dacs 128"
   ],
@@ -630,6 +666,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/10_deck_unit_cell.zip",
+   "name": "rep9-10_deck_unit_cell-reproduce.zip"
+  },
   "status": "ok",
   "page": "10_deck_unit_cell.html",
   "instructions": 135,
@@ -654,7 +694,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1906378,
+  "bytes": 1909513,
   "over_budget": [],
   "sites": 144,
   "junctions": 77,
@@ -694,6 +734,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/11_grid5x5.zip",
+   "name": "rep9-11_grid5x5-reproduce.zip"
+  },
   "status": "ok",
   "page": "11_grid5x5.html",
   "instructions": 137,
@@ -718,7 +762,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1837602,
+  "bytes": 1840723,
   "over_budget": [
    "dacs 1600 > max_dacs 128"
   ],
@@ -760,6 +804,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/12_cyclone_base_j.zip",
+   "name": "rep9-12_cyclone_base_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "12_cyclone_base_j.html",
   "instructions": 241,
@@ -784,7 +832,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1844735,
+  "bytes": 1847870,
   "over_budget": [],
   "sites": 72,
   "junctions": 0,
@@ -824,6 +872,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/13_ring144_24v_j.zip",
+   "name": "rep9-13_ring144_24v_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "13_ring144_24v_j.html",
   "instructions": 286,
@@ -848,7 +900,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1911783,
+  "bytes": 1914916,
   "over_budget": [],
   "sites": 168,
   "junctions": 24,
@@ -888,6 +940,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/14_ring24_8_j.zip",
+   "name": "rep9-14_ring24_8_j-reproduce.zip"
+  },
   "status": "ok",
   "page": "14_ring24_8_j.html",
   "instructions": 193,
@@ -920,7 +976,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1818114,
+  "bytes": 1821241,
   "over_budget": [],
   "sites": 32,
   "junctions": 8,
@@ -960,6 +1016,10 @@
    "T_source": "replay"
   },
   "r10": true,
+  "reproduce": {
+   "href": "reproduce/15_tanner.zip",
+   "name": "rep9-15_tanner-reproduce.zip"
+  },
   "status": "ok",
   "page": "15_tanner.html",
   "instructions": 182,
@@ -994,7 +1054,7 @@
     "kind": "note"
    }
   ],
-  "bytes": 1874091,
+  "bytes": 1877210,
   "over_budget": [
    "dacs 1320 > max_dacs 128"
   ],
