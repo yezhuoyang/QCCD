@@ -808,7 +808,7 @@ def board_index(ts: list[dict], goals: bool = True) -> str:
         # the QEC clock cycle of this board: the round it ranks, plus the classical loop
         # around it (qccd/site/qec_cycle.py, from qccd.analysis.feedback)
         cycles.append({"id": t["id"], "title": t["title"],
-                       "round_us": (_t(best) or 0.0) * 1000.0, "n_data": t.get("n_data")})
+                       "round_us": ((_t(best) if best else None) or 0.0) * 1000.0, "n_data": t.get("n_data")})
         rows_html.append(
             f'<section class="task" id="{t["id"]}"><div><h2><a href="{t["id"]}/">{html.escape(t["title"])}</a></h2>'
             f'<p class="desc">{html.escape(t.get("description", ""))}</p>'

@@ -285,7 +285,9 @@ def grade(code: str, point: dict, work_root: str) -> dict:
         row["budget"] = {k: round(v, 6) for k, v in (lr.get("budget") or {}).items()}
         row["status"] = "ok"
     except Exception as exc:  # noqa: BLE001 -- one point's failure is a row, not the end of the sweep
-        row.update(status="error", why=f"{type(exc).__name__}: {exc}"[:400], trace=traceback.format_exc()[-1200:])
+        # a row is published: its trace names files from the repository's root, not this machine's folders
+        row.update(status="error", why=f"{type(exc).__name__}: {exc}"[:400],
+                   trace=traceback.format_exc()[-1200:].replace(str(ROOT), "."))
     row["seconds"] = round(time.time() - t0, 1)
     return row
 
