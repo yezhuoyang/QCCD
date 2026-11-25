@@ -188,6 +188,16 @@ def _decoded_by(q: dict) -> str:
     return f'decoded by <a href="noise/#decoders">{_e(decoder_label(None, q.get("ler")))}</a>'
 
 
+def _gate_sets(b) -> str:
+    """The native gate sets a board takes a program in, said only where its release pins them
+    (`TaskRelease.gate_sets`): a board that names none takes a program in any set, and each entry
+    is tagged with its own where it is not the default (leaderboard.SCRIPT)."""
+    named = b.manifest.get("gate_sets")
+    if not named:
+        return ""
+    return " &middot; gate set " + " or ".join(_e(g) for g in named) + " only"
+
+
 def _ler_bars(t: dict) -> str:
     """One memory board's ranking, as the time boards show theirs: the three designs with the
     lowest logical error rate per round, each bar a link to its page (the ion animation and
@@ -237,7 +247,7 @@ def memory_section(ts: list | None = None) -> str:
             + (' <a class="lb-goaltag" href="goal1/">Goal 1</a>' if goal else "") + '</h3>'
             f'<p class="lb-meta">logical error rate per round, lower is better &middot; '
             f'<a href="noise/#{dict(NOISE_MODELS).get(q["noise"], "")}">{_e(q["noise"])}</a> &middot; up to '
-            f'{int(q["ler"].get("max_shots", 0)):,} shots &middot; {_decoded_by(q)}</p>'
+            f'{int(q["ler"].get("max_shots", 0)):,} shots &middot; {_decoded_by(q)}{_gate_sets(b)}</p>'
             + (_ler_bars(built[b.id]) if b.id in built else "")
             + _board_block(b.manifest["task"], b.title) + '</div>')
     how = "" if not noise else '<p class="lb-note"><a href="noise/">How the number is made &rarr;</a></p>'
@@ -263,7 +273,7 @@ def c2lr_section(ts: list | None = None) -> str:
             f'<p class="lb-meta">logical error rate per round, lower is better &middot; '
             f'<a href="noise/#{dict(NOISE_MODELS).get(q["noise"], "")}">{_e(q["noise"])}</a> &middot; '
             f'<a href="../rules/#set-{_e(rules)}">rule set {_e(rules)}</a> &middot; up to '
-            f'{int(q["ler"].get("max_shots", 0)):,} shots &middot; {_decoded_by(q)}</p>'
+            f'{int(q["ler"].get("max_shots", 0)):,} shots &middot; {_decoded_by(q)}{_gate_sets(b)}</p>'
             + (_ler_bars(built[b.id]) if b.id in built else "")
             + _board_block(b.manifest["task"], b.title) + '</div>')
     return ('<h2 id="c2lr">C2LR boards: swap-or-stay lattices</h2>'

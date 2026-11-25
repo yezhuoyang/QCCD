@@ -141,7 +141,9 @@ def data() -> dict | None:
             ler = r["ler"]
             pts.append({"f": fam, "n": name, "s": _size(r), "t": round(r["T_round_ms"], 4),
                         "l": ler["per_round"], "lo": ler["per_round_lo"], "hi": ler["per_round_hi"],
-                        "e": ler["errors"], "sh": ler["shots"], **u})
+                        "e": ler["errors"], "sh": ler["shots"], **u,
+                        # the native gate set, where a row was compiled to one that is not the default
+                        **({"gs": r["gate_set"]} if r.get("gate_set") not in (None, "ms") else {})})
         name, short = b.title.removeprefix("Goal 3: "), _short(b.title)
         # a release is never rewritten, and its text names the board's model; the reference sweep's is the deck's
         about = b.manifest.get("description", "").replace(
@@ -313,6 +315,8 @@ SCRIPT = r"""
   var root = document.getElementById('g3'), tabs = document.getElementById('g3-tabs');
   var tip = document.createElement('div'); tip.className = 'g3-tip'; document.body.appendChild(tip);
   var live = {}, cur = 0;
+  // a point's native gate set, named where it is not the default (qccd.ir.gate_sets)
+  var GATE_SETS = {ms: 'R, VZ, MS', rzz: 'R, VZ, RZZ'};
   function E(tag, attrs, text){ var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
     for (var k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
   function H(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -409,6 +413,8 @@ SCRIPT = r"""
     tip.appendChild(H('div', null, sci(p.l) + ' per round' + (p.hi ? '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')' : '')));
     if (p.e != null) tip.appendChild(H('div', 'm', p.e + ' logical errors in ' + Number(p.sh).toLocaleString() + ' shots'));
     if (p.e != null && c.decoder) tip.appendChild(H('div', 'm', 'Decoded by ' + c.decoder));
+    if (p.gs && p.gs !== 'ms') tip.appendChild(H('div', 'm', 'Gate set ' + p.gs.toUpperCase() + ' (' + (GATE_SETS[p.gs] || p.gs) +
+      '; the default is MS: ' + GATE_SETS.ms + ')'));
     if (href(p)) tip.appendChild(H('div', 'm', 'Click to open its page: the ions moving, the program against the circuit, the rules and the noise.' +
       (p.z ? ' Its page, and the table below the charts, have its Download and reproduce button.' : '')));
     tip.style.display = 'block'; move(ev);
@@ -512,7 +518,8 @@ SCRIPT = r"""
         var F = R.fams[f]; return {head: f, set: F.set, sub: F.n + (F.n === 1 ? ' size' : ' sizes'), n: F.n, cells: F.cells}; });
     (live[c.id] || []).forEach(function(p){
       var rr = (p.cf || {}).rules || {};
-      cols.push({head: p.n, set: rr.set || R.board, sub: 'submitted' + (p.by ? ' by ' + p.by : ''), to: href(p),
+      cols.push({head: p.n, set: rr.set || R.board, sub: 'submitted' + (p.by ? ' by ' + p.by : '')
+                 + (p.gs && p.gs !== 'ms' ? ', gate set ' + p.gs.toUpperCase() : ''), to: href(p),
                  cells: entryCells(R, p)}); });
     var order = D.rules.order, ids = [], why = {}, bad = [], drawn = {};
     c.points.forEach(function(p){ drawn[p.f + '|' + p.n] = 1; });
@@ -705,7 +712,7 @@ SCRIPT = r"""
         var l = e.ler || {};
         return {f: e.family, n: e.device || e.display_name || e.id, by: e.by, s: 0, t: e.T_round_ms, l: e.ler_per_round,
                 lo: l.per_round_lo || e.ler_per_round, hi: l.per_round_hi || e.ler_per_round, e: l.errors, sh: l.shots, sid: e.id,
-                cf: e.conformance};
+                cf: e.conformance, gs: e.gate_set};
       });
     });
     draw(cur);
