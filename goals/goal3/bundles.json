@@ -1,152 +1,1458 @@
 {
  "bb72": {
+  "c2lr10x10": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr10x10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr10x10.zip"
+  },
   "c2lr10x9": {
-   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
    "name": "goal3-bb72-c2lr10x9-reproduce.zip",
    "reproduces": "ler",
    "zip": "bb72/c2lr10x9.zip"
   },
-  "conveyor96_96d_j": {
-   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
-   "name": "goal3-bb72-conveyor96_96d_j-reproduce.zip",
+  "c2lr11x10": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr11x10-reproduce.zip",
    "reproduces": "ler",
-   "zip": "bb72/conveyor96_96d_j.zip"
+   "zip": "bb72/c2lr11x10.zip"
+  },
+  "c2lr11x11": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr11x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr11x11.zip"
+  },
+  "c2lr12x11": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr12x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr12x11.zip"
+  },
+  "c2lr12x12": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr12x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr12x12.zip"
+  },
+  "c2lr13x12": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr13x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr13x12.zip"
+  },
+  "c2lr13x13": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr13x13-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr13x13.zip"
+  },
+  "c2lr14x13": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr14x13-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr14x13.zip"
+  },
+  "c2lr14x14": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr14x14-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr14x14.zip"
+  },
+  "c2lr15x14": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr15x14-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr15x14.zip"
+  },
+  "c2lr15x15": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-c2lr15x15-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/c2lr15x15.zip"
+  },
+  "conveyor36_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-conveyor36_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/conveyor36_2L.zip"
+  },
+  "conveyor72_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-conveyor72_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/conveyor72_1L.zip"
+  },
+  "conveyor72_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-conveyor72_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/conveyor72_2L.zip"
+  },
+  "cyclone12_n12": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-cyclone12_n12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/cyclone12_n12.zip"
+  },
+  "cyclone18_n8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-cyclone18_n8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/cyclone18_n8.zip"
+  },
+  "cyclone24_n6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-cyclone24_n6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/cyclone24_n6.zip"
+  },
+  "cyclone36_n4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-cyclone36_n4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/cyclone36_n4.zip"
+  },
+  "cyclone6_n24": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-cyclone6_n24-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/cyclone6_n24.zip"
+  },
+  "cyclone72_n2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-cyclone72_n2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/cyclone72_n2.zip"
+  },
+  "wise_h3_11x10": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h3_11x10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h3_11x10.zip"
+  },
+  "wise_h3_12x12": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h3_12x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h3_12x12.zip"
+  },
+  "wise_h3_8x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h3_8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h3_8x7.zip"
+  },
+  "wise_h3_9x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h3_9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h3_9x9.zip"
+  },
+  "wise_h5_6x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h5_6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h5_6x6.zip"
+  },
+  "wise_h5_7x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h5_7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h5_7x7.zip"
+  },
+  "wise_h5_8x8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h5_8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h5_8x8.zip"
+  },
+  "wise_h5_9x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h5_9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h5_9x9.zip"
+  },
+  "wise_h7_5x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h7_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h7_5x5.zip"
+  },
+  "wise_h7_6x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h7_6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h7_6x6.zip"
+  },
+  "wise_h7_7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h7_7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h7_7x6.zip"
+  },
+  "wise_h7_8x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-bb72-wise_h7_8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "bb72/wise_h7_8x7.zip"
   }
  },
  "color3": {
+  "c2lr3x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-c2lr3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/c2lr3x3.zip"
+  },
   "c2lr4x3": {
-   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS, order 7)",
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
    "name": "goal3-color3-c2lr4x3-reproduce.zip",
    "reproduces": "ler",
    "zip": "color3/c2lr4x3.zip"
+  },
+  "c2lr4x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-c2lr4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/c2lr4x4.zip"
+  },
+  "conveyor4_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-conveyor4_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/conveyor4_1L.zip"
+  },
+  "conveyor4_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-conveyor4_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/conveyor4_2L.zip"
+  },
+  "conveyor8_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-conveyor8_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/conveyor8_1L.zip"
+  },
+  "conveyor8_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-conveyor8_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/conveyor8_2L.zip"
+  },
+  "cyclone2_n6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-cyclone2_n6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/cyclone2_n6.zip"
+  },
+  "cyclone4_n3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-cyclone4_n3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/cyclone4_n3.zip"
+  },
+  "cyclone6_n3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-cyclone6_n3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/cyclone6_n3.zip"
+  },
+  "cyclone8_n2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-cyclone8_n2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/cyclone8_n2.zip"
+  },
+  "grid3x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-grid3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/grid3x3.zip"
+  },
+  "grid4x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-grid4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/grid4x3.zip"
+  },
+  "grid4x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-grid4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/grid4x4.zip"
+  },
+  "helios98": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-helios98-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/helios98.zip"
+  },
+  "wise_h3_2x2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-wise_h3_2x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/wise_h3_2x2.zip"
+  },
+  "wise_h3_3x2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-wise_h3_3x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/wise_h3_3x2.zip"
+  },
+  "wise_h3_3x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-wise_h3_3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/wise_h3_3x3.zip"
+  },
+  "wise_h5_2x2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-wise_h5_2x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/wise_h5_2x2.zip"
+  },
+  "wise_h5_3x2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-wise_h5_3x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/wise_h5_3x2.zip"
+  },
+  "wise_h7_2x1": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-wise_h7_2x1-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/wise_h7_2x1.zip"
+  },
+  "wise_h7_2x2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color3-wise_h7_2x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color3/wise_h7_2x2.zip"
+  }
+ },
+ "color5": {
+  "c2lr5x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-c2lr5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/c2lr5x4.zip"
+  },
+  "c2lr5x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-c2lr5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/c2lr5x5.zip"
+  },
+  "c2lr6x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-c2lr6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/c2lr6x5.zip"
+  },
+  "c2lr6x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-c2lr6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/c2lr6x6.zip"
+  },
+  "c2lr7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-c2lr7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/c2lr7x6.zip"
+  },
+  "c2lr7x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-c2lr7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/c2lr7x7.zip"
+  },
+  "conveyor10_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-conveyor10_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/conveyor10_1L.zip"
+  },
+  "conveyor10_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-conveyor10_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/conveyor10_2L.zip"
+  },
+  "conveyor20_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-conveyor20_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/conveyor20_1L.zip"
+  },
+  "conveyor20_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-conveyor20_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/conveyor20_2L.zip"
+  },
+  "cyclone12_n3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-cyclone12_n3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/cyclone12_n3.zip"
+  },
+  "cyclone20_n2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-cyclone20_n2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/cyclone20_n2.zip"
+  },
+  "cyclone2_n15": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-cyclone2_n15-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/cyclone2_n15.zip"
+  },
+  "cyclone4_n8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-cyclone4_n8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/cyclone4_n8.zip"
+  },
+  "cyclone6_n6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-cyclone6_n6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/cyclone6_n6.zip"
+  },
+  "cyclone8_n5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-cyclone8_n5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/cyclone8_n5.zip"
+  },
+  "grid5x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-grid5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/grid5x4.zip"
+  },
+  "grid6x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-grid6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/grid6x5.zip"
+  },
+  "grid6x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-grid6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/grid6x6.zip"
+  },
+  "grid7x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-grid7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/grid7x7.zip"
+  },
+  "helios98": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-helios98-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/helios98.zip"
+  },
+  "wise_h3_4x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h3_4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h3_4x3.zip"
+  },
+  "wise_h3_4x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h3_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h3_4x4.zip"
+  },
+  "wise_h3_5x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h3_5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h3_5x4.zip"
+  },
+  "wise_h3_5x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h3_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h3_5x5.zip"
+  },
+  "wise_h5_3x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h5_3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h5_3x3.zip"
+  },
+  "wise_h5_4x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h5_4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h5_4x3.zip"
+  },
+  "wise_h5_4x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h5_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h5_4x4.zip"
+  },
+  "wise_h7_3x2": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h7_3x2-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h7_3x2.zip"
+  },
+  "wise_h7_3x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h7_3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h7_3x3.zip"
+  },
+  "wise_h7_4x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color5-wise_h7_4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color5/wise_h7_4x3.zip"
+  }
+ },
+ "color7": {
+  "c2lr10x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-c2lr10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/c2lr10x9.zip"
+  },
+  "c2lr7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-c2lr7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/c2lr7x6.zip"
+  },
+  "c2lr7x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-c2lr7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/c2lr7x7.zip"
+  },
+  "c2lr8x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-c2lr8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/c2lr8x7.zip"
+  },
+  "c2lr8x8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-c2lr8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/c2lr8x8.zip"
+  },
+  "c2lr9x8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-c2lr9x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/c2lr9x8.zip"
+  },
+  "c2lr9x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-c2lr9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/c2lr9x9.zip"
+  },
+  "conveyor20_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-conveyor20_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/conveyor20_1L.zip"
+  },
+  "conveyor20_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-conveyor20_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/conveyor20_2L.zip"
+  },
+  "conveyor38_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-conveyor38_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/conveyor38_1L.zip"
+  },
+  "conveyor38_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-conveyor38_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/conveyor38_2L.zip"
+  },
+  "cyclone18_n4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-cyclone18_n4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/cyclone18_n4.zip"
+  },
+  "cyclone2_n28": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-cyclone2_n28-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/cyclone2_n28.zip"
+  },
+  "cyclone6_n10": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-cyclone6_n10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/cyclone6_n10.zip"
+  },
+  "grid10x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-grid10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/grid10x9.zip"
+  },
+  "grid7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-grid7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/grid7x6.zip"
+  },
+  "grid8x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-grid8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/grid8x7.zip"
+  },
+  "grid9x8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-grid9x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/grid9x8.zip"
+  },
+  "helios98": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-helios98-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/helios98.zip"
+  },
+  "wise_h3_5x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h3_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h3_5x5.zip"
+  },
+  "wise_h3_6x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h3_6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h3_6x5.zip"
+  },
+  "wise_h3_7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h3_7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h3_7x6.zip"
+  },
+  "wise_h3_7x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h3_7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h3_7x7.zip"
+  },
+  "wise_h5_4x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h5_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h5_4x4.zip"
+  },
+  "wise_h5_5x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h5_5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h5_5x4.zip"
+  },
+  "wise_h5_5x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h5_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h5_5x5.zip"
+  },
+  "wise_h5_6x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h5_6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h5_6x5.zip"
+  },
+  "wise_h7_3x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h7_3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h7_3x3.zip"
+  },
+  "wise_h7_4x3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h7_4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h7_4x3.zip"
+  },
+  "wise_h7_4x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h7_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h7_4x4.zip"
+  },
+  "wise_h7_5x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-color7-wise_h7_5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "color7/wise_h7_5x4.zip"
+  }
+ },
+ "hgp58": {
+  "c2lr10x10": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr10x10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr10x10.zip"
+  },
+  "c2lr10x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr10x9.zip"
+  },
+  "c2lr11x10": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr11x10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr11x10.zip"
+  },
+  "c2lr11x11": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr11x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr11x11.zip"
+  },
+  "c2lr12x11": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr12x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr12x11.zip"
+  },
+  "c2lr12x12": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr12x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr12x12.zip"
+  },
+  "c2lr13x12": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr13x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr13x12.zip"
+  },
+  "c2lr8x8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr8x8.zip"
+  },
+  "c2lr9x8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr9x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr9x8.zip"
+  },
+  "c2lr9x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-c2lr9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/c2lr9x9.zip"
+  },
+  "conveyor30_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-conveyor30_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/conveyor30_2L.zip"
+  },
+  "conveyor58_1L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-conveyor58_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/conveyor58_1L.zip"
+  },
+  "conveyor58_2L": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-conveyor58_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/conveyor58_2L.zip"
+  },
+  "cyclone14_n8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-cyclone14_n8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/cyclone14_n8.zip"
+  },
+  "cyclone42_n3": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-cyclone42_n3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/cyclone42_n3.zip"
+  },
+  "cyclone6_n17": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-cyclone6_n17-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/cyclone6_n17.zip"
+  },
+  "grid10x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-grid10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/grid10x9.zip"
+  },
+  "grid11x11": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-grid11x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/grid11x11.zip"
+  },
+  "grid13x12": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-grid13x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/grid13x12.zip"
+  },
+  "grid8x8": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-grid8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/grid8x8.zip"
+  },
+  "wise_h3_10x10": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h3_10x10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h3_10x10.zip"
+  },
+  "wise_h3_7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h3_7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h3_7x6.zip"
+  },
+  "wise_h3_8x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h3_8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h3_8x7.zip"
+  },
+  "wise_h3_9x9": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h3_9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h3_9x9.zip"
+  },
+  "wise_h5_5x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h5_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h5_5x5.zip"
+  },
+  "wise_h5_6x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h5_6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h5_6x6.zip"
+  },
+  "wise_h5_7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h5_7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h5_7x6.zip"
+  },
+  "wise_h5_8x7": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h5_8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h5_8x7.zip"
+  },
+  "wise_h7_4x4": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h7_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h7_4x4.zip"
+  },
+  "wise_h7_5x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h7_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h7_5x5.zip"
+  },
+  "wise_h7_6x5": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h7_6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h7_6x5.zip"
+  },
+  "wise_h7_7x6": {
+   "decoder": "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)",
+   "name": "goal3-hgp58-wise_h7_7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "hgp58/wise_h7_7x6.zip"
   }
  },
  "surface3": {
   "c2lr4x4": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-c2lr4x4-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/c2lr4x4.zip"
   },
   "c2lr5x4": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-c2lr5x4-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/c2lr5x4.zip"
   },
   "c2lr5x5": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-c2lr5x5-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/c2lr5x5.zip"
   },
   "c2lr6x5": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-c2lr6x5-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/c2lr6x5.zip"
   },
-  "conveyor12_8d_j": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
-   "name": "goal3-surface3-conveyor12_8d_j-reproduce.zip",
+  "conveyor10_1L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface3-conveyor10_1L-reproduce.zip",
    "reproduces": "ler",
-   "zip": "surface3/conveyor12_8d_j.zip"
+   "zip": "surface3/conveyor10_1L.zip"
   },
-  "conveyor16_8d_j": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
-   "name": "goal3-surface3-conveyor16_8d_j-reproduce.zip",
+  "conveyor10_2L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface3-conveyor10_2L-reproduce.zip",
    "reproduces": "ler",
-   "zip": "surface3/conveyor16_8d_j.zip"
+   "zip": "surface3/conveyor10_2L.zip"
   },
-  "conveyor22_11d_j": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
-   "name": "goal3-surface3-conveyor22_11d_j-reproduce.zip",
+  "conveyor6_2L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface3-conveyor6_2L-reproduce.zip",
    "reproduces": "ler",
-   "zip": "surface3/conveyor22_11d_j.zip"
-  },
-  "cyclone10_n2": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
-   "name": "goal3-surface3-cyclone10_n2-reproduce.zip",
-   "reproduces": "ler",
-   "zip": "surface3/cyclone10_n2.zip"
+   "zip": "surface3/conveyor6_2L.zip"
   },
   "cyclone2_n9": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-cyclone2_n9-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/cyclone2_n9.zip"
   },
   "cyclone4_n5": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-cyclone4_n5-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/cyclone4_n5.zip"
   },
-  "cyclone6_n4": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
-   "name": "goal3-surface3-cyclone6_n4-reproduce.zip",
-   "reproduces": "ler",
-   "zip": "surface3/cyclone6_n4.zip"
-  },
   "cyclone8_n3": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-cyclone8_n3-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/cyclone8_n3.zip"
   },
+  "grid4x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface3-grid4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/grid4x4.zip"
+  },
+  "grid5x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface3-grid5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/grid5x4.zip"
+  },
+  "grid5x5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface3-grid5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/grid5x5.zip"
+  },
+  "grid6x5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface3-grid6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface3/grid6x5.zip"
+  },
   "helios98": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-helios98-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/helios98.zip"
   },
   "wise_h3_3x3": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h3_3x3-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h3_3x3.zip"
   },
   "wise_h3_4x3": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h3_4x3-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h3_4x3.zip"
   },
   "wise_h3_4x4": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h3_4x4-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h3_4x4.zip"
   },
   "wise_h5_2x2": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h5_2x2-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h5_2x2.zip"
   },
   "wise_h5_3x2": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h5_3x2-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h5_3x2.zip"
   },
   "wise_h5_3x3": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h5_3x3-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h5_3x3.zip"
   },
   "wise_h7_2x2": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h7_2x2-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h7_2x2.zip"
   },
   "wise_h7_3x2": {
-   "decoder": "PyMatching 2 (minimum-weight perfect matching)",
+   "decoder": "Minimum-weight perfect matching (pymatching)",
    "name": "goal3-surface3-wise_h7_3x2-reproduce.zip",
    "reproduces": "ler",
    "zip": "surface3/wise_h7_3x2.zip"
+  }
+ },
+ "surface5": {
+  "c2lr6x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-c2lr6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/c2lr6x6.zip"
+  },
+  "c2lr7x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-c2lr7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/c2lr7x6.zip"
+  },
+  "c2lr7x7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-c2lr7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/c2lr7x7.zip"
+  },
+  "c2lr8x7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-c2lr8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/c2lr8x7.zip"
+  },
+  "c2lr8x8": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-c2lr8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/c2lr8x8.zip"
+  },
+  "c2lr9x8": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-c2lr9x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/c2lr9x8.zip"
+  },
+  "c2lr9x9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-c2lr9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/c2lr9x9.zip"
+  },
+  "conveyor14_2L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-conveyor14_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/conveyor14_2L.zip"
+  },
+  "conveyor26_1L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-conveyor26_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/conveyor26_1L.zip"
+  },
+  "conveyor26_2L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-conveyor26_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/conveyor26_2L.zip"
+  },
+  "cyclone12_n5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-cyclone12_n5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/cyclone12_n5.zip"
+  },
+  "cyclone24_n3": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-cyclone24_n3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/cyclone24_n3.zip"
+  },
+  "cyclone2_n25": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-cyclone2_n25-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/cyclone2_n25.zip"
+  },
+  "cyclone4_n13": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-cyclone4_n13-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/cyclone4_n13.zip"
+  },
+  "cyclone6_n9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-cyclone6_n9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/cyclone6_n9.zip"
+  },
+  "cyclone8_n7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-cyclone8_n7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/cyclone8_n7.zip"
+  },
+  "grid6x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-grid6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/grid6x6.zip"
+  },
+  "grid7x7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-grid7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/grid7x7.zip"
+  },
+  "grid8x8": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-grid8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/grid8x8.zip"
+  },
+  "grid9x9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-grid9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/grid9x9.zip"
+  },
+  "helios98": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-helios98-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/helios98.zip"
+  },
+  "wise_h3_5x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h3_5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h3_5x4.zip"
+  },
+  "wise_h3_6x5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h3_6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h3_6x5.zip"
+  },
+  "wise_h3_6x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h3_6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h3_6x6.zip"
+  },
+  "wise_h3_7x7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h3_7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h3_7x7.zip"
+  },
+  "wise_h5_4x3": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h5_4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h5_4x3.zip"
+  },
+  "wise_h5_4x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h5_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h5_4x4.zip"
+  },
+  "wise_h5_5x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h5_5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h5_5x4.zip"
+  },
+  "wise_h5_5x5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h5_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h5_5x5.zip"
+  },
+  "wise_h7_3x3": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h7_3x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h7_3x3.zip"
+  },
+  "wise_h7_4x3": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h7_4x3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h7_4x3.zip"
+  },
+  "wise_h7_4x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h7_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h7_4x4.zip"
+  },
+  "wise_h7_5x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface5-wise_h7_5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface5/wise_h7_5x4.zip"
+  }
+ },
+ "surface7": {
+  "c2lr10x10": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr10x10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr10x10.zip"
+  },
+  "c2lr10x9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr10x9.zip"
+  },
+  "c2lr11x10": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr11x10-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr11x10.zip"
+  },
+  "c2lr11x11": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr11x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr11x11.zip"
+  },
+  "c2lr12x11": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr12x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr12x11.zip"
+  },
+  "c2lr12x12": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr12x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr12x12.zip"
+  },
+  "c2lr13x12": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr13x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr13x12.zip"
+  },
+  "c2lr8x8": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr8x8.zip"
+  },
+  "c2lr9x8": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr9x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr9x8.zip"
+  },
+  "c2lr9x9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-c2lr9x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/c2lr9x9.zip"
+  },
+  "conveyor26_2L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-conveyor26_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/conveyor26_2L.zip"
+  },
+  "conveyor50_1L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-conveyor50_1L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/conveyor50_1L.zip"
+  },
+  "conveyor50_2L": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-conveyor50_2L-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/conveyor50_2L.zip"
+  },
+  "cyclone12_n9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-cyclone12_n9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/cyclone12_n9.zip"
+  },
+  "cyclone16_n7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-cyclone16_n7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/cyclone16_n7.zip"
+  },
+  "cyclone24_n5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-cyclone24_n5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/cyclone24_n5.zip"
+  },
+  "cyclone48_n3": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-cyclone48_n3-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/cyclone48_n3.zip"
+  },
+  "cyclone4_n25": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-cyclone4_n25-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/cyclone4_n25.zip"
+  },
+  "cyclone6_n17": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-cyclone6_n17-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/cyclone6_n17.zip"
+  },
+  "grid10x9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-grid10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/grid10x9.zip"
+  },
+  "grid11x11": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-grid11x11-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/grid11x11.zip"
+  },
+  "grid13x12": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-grid13x12-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/grid13x12.zip"
+  },
+  "grid8x8": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-grid8x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/grid8x8.zip"
+  },
+  "wise_h3_10x9": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h3_10x9-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h3_10x9.zip"
+  },
+  "wise_h3_6x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h3_6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h3_6x6.zip"
+  },
+  "wise_h3_7x7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h3_7x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h3_7x7.zip"
+  },
+  "wise_h3_9x8": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h3_9x8-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h3_9x8.zip"
+  },
+  "wise_h5_5x5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h5_5x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h5_5x5.zip"
+  },
+  "wise_h5_6x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h5_6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h5_6x6.zip"
+  },
+  "wise_h5_7x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h5_7x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h5_7x6.zip"
+  },
+  "wise_h5_8x7": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h5_8x7-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h5_8x7.zip"
+  },
+  "wise_h7_4x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h7_4x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h7_4x4.zip"
+  },
+  "wise_h7_5x4": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h7_5x4-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h7_5x4.zip"
+  },
+  "wise_h7_6x5": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h7_6x5-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h7_6x5.zip"
+  },
+  "wise_h7_6x6": {
+   "decoder": "Minimum-weight perfect matching (pymatching)",
+   "name": "goal3-surface7-wise_h7_6x6-reproduce.zip",
+   "reproduces": "ler",
+   "zip": "surface7/wise_h7_6x6.zip"
   }
  }
 }

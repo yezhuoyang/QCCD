@@ -172,6 +172,12 @@ def main() -> int:
                 continue
             todo.append((row, [str(w) for w in works]))
     bad = 0
+    # a point the results no longer hold (a superseded compile) leaves the index: no page links its zip
+    for code in list(index):
+        live = {r["point"] for r in rows(code)} if (HERE / "results" / f"{code}.jsonl").exists() else set()
+        index[code] = {p: z for p, z in index[code].items() if p in live}
+        if not index[code]:
+            del index[code]
     t0 = time.time()
     # a process per point: a long programme's extraction takes gigabytes, and a worker that goes on keeps them
     one_each = {"max_tasks_per_child": 1} if sys.version_info >= (3, 11) else {}

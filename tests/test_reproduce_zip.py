@@ -553,7 +553,10 @@ GOAL3 = ROOT / "goals" / "goal3"
 def test_goal_3_links_every_built_point_and_names_each_code_s_decoder():
     from qccd.site import build, goal3
     index = json.loads((GOAL3 / "bundles.json").read_text(encoding="utf-8"))
-    assert len(index.get("surface3", {})) == 21, "every size of the distance-3 surface code"
+    sys.path.insert(0, str(GOAL3))
+    import bundles
+    compiled = {r["point"] for r in bundles.rows("surface3") if r.get("status") == "ok"}
+    assert set(index.get("surface3", {})) == compiled, "every size of the distance-3 surface code, and no other"
     d = goal3.data()
     by = {c["task"]: c for c in d["codes"]}
     linked = 0
@@ -566,13 +569,15 @@ def test_goal_3_links_every_built_point_and_names_each_code_s_decoder():
             assert drawn[name]["z"] == f"z/{code}/{name}.zip" and drawn[name]["zn"] == z["name"]
             assert z["reproduces"] in ("ler", "time")
             linked += 1
-    assert linked >= 21
+    assert linked >= len(compiled)
     assert by["goal3_surface3_mem"]["decoder"] == "Minimum-weight perfect matching (pymatching)"
     for code in ("color3", "bb72", "hgp58"):
         assert by[f"goal3_{code}_mem"]["decoder"] == "BP-OSD (ldpc: product-sum BP, 30 iterations; OSD-CS order 7)"
     page = goal3.page(build.PAGE, build.STYLE)
-    assert '<details id="g3-reproduce"><summary>Every point: download and reproduce</summary>' in page
-    assert 'id="g3-zips"' in page and "H('a', null, 'Download and reproduce')" in page
+    # a button, open where the reader looks: under each family's best below the charts, and on every point
+    assert '<details id="g3-reproduce" open><summary>Every point: download and reproduce</summary>' in page
+    assert '<details id="g3-best" open>' in page and "tr.appendChild(namedDl(fl))" in page
+    assert 'id="g3-zips"' in page and "H('a', 'g3-dl')" in page and "'Download and reproduce'" in page
     assert "'Decoded by ' + c.decoder" in page, "the tooltip of a point"
     assert "'Every rate of this code is decoded by ' + c.decoder" in page, "under each family's best"
     # About this goal: which codes by which decoder
@@ -596,7 +601,8 @@ def test_a_goal_3_zip_is_the_row_s_own_sample_from_the_folder_that_holds_it(tmp_
     sys.path.insert(0, str(GOAL3))
     import bundles
     row = next(r for r in bundles.rows("surface3") if r["point"] == "helios98")
-    assert row["ler_budget"]["batch"] == 500, "this size was sampled in smaller batches than the release's"
+    # the budget as the sweep recorded it (a row sampled in smaller batches keeps its batch): the zip takes it whole
+    assert row["ler_budget"].get("seed") and row["ler_budget"].get("decoder")
     pt = bundles.point_of(row, tmp_path)
     assert pt.budget == row["ler_budget"] and pt.ler == row["ler"]
     assert (pt.noise, pt.table, pt.release) == ("qccd-noise@3", "helios", "goal3_surface3_mem@1")
