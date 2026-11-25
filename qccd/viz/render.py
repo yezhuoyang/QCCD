@@ -485,6 +485,9 @@ def build_view_model(
 
     return {
         "kicker": kicker or "ROUTING SCHEME",
+        # the native gate set (qccd.ir.gate_sets): its entangling pulses decide, else what its meta
+        # names, else the default; "mixed" when they disagree.  The page names it in the head.
+        "gate_set": _gate_set_of(prog),
         "headline": headline or f"{arch.name} · {prog.name}",
         "lede": lede or (arch.description or ""),
         "roles": roles,
@@ -1873,6 +1876,8 @@ textarea.src.out{min-height:120px;opacity:.85}
         <b><i class="now" id="cSteps">0</i><i class="of" id="cStepsOf"></i></b></div>
       <div class="counter" data-hint="c:cost"><span>Cost</span>
         <b><i class="now" id="cCost">0</i><i class="of" id="cCostOf"></i></b></div>
+      <div class="counter" data-hint="c:gateset"><span>Gate set</span>
+        <b><i class="now" id="cGateSet">MS</i></b></div>
     </div>
     <div class="metrics" id="metrics"></div>
     <div class="grips">
@@ -2106,7 +2111,7 @@ textarea.src.out{min-height:120px;opacity:.85}
                     title="show the programme beside the animation, or back among the panels">&#9664; Beside the animation</button>
           </header>
           <div class="pblock" id="pHw">
-            <div class="ph"><h4>Hardware program</h4><span class="sub" id="pCount"></span>
+            <div class="ph"><h4>Hardware program</h4><span class="sub" id="pCount" data-hint="c:gateset"></span>
               <span class="grow"></span>
               <input class="filter" id="pFilter" type="text" spellcheck="false"
                      placeholder="filter (/)" data-hint="filter">
@@ -4020,6 +4025,34 @@ if(typeof ResizeObserver === 'function') new ResizeObserver(relayoutSoon).observ
 const M=D.metrics, hw=A.hardware, rl=D.rules, SUM=A.summary||{};
 const fmt=(x,d=0)=>(x==null)?'-':Number(x).toLocaleString(undefined,{maximumFractionDigits:d});
 document.getElementById('kicker').textContent = D.kicker || 'ROUTING SCHEME';
+// THE GATE SET, named on every page: the entangling pulses the programme holds decide (MS: the
+// ms set, R VZ MS; RZZ: the rzz set, R VZ RZZ, Quantinuum's); a programme with none (gates still
+// written as CX, or no two-qubit gate) is in the set the page was built with (D.gate_set).
+const GATE_SETS = {ms: ['MS', 'R, VZ, MS', 'the entangling pulse MS(\u03b8) = exp(\u2212i\u03b8/2 X\u2297X), M\u00f8lmer\u2013S\u00f8rensen; the default'],
+                   rzz: ['RZZ', 'R, VZ, RZZ', 'the entangling pulse RZZ(\u03b8) = exp(\u2212i\u03b8/2 Z\u2297Z), Quantinuum\u2019s native set']};
+let GATE_SET_OF = null, GATE_SET_WORDS = '';
+function gateSetNow(){
+  let ms = false, rzz = false;
+  for(const f of (P.frames || [])){
+    if(!f || f.type !== 'gate') continue;
+    if(f.gate === 'MS') ms = true; else if(f.gate === 'RZZ') rzz = true;
+    if(ms && rzz) break;
+  }
+  return ms && rzz ? 'mixed' : ms ? 'ms' : rzz ? 'rzz' : (D.gate_set || 'ms');
+}
+function showGateSet(){
+  if(GATE_SET_OF === P.frames) return;              // the same programme: nothing to read again
+  GATE_SET_OF = P.frames;
+  const gs = gateSetNow(), g = GATE_SETS[gs];
+  const short = g ? g[0] : 'MS + RZZ', words = g ? 'gate set ' + gs + ' (' + g[1] + ')' : 'gate sets mixed (MS and RZZ)';
+  const why = g ? 'This programme is in the ' + gs + ' gate set: R, VZ and ' + g[2] + '.'
+                : 'This programme holds both MS and RZZ pulses; a compiled programme is in one set.';
+  const c = document.getElementById('cGateSet'), h = document.getElementById('pCount');
+  if(c){ c.textContent = short; c.parentNode.parentNode.title = why; c.parentNode.parentNode.setAttribute('data-gate-set', gs); }
+  if(h) h.title = why;
+  GATE_SET_WORDS = ' \u00b7 gate set ' + short;
+}
+showGateSet();
 document.getElementById('title').textContent = D.headline || (A.name+' · '+P.name);
 document.getElementById('lede').textContent = D.lede || A.description || '';
 // "Download and reproduce": where this page's zip is (relative to the page) and its file name
@@ -4851,8 +4884,9 @@ function rebuildView(text, only){
     VIEWPOS[i]=VIEW.length; VIEW.push(i);
   }
   if(P.truncated && !q && !only) VIEW.push(-1);
+  showGateSet();
   document.getElementById('pCount').textContent =
-    VIEW.length + ' / ' + P.n_instructions + ' instructions';
+    VIEW.length + ' / ' + P.n_instructions + ' instructions' + GATE_SET_WORDS;
   PLIST.setCount(VIEW.length);
   syncCursor(true);
 }
@@ -5796,6 +5830,16 @@ __EDITOR__
 __STAGE3D__
 </body></html>
 '''
+
+
+def _gate_set_of(prog) -> str:
+    """The gate set a page names for its programme (`gate_sets.derive`); "mixed" when the
+    programme's pulses, its meta and its certificate's claims disagree."""
+    from ..ir import gate_sets
+    try:
+        return gate_sets.derive(prog) or "mixed"
+    except Exception:                                   # noqa: BLE001 -- a page never fails on a label
+        return gate_sets.DEFAULT
 
 
 def render_html(

@@ -4708,6 +4708,7 @@ var HINTS = {
   // the head
   'c:steps': { t: 'Steps', d: 'Instructions executed so far, out of the total. A step is one hardware instruction: a move, a gate, a measurement.' },
   'c:cost':  { t: 'Cost', d: 'What the cost model has charged so far for moving ions -- shuttles, junction crossings, splits and merges -- out of the programme\u2019s total. Lower is better.' },
+  'c:gateset': { t: 'Gate set', d: 'The native gate set this programme is compiled to. MS: the one-ion pulse R, the frame change VZ and the entangling pulse MS(\u03b8) = exp(\u2212i\u03b8/2 X\u2297X) -- the default. RZZ: R, VZ and RZZ(\u03b8) = exp(\u2212i\u03b8/2 Z\u2297Z), Quantinuum\u2019s set. Read off the programme\u2019s entangling pulses; a programme that still writes its gates as CX is in the set it was compiled for. Both are priced and noised as the machine\u2019s two-qubit gate.' },
   'm:cost':  { t: 'Cost', d: 'What the cost model charges for the whole programme\u2019s moves: shuttles, junction crossings, splits and merges. Lower is better. The heat the moves leave in the ions is peak n-bar, in Report.' },
   'm:steps': { t: 'Steps', d: 'How many hardware instructions the programme takes.' },
   'm:runtime': { t: 'Runtime', d: 'Wall-clock time to run the programme once.' },

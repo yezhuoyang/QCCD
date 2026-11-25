@@ -133,6 +133,20 @@ def test_the_template_carries_what_the_overlay_added(page):
         assert gone not in page, gone
 
 
+def test_every_page_names_its_gate_set(page):
+    """The user (2026-11-25): which gate set is in use must be explicit in every animation.  The
+    head has a Gate set counter, the Hardware program line says it, and the page carries the set
+    the programme was built in (here none is named: the default)."""
+    from qccd.viz.render import _gate_set_of
+    assert 'id="cGateSet"' in page and 'data-hint="c:gateset"' in page and '"gate_set":"ms"' in page
+    assert "function showGateSet" in page and "GATE_SET_WORDS" in page
+    g = lambda name: {"type": "gate", "gate": name, "qubits": ["q0", "q1"]}      # noqa: E731
+    assert _gate_set_of({"instructions": [g("RZZ")]}) == "rzz"
+    assert _gate_set_of({"instructions": [g("RZZ"), g("MS")]}) == "mixed"
+    assert _gate_set_of({"instructions": [g("CX")], "meta": {"gate_set": "rzz"}}) == "rzz"   # named, no pulse
+    assert _gate_set_of({"instructions": [g("CX")]}) == "ms"                                 # the default
+
+
 def test_the_deep_links_wait_for_the_editor():
     """#learn=B2 loads a lesson and #embed makes the page view-only, both through EDITOR, which
     the scripts AFTER the template's own define (editor.js, tutorial.js).  Called at the end of
