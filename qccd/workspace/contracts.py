@@ -135,6 +135,8 @@ class BundleManifest(_Strict):
     task: dict[str, str]
     files: dict[Literal["device", "program", "certified_program", "certificate", "presentation", "rules"], FileRef]
     provenance: dict[str, Any]
+    #: the native gate set the programs are in (qccd.ir.gate_sets); absent for the default, ms
+    gate_set: Optional[Literal["ms", "rzz"]] = None
 
 
 class TaskRelease(_Open):
@@ -212,6 +214,8 @@ class EvaluationReport(_Strict):
     #: how the entry stands to the board's rules and physics (evaluator._conformance); absent in a
     #: report from before entries could declare rules of their own (2026-10-29)
     conformance: Optional[dict[str, Any]] = None
+    #: the native gate set the entry is graded in (qccd.ir.gate_sets); absent for the default, ms
+    gate_set: Optional[Literal["ms", "rzz"]] = None
     metrics: dict[str, Metric]
     rank_by: Optional[str]
     cost_breakdown: dict[str, Any]

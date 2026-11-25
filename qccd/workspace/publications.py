@@ -413,7 +413,8 @@ class PublicationsMixin:
         rule sets of their own too), this design's test on it, its requests to publish, and who this
         computer submits as."""
         view = "all" if rules == "all" else "board"
-        rows_of = lambda lb: [{k: r.get(k) for k in ("id", "display_name", "by", "rank_value", "created_at", "conformance")}
+        rows_of = lambda lb: [{k: r.get(k) for k in ("id", "display_name", "by", "rank_value", "created_at", "conformance",
+                                                       "gate_set")}
                               for r in lb.get("rows") or []]
         rel = self.board(board or None) if board else None
         tasks = self._official_cached("/v1/tasks", ttl=60.0)
@@ -458,7 +459,8 @@ class PublicationsMixin:
                     "eligible": (rep.get("eligibility") or {}).get("eligible"),
                     "reasons": ((rep.get("eligibility") or {}).get("reasons") or [])[:3],
                     "value": mm.get("value"), "unit": mm.get("unit"), "revision": s["snapshot"]["revision"],
-                    "rules": s.get("rules"), "conformance": rep.get("conformance")}
+                    "rules": s.get("rules"), "conformance": rep.get("conformance"),
+                    **({"gate_set": rep["gate_set"]} if rep.get("gate_set") else {})}
             if s["status"] == "grading":
                 jid = s.get("job_id")
                 if jid:

@@ -11,6 +11,11 @@ A bundle is a directory (or a deterministic zip of one) holding
     rules.json               optional: the rule set the entry declares it keeps (qccd.ruleset.declared);
                              without it, the board's own
 
+The manifest's optional `gate_set` declares the native gate set the programs are in
+(`qccd.ir.gate_sets`): "rzz" for R, VZ and RZZ.  The default set, "ms", is declared by leaving it
+out, so a bundle in it is the bundle it always was.  `write_bundle` derives it from the program
+and its certificate (`gate_sets.derive`) unless told.
+
 Every file is canonical JSON (sorted keys, one number spelling), so the same design
 always makes the same bytes and the same digest.  The BUNDLE DIGEST is the digest of the
 manifest, and the manifest pins every file's sha256 -- so one digest names the whole
@@ -99,8 +104,17 @@ def _publishable(doc: Mapping | None) -> Mapping | None:
 def write_bundle(out_dir: Path, *, task_id: str, task_digest: str, device: Mapping,
                  program: Mapping, certified_program: Mapping | None, certificate: Mapping | None,
                  presentation: Mapping | None = None, provenance: Mapping | None = None,
-                 rules: Mapping | None = None) -> Bundle:
-    """Write canonical files and the manifest.  `out_dir` must not exist yet."""
+                 rules: Mapping | None = None, gate_set: str | None = None,
+                 derive_gate_set: bool = True) -> Bundle:
+    """Write canonical files and the manifest.  `out_dir` must not exist yet.  `gate_set` is the
+    native gate set the programs are in; None: what the program and its certificate say
+    (`gate_sets.derive`), unless `derive_gate_set` is False (a stored bundle written again as it
+    was).  The default set is written as no `gate_set` at all."""
+    from ..ir import gate_sets
+    if gate_set is None and derive_gate_set:
+        gate_set = gate_sets.derive(program, certificate)    # None where they disagree: the grader says why
+    if gate_set is not None:
+        gate_set = gate_sets.resolve(gate_set)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=False)
     files: dict = {}
@@ -117,6 +131,8 @@ def write_bundle(out_dir: Path, *, task_id: str, task_digest: str, device: Mappi
     manifest = {"kind": BUNDLE_KIND, "version": 1,
                 "task": {"id": task_id, "digest": task_digest},
                 "files": files, "provenance": dict(provenance or {})}
+    if gate_set is not None and gate_set != gate_sets.DEFAULT:
+        manifest["gate_set"] = gate_set
     (out / "manifest.json").write_bytes(canonical_bytes(manifest))
     return read_bundle(out)
 
@@ -132,9 +148,14 @@ def read_bundle(root: Path, *, require: tuple = REQUIRED_FILES) -> Bundle:
         raise BundleError("bad_manifest", f"manifest.json: {exc}") from None
     if man.get("kind") != BUNDLE_KIND or man.get("version") != 1:
         raise BundleError("bad_manifest", "manifest is not a qccd.submission_bundle v1")
-    extra = set(man) - {"kind", "version", "task", "files", "provenance"}
+    extra = set(man) - {"kind", "version", "task", "files", "provenance", "gate_set"}
     if extra:
         raise BundleError("bad_manifest", f"unknown manifest fields {sorted(extra)}")
+    if "gate_set" in man:
+        from ..ir.gate_sets import GATE_SETS
+        if man["gate_set"] not in GATE_SETS:
+            raise BundleError("bad_manifest", f"manifest.gate_set must be one of {', '.join(GATE_SETS)}, "
+                              f"not {man['gate_set']!r}")
     files = man.get("files")
     if not isinstance(files, dict):
         raise BundleError("bad_manifest", "manifest.files must be an object")

@@ -16,7 +16,11 @@ WHAT A PASSING REFERENCE REPORT ESTABLISHES, stage by stage (and nothing more):
                        used only where the release has none (`tasks.scored_device`), and every
                        such number is listed (`added`), as is every number of its own that was
                        not used (`ignored`); the budget is the release's.
-  program              the final program is a well-formed TSIR within the release limits.
+  program              the final program is a well-formed TSIR within the release limits, in ONE
+                       native gate set (`qccd.ir.gate_sets`): the one the bundle declares
+                       (`manifest.gate_set`; ms by naming none), which its pulses, its meta and
+                       the certificate's claims agree with and the board takes.  The report names
+                       a set that is not the default (`gate_set`); an ms report is unchanged.
   rules                replaying the final program on the machine under the task model, every
                        rule of the entry's rule set passes: the board's, or the set the bundle
                        declares (`rules.json`, checked in the rule language,
@@ -89,6 +93,7 @@ from .bundle import Bundle, BundleError, read_bundle
 from .jsonsafe import canonical_text, digest, normalize_numbers
 from .procs import run_limited
 from .tasks import FIXED_BLOCKS, TaskRelease, scored_device
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET, label as gate_set_label
 
 __all__ = ["grade", "Toolchain", "PROFILES", "REPORT_KIND", "comparable", "STAGE_STATUSES"]
 
@@ -347,7 +352,16 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
             st.done("failed", "size limit")
             return finish()
         ctx["prog"] = prog
-        st.done("passed", "TSIR shape and instruction types", instructions=len(prog))
+        gs = _gate_set(st, release, b, prog)
+        if gs is None:
+            st.done("failed", "TSIR shape; the native gate set")
+            return finish()
+        ctx["gate_set"] = gs
+        if gs == DEFAULT_GATE_SET:      # the default set: the report it always was
+            st.done("passed", "TSIR shape and instruction types", instructions=len(prog))
+        else:
+            st.done("passed", f"TSIR shape and instruction types; native gate set {gate_set_label(gs)}",
+                    instructions=len(prog), gate_set=gs)
     except (ValueError, KeyError, TypeError) as exc:
         st.diag("PROGRAM.INVALID", f"the program does not parse: {exc}", pointer="/program")
         st.done("failed", "TSIR shape")
@@ -464,6 +478,51 @@ def grade(release: TaskRelease, bundle_dir: Path, profile: str = "reference", *,
 
 #: the rule set an entry is judged by when its bundle declares none
 BOARD_RULES = "standard"
+
+
+def _gate_set(st: _Stage, release: TaskRelease, b: Bundle, prog) -> str | None:
+    """The native gate set the entry's programs are in (`qccd.ir.gate_sets`), or None, with the
+    diagnostics, when it cannot be graded in one.  The bundle declares it (`manifest.gate_set`; the
+    default set by naming none); a bundle written before the declaration existed is read by what
+    its program and certificate say (`gate_sets.derive`).  The final program's entangling pulses,
+    the programs' `meta` and the certificate's `claims` must all be in that set -- a programme is
+    in one set, and the leaderboard lists it under the one it declares -- and the board must take
+    it (`TaskRelease.gate_sets`).  Every later stage reads a pulse by its name, in either set."""
+    from ..ir import gate_sets as G
+    cert = b.docs.get("certificate")
+    declared = b.manifest.get("gate_set")
+    used = G.entanglers_used(prog)
+    said = G.named(b.docs.get("program"), cert) + G.named(b.docs.get("certified_program"))
+    bad = False
+    if len(used) > 1:
+        st.diag("PROGRAM.GATE_SET_MIXED", f"the program holds {' and '.join(sorted(used))} pulses: a program is in "
+                f"one native gate set ({'; '.join(G.label(s) for s in G.GATE_SETS)})", pointer="/program")
+        return None
+    in_pulses = next((s for s in G.GATE_SETS if G.ENTANGLER[s] in used), None)
+    if declared is None:
+        gs = in_pulses or next(iter(said), None) or G.DEFAULT
+        if gs != G.DEFAULT:
+            st.diag("BUNDLE.GATE_SET_UNDECLARED", f"the bundle declares no gate set; its program is in {G.label(gs)}, "
+                    "so it is graded and listed as that set (a bundle written today declares it: manifest.gate_set)",
+                    severity="warning", pointer="/manifest/gate_set")
+    else:
+        gs = declared
+    if in_pulses is not None and in_pulses != gs:
+        st.diag("PROGRAM.GATE_SET", f"the program's entangling pulses are {G.ENTANGLER[in_pulses]}, of the gate set "
+                f"{in_pulses}, but the bundle declares {G.label(gs)}"
+                + ("" if declared else " by naming none"), pointer="/manifest/gate_set")
+        bad = True
+    for s in sorted(set(said)):
+        if s != gs:
+            st.diag("PROGRAM.GATE_SET", f"a program's meta or the certificate's claims name the gate set {s!r}, but the "
+                    f"entry is in {G.label(gs)}", pointer="/program/meta/gate_set")
+            bad = True
+    if gs not in release.gate_sets:
+        st.diag("PROGRAM.GATE_SET_NOT_ALLOWED", f"this board takes programs in the gate set "
+                f"{' or '.join(G.label(s) for s in release.gate_sets)} only, and this one is in {G.label(gs)}",
+                pointer="/manifest/gate_set", reference={"release": release.id})
+        bad = True
+    return None if bad else gs
 
 
 def _rules_stage(st: _Stage, release: TaskRelease, arch, prog, *, declared: Mapping | None = None,
@@ -871,6 +930,9 @@ def _report(release: TaskRelease, profile: str, stages: dict, order: list, ctx: 
         "task": {"id": release.id, "digest": release.digest},
         "bundle": {"digest": b.digest if b else None, "files": b.file_digests() if b else {}},
         "input": (b.manifest.get("provenance") if b else None) or {},
+        # the native gate set the entry is graded in, when it is not the default (an ms report is
+        # the report it always was)
+        **({"gate_set": ctx["gate_set"]} if ctx.get("gate_set") not in (None, DEFAULT_GATE_SET) else {}),
         "evaluator": ident,
         "profile": profile,
         "stages": [stages[s].to_json() for s in order],

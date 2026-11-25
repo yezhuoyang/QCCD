@@ -94,6 +94,17 @@ class TaskRelease:
     def title(self) -> str:
         return str(self.manifest.get("title") or self.manifest["task"])
 
+    @property
+    def gate_sets(self) -> tuple:
+        """The native gate sets this board takes a program in (`qccd.ir.gate_sets`): the ones its
+        manifest names (`gate_sets`), or, where it names none, every set -- each set's entangling
+        pulse is priced and noised as the machine's one two-qubit primitive, so the board's physics
+        and noise model read either -- and the grade report and the leaderboard say which an
+        entry used.  A release that pins a set says so, and a program in another is refused."""
+        from ..ir.gate_sets import GATE_SETS
+        named = self.manifest.get("gate_sets")
+        return tuple(named) if named else GATE_SETS
+
     def board(self) -> dict:
         """What a person (or an agent speaking to one) is shown about this board: its title."""
         m = self.manifest
@@ -101,6 +112,8 @@ class TaskRelease:
                "suggested_start": m.get("starter"), "id": self.id, "track": m.get("track")}
         if m.get("rules"):
             out["rules"] = m["rules"]
+        if m.get("gate_sets"):
+            out["gate_sets"] = list(m["gate_sets"])
         if m.get("qec"):
             out["memory_experiment"] = {k: m["qec"].get(k) for k in ("experiment", "noise", "ler")}
         return out
@@ -116,7 +129,8 @@ class TaskRelease:
                 "allowed_transformations": m.get("allowed_transformations"),
                 "starter": m.get("starter"), "order": m.get("order"), "description": m.get("description"),
                 "qec": ({k: m["qec"].get(k) for k in ("experiment", "noise", "ler")} if m.get("qec") else None),
-                **({"rules": m["rules"]} if m.get("rules") else {})}
+                **({"rules": m["rules"]} if m.get("rules") else {}),
+                **({"gate_sets": list(m["gate_sets"])} if m.get("gate_sets") else {})}
 
     def verify_files(self) -> None:
         """Every file the manifest pins must hash to its pinned digest."""
@@ -137,6 +151,10 @@ class TaskRelease:
         man = strict_loads((root / "release.json").read_bytes())
         if man.get("kind") != "qccd.task_release" or man.get("version") != 1:
             raise ReleaseError(f"{root}: not a qccd.task_release v1")
+        from ..ir.gate_sets import GATE_SETS
+        gs = man.get("gate_sets")
+        if gs is not None and (not isinstance(gs, list) or not gs or not set(gs) <= set(GATE_SETS)):
+            raise ReleaseError(f"{root}: gate_sets must be a non-empty list of {', '.join(GATE_SETS)}")
         rel = cls(root=root, manifest=man)
         rel.verify_files()
         return rel
@@ -366,12 +384,14 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
                   limits: Mapping | None = None, order: int | None = None,
                   qec: Mapping | None = None, rank_table: str = "qccdsim_jones",
                   tables: list | None = None, goal: str | None = None,
-                  track: str = "codesign-artifact", rules: str | None = None) -> Path:
+                  track: str = "codesign-artifact", rules: str | None = None,
+                  gate_sets: list | None = None) -> Path:
     """Write a release directory (a maintainer tool; releases are immutable once published).
     `goal` names the leaderboard goal the release belongs to when it is not Goal 1's
     (`OfficialService.GOALS`).  `track` is the family of boards it is ranked beside (the C2LR
     boards' own, `c2lr`); `rules` the rule set (`qccd/ruleset/library`) its entries are judged
-    by as well as by the replay's rules (the grader's rules stage)."""
+    by as well as by the replay's rules (the grader's rules stage); `gate_sets` the native gate
+    sets it takes a program in (`qccd.ir.gate_sets`), left out for every set."""
     d = Path(out_dir) / f"{task}@{release}"
     d.mkdir(parents=True, exist_ok=False)
     (d / "circuit.qasm").write_bytes(circuit_text.encode("utf-8"))
@@ -412,6 +432,9 @@ def build_release(task: str, release: str, circuit_text: str, physics: Mapping, 
     if rules:
         from ..ruleset import load as load_rules
         man["rules"] = load_rules(str(rules)).name       # refused here if no such set
+    if gate_sets:
+        from ..ir.gate_sets import resolve
+        man["gate_sets"] = sorted({resolve(g) for g in gate_sets})      # refused here if no such set
     if starter:
         man["starter"] = dict(starter)
     if stabilizers:
