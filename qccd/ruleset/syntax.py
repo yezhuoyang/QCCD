@@ -342,7 +342,7 @@ class _Parser:
                 self.next()
                 rs.level = self.string()
                 if rs.level not in ("device", "machine"):
-                    self.fail("a rule set's level is \"machine\" or \"machine\"")
+                    self.fail("a rule set's level is \"device\" (one machine) or \"machine\" (a floorplan of verified places)")
             elif self.at("include"):
                 self.next()
                 rs.includes.append(self.string())

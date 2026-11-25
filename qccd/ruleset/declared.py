@@ -59,7 +59,8 @@ def load_declared(text: str) -> RuleSet:
     try:
         src = parse(text)
         if src.level != "device":
-            raise DeclaredRulesError(f"a leaderboard entry's rules are about its machine, not level {src.level!r}")
+            raise DeclaredRulesError(f"a leaderboard entry's rules are about its own machine (level \"device\"), "
+                                     f"not level {src.level!r}")
         _check_includes(text)
         rs = load(text)
     except RuleSyntaxError as exc:
