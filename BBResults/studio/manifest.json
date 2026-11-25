@@ -98,7 +98,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4348387,
+  "bytes": 4350846,
   "r10": true,
   "over_budget": [],
   "sites": 196,
@@ -204,7 +204,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4276906,
+  "bytes": 4279365,
   "r10": true,
   "over_budget": [],
   "sites": 236,
@@ -310,7 +310,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4510609,
+  "bytes": 4513068,
   "r10": true,
   "over_budget": [],
   "sites": 292,
@@ -416,7 +416,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 4473039,
+  "bytes": 4475498,
   "r10": true,
   "over_budget": [],
   "sites": 294,
@@ -440,7 +440,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1817772,
+  "bytes": 1820231,
   "r10": null,
   "over_budget": [],
   "sites": 148,
@@ -464,7 +464,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 2023686,
+  "bytes": 2026145,
   "r10": null,
   "over_budget": [],
   "sites": 312,
@@ -488,7 +488,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1902548,
+  "bytes": 1905007,
   "r10": null,
   "over_budget": [],
   "sites": 300,
@@ -942,7 +942,7 @@
   "numbers": {
    "r10": null
   },
-  "bytes": 1940088,
+  "bytes": 1942547,
   "r10": null,
   "over_budget": [],
   "sites": 360,
@@ -1082,7 +1082,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3590480,
+  "bytes": 3592939,
   "r10": true,
   "over_budget": [],
   "sites": 576,
@@ -1185,7 +1185,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 2755715,
+  "bytes": 2758174,
   "r10": true,
   "over_budget": [],
   "sites": 216,
@@ -1278,7 +1278,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3343897,
+  "bytes": 3346356,
   "r10": true,
   "over_budget": [],
   "sites": 216,
@@ -1371,7 +1371,7 @@
    "T_source": "replay",
    "rules_ok": true
   },
-  "bytes": 3337955,
+  "bytes": 3340414,
   "r10": true,
   "over_budget": [],
   "sites": 216,
