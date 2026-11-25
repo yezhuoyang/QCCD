@@ -122,3 +122,6 @@ Compiler `8bd2adf9f1f3`, from `61c6b1a`, 2026-11-24 (Windows and Linux): the nat
 `--gate-set ms|rzz` (`qccdc_cli gate-sets`). Against `cd3efedbbc10` on suite@1's public pairs in the
 reference compiler's modes: 106 compiles identical, 50 refused by both; with `--gate-set rzz` the same 106
 compile and no MS is left in any program.
+The same day it was replaced by `9a761f289e00`, from `34aa9c9`: the same compiler source, with
+`Compiler/ocaml/ocamlenv.sh` cleaned of one machine's folder as 57d187b promised for the next release
+(the Linux binary is byte-identical to `8bd2adf9f1f3`'s; the Windows one differs only by its build path).
