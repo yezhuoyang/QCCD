@@ -55,7 +55,7 @@ def main() -> int:
     if spec.get("gate_set"):
         want, got_gs = spec["gate_set"]["name"], (reproduce.gate_set(program, cert) or {}).get("name")
         ok &= got_gs == want
-        print(f"gate set  {want} ({', '.join(spec['gate_set']['pulses'])})"
+        print(f"gate set  {spec['gate_set'].get('label') or want + ' (' + ', '.join(spec['gate_set']['pulses']) + ')'}"
               + ("   identical" if got_gs == want else f"   DIFFERENT: the program is in {got_gs or 'no one set'}"))
 
     # ---- 1. the replay

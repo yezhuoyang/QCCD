@@ -189,13 +189,11 @@ def _decoded_by(q: dict) -> str:
 
 
 def _gate_sets(b) -> str:
-    """The native gate sets a board takes a program in, said only where its release pins them
-    (`TaskRelease.gate_sets`): a board that names none takes a program in any set, and each entry
-    is tagged with its own where it is not the default (leaderboard.SCRIPT)."""
-    named = b.manifest.get("gate_sets")
-    if not named:
-        return ""
-    return " &middot; gate set " + " or ".join(_e(g) for g in named) + " only"
+    """The native gate sets a board takes a program in (`TaskRelease.gate_sets`: every set, unless
+    its release pins some), in the card's header; each entry's own is a column of its list
+    (leaderboard.SCRIPT)."""
+    from .leaderboard import takes_words
+    return " &middot; " + _e(takes_words(b.gate_sets).rstrip(".").replace("Gate set:", "gate set", 1))
 
 
 def _ler_bars(t: dict) -> str:

@@ -889,9 +889,14 @@ function withGateSet(params) {
   return params;
 }
 function gateSetWords(gs) {
+  gs = gs || 'ms';
   var x = GATE_SETS.filter(function (g) { return g[0] === gs; })[0];
   return 'gate set ' + (x ? gs + ' (R, VZ, ' + x[2] + ')' : gs);
 }
+// the jobs that compile a program in a gate set (qccd/workspace/results.py JOB_RUNNERS): each says
+// which, the default as plainly as RZZ (a job that names none runs in ms)
+var GATE_SET_JOBS = ['compile', 'run', 'submit', 'ler'];
+function gateSetChip(gs) { return h('span', { cls: 'qcl-chip', 'data-gate-set': gs || 'ms', text: gateSetWords(gs) }); }
 function gateSetPick(id) {
   return h('select', { id: id || 'qcl-gateset', cls: 'qcl-sel',
                        title: 'the native gate set Compile only, Submit and Test on this board lower the board\'s circuit to: MS (R, VZ and the entangling pulse MS; the default) ' +
@@ -1175,7 +1180,7 @@ function renderResults(b) {
     b.appendChild(h('div', { cls: 'qcl-label', text: 'Jobs' }));
     S.jobs.forEach(function (j) {
       b.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-chip ' + ({ succeeded: 'ok', failed: 'bad', internal_error: 'bad', running: 'warn' }[j.status] || ''), text: j.kind + ' ' + j.status }),
-        j.gate_set ? h('span', { cls: 'qcl-chip', 'data-gate-set': j.gate_set, text: gateSetWords(j.gate_set) }) : null,
+        (j.gate_set || GATE_SET_JOBS.indexOf(j.kind) >= 0) ? gateSetChip(j.gate_set) : null,
         h('span', { cls: 'qcl-note', text: (j.summary || ((j.progress || {}).message) || '') }),
         (j.status === 'running' || j.status === 'queued') ? btn('Cancel', function () { api('POST', '/api/jobs/' + j.job_id + '/cancel', {}).then(loadResults); }) : null]));
     });
@@ -1188,6 +1193,7 @@ function renderResults(b) {
     b.appendChild(h('div', { cls: 'qcl-item' }, [
       h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-chip', text: s.design || draftName(s.branch) }), h('span', { cls: 'qcl-chip', text: 'r' + s.revision }),
         h('span', { cls: 'qcl-chip ' + (s.eligible ? 'ok' : (s.status === 'grading' ? 'warn' : 'bad')), text: s.status }),
+        s.gate_set || s.status !== 'grading' ? gateSetChip(s.gate_set) : null,
         s.stale ? h('span', { cls: 'qcl-chip warn', text: 'stale: the design changed since' }) : h('span', { cls: 'qcl-chip ok', text: 'current' })]),
       h('div', { cls: 'qcl-note', text: Object.keys(m).map(function (k) { return k + ' ' + (typeof m[k] === 'number' ? (+m[k]).toPrecision(5) : m[k]); }).join(' · ') }),
       h('div', { cls: 'qcl-row' }, [
@@ -1216,7 +1222,7 @@ function showReport(sub) {
     var s = r.data, rep = s.report || {};
     var box = h('div', {}, [h('b', { text: 'Report for ' + sub + ' ' }), h('span', { cls: 'qcl-local', text: 'Local result - not published' }),
       h('div', { cls: 'qcl-note', text: 'revision r' + s.snapshot.revision + (s.stale ? ' (stale relative to the editor)' : '') + ' · bundle ' + s.snapshot.bundle_digest }),
-      h('div', { cls: 'qcl-note', text: 'evaluator ' + ((rep.evaluator || {}).name || '') + ' ' + ((rep.evaluator || {}).version || '') + ' · profile ' + (rep.profile || '') })]);
+      h('div', { cls: 'qcl-note', text: 'evaluator ' + ((rep.evaluator || {}).name || '') + ' ' + ((rep.evaluator || {}).version || '') + ' · profile ' + (rep.profile || '') + (rep.stages ? ' · ' + gateSetWords(rep.gate_set) : '') })]);
     var tb = h('table', { cls: 'qcl-table' }, [h('tr', {}, [h('th', { text: 'stage' }), h('th', { text: 'status' }), h('th', { text: 'coverage' })])]);
     (rep.stages || []).forEach(function (st) {
       tb.appendChild(h('tr', {}, [h('td', { text: st.id + (st.required ? ' *' : '') }), h('td', { text: st.status }), h('td', { text: st.coverage })]));
@@ -1500,11 +1506,11 @@ function renderBoard() {
   if (!t) line = 'Not tested on this board yet.';
   else if (t.state === 'running') { line = 'Testing: ' + (t.progress || 'compiling the board\'s circuit onto the design') + '…'; cls = 'busy'; }
   else if (t.eligible) {
-    line = 'Passed every check' + (t.rules ? ' under ' + t.rules.name : '') + ': ' + fmtVal(t.value, t.unit) +
+    line = 'Passed every check' + (t.rules ? ' under ' + t.rules.name : '') + ', ' + gateSetWords(t.gate_set) + ': ' + fmtVal(t.value, t.unit) +
       (t.would_rank ? ' · would place #' + t.would_rank + ' of ' + t.of + ' on the official board' : '');
     if (t.listed_with === 'all') line += ' · listed with every entry, not among the board\'s own (' + ownNote(t.conformance) + ')';
     cls = 'ok';
-  } else { line = 'Did not pass' + (t.rules ? ' under ' + t.rules.name : '') + ((t.reasons || []).length ? ': ' + t.reasons.join('; ') : '') + '.'; cls = 'bad'; }
+  } else { line = 'Did not pass' + (t.rules ? ' under ' + t.rules.name : '') + ', ' + gateSetWords(t.gate_set) + ((t.reasons || []).length ? ': ' + t.reasons.join('; ') : '') + '.'; cls = 'bad'; }
   body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Rules' }), rulesPick()]));
   body.appendChild(h('div', { id: 'qcl-btest', cls: 'qcl-bstatus ' + cls, text: line }));
   body.appendChild(h('div', { cls: 'qcl-row' }, [
@@ -1574,12 +1580,13 @@ function renderBoard() {
   if (off.error) body.appendChild(h('div', { cls: 'qcl-note', text: 'qccd.academy did not answer: ' + off.error }));
   else if (!rows.length) body.appendChild(h('div', { cls: 'qcl-note', text: 'Nobody has submitted to this board yet: the first eligible design is #1.' }));
   else {
-    var tb = h('table', { cls: 'qcl-btable' }, [h('tr', {}, ['#', 'design', 'by', bd.rank_by, 'date'].map(function (c) { return h('th', { text: c }); }))]);
+    var tb = h('table', { cls: 'qcl-btable' }, [h('tr', {}, ['#', 'design', 'by', 'gate set', bd.rank_by, 'date'].map(function (c) { return h('th', { text: c }); }))]);
     rows.forEach(function (r, i) {
       var own = ownNote(r.conformance);
       tb.appendChild(h('tr', { cls: mine[r.id] ? 'mine' : '' }, [h('td', { text: String(i + 1) }),
         h('td', { text: (r.display_name || '–') + (own ? ' (own rules)' : ''), title: own }),
-        h('td', { text: r.by || '–' }), h('td', { cls: 'n', text: fmtVal(r.rank_value) }), h('td', { text: fmtDay(r.created_at) })]));
+        h('td', { text: r.by || '–' }), h('td', { 'data-gate-set': r.gate_set || 'ms', text: gateSetWords(r.gate_set).replace(/^gate set /, '') }),
+        h('td', { cls: 'n', text: fmtVal(r.rank_value) }), h('td', { text: fmtDay(r.created_at) })]));
     });
     body.appendChild(tb);
   }
@@ -2664,7 +2671,7 @@ function runPanel(jid, p) {
     var qasm = String(info.qasm || '').split('\n');
     box = h('div', { id: 'qcl-runpanel', 'data-run': jid, 'data-qccd-private': '' }, [
       h('div', { cls: 'qcl-rp-t', text: (info.agent ? shortName(info.agent) + ' is running ' : 'Running ') + info.name +
-                                         ' on ' + (info.design || info.draft) + (info.gate_set ? ', ' + gateSetWords(info.gate_set) : '') }),
+                                         ' on ' + (info.design || info.draft) + ', ' + gateSetWords(info.gate_set) }),
       h('div', { id: 'qcl-rp-s', cls: 'qcl-rp-s', text: 'loading the program' }),
       h('div', { cls: 'qcl-rp-l', text: 'the program (' + qasm.length + ' lines of OpenQASM)' }),
       h('pre', { cls: 'qcl-rp-q', text: qasm.slice(0, 80).join('\n') + (qasm.length > 80 ? '\n…' : '') }),

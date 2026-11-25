@@ -329,14 +329,14 @@ def replay(program, machine, table: str, *, rule_set: str | None = None, certifi
 
 
 def gate_set(program, certificate: Mapping | None = None) -> dict | None:
-    """The native gate set a hardware program is in (`qccd.ir.gate_sets.derive`): `{name, pulses}`,
+    """The native gate set a hardware program is in (`qccd.ir.gate_sets.derive`): `{name, pulses, label}`,
     or None for a program that mixes the two sets' entangling pulses or names another set than its
     pulses are in.  The replay and the noise model read each pulse by its name in either set; an
     RZZ is priced and noised as the machine's two-qubit gate, as an MS is."""
     from ..ir import gate_sets as G
     from .extract import load_program
     name = G.derive(program if isinstance(program, Mapping) else load_program(program), certificate)
-    return None if name is None else {"name": name, "pulses": list(G.NATIVE[name])}
+    return None if name is None else {"name": name, "pulses": list(G.NATIVE[name]), "label": G.label(name)}
 
 
 def noisy_stim(program, machine, qasm: str, detectors: Mapping, noise: str, certificate: Mapping | None = None):
@@ -589,9 +589,9 @@ def _readme(point: Point, r: dict) -> str:
             ("machine", f"`{r['entry']['machine']}`" + (f", {point.family}" if point.family else "")
              + " (`machine.arch.json`)"),
             ("compiled by", point.compiler or "-"),
-            ("native gate set", f"`{r['gate_set']['name']}`: {', '.join(r['gate_set']['pulses'])}"
-                                + (" (the default)" if r["gate_set"]["name"] == "ms" else
-                                   " (Quantinuum's; the default is `ms`: R, VZ, MS)")),
+            ("native gate set", f"**{r['gate_set']['label']}** (`{r['gate_set']['name']}`"
+                                + ("; the default)" if r["gate_set"]["name"] == "ms" else
+                                   "; Quantinuum's set, where the default is MS (R, VZ, MS))")),
             ("hardware program", f"{r['program']['instructions']} instructions (`hardware_program.tsir.json`; "
                                  "`hardware_program.txt` is the same program as text)")]
     if ler is not None:

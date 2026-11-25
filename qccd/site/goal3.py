@@ -85,6 +85,7 @@ def _speed(code: str, fams: list[str]) -> dict | None:
         if mine:
             col = lambda k: [mine[v]["ler"][k] if v in mine else None for v in speeds]      # noqa: E731
             out[fam] = {"n": next(iter(mine.values()))["point"],
+                        "gs": next(iter(mine.values())).get("gate_set", "ms"),
                         "t": [round(mine[v]["T_round_ms"], 4) if v in mine else None for v in speeds],
                         "l": col("per_round"), "lo": col("per_round_lo"), "hi": col("per_round_hi")}
     return {"v": [int(v) if float(v).is_integer() else v for v in speeds], "fams": out} if out else None
@@ -136,14 +137,14 @@ def data() -> dict | None:
             if r.get("status") != "ok":
                 c["failed"] += 1
                 why = ("breaks " + ", ".join(r["rules_failed"]) + ": " if r.get("rules_failed") else "") + (r.get("why") or "")
-                failed.append({"f": fam, "n": name, "why": why[:240], **u})
+                failed.append({"f": fam, "n": name, "why": why[:240], **u, "gs": r.get("gate_set", "ms")})
                 continue
             ler = r["ler"]
             pts.append({"f": fam, "n": name, "s": _size(r), "t": round(r["T_round_ms"], 4),
                         "l": ler["per_round"], "lo": ler["per_round_lo"], "hi": ler["per_round_hi"],
                         "e": ler["errors"], "sh": ler["shots"], **u,
-                        # the native gate set, where a row was compiled to one that is not the default
-                        **({"gs": r["gate_set"]} if r.get("gate_set") not in (None, "ms") else {})})
+                        # the native gate set: the default, MS, unless the row names another
+                        "gs": r.get("gate_set", "ms")})
         name, short = b.title.removeprefix("Goal 3: "), _short(b.title)
         # a release is never rewritten, and its text names the board's model; the reference sweep's is the deck's
         about = b.manifest.get("description", "").replace(
@@ -154,8 +155,12 @@ def data() -> dict | None:
                       # the decoder of every rate of this code, with its parameters (the release's budget)
                       "decoder": decoder_label(None, (b.manifest.get("qec") or {}).get("ler")),
                       "counts": counts, "points": pts, "failed": failed,
+                      # the gate sets the reference points are compiled to (MS unless a row says another)
+                      "gate_sets": sorted({r.get("gate_set", "ms") for r in rows.values()}) or ["ms"],
                       **({"speed": sp} if (sp := _speed(code, fams)) else {}),
-                      **({"tried": tried["codes"][code]} if code in tried.get("codes", {}) else {}),
+                      **({"tried": {**tried["codes"][code], "gs": (rows.get((tried["codes"][code].get("family"),
+                                                                         tried["codes"][code].get("point"))) or {})
+                                    .get("gate_set", "ms")}} if code in tried.get("codes", {}) else {}),
                       **({"rules": _code_rules(code, b.manifest.get("rules") or "standard", judged)}
                          if judged and code in judged["codes"] else {})})
     out = {"families": fams, "caveats": caveats, "codes": codes, "tried_about": tried.get("about", ""),
@@ -315,8 +320,11 @@ SCRIPT = r"""
   var root = document.getElementById('g3'), tabs = document.getElementById('g3-tabs');
   var tip = document.createElement('div'); tip.className = 'g3-tip'; document.body.appendChild(tip);
   var live = {}, cur = 0;
-  // a point's native gate set, named where it is not the default (qccd.ir.gate_sets)
-  var GATE_SETS = {ms: 'R, VZ, MS', rzz: 'R, VZ, RZZ'};
+  // every point's native gate set, in qccd.ir.gate_sets.labels()' words: "MS (R, VZ, MS)"
+  var GATE_SETS = __GATE_SETS__;
+  function gsLabel(g){ var x = GATE_SETS[g || 'ms']; return x ? x.label : String(g); }
+  function gsSet(sets){ return (sets || ['ms']).map(function(g){ var x = GATE_SETS[g] || {name: g, pulses: ''};
+    return 'the ' + x.name + ' gate set (' + x.pulses + ')'; }).join(' and '); }
   function E(tag, attrs, text){ var e = document.createElementNS('http://www.w3.org/2000/svg', tag);
     for (var k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
   function H(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
@@ -413,8 +421,7 @@ SCRIPT = r"""
     tip.appendChild(H('div', null, sci(p.l) + ' per round' + (p.hi ? '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')' : '')));
     if (p.e != null) tip.appendChild(H('div', 'm', p.e + ' logical errors in ' + Number(p.sh).toLocaleString() + ' shots'));
     if (p.e != null && c.decoder) tip.appendChild(H('div', 'm', 'Decoded by ' + c.decoder));
-    if (p.gs && p.gs !== 'ms') tip.appendChild(H('div', 'm', 'Gate set ' + p.gs.toUpperCase() + ' (' + (GATE_SETS[p.gs] || p.gs) +
-      '; the default is MS: ' + GATE_SETS.ms + ')'));
+    tip.appendChild(H('div', 'm', 'Gate set ' + gsLabel(p.gs)));
     if (href(p)) tip.appendChild(H('div', 'm', 'Click to open its page: the ions moving, the program against the circuit, the rules and the noise.' +
       (p.z ? ' Its page, and the table below the charts, have its Download and reproduce button.' : '')));
     tip.style.display = 'block'; move(ev);
@@ -426,13 +433,14 @@ SCRIPT = r"""
 
   function table(host, c){
     var ps = pts(c), fams = famsOf(c, ps), tw = H('div', 'tw'), t = H('table');
-    var hd = H('tr'); ['family', 'fastest', 'ms / round', 'lowest LER', 'LER / round (95%)'].forEach(function(s){ hd.appendChild(H('th', null, s)); });
+    var hd = H('tr'); ['family', 'gate set', 'fastest', 'ms / round', 'lowest LER', 'LER / round (95%)'].forEach(function(s){ hd.appendChild(H('th', null, s)); });
     t.appendChild(hd);
     fams.forEach(function(f){
       var mine = ps.filter(function(p){ return p.f === f; }), tr = H('tr');
       tr.appendChild(H('td', null, f));
-      if (!mine.length) { ['none ran', '', '', ''].forEach(function(s){ tr.appendChild(H('td', null, s)); }); t.appendChild(tr); return; }
+      if (!mine.length) { ['', 'none ran', '', '', ''].forEach(function(s){ tr.appendChild(H('td', null, s)); }); t.appendChild(tr); return; }
       var ft = mine.reduce(function(a, b){ return b.t < a.t ? b : a; }), fl = mine.reduce(function(a, b){ return b.l < a.l ? b : a; });
+      tr.appendChild(H('td', null, gsLabel(ft.gs) + (fl.gs !== ft.gs ? ' · ' + gsLabel(fl.gs) : '')));
       tr.appendChild(namedDl(ft)); tr.appendChild(H('td', 'n', ms(ft.t)));
       tr.appendChild(namedDl(fl)); tr.appendChild(H('td', 'n', sci(fl.l) + '  (' + sci(fl.lo) + ' to ' + sci(fl.hi) + ')'));
       t.appendChild(tr);
@@ -453,12 +461,12 @@ SCRIPT = r"""
   function namedDl(p){ var td = named(p); if (p.z) { td.appendChild(H('br')); var a = zipLink(p); a.style.marginTop = '5px'; td.appendChild(a); } return td; }
   function zips(host, c){
     var ps = pts(c).filter(function(p){ return p.ref; }), fams = famsOf(c, ps), tw = H('div', 'tw'), t = H('table'), hd = H('tr');
-    ['family', 'size', 'ms / round', 'LER / round (95%)', 'sample', ''].forEach(function(s){ hd.appendChild(H('th', null, s)); });
+    ['family', 'size', 'gate set', 'ms / round', 'LER / round (95%)', 'sample', ''].forEach(function(s){ hd.appendChild(H('th', null, s)); });
     t.appendChild(hd);
     var have = 0, all = 0;
     function line(f, p, bad){
       var tr = H('tr'), td = H('td'); all++;
-      tr.appendChild(H('td', null, f)); tr.appendChild(named(p));
+      tr.appendChild(H('td', null, f)); tr.appendChild(named(p)); tr.appendChild(H('td', null, gsLabel(p.gs)));
       tr.appendChild(H('td', 'n', bad ? '' : ms(p.t)));
       tr.appendChild(H('td', 'n', bad ? 'broke a rule' : sci(p.l) + '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')'));
       tr.appendChild(H('td', 'n', bad ? '' : p.e + ' in ' + Number(p.sh).toLocaleString()));
@@ -481,8 +489,9 @@ SCRIPT = r"""
     host.parentNode.hidden = !fs.length;
     if (!fs.length) return;
     var tw = H('div', 'tw'), t = H('table'), hd = H('tr');
-    ['family', 'size', 'why'].forEach(function(s){ hd.appendChild(H('th', null, s)); }); t.appendChild(hd);
+    ['family', 'size', 'gate set', 'why'].forEach(function(s){ hd.appendChild(H('th', null, s)); }); t.appendChild(hd);
     fs.forEach(function(p){ var tr = H('tr'); tr.appendChild(H('td', null, p.f)); tr.appendChild(named(p));
+      tr.appendChild(H('td', null, gsLabel(p.gs)));
       tr.appendChild(H('td', null, p.why)); t.appendChild(tr); });
     tw.appendChild(t); host.appendChild(tw);
   }
@@ -515,11 +524,15 @@ SCRIPT = r"""
     if (!R) return;
     var cols = D.families.concat(Object.keys(R.fams).filter(function(f){ return D.families.indexOf(f) < 0; }))
       .filter(function(f){ return R.fams[f]; }).map(function(f){
-        var F = R.fams[f]; return {head: f, set: F.set, sub: F.n + (F.n === 1 ? ' size' : ' sizes'), n: F.n, cells: F.cells}; });
+        var F = R.fams[f], gs = {};
+        c.points.concat(c.failed || []).forEach(function(p){ if (p.f === f) gs[p.gs || 'ms'] = 1; });
+        var gl = Object.keys(gs).length ? Object.keys(gs) : ['ms'];
+        return {head: f, set: F.set, sub: F.n + (F.n === 1 ? ' size' : ' sizes') + ', gate set ' + gl.map(gsLabel).join(' · '),
+                n: F.n, cells: F.cells}; });
     (live[c.id] || []).forEach(function(p){
       var rr = (p.cf || {}).rules || {};
       cols.push({head: p.n, set: rr.set || R.board, sub: 'submitted' + (p.by ? ' by ' + p.by : '')
-                 + (p.gs && p.gs !== 'ms' ? ', gate set ' + p.gs.toUpperCase() : ''), to: href(p),
+                 + ', gate set ' + gsLabel(p.gs), to: href(p),
                  cells: entryCells(R, p)}); });
     var order = D.rules.order, ids = [], why = {}, bad = [], drawn = {};
     c.points.forEach(function(p){ drawn[p.f + '|' + p.n] = 1; });
@@ -626,7 +639,9 @@ SCRIPT = r"""
         row.appendChild(H('b', null, F[key][j] > 0 ? (key === 't' ? ms(F.t[j]) + ' ms' : sci(F.l[j])) : 'no run'));
         tip.appendChild(row);
       });
-      tip.appendChild(H('div', 'm', key === 't' ? 'time per round' : 'logical error rate per round'));
+      var gss = {}; fams.forEach(function(f){ gss[S.fams[f].gs || 'ms'] = 1; });
+      tip.appendChild(H('div', 'm', (key === 't' ? 'time per round' : 'logical error rate per round') + '; gate set ' +
+        Object.keys(gss).map(gsLabel).join(' · ')));
       tip.style.display = 'block'; move(ev);
     }
     hit.addEventListener('pointermove', at);
@@ -648,11 +663,11 @@ SCRIPT = r"""
       s.appendChild(sw); s.appendChild(document.createTextNode(f + ': ' + S.fams[f].n)); key.appendChild(s);
     });
     var tw = H('div', 'tw'), t = H('table'), hd = H('tr');
-    hd.appendChild(H('th', null, 'family, size'));
+    hd.appendChild(H('th', null, 'family, size, gate set'));
     S.v.forEach(function(v){ hd.appendChild(H('th', null, v + ' m/s')); });
     t.appendChild(hd);
     fams.forEach(function(f){
-      var F = S.fams[f], tr = H('tr'); tr.appendChild(H('td', null, f + ', ' + F.n));
+      var F = S.fams[f], tr = H('tr'); tr.appendChild(H('td', null, f + ', ' + F.n + ', ' + gsLabel(F.gs)));
       S.v.forEach(function(v, j){ tr.appendChild(H('td', 'n', F.l[j] > 0 ? ms(F.t[j]) + ' ms \u00b7 ' + sci(F.l[j]) : '\u2013')); });
       t.appendChild(tr);
     });
@@ -677,7 +692,7 @@ SCRIPT = r"""
       t.appendChild(tr);
     });
     tw.appendChild(t); host.appendChild(tw);
-    host.appendChild(H('p', 'g3r-why', X.family + ', ' + X.point + '. ' + D.tried_about));
+    host.appendChild(H('p', 'g3r-why', X.family + ', ' + X.point + ', gate set ' + gsLabel(X.gs) + '. ' + D.tried_about));
   }
 
   function draw(i){
@@ -685,7 +700,8 @@ SCRIPT = r"""
     [].forEach.call(tabs.querySelectorAll('button'), function(b, j){ b.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
     [].forEach.call(document.querySelectorAll('.g3-try'), function(el){ el.hidden = el.getAttribute('data-task') !== c.task; });
     document.getElementById('g3-code').textContent = c.ions + ' ions: ' + c.rounds + ' rounds of a Z memory, then ' +
-      c.rounds + ' of an X memory on the same ions.' + (c.decoder ? ' Decoded by ' + c.decoder + '.' : '');
+      c.rounds + ' of an X memory on the same ions. Compiled to ' + gsSet(c.gate_sets) +
+      (c.decoder ? '; decoded by ' + c.decoder : '') + '.';
     document.getElementById('g3-about').textContent = c.about;
     var pan = document.getElementById('g3-panels'); pan.textContent = '';
     panel(pan, c, 't', 'Time per syndrome round');
@@ -712,13 +728,20 @@ SCRIPT = r"""
         var l = e.ler || {};
         return {f: e.family, n: e.device || e.display_name || e.id, by: e.by, s: 0, t: e.T_round_ms, l: e.ler_per_round,
                 lo: l.per_round_lo || e.ler_per_round, hi: l.per_round_hi || e.ler_per_round, e: l.errors, sh: l.shots, sid: e.id,
-                cf: e.conformance, gs: e.gate_set};
+                cf: e.conformance, gs: e.gate_set || 'ms'};
       });
     });
     draw(cur);
   }, function(){});
 })();
 """
+
+
+def _gs_words(d: dict) -> str:
+    """The gate sets the reference points are compiled to, in qccd.ir.gate_sets' words."""
+    from ..ir import gate_sets
+    sets = sorted({g for c in d["codes"] for g in c.get("gate_sets") or ["ms"]})
+    return " and ".join(f"{gate_sets.ENTANGLER[g]} gate set ({', '.join(gate_sets.NATIVE[g])})" for g in sets)
 
 
 def _decoders(d: dict) -> str:
@@ -789,7 +812,9 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "server, which ran every check on the board&rsquo;s own physics. "
         "Click any point to open its page: the ions moving on the machine, the program against the circuit, the "
         "rules, and the noise model&rsquo;s stim program block by block.</p>"
-        f"<p>Every rate is sampled with a fixed seed and decoded: {_decoders(d)}. "
+        f"<p>Every reference point is compiled to the {_e(_gs_words(d))}, unless its row names another set, "
+        "and every entry names its own. "
+        f"Every rate is sampled with a fixed seed and decoded: {_decoders(d)}. "
         "Every point has a <b>Download and reproduce</b> button, in the tables under the charts and on its own "
         "page: one zip with its circuit, machine, hardware program, noisy stim circuit and the scripts that run "
         "it again.</p>"
@@ -863,7 +888,8 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "<p>A size counts as failed when its compiler refused it or its program broke a rule.</p></details>"
         f"{tries}</div>"
     )
-    js = SCRIPT.replace("__DATA__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))
+    from ..ir import gate_sets
+    js = SCRIPT.replace("__GATE_SETS__", json.dumps(gate_sets.labels())).replace("__DATA__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))
     hints = "<script>window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, " + json.dumps(HINTS) + ");</script>"
     out = PAGE.format(title="Goal 3: one code at a time, every architecture - QCCD studio", style=STYLE,
                       extra_css=CSS + leaderboard.CSS, body=body)

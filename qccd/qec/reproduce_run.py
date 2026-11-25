@@ -246,6 +246,10 @@ def main(argv=None) -> int:
     pub = (spec.get("published") or {}).get("ler") or {}
     samp, dec = spec["sampling"], spec["decoder"]
     print(f"{spec['board']['title']}  --  {spec['entry']['title']}")
+    gs = spec.get("gate_set")             # the hardware program's native gate set (a zip from before says none)
+    if gs:
+        print(f"gate set  {gs.get('label') or gs['name']}: the circuit.stim pulses' set; its entangling pulse is "
+              "noised as the two-qubit gate")
     print(f"decoder   {dec['label']}")
     print(f"budget    up to {int(samp['max_shots']):,} shots or {int(samp['max_errors'])} logical errors, "
           f"batches of {int(samp['batch']):,}, seed {samp['seed']}"

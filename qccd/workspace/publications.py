@@ -352,6 +352,7 @@ class PublicationsMixin:
             o = {k: s.get(k) for k in ("submission_id", "status", "visibility", "display_name", "by", "created_at")}
             rep = s.get("report") or {}
             o["eligible"] = rep.get("eligible")
+            o["gate_set"] = (rep.get("gate_set") or "ms") if rep else None
             o["metrics"] = rep.get("metrics")
             o["reasons"] = ((rep.get("eligibility") or {}).get("reasons") or [])[:3]
             o["job"] = s.get("job")
@@ -460,7 +461,7 @@ class PublicationsMixin:
                     "reasons": ((rep.get("eligibility") or {}).get("reasons") or [])[:3],
                     "value": mm.get("value"), "unit": mm.get("unit"), "revision": s["snapshot"]["revision"],
                     "rules": s.get("rules"), "conformance": rep.get("conformance"),
-                    **({"gate_set": rep["gate_set"]} if rep.get("gate_set") else {})}
+                    "gate_set": rep.get("gate_set") or "ms"}
             if s["status"] == "grading":
                 jid = s.get("job_id")
                 if jid:
