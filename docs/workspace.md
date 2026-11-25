@@ -225,7 +225,11 @@ page keeps its self-containment scan. What it does:
 
   From the terminal: `qccd compile --board T --gate-set rzz` and
   `qccd ler --experiment surface3 --gate-set rzz`; from an agent, `gate_set` on
-  `qccd_run_program`, `qccd_start_job` (kind `compile`) and `qccd_estimate_ler`.
+  `qccd_run_program`, `qccd_start_job` (kind `compile`) and `qccd_estimate_ler`. In the
+  Studio, the chat's Results tab (Debug view) has a **Gate set** choice beside Compile only;
+  RZZ is sent as `gate_set: "rzz"` and MS as no parameter. A job brief (`/api/jobs`) and a
+  run's program (`/api/runs/<id>/program`) carry `gate_set` when it is not the default, and
+  the panel shows it on the job and on the run card.
 - **The performance report** (`perf.performance`) is read off that replay:
   - the round time, and time by category (transport, cooling, gates, measurement, reset)
     with shares;

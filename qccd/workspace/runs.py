@@ -158,7 +158,10 @@ class RunsMixin:
                 "animate": (params or {}).get("animate", run.get("animate", True)) is not False,
                 "draft": str(draft).removeprefix("cand/"), "design": self._design_title_of(str(draft)),
                 "status": j["status"],
-                "progress": (j.get("progress") or {}).get("message"), "agent": (j.get("actor") or {}).get("label")}
+                "progress": (j.get("progress") or {}).get("message"), "agent": (j.get("actor") or {}).get("label"),
+                # the gate set it compiles in, when not the default (the person's run panel says it)
+                **({"gate_set": gs} if (gs := (params or {}).get("gate_set") or run.get("gate_set")
+                                        or res.get("gate_set")) else {})}
 
     # ------------------------------------------------------------------ the job
 

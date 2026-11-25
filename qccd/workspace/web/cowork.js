@@ -49,6 +49,8 @@ var S = {
   protected: Object.create(null), lastTouched: [], highlight: [], agentMsgs: [], history: [],
   jobs: [], subs: [], board: null, lastViewPatch: 0, viewDirty: true, openPrompt: null,
   paired: false, lastError: null, compile: null,
+  // the native gate set the panel's compiles lower to (qccd/ir/gate_sets.py); ms, the default, is sent as no parameter
+  gateSet: localGet('qccd.compile.gate_set') === 'rzz' ? 'rzz' : 'ms',
   // the chat view (default) vs the debug view (tabs)
   debug: localGet('qccd.live.debug') === '1' || /[?&]debug(=1)?(&|$)/.test(location.search.slice(1)),
   conv: [], working: [], pending: null, codex: null, claude: null, cursorAgent: null, connecting: false, branches: [], convTimer: null,
@@ -878,6 +880,27 @@ function renderBody() {
 }
 function btn(text, fn, cls, title) { return h('button', { cls: 'qcl-btn ' + (cls || ''), text: text, title: title, on: { click: fn } }); }
 
+// ------------------------------------------------------------------ the native gate set (qccd/ir/gate_sets.py: GATE_SETS, ENTANGLER)
+// the option's values, the default first: [value, label, entangling pulse]
+var GATE_SETS = [['ms', 'MS (R, VZ, MS) · default', 'MS'], ['rzz', 'RZZ (R, VZ, RZZ) · Quantinuum', 'RZZ']];
+// a compile's params in the chosen set: the default is no parameter, so the job is the one it always was
+function withGateSet(params) {
+  if (S.gateSet !== 'ms') params.gate_set = S.gateSet;
+  return params;
+}
+function gateSetWords(gs) {
+  var x = GATE_SETS.filter(function (g) { return g[0] === gs; })[0];
+  return 'gate set ' + (x ? gs + ' (R, VZ, ' + x[2] + ')' : gs);
+}
+function gateSetPick() {
+  return h('select', { id: 'qcl-gateset', cls: 'qcl-sel',
+                       title: 'the native gate set Compile only lowers the board\'s circuit to: MS (R, VZ and the entangling pulse MS; the default) ' +
+                              'or RZZ (R, VZ and the entangling pulse RZZ = exp(-i theta/2 Z(x)Z); Quantinuum\'s set). QCCDCert, the verified ' +
+                              'compiler, lowers to MS only, so a program in RZZ is compiled by qccdc_cli (or the C2LR router on a C2LR lattice)',
+                       on: { change: function (e) { S.gateSet = e.target.value; localSet('qccd.compile.gate_set', S.gateSet); renderBody(); } } },
+           GATE_SETS.map(function (g) { var o = h('option', { value: g[0], text: g[1] }); if (g[0] === S.gateSet) o.selected = true; return o; }));
+}
+
 function renderCompose(b) {
   var ta = h('textarea', { id: 'qcl-text', cls: 'qcl-ta', placeholder: 'What should change here? ("Use this structure here, but keep these gate zones")' });
   ta.value = S.textCache || '';
@@ -1134,9 +1157,17 @@ function renderResults(b) {
         loadResults(); }); }, 'pri',
         'compile this board\'s circuit onto the design, adopt the program, freeze it and grade it with the reference evaluator')
   ]));
+  b.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-note', text: 'Gate set' }), gateSetPick()]));
+  if (S.gateSet !== 'ms')
+    b.appendChild(h('div', { id: 'qcl-gateset-note', cls: 'qcl-note', text: 'RZZ: QCCDCert, the verified compiler, lowers to MS only, ' +
+      'so a program in RZZ is compiled by qccdc_cli (or the C2LR router), never by QCCDCert. Submit grades the program the design ' +
+      'adopted: press Adopt compiled program after compiling, or Submit compiles again in MS.' }));
   b.appendChild(h('div', { cls: 'qcl-row' }, [
-    btn('Compile only', function () { api('POST', '/api/jobs', { kind: 'compile', params: { branch: S.branch, board: S.pickBoard }, request_id: rid('compile') }).then(loadResults); },
-        '', 'run the real compiler on this board\'s circuit for this revision'),
+    btn('Compile only', function () {
+      api('POST', '/api/jobs', { kind: 'compile', params: withGateSet({ branch: S.branch, board: S.pickBoard }), request_id: rid('compile') }).then(function (r) {
+        if (!r.ok) notice('Not compiled: ' + ((r.error || {}).message || 'error'), 'bad');
+        loadResults(); }); },
+        '', 'run the real compiler on this board\'s circuit for this revision, in the gate set chosen above'),
     btn('Adopt compiled program', adoptCompiled, '', 'make the last successful compile the design\'s final program'),
     btn('Validate (draft)', function () { api('POST', '/api/jobs', { kind: 'evaluate', params: { branch: S.branch, profile: 'draft', board: S.pickBoard }, request_id: rid('val') }).then(loadResults); })
   ]));
@@ -1144,6 +1175,7 @@ function renderResults(b) {
     b.appendChild(h('div', { cls: 'qcl-label', text: 'Jobs' }));
     S.jobs.forEach(function (j) {
       b.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-chip ' + ({ succeeded: 'ok', failed: 'bad', internal_error: 'bad', running: 'warn' }[j.status] || ''), text: j.kind + ' ' + j.status }),
+        j.gate_set ? h('span', { cls: 'qcl-chip', 'data-gate-set': j.gate_set, text: gateSetWords(j.gate_set) }) : null,
         h('span', { cls: 'qcl-note', text: (j.summary || ((j.progress || {}).message) || '') }),
         (j.status === 'running' || j.status === 'queued') ? btn('Cancel', function () { api('POST', '/api/jobs/' + j.job_id + '/cancel', {}).then(loadResults); }) : null]));
     });
@@ -2630,7 +2662,7 @@ function runPanel(jid, p) {
     var qasm = String(info.qasm || '').split('\n');
     box = h('div', { id: 'qcl-runpanel', 'data-run': jid, 'data-qccd-private': '' }, [
       h('div', { cls: 'qcl-rp-t', text: (info.agent ? shortName(info.agent) + ' is running ' : 'Running ') + info.name +
-                                         ' on ' + (info.design || info.draft) }),
+                                         ' on ' + (info.design || info.draft) + (info.gate_set ? ', ' + gateSetWords(info.gate_set) : '') }),
       h('div', { id: 'qcl-rp-s', cls: 'qcl-rp-s', text: 'loading the program' }),
       h('div', { cls: 'qcl-rp-l', text: 'the program (' + qasm.length + ' lines of OpenQASM)' }),
       h('pre', { cls: 'qcl-rp-q', text: qasm.slice(0, 80).join('\n') + (qasm.length > 80 ? '\n…' : '') }),

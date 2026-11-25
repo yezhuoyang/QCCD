@@ -136,6 +136,29 @@ def test_the_conversation_is_one_stream(ws):
     assert conv["working"] == [{"prompt_id": pid, "state": "working"}]
 
 
+def test_a_job_in_another_gate_set_says_so_in_its_record(ws, tmp_path, monkeypatch):
+    """The Studio panel's job list and run panel show the gate set a compile or run is in: the
+    job's brief names it while it waits and once it is done (failed here: no compiler is found),
+    the run's program record names it, and a job in the default set names nothing, as before."""
+    monkeypatch.setenv("QCCD_QCCDC", str(tmp_path / "no-compiler"))
+    monkeypatch.setattr("qccd.cert.toolchain.available", lambda: False)     # no compiler at all: each job fails fast
+    brief = ws.start_job(HUMAN, "compile", {"gate_set": "rzz"})
+    assert brief["gate_set"] == "rzz"
+    j = _wait(ws, brief["job_id"])
+    assert j["status"] == "failed" and j["result"]["gate_set"] == "rzz", j
+    assert next(x for x in ws.jobs() if x["job_id"] == brief["job_id"])["gate_set"] == "rzz"
+    run = ws.start_job(HUMAN, "run", {"program": "ghz4", "gate_set": "RZZ", "animate": False})
+    assert run["gate_set"] == "rzz" and ws.run_program_source(run["job_id"])["gate_set"] == "rzz"
+    _wait(ws, run["job_id"])
+    assert ws.run_program_source(run["job_id"])["gate_set"] == "rzz"
+    for kind, params in (("compile", {"gate_set": "ms"}), ("compile", {}), ("run", {"program": "ghz4", "animate": False})):
+        b = ws.start_job(HUMAN, kind, params)
+        j = _wait(ws, b["job_id"])
+        assert "gate_set" not in b and "gate_set" not in (j["result"] or {}), j
+        assert "gate_set" not in next(x for x in ws.jobs() if x["job_id"] == b["job_id"])
+    assert "gate_set" not in ws.run_program_source(b["job_id"])
+
+
 def test_a_run_in_the_rzz_gate_set_says_which_compiler_ran(ws, monkeypatch):
     """`gate_set: rzz` (docs/workspace.md): QCCDCert lowers to MS only, so under `compiler: auto`
     the run is compiled by qccdc, with `--gate-set rzz`, and says so; every acceptance step reads

@@ -267,6 +267,10 @@ class ResultsMixin:
             status = "failed" if code else "internal_error"
         if cancel.is_set() and status not in ("succeeded",):
             status = "cancelled"
+        if params.get("gate_set") and isinstance(result, dict):
+            # a job in another gate set than the default says so when it is done, failed or not
+            # (`_job_brief`); a default job's record is the one it always was
+            result.setdefault("gate_set", params["gate_set"])
         with self.store.tx() as db:
             db.execute("UPDATE jobs SET status=?, result=?, error=?, finished_at=? WHERE id=?",
                        (status, dumps(result), error, _now(), jid))
@@ -935,10 +939,14 @@ class ResultsMixin:
 
 def _job_brief(j: Mapping) -> dict:
     res = j.get("result") or {}
+    # the gate set a job compiles in, when it is not the default: named in its params while it waits
+    # or runs, in its result once it is done (`_run_job`)
+    gate_set = res.get("gate_set") or (res.get("params") or {}).get("gate_set")
     return {"job_id": j["id"], "kind": j["kind"], "status": j["status"], "progress": j.get("progress"),
             "summary": res.get("summary"), "origin_prompt_id": j.get("origin_prompt_id"),
             "created_at": j["created_at"], "started_at": j.get("started_at"), "finished_at": j.get("finished_at"),
-            "error": j.get("error"), "cancel_requested": j.get("cancel_requested")}
+            "error": j.get("error"), "cancel_requested": j.get("cancel_requested"),
+            **({"gate_set": gate_set} if gate_set else {})}
 
 
 def _compiler_label(mode: str) -> str:

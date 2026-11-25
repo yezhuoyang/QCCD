@@ -771,6 +771,98 @@ def test_the_studio_page_takes_page_actions_too(tmp_path, monkeypatch):
             pass
 
 
+def test_the_panels_gate_sets_are_the_compilers():
+    """The panel's Gate set choice lists qccd.ir.gate_sets, the default first, each with its pulse."""
+    import re
+
+    from qccd.ir import gate_sets
+    js = (REPO / "qccd" / "workspace" / "web" / "cowork.js").read_text(encoding="utf-8")
+    line = re.search(r"^var GATE_SETS = (\[.*\]);$", js, re.M).group(1)
+    sets = json.loads(line.replace("'", '"'))
+    assert tuple(s[0] for s in sets) == gate_sets.GATE_SETS and sets[0][0] == gate_sets.DEFAULT
+    assert {s[0]: s[2] for s in sets} == gate_sets.ENTANGLER
+    assert all(s[1].startswith(f"{s[2]} (R, VZ, {s[2]})") for s in sets)
+
+
+@needs_chrome
+def test_the_panels_compile_takes_the_gate_set_chosen(tmp_path, monkeypatch):
+    """The Results tab's Gate set choice: MS, the default, posts the compile job it always did (no
+    gate_set); RZZ posts `gate_set: "rzz"`, says QCCDCert lowers to MS only, and the job list
+    shows the job's gate set.  No compiler is found here, so the jobs fail fast: what is checked
+    is what the panel asks for and what the record says."""
+    from qccd.workspace.runtime import ensure_service, service_request
+    monkeypatch.setenv("QCCD_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("QCCD_CODEX", "none")
+    monkeypatch.setenv("QCCD_CLAUDE", "none")
+    monkeypatch.setenv("QCCD_CURSOR", "none")
+    monkeypatch.setenv("QCCD_QCCDC", str(tmp_path / "no-compiler"))
+    Workspace.init(tmp_path / "ws", "ghz4@1").close()
+    info = ensure_service(tmp_path / "ws", python=sys.executable)
+    try:
+        own = lambda m, p, b=None: service_request(info, m, p, b, token="owner", timeout=60)
+        base = f"http://127.0.0.1:{info['port']}"
+        code = own("POST", "/api/pair-code", {})["code"]
+        compile_btn = ("Array.prototype.filter.call(document.querySelectorAll('#qcl-body button'), function (b) {"
+                       " return b.textContent === 'Compile only'; })[0]")
+        steps = [
+            {"wait": "window.QCCD_LIVE && QCCD_LIVE.state().paired && QCCD_LIVE.state().connected && "
+                     "QCCD_LIVE.state().rev !== null", "timeout": 40000, "stopOnFail": True},
+            {"eval": "(function () { var of = window.fetch; window.__posted = []; window.__answers = [];"
+                     " window.fetch = function (u, o) { var p = of.apply(this, arguments);"
+                     "  if (o && o.method === 'POST' && String(u) === '/api/jobs') { window.__posted.push(JSON.parse(o.body));"
+                     "   p.then(function (r) { return r.clone().json(); }).then(function (d) { window.__answers.push(d); },"
+                     "                                                       function () { window.__answers.push(null); }); }"
+                     "  return p; };"
+                     " QCCD_LIVE.setDebug(true);"
+                     " Array.prototype.filter.call(document.querySelectorAll('#qcl-tabs button'), function (b) {"
+                     "  return b.textContent === 'Results'; })[0].click(); return true; })()"},
+            {"wait": "!!document.getElementById('qcl-gateset') && "
+                     "!!document.querySelector('#qcl-body select[title=\"the leaderboard\"] option')", "timeout": 20000,
+             "stopOnFail": True},
+            {"eval": "(function () { var s = document.getElementById('qcl-gateset');"
+                     " var out = { options: Array.prototype.map.call(s.options, function (o) { return [o.value, o.text]; }),"
+                     "  value: s.value, title: s.title, note: !!document.getElementById('qcl-gateset-note') };"
+                     " " + compile_btn + ".click(); return JSON.stringify(out); })()"},
+            {"wait": "window.__answers.length === 1", "timeout": 20000},
+            {"eval": "(function () { var s = document.getElementById('qcl-gateset'); s.value = 'rzz';"
+                     " s.dispatchEvent(new Event('change')); var n = document.getElementById('qcl-gateset-note');"
+                     " var out = { value: document.getElementById('qcl-gateset').value, note: n ? n.textContent : null };"
+                     " " + compile_btn + ".click(); return JSON.stringify(out); })()"},
+            {"wait": "window.__answers.length === 2 && !!document.querySelector('#qcl-body [data-gate-set=\"rzz\"]')",
+             "timeout": 20000},
+            {"eval": "JSON.stringify({ posted: window.__posted, answers: window.__answers,"
+                     " chip: document.querySelector('#qcl-body [data-gate-set=\"rzz\"]').textContent,"
+                     " kept: localStorage.getItem('qccd.compile.gate_set') })"},
+        ]
+        spec = tmp_path / "spec.json"
+        spec.write_text(json.dumps({"pages": {"a": f"{base}/studio#pair={code}"}, "steps": steps}), encoding="utf-8")
+        r = subprocess.run(["node", str(REPO / "tests" / "workspace_browser.mjs"), str(spec)], capture_output=True,
+                           timeout=300, cwd=REPO)
+        out = json.loads(r.stdout.decode("utf-8") or "{}")
+        st = out.get("steps", [])
+        diag = json.dumps({"steps": st, "logs": out.get("logs"), "fatal": out.get("fatal")})[:5000]
+        assert len(st) == len(steps) and all(s.get("ok", True) and not s.get("error") for s in st), diag
+        first = json.loads(st[3]["value"])
+        assert first["options"] == [["ms", "MS (R, VZ, MS) · default"], ["rzz", "RZZ (R, VZ, RZZ) · Quantinuum"]], diag
+        assert first["value"] == "ms" and not first["note"] and "QCCDCert" in first["title"], diag
+        chosen = json.loads(st[5]["value"])
+        assert chosen["value"] == "rzz" and "QCCDCert, the verified compiler, lowers to MS only" in chosen["note"], diag
+        got = json.loads(st[7]["value"])
+        ms, rzz = (p["params"] for p in got["posted"])
+        assert got["posted"][0]["kind"] == got["posted"][1]["kind"] == "compile", diag
+        assert "gate_set" not in ms and rzz["gate_set"] == "rzz", diag            # the default posts what it always did
+        assert {k: v for k, v in rzz.items() if k != "gate_set"} == ms, diag
+        assert "gate_set" not in got["answers"][0] and got["answers"][1]["gate_set"] == "rzz", diag
+        assert got["chip"] == "gate set rzz (R, VZ, RZZ)" and got["kept"] == "rzz", diag
+        jobs = own("GET", "/api/jobs?limit=5")["jobs"]
+        assert sorted(j.get("gate_set", "ms") for j in jobs if j["kind"] == "compile") == ["ms", "rzz"], jobs
+    finally:
+        try:
+            service_request(info, "POST", "/api/shutdown", {}, token="owner")
+        except Exception:
+            pass
+
+
 @needs_chrome
 def test_the_agent_draws_a_shape_on_the_persons_studio(tmp_path, monkeypatch):
     """Asked for "a triangle", the agent draws it with the Studio's own sketch verb on the person's
