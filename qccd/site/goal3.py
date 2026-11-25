@@ -296,6 +296,14 @@ CSS = """
 .g3r-ok{color:#1b7f3b;font-weight:600}.g3r-bad{color:#b42318;font-weight:600}.g3r-part{color:#8a5300;font-weight:600}
 .g3r-skip,.g3r-no{color:#8a8985}.g3r-skip{font-size:20px;font-weight:700;line-height:1}
 .g3 p.g3r-why{margin:4px 0;font-size:13px}
+.g3 a.g3-dl{display:inline-flex;align-items:center;gap:6px;font:600 12.5px/1 var(--sans);padding:7px 11px;
+ border-radius:999px;background:var(--accent);color:#fff;text-decoration:none;white-space:nowrap}
+.g3 a.g3-dl:hover{filter:brightness(1.1)}
+.g3 a.g3-dl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.g3 a.g3-dl svg{flex:none}
+.g3 td.dl{white-space:nowrap}
+.g3 td{vertical-align:top}
+.g3 .g3-dlnote{margin:2px 0 8px;font:13px/1.5 var(--sans);color:var(--ink2)}
 """
 
 SCRIPT = r"""
@@ -401,7 +409,8 @@ SCRIPT = r"""
     tip.appendChild(H('div', null, sci(p.l) + ' per round' + (p.hi ? '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')' : '')));
     if (p.e != null) tip.appendChild(H('div', 'm', p.e + ' logical errors in ' + Number(p.sh).toLocaleString() + ' shots'));
     if (p.e != null && c.decoder) tip.appendChild(H('div', 'm', 'Decoded by ' + c.decoder));
-    if (href(p)) tip.appendChild(H('div', 'm', 'Click to open its page: the ions moving, the program against the circuit, the rules and the noise.'));
+    if (href(p)) tip.appendChild(H('div', 'm', 'Click to open its page: the ions moving, the program against the circuit, the rules and the noise.' +
+      (p.z ? ' Its page, and the table below the charts, have its Download and reproduce button.' : '')));
     tip.style.display = 'block'; move(ev);
   }
   function move(ev){ var w = tip.offsetWidth, h = tip.offsetHeight, x = ev.clientX + 14, yy = ev.clientY + 14;
@@ -418,8 +427,8 @@ SCRIPT = r"""
       tr.appendChild(H('td', null, f));
       if (!mine.length) { ['none ran', '', '', ''].forEach(function(s){ tr.appendChild(H('td', null, s)); }); t.appendChild(tr); return; }
       var ft = mine.reduce(function(a, b){ return b.t < a.t ? b : a; }), fl = mine.reduce(function(a, b){ return b.l < a.l ? b : a; });
-      tr.appendChild(named(ft)); tr.appendChild(H('td', 'n', ms(ft.t)));
-      tr.appendChild(named(fl)); tr.appendChild(H('td', 'n', sci(fl.l) + '  (' + sci(fl.lo) + ' to ' + sci(fl.hi) + ')'));
+      tr.appendChild(namedDl(ft)); tr.appendChild(H('td', 'n', ms(ft.t)));
+      tr.appendChild(namedDl(fl)); tr.appendChild(H('td', 'n', sci(fl.l) + '  (' + sci(fl.lo) + ' to ' + sci(fl.hi) + ')'));
       t.appendChild(tr);
     });
     tw.appendChild(t); host.appendChild(tw);
@@ -427,10 +436,18 @@ SCRIPT = r"""
   }
   // every point with its numbers and its "Download and reproduce" zip: the circuit, the machine, the
   // hardware program, the noisy stim circuit and the scripts that sample and decode it again
-  function zipLink(p){ var a = H('a', null, 'Download and reproduce'); a.href = p.z; a.setAttribute('download', p.zn || ''); return a; }
+  function zipLink(p){
+    var a = H('a', 'g3-dl'); a.href = p.z; a.setAttribute('download', p.zn || '');
+    a.title = 'A zip of ' + p.n + ': the circuit (QASM), the machine, the hardware program, the noisy stim circuit and the Python scripts that run it';
+    var ic = E('svg', {width: 12, height: 12, viewBox: '0 0 12 12', 'aria-hidden': 'true'});
+    ic.appendChild(E('path', {d: 'M6 1v7M2.5 5L6 8.5 9.5 5M1.5 11h9', fill: 'none', stroke: '#fff', 'stroke-width': 1.6,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round'}));
+    a.appendChild(ic); a.appendChild(document.createTextNode('Download and reproduce')); return a; }
+  // a point's name with its button under it
+  function namedDl(p){ var td = named(p); if (p.z) { td.appendChild(H('br')); var a = zipLink(p); a.style.marginTop = '5px'; td.appendChild(a); } return td; }
   function zips(host, c){
     var ps = pts(c).filter(function(p){ return p.ref; }), fams = famsOf(c, ps), tw = H('div', 'tw'), t = H('table'), hd = H('tr');
-    ['family', 'size', 'ms / round', 'LER / round (95%)', 'sample', 'files'].forEach(function(s){ hd.appendChild(H('th', null, s)); });
+    ['family', 'size', 'ms / round', 'LER / round (95%)', 'sample', ''].forEach(function(s){ hd.appendChild(H('th', null, s)); });
     t.appendChild(hd);
     var have = 0, all = 0;
     function line(f, p, bad){
@@ -440,7 +457,7 @@ SCRIPT = r"""
       tr.appendChild(H('td', 'n', bad ? 'broke a rule' : sci(p.l) + '  (' + sci(p.lo) + ' to ' + sci(p.hi) + ')'));
       tr.appendChild(H('td', 'n', bad ? '' : p.e + ' in ' + Number(p.sh).toLocaleString()));
       if (p.z) { td.appendChild(zipLink(p)); have++; } else td.textContent = 'not built yet';
-      tr.appendChild(td); t.appendChild(tr);
+      td.className = 'dl'; tr.appendChild(td); t.appendChild(tr);
     }
     fams.forEach(function(f){
       ps.filter(function(p){ return p.f === f; }).sort(function(a, b){ return (a.s || 0) - (b.s || 0); }).forEach(function(p){ line(f, p, false); });
@@ -766,8 +783,9 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "Click any point to open its page: the ions moving on the machine, the program against the circuit, the "
         "rules, and the noise model&rsquo;s stim program block by block.</p>"
         f"<p>Every rate is sampled with a fixed seed and decoded: {_decoders(d)}. "
-        "Each point&rsquo;s files and the scripts that run it again are under "
-        "&ldquo;Every point: download and reproduce&rdquo;, below the charts.</p>"
+        "Every point has a <b>Download and reproduce</b> button, in the tables under the charts and on its own "
+        "page: one zip with its circuit, machine, hardware program, noisy stim circuit and the scripts that run "
+        "it again.</p>"
         f"<div class=\"tw\"><table><tr><th>family</th><th>the machine</th><th>swept</th></tr>{fams}</table></div></details>"
         '<div class="g3" id="g3">'
         '<div class="g3-tabs" id="g3-tabs" role="tablist" aria-label="Code"></div>'
@@ -780,7 +798,11 @@ def page(PAGE: str, STYLE: str) -> str | None:
         '<span><svg width="12" height="12"><path d="M6 0.5l5.5 5.5-5.5 5.5-5.5-5.5z" fill="#8f8e88"/></svg>'
         "submitted entry</span>"
         "<span>Bars: 95% interval</span><span>Click any point to open its page</span></div>"
-        '<details><summary>Each family&rsquo;s best, as a table</summary><div id="g3-table"></div></details>'
+        '<details id="g3-best" open><summary>Each family&rsquo;s best, with its files: download and reproduce</summary>'
+        '<p class="g3-dlnote">Each <b>Download and reproduce</b> button downloads one zip: the circuit (QASM), the '
+        'machine, the hardware program, the stim circuit with its noise, and the Python script that samples and '
+        'decodes it again. Every other size is in the full list below.</p>'
+        '<div id="g3-table"></div></details>'
         '<details id="g3-decbox" hidden><summary>A second decoder, tried on the same shots: beam search</summary>'
         '<div id="g3-dec"></div></details>'
         '<details id="g3-speedbox" open hidden><summary>Against the shuttling speed</summary>'
@@ -807,7 +829,7 @@ def page(PAGE: str, STYLE: str) -> str | None:
         "leakage and background heating all grow with time), and a faster rail is more heat for the next two-ion "
         "gate to meet, or one more cooling before it. It is a simulation assumption, not a measurement of one "
         "machine.</p></details></details>"
-        '<details id="g3-reproduce"><summary>Every point: download and reproduce</summary>'
+        '<details id="g3-reproduce" open><summary>Every point: download and reproduce</summary>'
         "<p>One zip file per point: the code&rsquo;s circuit, the point&rsquo;s machine, its hardware program, the "
         "noisy stim circuit the rate was sampled from, and two Python scripts. The first samples and decodes the "
         "stim circuit again with the point&rsquo;s seed, budget and decoder, and needs only stim, numpy and the "
