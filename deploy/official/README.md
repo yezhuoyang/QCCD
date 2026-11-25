@@ -128,6 +128,23 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-11-25 05:24 UTC, `qccd-official:9ac563f`: the native gate set is a declared
+property of an entry. A bundle names `manifest.gate_set` when its program is in `rzz` (R, VZ and
+RZZ, Quantinuum's set; `ms`, the default, by naming none); the grader checks that the program's
+pulses, its meta and its certificate agree with the declaration and that the board takes the set
+(a release may list `gate_sets`; none listed takes every set); the report, the API's entry rows
+and the leaderboards name a non-default set. The image also carries every commit since `d8211aa`
+(it was the first deploy since 2026-11-09). Derived from `qccd-official:d8211aav` on the droplet,
+COPY only: `qccd/`, `arch/` and `Compiler/bridge` from the git archive of `9ac563f` (1169 files ==
+image) and the published Linux qccdc `9a761f289e00` (`--gate-set ms|rzz`); qcheck, runtime and
+compose unchanged. Census in `/root/qccd-9ac563f`: the rules stage over all 85 stored submissions
+identical in both images; full grades of a GHZ, rep3xz, rep5xz and Goal 3 surface3 entry identical.
+Smoke: a ring design on `rep9@1` compiled by that qccdc in `rzz`, uploaded PRIVATE by the operator
+uploader `deploy-smoke-9ac563f` (quota 2; key revoked, token deleted) as `os_3dc12022c95973c4`:
+eligible, all stages passed, report `gate_set: rzz`, equal to the local grade. Then `worker redraw`
+drew all 86 entry pages (0 failed). Rollback: `.env.bak-d8211aav`, `VERSION.bak-d8211aav`,
+`docker-compose.prod.yml.bak-d8211aav`.
+
 **Deployed** 2026-11-03 17:47 UTC, `qccd-official:167c1cc`: release `bb144@2`, the BB
 [[144,12,12]] board as Bravyi et al.'s syndrome round. The commit, `167c1cc`, is pushed to
 `compiler` and `website/invitations`. The user chose the circuit ("Bravyi's circuit as
