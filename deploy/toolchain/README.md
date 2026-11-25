@@ -117,3 +117,11 @@ included in qccd.academy's HTTPS server block after `qccd-official.conf`.
 First release: version `73864a5c493d`, from commit `3df0d19`, published 2026-09-23. The first
 Windows and Linux checker: `b92bb9c600b2`, from `a1bc1df` (the strict reader), 2026-10-20,
 replaced the same day by `e8acd6640fd3` from `1f80ea8` (a malformed entry says why).
+
+Compiler `8bd2adf9f1f3`, from `61c6b1a`, 2026-11-24 (Windows and Linux): the native gate set option
+`--gate-set ms|rzz` (`qccdc_cli gate-sets`). Against `cd3efedbbc10` on suite@1's public pairs in the
+reference compiler's modes: 106 compiles identical, 50 refused by both; with `--gate-set rzz` the same 106
+compile and no MS is left in any program.
+The same day it was replaced by `9a761f289e00`, from `34aa9c9`: the same compiler source, with
+`Compiler/ocaml/ocamlenv.sh` cleaned of one machine's folder as 57d187b promised for the next release
+(the Linux binary is byte-identical to `8bd2adf9f1f3`'s; the Windows one differs only by its build path).
