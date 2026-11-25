@@ -36,7 +36,7 @@ a noise text that charges a frame change as pulses (qccd-noise@2) the noisier on
 from __future__ import annotations
 
 __all__ = ["GATE_SETS", "DEFAULT", "ENTANGLER", "ENTANGLERS", "NATIVE", "ALL_NATIVE", "KIND",
-           "resolve", "of_program", "entanglers_used", "named", "derive", "label",
+           "resolve", "of_program", "entanglers_used", "named", "derive", "label", "labels",
            "binary_gate_sets", "binary_refusal"]
 
 #: the option's values, the default first
@@ -129,9 +129,18 @@ def entanglers_used(program) -> set:
             if isinstance(i, dict) and i.get("type") == "gate" and i.get("gate") in ENTANGLERS}
 
 
-def label(gate_set: str) -> str:
-    """A gate set in the words a page or a report uses: "rzz (R, VZ, RZZ)"."""
-    return f"{gate_set} ({', '.join(NATIVE[gate_set])})" if gate_set in NATIVE else str(gate_set)
+def label(gate_set: str | None) -> str:
+    """A gate set in the words every page, table, tooltip, zip and report uses: "MS (R, VZ, MS)",
+    "RZZ (R, VZ, RZZ)" (None: the default).  The ONE spelling: a page's script takes its table from
+    `labels()`, never its own."""
+    gs = DEFAULT if gate_set is None else gate_set
+    return f"{ENTANGLER[gs]} ({', '.join(NATIVE[gs])})" if gs in NATIVE else str(gs)
+
+
+def labels() -> dict:
+    """Every set's words, for a page's script: {set: {name, pulses, label}} -- "MS", "R, VZ, MS",
+    "MS (R, VZ, MS)"."""
+    return {s: {"name": ENTANGLER[s], "pulses": ", ".join(NATIVE[s]), "label": label(s)} for s in GATE_SETS}
 
 
 def named(program=None, certificate=None) -> list:

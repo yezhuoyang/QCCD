@@ -842,8 +842,9 @@ class ResultsMixin:
                         "metrics": {k: v.get("value") for k, v in (rep.get("metrics") or {}).items()},
                         "rank_by": rep.get("rank_by"), "evaluator": (rep.get("evaluator") or {}).get("version"),
                         "created_at": s["created_at"], "label": s["label"],
-                        # the native gate set, only when not the default (the report names none then)
-                        **({"gate_set": rep["gate_set"]} if rep.get("gate_set") else {})})
+                        # the native gate set it was graded in: the report names a set that is not
+                        # the default, and a graded report that names none is in ms
+                        "gate_set": rep.get("gate_set") or ("ms" if rep else None)})
         return out
 
     def _board_title(self, release_id: str) -> str:

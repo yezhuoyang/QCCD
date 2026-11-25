@@ -770,6 +770,7 @@ def board_index(ts: list[dict], goals: bool = True) -> str:
     at the end (`qec_cycle`)."""
     from . import boards, cowork, leaderboard, qec_cycle
     rows_html, cycles = [], []
+    _ids = leaderboard.board_ids()          # each board's release: the gate sets it takes
     # a memory board ranks by the logical error rate, not by the round's time: it is shown
     # in the memory section (boards.memory_section), with its own ranking, not as a time row
     for t in (t for t in ts if t.get("rank_by") != "ler_per_round"):
@@ -812,7 +813,10 @@ def board_index(ts: list[dict], goals: bool = True) -> str:
         rows_html.append(
             f'<section class="task" id="{t["id"]}"><div><h2><a href="{t["id"]}/">{html.escape(t["title"])}</a></h2>'
             f'<p class="desc">{html.escape(t.get("description", ""))}</p>'
-            f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p></div>'
+            # the native gate sets the board takes (every entry's own is a column of its list)
+            + (f'<p class="desc">{html.escape(leaderboard.takes_words(_ids[t["id"]]["gate_sets"]))}</p>'
+               if t["id"] in _ids else "")
+            + f'<p class="more"><a href="{t["id"]}/">Open the ranking plot &rarr;</a></p></div>'
             f'<div><div class="bars">{"".join(bars)}</div>{ref}<div class="stats">{stats}</div>'
             f'{qec_cycle.board_block(_t(best) * 1000.0 if best else None)}'
             # take part: "Try your own design", and the people's submissions with who made them (leaderboard.py)

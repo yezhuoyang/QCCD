@@ -50,6 +50,7 @@ import sys
 import time
 import webbrowser
 from pathlib import Path
+from ..ir.gate_sets import label as gate_set_label
 
 __all__ = ["main", "COMMANDS"]
 
@@ -456,8 +457,8 @@ def cmd_submit(a) -> int:
         sub = _call(info, "GET", f"/api/submissions/{s['submission_id']}")
         rep = sub.get("report") or {}
         print(f"{sub['status']}  " + "  ".join(f"{st['id']}={st['status']}" for st in rep.get("stages", [])))
-        if rep.get("gate_set") not in (None, "ms"):
-            print(f"  native gate set {rep['gate_set']} (the bundle declares it; ms is the default)")
+        if rep:
+            print(f"  native gate set {gate_set_label(rep.get('gate_set'))}")
         c = rep.get("conformance") or {}
         if c and not c.get("board"):
             r, ph = c.get("rules") or {}, c.get("physics") or {}
@@ -490,8 +491,7 @@ def cmd_leaderboard(a) -> int:
         for i, r in enumerate(b["rows"], 1):
             own = "" if (r.get("conformance") or {}).get("board", True) else \
                 f"  (own rules: {((r.get('conformance') or {}).get('rules') or {}).get('set')})"
-            if r.get("gate_set") not in (None, "ms"):
-                own += f"  (gate set {r['gate_set']})"
+            own = f"  {gate_set_label(r.get('gate_set'))}" + own
             print(f"  {i:3d}. {r.get('display_name') or r['id']:32s} {r.get('rank_value')!s:>12}  by {r.get('by') or '-'}{own}")
         more = ((b.get("counts") or {}).get("all") or 0) - ((b.get("counts") or {}).get("board") or 0)
         if more > 0 and a.rules != "all":
@@ -511,7 +511,8 @@ def cmd_leaderboard(a) -> int:
     print(f"{b['label']}: {b.get('board') or b['task']}, ranked by {b['rank_by']} ({b['better']} is better)")
     for r in b["rows"]:
         print(f"  {r.get('design') or r['branch']:24s} r{r['revision']:<4} {r['status']:10s} "
-              f"{'stale' if r['stale'] else 'current':8s} {r['metrics'].get(b['rank_by'])}")
+              f"{'stale' if r['stale'] else 'current':8s} {gate_set_label(r.get('gate_set')):16s} "
+              f"{r['metrics'].get(b['rank_by'])}")
     return 0
 
 
@@ -560,7 +561,7 @@ def cmd_grade(a) -> int:
         return 0 if (rep.get("eligibility") or {}).get("eligible") else 1
     el = (rep.get("eligibility") or {})
     print(f"{rel.title} ({rel.id}): {'eligible' if el.get('eligible') else 'not eligible'}"
-          + (f", native gate set {rep['gate_set']}" if rep.get("gate_set") else ""))
+          + f", native gate set {gate_set_label(rep.get('gate_set'))}")
     for s in rep.get("stages", []):
         print(f"  {s['id']:22s} {s['status']}")
         if s["status"] != "passed":

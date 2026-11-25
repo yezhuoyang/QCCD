@@ -56,8 +56,8 @@ CSS = """
 .lbx-rules{font:13px/1.5 var(--sans,system-ui,sans-serif);color:#56545e;margin:6px 0 0}
 .lbx-rules a{margin-left:4px}
 .lbx-ownnote{font:13px/1.5 var(--sans,system-ui,sans-serif);color:#8a5300;margin:2px 0 8px}
-.lbx-gs{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#eaf1fb;color:#1f4f8f;
- font:600 11px/1.5 var(--sans,system-ui,sans-serif);white-space:nowrap;cursor:help}
+.lbx-live td.lbx-gs{white-space:nowrap;color:#1f4f8f;cursor:help}
+.lbx-takes{font:12.5px/1.4 var(--sans,system-ui,sans-serif);color:#56545e}
 #lbx-pop{position:absolute;z-index:1200;width:min(420px,calc(100vw - 24px));background:#fff;border:1px solid #cfceca;
  border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.18);padding:14px 16px;font:14px/1.5 var(--sans,system-ui,sans-serif);
  color:#1d1d1b}
@@ -84,11 +84,19 @@ HINTS = {
 }
 
 
+def takes_words(sets) -> str:
+    """Which native gate sets a board takes, in the page's words: "Gate set: MS (R, VZ, MS) or RZZ
+    (R, VZ, RZZ)." (`TaskRelease.gate_sets`, worded by `qccd.ir.gate_sets.label`)."""
+    from ..ir import gate_sets
+    sets = list(sets or gate_sets.GATE_SETS)
+    return "Gate set: " + " or ".join(gate_sets.label(g) for g in sets) + ("." if len(sets) > 1 else " only.")
+
+
 def board_ids() -> dict:
     """task (a board's section id on /board/) -> the official release id and title the server ranks."""
     try:
         from ..workspace.tasks import list_boards
-        return {b.manifest["task"]: {"id": b.id, "title": b.title} for b in list_boards()}
+        return {b.manifest["task"]: {"id": b.id, "title": b.title, "gate_sets": list(b.gate_sets)} for b in list_boards()}
     except Exception:                       # the workspace package is optional for a site build
         return {}
 
@@ -138,11 +146,12 @@ SCRIPT = r"""
       return x.replace(/^primitives\./, '').replace('.curve_by_degree.', ' degree '); }).join(', '));
     return bits.join(' · ');
   }
-  // the native gate set an entry's program is in, when it is not the default (ms: R, VZ, MS)
-  var GATE_SETS = {ms: 'R, VZ, MS', rzz: 'R, VZ, RZZ'};
-  function gsNote(g){ return (g && g !== 'ms') ? 'gate set ' + String(g).toUpperCase() : ''; }
-  function gsWords(g){ return 'native gate set ' + g + (GATE_SETS[g] ? ': ' + GATE_SETS[g] : '') +
-    ' (the default is ms: ' + GATE_SETS.ms + '); its entangling pulse is priced and noised as the two-qubit gate'; }
+  // the native gate set every entry's program is in, the default (MS) named as plainly as RZZ
+  // every set's words, from qccd.ir.gate_sets.labels(): "MS (R, VZ, MS)", "RZZ (R, VZ, RZZ)"
+  var GATE_SETS = __GATE_SETS__;
+  function gsLabel(g){ var x = GATE_SETS[g || 'ms']; return x ? x.label : String(g); }
+  function gsWords(g){ return 'native gate set ' + gsLabel(g) + '; its entangling pulse is priced and noised as the two-qubit gate'; }
+  function gsTakes(sets){ return (sets && sets.length ? sets : Object.keys(GATE_SETS)).map(gsLabel).join(' or '); }
   // "Try your own design": into the person's own workspace, focused on this board
   function studioURL(task){ return (window.QCCD_MIRROR ? '/studio' : LOCAL) + '?board=' + encodeURIComponent(task); }
   var pop = null;
@@ -208,6 +217,7 @@ SCRIPT = r"""
     sel.value = main.name; lab.appendChild(sel); bar.appendChild(lab);
     var pick = rulesPick(box, task, lb); if (pick) bar.appendChild(pick);
     bar.appendChild(el('span', 'lbx-n', rows.length + (rows.length === 1 ? ' design' : ' designs')));
+    bar.appendChild(el('span', 'lbx-takes', 'gate set: ' + gsTakes(lb.gate_sets)));
     var wrap = el('div', 'lbx-tw'); box.appendChild(bar); box.appendChild(wrap);
     function open(r){ return CHARTS.indexOf(task) >= 0 ? task + '/?sel=c-' + encodeURIComponent(r.id)
                                                          : API + '/submissions/' + encodeURIComponent(r.id) + '/page'; }
@@ -215,7 +225,7 @@ SCRIPT = r"""
       var m = ms.filter(function(x){ return x.name === sel.value; })[0] || main, k = m.name;
       var xs = rows.filter(function(r){ return has(r, k); }).sort(function(a, b){
         var d = a.metrics[k] - b.metrics[k]; return m.better === 'high' ? -d : d; });
-      var tb = el('table'), hd = el('tr'), cols = ['#', 'design', 'by', nice(m) + (unitOf(m) ? ' (' + unitOf(m) + ')' : '')];
+      var tb = el('table'), hd = el('tr'), cols = ['#', 'design', 'by', 'gate set', nice(m) + (unitOf(m) ? ' (' + unitOf(m) + ')' : '')];
       if (k !== main.name) cols.push(nice(main));
       cols.push('submitted', '');
       cols.forEach(function(c){ hd.appendChild(el('th', null, c)); });
@@ -227,9 +237,9 @@ SCRIPT = r"""
         a0.href = open(r); td0.appendChild(a0);
         var own = ownNote(r.conformance);
         if (own) { var tg = el('span', 'lbx-own', 'own rules'); tg.title = own; td0.appendChild(tg); }
-        if (gsNote(r.gate_set)) { var tgs = el('span', 'lbx-gs', gsNote(r.gate_set)); tgs.title = gsWords(r.gate_set); td0.appendChild(tgs); }
         tr.appendChild(td0);
         tr.appendChild(el('td', 'lbx-by', r.by || '-'));
+        var tgs = el('td', 'lbx-gs', gsLabel(r.gate_set)); tgs.title = gsWords(r.gate_set); tr.appendChild(tgs);
         tr.appendChild(el('td', 'n', fmt(r.metrics[k])));
         if (k !== main.name) tr.appendChild(el('td', 'n', fmt((r.metrics || {})[main.name])));
         tr.appendChild(el('td', null, day(r.created_at)));
@@ -326,11 +336,12 @@ CHART_SCRIPT = r"""
       return x.replace(/^primitives\./, '').replace('.curve_by_degree.', ' degree '); }).join(', '));
     return bits.join(' · ');
   }
-  // the native gate set an entry's program is in, when it is not the default (ms: R, VZ, MS)
-  var GATE_SETS = {ms: 'R, VZ, MS', rzz: 'R, VZ, RZZ'};
-  function gsNote(g){ return (g && g !== 'ms') ? 'gate set ' + String(g).toUpperCase() : ''; }
-  function gsWords(g){ return 'native gate set ' + g + (GATE_SETS[g] ? ': ' + GATE_SETS[g] : '') +
-    ' (the default is ms: ' + GATE_SETS.ms + '); its entangling pulse is priced and noised as the two-qubit gate'; }
+  // the native gate set every entry's program is in, the default (MS) named as plainly as RZZ
+  // every set's words, from qccd.ir.gate_sets.labels(): "MS (R, VZ, MS)", "RZZ (R, VZ, RZZ)"
+  var GATE_SETS = __GATE_SETS__;
+  function gsLabel(g){ var x = GATE_SETS[g || 'ms']; return x ? x.label : String(g); }
+  function gsWords(g){ return 'native gate set ' + gsLabel(g) + '; its entangling pulse is priced and noised as the two-qubit gate'; }
+  function gsTakes(sets){ return (sets && sets.length ? sets : Object.keys(GATE_SETS)).map(gsLabel).join(' or '); }
   function rulesLine(lb){
     var cnt = lb.counts || {}, others = (cnt.all || 0) - (cnt.board || 0), blk = document.querySelector('.lbx');
     if (!blk || !(others > 0 || RULES === 'all')) return;
@@ -380,6 +391,29 @@ CHART_SCRIPT = r"""
       METRICS.forEach(function(m){ var o = E('option', null, m.name); o.value = m.k; s.appendChild(o); });
     });
   }
+  // every point's gate set: an official entry's from the server, the study's own as its row says
+  // (the study compiles to the default, MS, unless a row names another)
+  function gsOf(d){ return (d && (d.gs || d.gate_set)) || 'ms'; }
+  if (typeof tip === 'function') {
+    var _tip0 = tip;
+    tip = function(ev, d){ _tip0.apply(null, arguments); var t = $('tip'); if (!t || !d) return;
+      t.appendChild(document.createElement('br')); t.appendChild(E('span', null, 'gate set ' + gsLabel(gsOf(d)))); };
+  }
+  var _detail0 = detail;
+  detail = function(d){ _detail0(d); if (!d || d.community) return;
+    var t = $('detail') && $('detail').querySelector('table');
+    if (t) t.appendChild(row('gate set', gsLabel(gsOf(d)))); };
+  var _table0 = table;
+  table = function(){ _table0();
+    // the study's table, until the server's entries join it: one more column, every row's set
+    var t = $('tablewrap') && $('tablewrap').querySelector('table');
+    if (!t) return;
+    var trs = t.querySelectorAll('tr'), sets = {};
+    DATA.forEach(function(d){ sets[gsOf(d)] = 1; });
+    var one = Object.keys(sets).length === 1 ? Object.keys(sets)[0] : null;
+    [].forEach.call(trs, function(tr, i){ tr.appendChild(E(i ? 'td' : 'th', null, i ? (one ? gsLabel(one) : '–') : 'gate set')); });
+  };
+  if (typeof VIEW !== 'undefined' && VIEW === 'table') table();     // drawn before this layer ran
   var path = (B.goal ? '/goals/' + encodeURIComponent(B.goal) : '/leaderboard/' + encodeURIComponent(B.id))
            + (RULES === 'all' ? '?rules=all' : '');
   fetch(API + path, {headers: {'Accept': 'application/json'}}).then(function(r){
@@ -524,7 +558,7 @@ CHART_SCRIPT = r"""
       }
       if (d.ler && d.ler.shots) tb.appendChild(row('sample', d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() + ' shots'));
       if (d.ler && decoderOf(d)) tb.appendChild(row('decoder', decoderOf(d)));
-      if (gsNote(d.gs)) tb.appendChild(row('gate set', d.gs.toUpperCase() + ' (' + (GATE_SETS[d.gs] || d.gs) + ')'));
+      tb.appendChild(row('gate set', gsLabel(gsOf(d))));
       METRICS.forEach(function(m){
         if (val(d, m.k) == null || (d.exp && SIZE.indexOf(m.k) >= 0)) return;
         var tr = row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m));
@@ -541,7 +575,7 @@ CHART_SCRIPT = r"""
     // the table names who each design is by (and, on a goal's page, its code); the measures are the server's
     table = function(){
       var w = $('tablewrap'); w.innerHTML = ''; var yk = ysel.value;
-      var cols = tcols.map(metric).filter(Boolean), lead = B.goal ? ['#', 'design', 'by', 'code', 'ions'] : ['#', 'design', 'by', 'family'];
+      var cols = tcols.map(metric).filter(Boolean), lead = B.goal ? ['#', 'design', 'by', 'code', 'ions', 'gate set'] : ['#', 'design', 'by', 'family', 'gate set'];
       var t = E('table', 'tbl'), tr = E('tr');
       lead.concat(cols.map(function(m){ return m.name.split(' — ')[1] || m.name; })).forEach(function(h, i){
         var th = E('th', null, h), c = cols[i - lead.length];
@@ -555,9 +589,10 @@ CHART_SCRIPT = r"""
                                            DATA.filter(function(d){ return !d.compiled; }));
       all.forEach(function(d){
         var r = E('tr'); if (SEL === d.key) r.className = 'sel'; var i = rk.indexOf(d);
-        var head = [i >= 0 ? String(i + 1) : '–', d.community ? d.title + (ownNote(d.conf) ? ' (own rules)' : '') + (gsNote(d.gs) ? ' (' + gsNote(d.gs) + ')' : '') : shortName(d),
+        var head = [i >= 0 ? String(i + 1) : '–', d.community ? d.title + (ownNote(d.conf) ? ' (own rules)' : '') : shortName(d),
                     d.community ? d.by : 'the QCCD study'];
         head = head.concat(B.goal ? [d.code || '', d.exp ? String(d.exp.ions) : ''] : [d.community ? 'submitted' : d.family]);
+        head.push(gsLabel(gsOf(d)));
         head.concat(cols.map(function(m){ return fmt(val(d, m.k), m); })).forEach(function(v){ r.appendChild(E('td', null, v)); });
         if (zips) { var zc = E('td');
           if (d.zip && typeof zipLink === 'function') { var zl = zipLink(d, 'dl'); zl.onclick = function(ev){ ev.stopPropagation(); }; zc.appendChild(zl); }
@@ -618,7 +653,9 @@ def with_submissions(page: str, task: str, title: str) -> str:
     if not b or "</body>" not in page:
         return page
     block = board_block(task, title, seed_note=False, live=False, root="../../")
-    return _with_layer(_short(page), {"id": b["id"], "task": task}, block, task)
+    page = _short(page).replace(f'<p class="sub">{BOARD_SUB}</p>',
+                                f'<p class="sub">{BOARD_SUB} {html.escape(takes_words(b["gate_sets"]))}</p>', 1)
+    return _with_layer(page, {"id": b["id"], "task": task}, block, task)
 
 
 # ------------------------------------------------------------------ a goal: one ranking across codes
@@ -670,7 +707,8 @@ def goal_page(page: str, goal: str = "goal1") -> str | None:
     page = re.sub(r"<h1>[^<]*</h1>", f"<h1>{html.escape(h1)}</h1>", page, count=1)
     page = re.sub(r'(<h1>[^<]*</h1>\s*<p class="sub">)[^<]*(</p>)',
                   lambda m: m.group(1) + html.escape(GOAL_SUB.format(max_ions=g["max_ions"], codes=codes,
-                                                                     noise=g["noise"])) + m.group(2), page, count=1)
+                                                                     noise=g["noise"]) + " " + takes_words(None))
+                  + m.group(2), page, count=1)
     page = re.sub(r"var DATA = \[.*?\];\n", "var DATA = [];\n", page, count=1, flags=re.S)
     page = re.sub(r'<section class="dq" id="disqualified">.*?</section>', "", page, count=1, flags=re.S)
     page = page.replace("Click a dot to see the design's numbers, its claim, and the steps to check it on.",
@@ -702,6 +740,8 @@ GOAL_TABLE_SCRIPT = r"""
   if (!box || typeof fetch !== 'function') return;
   function el(t, c, x){ var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
   function fmt(v){ return typeof v === 'number' ? v.toExponential(2) : '–'; }
+  var GATE_SETS = __GATE_SETS__;
+  function gsLabel(g){ var x = GATE_SETS[g || 'ms']; return x ? x.label : String(g); }
   fetch('/official/v1/goals/goal1', {headers: {'Accept': 'application/json'}}).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function(g){
     var best = {};
@@ -710,7 +750,7 @@ GOAL_TABLE_SCRIPT = r"""
       var x = best[a.id], y = best[b.id];
       return x && y ? x.rank_value - y.rank_value : (x ? -1 : y ? 1 : (a.ions || 0) - (b.ions || 0)); });
     var t = el('table'), hd = el('tr');
-    ['code', 'ions', 'logical qubits', 'ions per logical qubit', 'entries', 'best, per round per logical qubit', 'design', 'by'].forEach(function(h){
+    ['code', 'ions', 'logical qubits', 'ions per logical qubit', 'entries', 'best, per round per logical qubit', 'design', 'by', 'gate set'].forEach(function(h){
       hd.appendChild(el('th', null, h)); });
     var th = el('thead'); th.appendChild(hd); t.appendChild(th);
     var tb = el('tbody');
@@ -722,9 +762,9 @@ GOAL_TABLE_SCRIPT = r"""
       tr.appendChild(el('td', 'n', rel.k && rel.ions ? (rel.ions / rel.k).toFixed(1) : '–'));
       tr.appendChild(el('td', 'n', String(rel.entries || 0)));
       tr.appendChild(el('td', 'n', b ? fmt(b.rank_value) : '–'));
-      tr.appendChild(el('td', null, b ? (b.display_name || b.id) + (b.gate_set && b.gate_set !== 'ms'
-        ? ' (gate set ' + String(b.gate_set).toUpperCase() + ')' : '') : 'no entry yet'));
+      tr.appendChild(el('td', null, b ? (b.display_name || b.id) : 'no entry yet'));
       tr.appendChild(el('td', null, b ? (b.by || '–') : ''));
+      tr.appendChild(el('td', null, b ? gsLabel(b.gate_set) : ''));
       tb.appendChild(tr);
     });
     t.appendChild(tb); box.textContent = ''; var w = el('div', 'g1w'); w.appendChild(t); box.appendChild(w);
@@ -884,3 +924,12 @@ window.QCCD_HINTS = Object.assign(window.QCCD_HINTS || {}, {
 
 def connect_page(PAGE: str, STYLE: str) -> str:
     return PAGE.format(title="Connect a workspace - QCCD studio", style=STYLE, extra_css=CONNECT_CSS, body=CONNECT_BODY)
+
+
+# every script names a gate set in qccd.ir.gate_sets' words, from its one table
+def _with_gate_sets(js: str) -> str:
+    from ..ir import gate_sets
+    return js.replace("__GATE_SETS__", json.dumps(gate_sets.labels()))
+
+
+SCRIPT, CHART_SCRIPT, GOAL_TABLE_SCRIPT = (_with_gate_sets(x) for x in (SCRIPT, CHART_SCRIPT, GOAL_TABLE_SCRIPT))

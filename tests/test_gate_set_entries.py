@@ -125,7 +125,7 @@ def test_an_rzz_bundle_grades_eligible_with_its_gate_set_recorded(graded):
     assert rep["eligibility"]["eligible"], rep["eligibility"]
     assert rep["gate_set"] == "rzz"
     prog = _stage(rep, "program")
-    assert prog["detail"]["gate_set"] == "rzz" and "rzz (R, VZ, RZZ)" in prog["coverage"]
+    assert prog["detail"]["gate_set"] == "rzz" and "RZZ (R, VZ, RZZ)" in prog["coverage"]
     # R10's two halves and the noisy circuit read the RZZ pulses
     assert _stage(rep, "semantics")["detail"]["o2_semantics"] == "ok"
     assert _stage(rep, "lean_certificate")["status"] == "passed"
@@ -240,18 +240,39 @@ global.document = {createElement: function(t){ return new N(t); }, body: new N('
 var LB = __LB__;
 global.fetch = function(url){ return Promise.resolve({ok: true, json: function(){
   return Promise.resolve(/\/tasks$/.test(url) ? {tasks: [{id: 'b@1'}]} : LB); }}); };
-function walk(n, out){ if (n.className === 'lbx-gs') out.push([n.textContent, n.title]); n.children.forEach(function(c){ walk(c, out); }); return out; }
+function walk(n, out){ if (n.className === 'lbx-gs' || n.className === 'lbx-takes' || n.tag === 'th')
+  out.push([n.className || n.tag, n.textContent, n.title]); n.children.forEach(function(c){ walk(c, out); }); return out; }
 """
 
 
+def test_one_label_names_every_set():
+    """The words every surface uses, from one helper (`gate_sets.label`, `labels()` for a script)."""
+    assert gate_sets.label("ms") == gate_sets.label(None) == "MS (R, VZ, MS)"
+    assert gate_sets.label("rzz") == "RZZ (R, VZ, RZZ)"
+    assert gate_sets.labels()["ms"] == {"name": "MS", "pulses": "R, VZ, MS", "label": "MS (R, VZ, MS)"}
+    from qccd.site import goal3, leaderboard
+    for js in (leaderboard.SCRIPT, leaderboard.CHART_SCRIPT, leaderboard.GOAL_TABLE_SCRIPT):
+        assert "__GATE_SETS__" not in js and json.dumps(gate_sets.labels()) in js
+    assert "__GATE_SETS__" in goal3.SCRIPT            # filled in by goal3.page with the same table
+    # the workspace panel's own table says the same words
+    cowork = (ROOT / "qccd" / "workspace" / "web" / "cowork.js").read_text(encoding="utf-8")
+    for g in gate_sets.GATE_SETS:
+        assert f"'{gate_sets.label(g)} · " in cowork
+    assert "GATE_SET_JOBS = ['compile', 'run', 'submit', 'ler']" in cowork
+    assert leaderboard.takes_words(None) == "Gate set: MS (R, VZ, MS) or RZZ (R, VZ, RZZ)."
+    assert leaderboard.takes_words(["ms"]) == "Gate set: MS (R, VZ, MS) only."
+
+
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
-def test_the_board_s_list_tags_an_rzz_entry_and_not_an_ms_one(tmp_path):
+def test_the_board_s_list_names_every_entry_s_gate_set(tmp_path):
+    """The board's list: a gate set column on every row, an ms entry (and one from before the API
+    named it) as plainly as an rzz one, and the sets the board takes in its bar."""
     from qccd.site import leaderboard
     row = lambda i, gs: {"id": i, "display_name": i, "by": "ada", "created_at": 0, "rank_value": 1.0,  # noqa: E731
                          "metrics": {"ler_per_round": 1e-3}, "conformance": {"board": True}, "gate_set": gs}
     lb = {"rows": [row("x_rzz", "rzz"), row("x_ms", "ms"), {**row("x_old", None)}], "metrics": [
         {"name": "ler_per_round", "better": "low", "unit": "per round"}], "rank_by": "ler_per_round",
-        "better": "low", "counts": {"board": 3, "all": 3}, "rules": "board"}
+        "better": "low", "counts": {"board": 3, "all": 3}, "rules": "board", "gate_sets": ["ms", "rzz"]}
     js = (_DOM.replace("__LB__", json.dumps(lb))
           + leaderboard.SCRIPT.replace("__BOARDS__", json.dumps({"b": {"id": "b@1", "title": "B"}}))
           .replace("__LOCAL__", '""').replace("__CHARTS__", "[]")
@@ -260,18 +281,30 @@ def test_the_board_s_list_tags_an_rzz_entry_and_not_an_ms_one(tmp_path):
     f.write_text(js, encoding="utf-8")
     r = subprocess.run(["node", str(f)], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
-    tags = json.loads(r.stdout.strip().splitlines()[-1])
-    assert len(tags) == 1 and tags[0][0] == "gate set RZZ" and "R, VZ, RZZ" in tags[0][1], tags
+    got = json.loads(r.stdout.strip().splitlines()[-1])
+    cells = [x for x in got if x[0] == "lbx-gs"]
+    assert [c[1] for c in cells] == ["RZZ (R, VZ, RZZ)", "MS (R, VZ, MS)", "MS (R, VZ, MS)"], got
+    assert all("native gate set" in c[2] for c in cells)
+    assert ["th", "gate set", ""] in got
+    assert ["lbx-takes", "gate set: MS (R, VZ, MS) or RZZ (R, VZ, RZZ)", ""] in got
 
 
-def test_the_ranking_charts_and_goal_3_show_an_entry_s_gate_set(monkeypatch, tmp_path):
+def test_the_ranking_charts_and_goal_3_name_every_gate_set(monkeypatch, tmp_path):
     from qccd.site import goal3, leaderboard
-    # a ranking chart's entry: its detail and its table name the set
-    assert "gs: r.gate_set || 'ms'" in leaderboard.CHART_SCRIPT
-    assert "row('gate set'" in leaderboard.CHART_SCRIPT and "gsNote(d.gs)" in leaderboard.CHART_SCRIPT
-    # Goal 1's table, an official entry on Goal 3, and a reference row compiled to rzz
-    assert "b.gate_set" in leaderboard.GOAL_TABLE_SCRIPT
-    assert "gs: e.gate_set" in goal3.SCRIPT and "'Gate set ' + p.gs.toUpperCase()" in goal3.SCRIPT
+    # a ranking chart: the detail, the table, the tooltip and the study's own points, every one
+    c = leaderboard.CHART_SCRIPT
+    assert "gs: r.gate_set || 'ms'" in c and "tb.appendChild(row('gate set', gsLabel(gsOf(d))));" in c
+    assert "head.push(gsLabel(gsOf(d)));" in c and "'gate set ' + gsLabel(gsOf(d))" in c
+    assert "['#', 'design', 'by', 'family', 'gate set']" in c and "'ions', 'gate set']" in c
+    # Goal 1's table and Goal 3's page
+    assert "'design', 'by', 'gate set']" in leaderboard.GOAL_TABLE_SCRIPT
+    assert "tr.appendChild(el('td', null, b ? gsLabel(b.gate_set) : ''));" in leaderboard.GOAL_TABLE_SCRIPT
+    g3 = goal3.SCRIPT
+    assert "gs: e.gate_set || 'ms'" in g3 and "'Gate set ' + gsLabel(p.gs)" in g3
+    assert "Compiled to ' + gsSet(c.gate_sets)" in g3 and "'; decoded by ' + c.decoder" in g3
+    for head in ("['family', 'gate set', 'fastest'", "['family', 'size', 'gate set', 'ms / round'",
+                 "['family', 'size', 'gate set', 'why']", "'family, size, gate set'"):
+        assert head in g3, head
     g = tmp_path / "goal3"
     (g / "results").mkdir(parents=True)
     shutil.copy(goal3.GOAL / "families.py", g / "families.py")
@@ -283,36 +316,63 @@ def test_the_ranking_charts_and_goal_3_show_an_entry_s_gate_set(monkeypatch, tmp
     monkeypatch.setattr(goal3, "GOAL", g)
     d = goal3.data()
     pts = {p["n"]: p for c in d["codes"] for p in c["points"]}
-    assert pts[row["point"] + "_rzz"]["gs"] == "rzz" and "gs" not in pts[row["point"]]
+    assert pts[row["point"] + "_rzz"]["gs"] == "rzz" and pts[row["point"]]["gs"] == "ms"
+    code = next(c for c in d["codes"] if c["points"])
+    assert code["gate_sets"] == ["ms", "rzz"]
+    assert all(c["gate_sets"] == ["ms"] for c in d["codes"] if not c["points"] and not c["failed"])
+    assert goal3._gs_words(d) == "MS gate set (R, VZ, MS) and RZZ gate set (R, VZ, RZZ)"
 
 
 # ------------------------------------------------------------------ the zip
 
 
+def _zip_point(rel, parts, rep, gs):
+    from qccd.qec import reproduce as R
+    doc, prog, certified, cert, w = parts
+    (w / "final.tsir.json").write_text(json.dumps(prog), encoding="utf-8")
+    (w / "cert.json").write_text(json.dumps(cert), encoding="utf-8")
+    return R.Point(board="c2lr_rep5_mem_basr", board_title=rel.title, entry=f"c2lr5x2_{gs}",
+                   title=f"C2LR 5x2, {gs}", qasm=rel.circuit_path, machine=w / "device.arch.json",
+                   program=w / "final.tsir.json", certificate=w / "cert.json", release=rel.id,
+                   ler=_stage(rep, "ler")["detail"]["ler"], rule_set="c2lr", replay_rules=False,
+                   family="C2LR", compiler="the baseline C2LR router", gate_set=gs)
+
+
+def test_an_ms_zip_states_its_gate_set_too(built, graded, tmp_path):
+    from qccd.qec import reproduce as R
+    rel, out = built
+    data, info = R.build(_zip_point(rel, out["ms"], graded["ms"][1], "ms"))
+    assert {k: info["gate_set"][k] for k in ("name", "pulses", "label")} == \
+        {"name": "ms", "pulses": ["R", "VZ", "MS"], "label": "MS (R, VZ, MS)"}
+    folder = tmp_path / "z"
+    zipfile.ZipFile(io.BytesIO(data)).extractall(folder)
+    assert "| native gate set | **MS (R, VZ, MS)** (`ms`; the default) |" in \
+        (folder / "README.md").read_text(encoding="utf-8")
+    pytest.importorskip("stim")
+    r = subprocess.run([sys.executable, "-I", str(folder / "run.py"), "--shots", "2000"], cwd=str(folder),
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
+    assert "gate set  MS (R, VZ, MS)" in r.stdout, r.stdout + r.stderr
+
+
+
 def test_the_zip_records_the_gate_set_and_regenerate_rebuilds_the_rzz_point(built, graded, tmp_path):
     from qccd.qec import reproduce as R
     rel, out = built
-    _, rep = graded["rzz"]
-    doc, prog, certified, cert, w = out["rzz"]
-    (w / "final.tsir.json").write_text(json.dumps(prog), encoding="utf-8")
-    (w / "cert.json").write_text(json.dumps(cert), encoding="utf-8")
-    point = R.Point(board="c2lr_rep5_mem_basr", board_title=rel.title, entry="c2lr5x2_rzz",
-                    title="C2LR 5x2, rzz", qasm=rel.circuit_path, machine=w / "device.arch.json",
-                    program=w / "final.tsir.json", certificate=w / "cert.json", release=rel.id,
-                    ler=_stage(rep, "ler")["detail"]["ler"], rule_set="c2lr", replay_rules=False,
-                    family="C2LR", compiler="the baseline C2LR router", gate_set="rzz")
+    point = _zip_point(rel, out["rzz"], graded["rzz"][1], "rzz")
     data, info = R.build(point)
-    assert info["gate_set"] == {"name": "rzz", "pulses": ["R", "VZ", "RZZ"], "note": info["gate_set"]["note"]}
+    assert {k: info["gate_set"][k] for k in ("name", "pulses", "label")} == \
+        {"name": "rzz", "pulses": ["R", "VZ", "RZZ"], "label": "RZZ (R, VZ, RZZ)"}
     folder = tmp_path / "z"
     zipfile.ZipFile(io.BytesIO(data)).extractall(folder)
     assert json.loads((folder / "experiment.json").read_text(encoding="utf-8"))["gate_set"]["name"] == "rzz"
-    assert "| native gate set | `rzz`: R, VZ, RZZ" in (folder / "README.md").read_text(encoding="utf-8")
+    assert "| native gate set | **RZZ (R, VZ, RZZ)** (`rzz`; Quantinuum's set" in \
+        (folder / "README.md").read_text(encoding="utf-8")
     import os
     env = {**os.environ, "PYTHONPATH": str(ROOT)}
     r = subprocess.run([sys.executable, str(folder / "regenerate.py")], cwd=str(folder), env=env,
                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "gate set  rzz (R, VZ, RZZ)   identical" in r.stdout and "identical to circuit.stim" in r.stdout
+    assert "gate set  RZZ (R, VZ, RZZ)   identical" in r.stdout and "identical to circuit.stim" in r.stdout
     assert "REPRODUCED: everything computed is identical." in r.stdout
     # a row that says ms, with an rzz program in its folder, is refused
     with pytest.raises(R.ReproduceError, match="gate set"):
