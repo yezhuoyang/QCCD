@@ -31,7 +31,7 @@
     {
       id: 'rules-wise',
       title: 'Parallel switched swaps (WISE)',
-      blurb: 'What a WISE chip may do: one parity and one kind of operation across the chip in a step, a swap between a pair's two zones, one gate at one angle in a layer, and a shim charge before every layer.',
+      blurb: 'What a WISE chip may do: one parity and one kind of operation across the chip in a step, a swap between a pair’s two zones, one gate at one angle in a layer, and a shim charge before every layer.',
       rules: ['W1', 'W2', 'W4', 'W5', 'W10', 'W11']
     },
     {

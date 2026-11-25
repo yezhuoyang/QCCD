@@ -301,6 +301,16 @@ def test_every_rule_on_the_rules_page_has_a_category_and_the_site_groups_them():
     assert "Static &amp; occupancy" not in page and "'Static & occupancy'" in page and "#rule-categories" in page
 
 
+def test_every_workspace_web_script_parses():
+    """An apostrophe inside a single-quoted string (a profile's blurb) stopped the Rules page's script."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("no node on PATH")
+    for js in sorted((REPO / "qccd" / "workspace" / "web").glob("*.js")):
+        r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True)
+        assert r.returncode == 0, f"{js.name}: {r.stderr[:400]}"
+
+
 def test_the_mirror_serves_pages_and_nothing_else(svc):
     ws, state, c, w = svc
     r = w.get("/web/rules/")
