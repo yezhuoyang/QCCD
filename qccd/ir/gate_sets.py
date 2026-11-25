@@ -36,7 +36,8 @@ a noise text that charges a frame change as pulses (qccd-noise@2) the noisier on
 from __future__ import annotations
 
 __all__ = ["GATE_SETS", "DEFAULT", "ENTANGLER", "ENTANGLERS", "NATIVE", "ALL_NATIVE", "KIND",
-           "resolve", "of_program", "binary_gate_sets", "binary_refusal"]
+           "resolve", "of_program", "entanglers_used", "named", "derive", "label",
+           "binary_gate_sets", "binary_refusal"]
 
 #: the option's values, the default first
 GATE_SETS = ("ms", "rzz")
@@ -118,3 +119,43 @@ def of_program(prog) -> str | None:
     if len(used) > 1:
         return None
     return next(s for s in GATE_SETS if ENTANGLER[s] in used)
+
+
+def entanglers_used(program) -> set:
+    """The entangling pulses (`ENTANGLERS`) a programme -- a `TSIR` or its JSON document -- holds."""
+    if hasattr(program, "instructions"):
+        return {i.gate for i in program.instructions if i.type == "gate" and i.gate in ENTANGLERS}
+    return {i.get("gate") for i in (program or {}).get("instructions") or ()
+            if isinstance(i, dict) and i.get("type") == "gate" and i.get("gate") in ENTANGLERS}
+
+
+def label(gate_set: str) -> str:
+    """A gate set in the words a page or a report uses: "rzz (R, VZ, RZZ)"."""
+    return f"{gate_set} ({', '.join(NATIVE[gate_set])})" if gate_set in NATIVE else str(gate_set)
+
+
+def named(program=None, certificate=None) -> list:
+    """What a programme's `meta` and a certificate's `claims` say their gate set is, in that order:
+    a compiler writes `gate_set` there for a set that is not the default, and nothing for it."""
+    out = []
+    meta = (program.meta if hasattr(program, "meta") else (program or {}).get("meta")) if program is not None else None
+    claims = (certificate or {}).get("claims") if isinstance(certificate, dict) else None
+    for where in (meta, claims):
+        if isinstance(where, dict) and where.get("gate_set") is not None:
+            out.append(str(where["gate_set"]).strip().lower())
+    return out
+
+
+def derive(program, certificate=None) -> str | None:
+    """The gate set a compiled programme is in, from the programme and its certificate: its
+    entangling pulses decide, and where it has none what its `meta` or its certificate's `claims`
+    name; the default when nothing says otherwise.  None when they disagree (a programme that
+    mixes MS and RZZ, or whose pulses are not the set its compiler wrote down)."""
+    used = entanglers_used(program)
+    said = set(named(program, certificate))
+    if len(used) > 1 or not said <= set(GATE_SETS) or len(said) > 1:
+        return None
+    if used:
+        gs = next(s for s in GATE_SETS if ENTANGLER[s] in used)
+        return gs if not said or said == {gs} else None
+    return next(iter(said)) if said else DEFAULT

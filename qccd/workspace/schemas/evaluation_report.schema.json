@@ -244,6 +244,22 @@
    "title": "Evaluator",
    "type": "object"
   },
+  "gate_set": {
+   "anyOf": [
+    {
+     "enum": [
+      "ms",
+      "rzz"
+     ],
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Gate Set"
+  },
   "input": {
    "additionalProperties": true,
    "title": "Input",

@@ -117,6 +117,7 @@ def point_of(row: dict, work: Path):
         time_ms=row["T_ms"], time_tol_ms=1e-6 * max(1.0, row["T_ms"]),
         rule_set=row.get("rule_set"), replay_rules=False, rules_failed=row.get("rules_failed") or [],
         machine_name=row["point"], family=row["family"], compiler=row.get("compiler", ""),
+        gate_set=row.get("gate_set"),
         physics=row.get("physics", ""), url=f"{SITE}#{rel.manifest['task']}",
         numbers={k: row[k] for k in ("T_ms", "T_round_ms", "ions", "instructions", "cools", "transport_steps")
                  if k in row},

@@ -182,6 +182,8 @@ class Point:
     numbers: Mapping = field(default_factory=dict)   # other published numbers, as the board shows them
     note: str = ""                          # one more sentence for the README
     no_ler_reason: str = ""                 # why a point of a board with rates has none (it broke a rule)
+    gate_set: str | None = None             # the native gate set the row says it was compiled to (None: the
+                                            # program's own, `gate_set`)
 
     @property
     def name(self) -> str:
@@ -326,6 +328,17 @@ def replay(program, machine, table: str, *, rule_set: str | None = None, certifi
     return out
 
 
+def gate_set(program, certificate: Mapping | None = None) -> dict | None:
+    """The native gate set a hardware program is in (`qccd.ir.gate_sets.derive`): `{name, pulses}`,
+    or None for a program that mixes the two sets' entangling pulses or names another set than its
+    pulses are in.  The replay and the noise model read each pulse by its name in either set; an
+    RZZ is priced and noised as the machine's two-qubit gate, as an MS is."""
+    from ..ir import gate_sets as G
+    from .extract import load_program
+    name = G.derive(program if isinstance(program, Mapping) else load_program(program), certificate)
+    return None if name is None else {"name": name, "pulses": list(G.NATIVE[name])}
+
+
 def noisy_stim(program, machine, qasm: str, detectors: Mapping, noise: str, certificate: Mapping | None = None):
     """The noisy stim circuit of a hardware program: `(text, extraction)`.
 
@@ -396,6 +409,15 @@ def build(point: Point) -> tuple[bytes, dict]:
         raise ReproduceError(f"{point.board} {point.entry}: a logical error rate needs the release of its "
                              "memory experiment")
 
+    # -- the native gate set the program is in: the one the published row says, when it says one
+    gs = gate_set(program_doc, cert_doc)
+    if gs is None:
+        raise ReproduceError(f"{point.board} {point.entry}: the program is in no one native gate set (it mixes MS "
+                             "and RZZ, or names another set than its pulses are in)")
+    if point.gate_set is not None and point.gate_set != gs["name"]:
+        raise ReproduceError(f"{point.board} {point.entry}: the published row was compiled to the gate set "
+                             f"{point.gate_set}, the program in the folder is in {gs['name']}")
+
     # -- the replay: the time and the rule verdicts, by the code regenerate.py runs
     from .extract import load_arch, load_program
     arch, prog = load_arch(machine_doc), load_program(program_doc)
@@ -421,6 +443,8 @@ def build(point: Point) -> tuple[bytes, dict]:
                   "ranked_by": (rel.manifest.get("rank_by") if rel else None)},
         "entry": {"key": point.entry, "title": point.title, "machine": point.machine_name or arch.name,
                   "family": point.family or None, "compiler": point.compiler or None},
+        "gate_set": {**gs, "note": "the native gate set the hardware program is in (qccd.ir.gate_sets); the "
+                                   "entangling pulse is priced and noised as the machine's two-qubit gate"},
         "circuit": {"qubits": None, "matches_release": None},
         "physics": {"name": point.physics or None, "clock_table": point.table,
                     "release_physics_digest": (rel.manifest["physics"].get("digest") if rel else None),
@@ -565,6 +589,9 @@ def _readme(point: Point, r: dict) -> str:
             ("machine", f"`{r['entry']['machine']}`" + (f", {point.family}" if point.family else "")
              + " (`machine.arch.json`)"),
             ("compiled by", point.compiler or "-"),
+            ("native gate set", f"`{r['gate_set']['name']}`: {', '.join(r['gate_set']['pulses'])}"
+                                + (" (the default)" if r["gate_set"]["name"] == "ms" else
+                                   " (Quantinuum's; the default is `ms`: R, VZ, MS)")),
             ("hardware program", f"{r['program']['instructions']} instructions (`hardware_program.tsir.json`; "
                                  "`hardware_program.txt` is the same program as text)")]
     if ler is not None:

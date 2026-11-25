@@ -54,7 +54,9 @@ so neither of you can silently overwrite the other.
   RZZ) instead of the default `ms` (R, VZ, MS). Ask for it only when the user does. The result
   says which compiler ran and in which set; if the installed compiler is older than the option
   the tool refuses and says how to get one that has it. Tell the user that, never compile in
-  the other set instead.
+  the other set instead. A submission declares the set its program is in (the bundle's
+  `gate_set`, written from the program); the grade report and the leaderboard entry say
+  "gate set rzz" where it is not the default.
 - **Explain it from the report, never from memory**: the round time, `breakdown` (transport,
   cooling, gates, measurement, reset, with shares), `transport_by_class_ms`, `longest`,
   `hotspots` (junctions and their imbalance, busiest ions), `heating`, failed `rules`, and the

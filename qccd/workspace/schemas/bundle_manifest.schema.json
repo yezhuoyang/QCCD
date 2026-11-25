@@ -48,6 +48,22 @@
    "title": "Files",
    "type": "object"
   },
+  "gate_set": {
+   "anyOf": [
+    {
+     "enum": [
+      "ms",
+      "rzz"
+     ],
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Gate Set"
+  },
   "kind": {
    "const": "qccd.submission_bundle",
    "title": "Kind",

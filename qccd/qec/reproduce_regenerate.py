@@ -7,6 +7,8 @@ This script uses the QCCD package, from the public repository at the commit the 
 from (README.md and requirements.txt give the `pip install` line).  It does the two computed
 (not sampled) halves of the data point:
 
+0. THE GATE SET.  The native gate set the program's pulses are in is the one `experiment.json`
+   records (`ms`: R, VZ, MS; or `rzz`: R, VZ, RZZ).
 1. THE REPLAY.  `hardware_program.tsir.json` is executed step by step on `machine.arch.json`
    under the board's clock: the total time, and the verdict of every rule.  On a board ranked
    by time this is the whole reproduction.
@@ -48,6 +50,13 @@ def main() -> int:
     machine = json.loads((HERE / "machine.arch.json").read_text(encoding="utf-8"))
     ok = True
     print(f"{spec['board']['title']}  --  {spec['entry']['title']}")
+
+    # ---- 0. the native gate set the program is in (a zip built before the record had it says none)
+    if spec.get("gate_set"):
+        want, got_gs = spec["gate_set"]["name"], (reproduce.gate_set(program, cert) or {}).get("name")
+        ok &= got_gs == want
+        print(f"gate set  {want} ({', '.join(spec['gate_set']['pulses'])})"
+              + ("   identical" if got_gs == want else f"   DIFFERENT: the program is in {got_gs or 'no one set'}"))
 
     # ---- 1. the replay
     got = reproduce.replay(program, machine, was["table"], certificate=cert,

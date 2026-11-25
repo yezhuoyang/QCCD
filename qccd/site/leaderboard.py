@@ -56,6 +56,8 @@ CSS = """
 .lbx-rules{font:13px/1.5 var(--sans,system-ui,sans-serif);color:#56545e;margin:6px 0 0}
 .lbx-rules a{margin-left:4px}
 .lbx-ownnote{font:13px/1.5 var(--sans,system-ui,sans-serif);color:#8a5300;margin:2px 0 8px}
+.lbx-gs{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#eaf1fb;color:#1f4f8f;
+ font:600 11px/1.5 var(--sans,system-ui,sans-serif);white-space:nowrap;cursor:help}
 #lbx-pop{position:absolute;z-index:1200;width:min(420px,calc(100vw - 24px));background:#fff;border:1px solid #cfceca;
  border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.18);padding:14px 16px;font:14px/1.5 var(--sans,system-ui,sans-serif);
  color:#1d1d1b}
@@ -136,6 +138,11 @@ SCRIPT = r"""
       return x.replace(/^primitives\./, '').replace('.curve_by_degree.', ' degree '); }).join(', '));
     return bits.join(' · ');
   }
+  // the native gate set an entry's program is in, when it is not the default (ms: R, VZ, MS)
+  var GATE_SETS = {ms: 'R, VZ, MS', rzz: 'R, VZ, RZZ'};
+  function gsNote(g){ return (g && g !== 'ms') ? 'gate set ' + String(g).toUpperCase() : ''; }
+  function gsWords(g){ return 'native gate set ' + g + (GATE_SETS[g] ? ': ' + GATE_SETS[g] : '') +
+    ' (the default is ms: ' + GATE_SETS.ms + '); its entangling pulse is priced and noised as the two-qubit gate'; }
   // "Try your own design": into the person's own workspace, focused on this board
   function studioURL(task){ return (window.QCCD_MIRROR ? '/studio' : LOCAL) + '?board=' + encodeURIComponent(task); }
   var pop = null;
@@ -220,6 +227,7 @@ SCRIPT = r"""
         a0.href = open(r); td0.appendChild(a0);
         var own = ownNote(r.conformance);
         if (own) { var tg = el('span', 'lbx-own', 'own rules'); tg.title = own; td0.appendChild(tg); }
+        if (gsNote(r.gate_set)) { var tgs = el('span', 'lbx-gs', gsNote(r.gate_set)); tgs.title = gsWords(r.gate_set); td0.appendChild(tgs); }
         tr.appendChild(td0);
         tr.appendChild(el('td', 'lbx-by', r.by || '-'));
         tr.appendChild(el('td', 'n', fmt(r.metrics[k])));
@@ -318,6 +326,11 @@ CHART_SCRIPT = r"""
       return x.replace(/^primitives\./, '').replace('.curve_by_degree.', ' degree '); }).join(', '));
     return bits.join(' · ');
   }
+  // the native gate set an entry's program is in, when it is not the default (ms: R, VZ, MS)
+  var GATE_SETS = {ms: 'R, VZ, MS', rzz: 'R, VZ, RZZ'};
+  function gsNote(g){ return (g && g !== 'ms') ? 'gate set ' + String(g).toUpperCase() : ''; }
+  function gsWords(g){ return 'native gate set ' + g + (GATE_SETS[g] ? ': ' + GATE_SETS[g] : '') +
+    ' (the default is ms: ' + GATE_SETS.ms + '); its entangling pulse is priced and noised as the two-qubit gate'; }
   function rulesLine(lb){
     var cnt = lb.counts || {}, others = (cnt.all || 0) - (cnt.board || 0), blk = document.querySelector('.lbx');
     if (!blk || !(others > 0 || RULES === 'all')) return;
@@ -422,7 +435,7 @@ CHART_SCRIPT = r"""
       var fam = B.goal ? code : (own ? OWNFAM : FAM);
       if (codes.indexOf(fam) < 0) { codes.push(fam); relOf[fam] = r.release; FAMHEX[fam] = B.goal ? PALETTE[(codes.length - 1) % PALETTE.length] : (own ? OWNCOLOR : COLOR); }
       DATA.push({key: 'c-' + r.id, sid: r.id, community: true, by: r.by || '', when: r.created_at, ler: r.ler || null,
-                 conf: r.conformance || null, rel: r.release || B.id || '',
+                 conf: r.conformance || null, rel: r.release || B.id || '', gs: r.gate_set || 'ms',
                  place: i + 1, title: name, short: name + ' · ' + (r.by || 'unnamed'), family: fam, compiled: true,
                  code: code, exp: r.experiment || null, numbers: n, marks: [], rules_failed: [], claim: ''});
     });
@@ -511,6 +524,7 @@ CHART_SCRIPT = r"""
       }
       if (d.ler && d.ler.shots) tb.appendChild(row('sample', d.ler.errors + ' errors in ' + Number(d.ler.shots).toLocaleString() + ' shots'));
       if (d.ler && decoderOf(d)) tb.appendChild(row('decoder', decoderOf(d)));
+      if (gsNote(d.gs)) tb.appendChild(row('gate set', d.gs.toUpperCase() + ' (' + (GATE_SETS[d.gs] || d.gs) + ')'));
       METRICS.forEach(function(m){
         if (val(d, m.k) == null || (d.exp && SIZE.indexOf(m.k) >= 0)) return;
         var tr = row(m.name.replace(' — ', ': '), fmt(val(d, m.k), m));
@@ -541,7 +555,7 @@ CHART_SCRIPT = r"""
                                            DATA.filter(function(d){ return !d.compiled; }));
       all.forEach(function(d){
         var r = E('tr'); if (SEL === d.key) r.className = 'sel'; var i = rk.indexOf(d);
-        var head = [i >= 0 ? String(i + 1) : '–', d.community ? d.title + (ownNote(d.conf) ? ' (own rules)' : '') : shortName(d),
+        var head = [i >= 0 ? String(i + 1) : '–', d.community ? d.title + (ownNote(d.conf) ? ' (own rules)' : '') + (gsNote(d.gs) ? ' (' + gsNote(d.gs) + ')' : '') : shortName(d),
                     d.community ? d.by : 'the QCCD study'];
         head = head.concat(B.goal ? [d.code || '', d.exp ? String(d.exp.ions) : ''] : [d.community ? 'submitted' : d.family]);
         head.concat(cols.map(function(m){ return fmt(val(d, m.k), m); })).forEach(function(v){ r.appendChild(E('td', null, v)); });
@@ -708,7 +722,8 @@ GOAL_TABLE_SCRIPT = r"""
       tr.appendChild(el('td', 'n', rel.k && rel.ions ? (rel.ions / rel.k).toFixed(1) : '–'));
       tr.appendChild(el('td', 'n', String(rel.entries || 0)));
       tr.appendChild(el('td', 'n', b ? fmt(b.rank_value) : '–'));
-      tr.appendChild(el('td', null, b ? (b.display_name || b.id) : 'no entry yet'));
+      tr.appendChild(el('td', null, b ? (b.display_name || b.id) + (b.gate_set && b.gate_set !== 'ms'
+        ? ' (gate set ' + String(b.gate_set).toUpperCase() + ')' : '') : 'no entry yet'));
       tr.appendChild(el('td', null, b ? (b.by || '–') : ''));
       tb.appendChild(tr);
     });

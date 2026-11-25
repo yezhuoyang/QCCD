@@ -43,6 +43,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
+from ..ir.gate_sets import DEFAULT as DEFAULT_GATE_SET
 from ..workspace.bundle import BundleError, extract_archive
 from ..workspace.jsonsafe import digest
 from ..workspace.tasks import TaskRelease
@@ -83,6 +84,12 @@ def _conformance(report: dict) -> dict:
     return {"board": True, "rules": {"set": "standard", "declared": False, "board_set": "standard", "breaks": [],
                                      "drops": [], "replaces": [], "adds": [], "params": {}},
             "physics": {"board": True, "added": [], "ignored": []}}
+
+
+def _gate_set(report: dict) -> str:
+    """The native gate set a graded entry's programs are in (`qccd.ir.gate_sets`): the report's
+    `gate_set`, which names a set that is not the default; a report without one is in ms."""
+    return str(report.get("gate_set") or DEFAULT_GATE_SET)
 
 
 class OfficialService:
@@ -332,6 +339,10 @@ class OfficialService:
                 if b.manifest["task"]["id"] != rel.id or b.manifest["task"]["digest"] != rel.digest:
                     raise OfficialError("wrong_task", f"the bundle is for {b.manifest['task']['id']} "
                                         f"({b.manifest['task']['digest'][:19]}...), not this server's {rel.id}", 422)
+                gs = b.manifest.get("gate_set") or DEFAULT_GATE_SET
+                if gs not in rel.gate_sets:
+                    raise OfficialError("gate_set_not_allowed", f"{rel.id} takes programs in the gate set "
+                                        f"{' or '.join(rel.gate_sets)} only; the bundle declares {gs}", 422)
                 bundle_digest = b.digest
         prior = self.db.one("SELECT * FROM submissions WHERE uploader=? AND task=? AND bundle_digest=?",
                             (uploader["id"], rel.id, bundle_digest))
@@ -400,6 +411,7 @@ class OfficialService:
                 out["report"]["counts"] = (r.get("summary") or {}).get("counts")
             else:
                 out["report"]["conformance"] = _conformance(r)
+                out["report"]["gate_set"] = _gate_set(r)
         job = self.db.one("SELECT status, attempts, error FROM jobs WHERE submission=? ORDER BY created_at DESC LIMIT 1",
                           (sid,))
         out["job"] = job
@@ -455,6 +467,7 @@ class OfficialService:
                 "title": rel.title, "track": rel.manifest.get("track"),
                 "rank_by": key, "better": better, "metrics": metrics, "rows": rows,
                 "rules": view, "board_rules": rel.manifest.get("rules") or "standard",
+                "gate_sets": list(rel.gate_sets),
                 "counts": {"board": sum(1 for r in every if r["conformance"]["board"]), "all": len(every)}}
 
     def _ranked_rows(self, task: str) -> tuple[list, dict]:
@@ -473,6 +486,7 @@ class OfficialService:
             # every metric the report scored, so a reader can rank by any of them, not only rank_by
             rep = json.loads(r.pop("report") or "{}")
             r["conformance"] = _conformance(rep)
+            r["gate_set"] = _gate_set(rep)
             r["metrics"] = {k: v.get("value") for k, v in (rep.get("metrics") or {}).items()}
             for k, v in (rep.get("metrics") or {}).items():
                 units.setdefault(k, v.get("unit"))
@@ -673,7 +687,8 @@ class OfficialService:
                                 "created_at": r["created_at"], "family": fam, "device": dev,
                                 "T_round_ms": T / rounds if isinstance(T, (int, float)) else None,
                                 "ler_per_round": r["metrics"].get("ler_per_round"), "ler": r.get("ler"),
-                                "metrics": r["metrics"], "conformance": r.get("conformance")})
+                                "metrics": r["metrics"], "conformance": r.get("conformance"),
+                                "gate_set": r.get("gate_set", DEFAULT_GATE_SET)})
             q = rel.manifest.get("qec") or {}
             out.append({"id": rel.id, "title": rel.title, "task": rel.manifest.get("task"), "task_digest": rel.digest,
                         "code": spec.get("code"), "distance": spec.get("distance"), "rounds": rounds,
@@ -776,7 +791,8 @@ class OfficialService:
                                   task_digest=b.manifest["task"]["digest"], device=d["device"],
                                   program=d["program"], certified_program=d.get("certified_program"),
                                   certificate=d.get("certificate"), presentation=d.get("presentation"),
-                                  provenance=b.manifest.get("provenance"))
+                                  provenance=b.manifest.get("provenance"), rules=d.get("rules"),
+                                  gate_set=b.manifest.get("gate_set"), derive_gate_set=False)
                 if nb.digest == b.digest:
                     continue
                 entry = {"id": r["id"], "old": b.digest, "new": nb.digest}

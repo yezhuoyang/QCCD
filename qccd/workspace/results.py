@@ -548,7 +548,9 @@ class ResultsMixin:
             self._emit(db, "snapshot.created", {"snapshot_id": sid, "bundle_digest": b.digest,
                                                 "revision": revision, "actor": dict(actor)}, branch, revision)
         return {"snapshot_id": sid, "bundle_digest": b.digest, "branch": branch, "revision": revision,
-                "files": b.manifest["files"], "stale_program": fp.get("compiled_for") not in (None, r.arch_digest())}
+                "files": b.manifest["files"], "stale_program": fp.get("compiled_for") not in (None, r.arch_digest()),
+                # the native gate set the bundle declares, derived from the program (none: ms, the default)
+                **({"gate_set": b.manifest["gate_set"]} if b.manifest.get("gate_set") else {})}
 
     def snapshot(self, sid: str) -> dict:
         from .core import WorkspaceError
@@ -593,7 +595,8 @@ class ResultsMixin:
                    "bundle_digest": snap["bundle_digest"], "revision": rev, "branch": branch,
                    "design": self.design_title(self.branch(branch)), "board": rel.title,
                    "profile": profile, "status": "grading", "rules": self._bundle_rules(self.snapshot(snap["snapshot_id"])),
-                   "label": "Local result - not published"}
+                   "label": "Local result - not published",
+                   **({"gate_set": snap["gate_set"]} if snap.get("gate_set") else {})}
             if request_id:
                 db.execute("INSERT INTO idempotency(key, request_digest, response, created_at) VALUES(?,?,?,?)",
                            (f"submit:{request_id}", digest([branch, rev, profile, rel.id, rel.digest] + ([rules_doc["text"]] if rules_doc else [])), dumps(out),
