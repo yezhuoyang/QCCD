@@ -295,6 +295,10 @@ def compile_with_qccdc(qasm_text: str, arch, workdir, *, cool: bool = True,
         if co.returncode or not cooled.exists():
             raise CompileFailed("crash", "insert_cooling failed", (co.stdout + co.stderr)[-4000:])
         prog = cooled
+    # the log names the files it wrote by absolute path: relative to the checkout here, so a
+    # compile.json a board commits carries no user folder (tests/test_no_machine_paths.py)
+    for root in {str(_REPO), str(_REPO).replace("\\", "/")}:
+        log = log.replace(root + "\\", "").replace(root + "/", "")
     (work / "compile.json").write_text(json.dumps({
         "mode": used, "cool": cool, "compile_s": round(t_compile, 3),
         "total_s": round(time.time() - t0, 3), "log": log[-6000:],

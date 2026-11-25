@@ -296,6 +296,9 @@ def compile_point(out: Path, code_key: str, dev: dict, qasm: Path) -> dict:
                           f"(ops {unreal[:6]}{'...' if len(unreal) > 6 else ''})"}
     cooled = Path(str(prefix) + ".cooled.tsir.json")
     sh([sys.executable, BRIDGE / "insert_cooling.py", tsir, "--arch", arch_p, "-o", cooled])
+    # committed beside the board: no checkout path in its provenance
+    from qccd.ir.provenance import blank_root_file
+    blank_root_file(cooled)
     rc, rlog, _ = sh([sys.executable, BRIDGE / "check_tsir.py", cooled, "--arch", arch_p, "--model", "corrected"])
     row["rules"] = next((ln.strip() for ln in rlog.splitlines() if "rules passed" in ln), "?")
     row["rules_ok"] = "RULES FAILED" not in rlog and rc == 0

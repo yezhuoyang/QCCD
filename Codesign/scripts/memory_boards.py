@@ -227,6 +227,9 @@ def grade_point(out: Path, release, exp, dev: dict, compile=None) -> dict:
     except Exception as exc:  # noqa: BLE001 -- a device the tools cannot load is a refusal too
         return {**row, "status": "refused", "reason": f"{type(exc).__name__}: {exc}"[:300]}
     row["compile_seconds"] = round(time.time() - t0, 1)
+    # a programme the board keeps (and commits) names no checkout: its provenance root blanked
+    from qccd.ir.provenance import blank_root_file
+    blank_root_file(cooled)
     row["compiler_mode"] = json.loads((work / "compile.json").read_text(encoding="utf-8")).get("mode")
     cert = json.loads(cert_p.read_text(encoding="utf-8"))
     q = release.manifest["qec"]
