@@ -1,7 +1,7 @@
 {
  "bb72": {
   "c2lr10x10": {
-   "bytes": 42756562,
+   "bytes": 42784289,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 15536,
@@ -11,7 +11,7 @@
    "status": "ok"
   },
   "c2lr10x9": {
-   "bytes": 44368712,
+   "bytes": 44396437,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 16348,
@@ -21,7 +21,7 @@
    "status": "ok"
   },
   "c2lr11x10": {
-   "bytes": 43099420,
+   "bytes": 43127147,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 15615,
@@ -31,7 +31,7 @@
    "status": "ok"
   },
   "c2lr11x11": {
-   "bytes": 45402863,
+   "bytes": 45430590,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 16768,
@@ -41,7 +41,7 @@
    "status": "ok"
   },
   "c2lr12x11": {
-   "bytes": 43095701,
+   "bytes": 43123428,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 15665,
@@ -51,7 +51,7 @@
    "status": "ok"
   },
   "c2lr12x12": {
-   "bytes": 42797663,
+   "bytes": 42825390,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 15268,
@@ -61,7 +61,7 @@
    "status": "ok"
   },
   "c2lr13x12": {
-   "bytes": 42854968,
+   "bytes": 42882695,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 15424,
@@ -71,7 +71,7 @@
    "status": "ok"
   },
   "c2lr13x13": {
-   "bytes": 42083466,
+   "bytes": 42111193,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 14752,
@@ -81,7 +81,7 @@
    "status": "ok"
   },
   "c2lr14x13": {
-   "bytes": 44064870,
+   "bytes": 44092597,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 16115,
@@ -91,7 +91,7 @@
    "status": "ok"
   },
   "c2lr14x14": {
-   "bytes": 42330470,
+   "bytes": 42358197,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 14919,
@@ -101,7 +101,7 @@
    "status": "ok"
   },
   "c2lr15x14": {
-   "bytes": 41439034,
+   "bytes": 41466762,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 14230,
@@ -111,7 +111,7 @@
    "status": "ok"
   },
   "c2lr15x15": {
-   "bytes": 43823585,
+   "bytes": 43851313,
    "code": "bb72",
    "family": "C2LR",
    "instructions": 15428,
@@ -120,68 +120,78 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor144_96d_j": {
-   "bytes": 32504305,
+  "conveyor36_2L": {
+   "bytes": 20767001,
    "code": "bb72",
    "family": "Conveyor",
-   "instructions": 26562,
-   "page": "bb72/conveyor144_96d_j.html",
-   "point": "conveyor144_96d_j",
+   "instructions": 8343,
+   "page": "bb72/conveyor36_2L.html",
+   "point": "conveyor36_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor96_96d_j": {
-   "bytes": 27126222,
+  "conveyor72_1L": {
+   "bytes": 39406774,
    "code": "bb72",
    "family": "Conveyor",
-   "instructions": 14322,
-   "page": "bb72/conveyor96_96d_j.html",
-   "point": "conveyor96_96d_j",
+   "instructions": 18398,
+   "page": "bb72/conveyor72_1L.html",
+   "point": "conveyor72_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone10_n16": {
-   "bytes": 31194549,
+  "conveyor72_2L": {
+   "bytes": 23380517,
    "code": "bb72",
-   "family": "Cyclone",
-   "instructions": 32749,
-   "page": "bb72/cyclone10_n16.html",
-   "point": "cyclone10_n16",
+   "family": "Conveyor",
+   "instructions": 8244,
+   "page": "bb72/conveyor72_2L.html",
+   "point": "conveyor72_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone16_n10": {
-   "bytes": 37679674,
+  "cyclone12_n12": {
+   "bytes": 33749220,
    "code": "bb72",
    "family": "Cyclone",
-   "instructions": 31971,
-   "page": "bb72/cyclone16_n10.html",
-   "point": "cyclone16_n10",
+   "instructions": 30497,
+   "page": "bb72/cyclone12_n12.html",
+   "point": "cyclone12_n12",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone26_n6": {
-   "bytes": 50726390,
+  "cyclone18_n8": {
+   "bytes": 40071579,
    "code": "bb72",
    "family": "Cyclone",
-   "instructions": 32542,
-   "page": "bb72/cyclone26_n6.html",
-   "point": "cyclone26_n6",
+   "instructions": 29499,
+   "page": "bb72/cyclone18_n8.html",
+   "point": "cyclone18_n8",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone44_n4": {
-   "bytes": 71229578,
+  "cyclone24_n6": {
+   "bytes": 47840824,
    "code": "bb72",
    "family": "Cyclone",
-   "instructions": 34443,
-   "page": "bb72/cyclone44_n4.html",
-   "point": "cyclone44_n4",
+   "instructions": 29523,
+   "page": "bb72/cyclone24_n6.html",
+   "point": "cyclone24_n6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone36_n4": {
+   "bytes": 58455218,
+   "code": "bb72",
+   "family": "Cyclone",
+   "instructions": 28207,
+   "page": "bb72/cyclone36_n4.html",
+   "point": "cyclone36_n4",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone6_n24": {
-   "bytes": 26794218,
+   "bytes": 26821375,
    "code": "bb72",
    "family": "Cyclone",
    "instructions": 30694,
@@ -191,7 +201,7 @@
    "status": "ok"
   },
   "cyclone72_n2": {
-   "bytes": 98143503,
+   "bytes": 98167690,
    "code": "bb72",
    "family": "Cyclone",
    "instructions": 28016,
@@ -201,7 +211,7 @@
    "status": "ok"
   },
   "wise_h3_11x10": {
-   "bytes": 32551404,
+   "bytes": 32562082,
    "code": "bb72",
    "family": "WISE",
    "instructions": 72719,
@@ -211,7 +221,7 @@
    "status": "ok"
   },
   "wise_h3_12x12": {
-   "bytes": 32323669,
+   "bytes": 32329044,
    "code": "bb72",
    "family": "WISE",
    "instructions": 69699,
@@ -221,7 +231,7 @@
    "status": "ok"
   },
   "wise_h3_8x7": {
-   "bytes": 29738782,
+   "bytes": 29757850,
    "code": "bb72",
    "family": "WISE",
    "instructions": 49383,
@@ -231,7 +241,7 @@
    "status": "ok"
   },
   "wise_h3_9x9": {
-   "bytes": 31907749,
+   "bytes": 31922936,
    "code": "bb72",
    "family": "WISE",
    "instructions": 68712,
@@ -241,7 +251,7 @@
    "status": "ok"
   },
   "wise_h5_6x6": {
-   "bytes": 35599363,
+   "bytes": 35619002,
    "code": "bb72",
    "family": "WISE",
    "instructions": 89710,
@@ -251,7 +261,7 @@
    "status": "ok"
   },
   "wise_h5_7x7": {
-   "bytes": 34747511,
+   "bytes": 34764232,
    "code": "bb72",
    "family": "WISE",
    "instructions": 84984,
@@ -261,7 +271,7 @@
    "status": "ok"
   },
   "wise_h5_8x8": {
-   "bytes": 34598577,
+   "bytes": 34611924,
    "code": "bb72",
    "family": "WISE",
    "instructions": 84362,
@@ -271,7 +281,7 @@
    "status": "ok"
   },
   "wise_h5_9x9": {
-   "bytes": 34466539,
+   "bytes": 34476056,
    "code": "bb72",
    "family": "WISE",
    "instructions": 82484,
@@ -281,7 +291,7 @@
    "status": "ok"
   },
   "wise_h7_5x5": {
-   "bytes": 39171598,
+   "bytes": 39191949,
    "code": "bb72",
    "family": "WISE",
    "instructions": 110587,
@@ -291,7 +301,7 @@
    "status": "ok"
   },
   "wise_h7_6x6": {
-   "bytes": 36770058,
+   "bytes": 36787177,
    "code": "bb72",
    "family": "WISE",
    "instructions": 95994,
@@ -301,7 +311,7 @@
    "status": "ok"
   },
   "wise_h7_7x6": {
-   "bytes": 37403840,
+   "bytes": 37419194,
    "code": "bb72",
    "family": "WISE",
    "instructions": 99755,
@@ -311,7 +321,7 @@
    "status": "ok"
   },
   "wise_h7_8x7": {
-   "bytes": 36540382,
+   "bytes": 36551610,
    "code": "bb72",
    "family": "WISE",
    "instructions": 93769,
@@ -323,7 +333,7 @@
  },
  "color3": {
   "c2lr3x3": {
-   "bytes": 2503004,
+   "bytes": 2530730,
    "code": "color3",
    "family": "C2LR",
    "instructions": 1068,
@@ -333,7 +343,7 @@
    "status": "ok"
   },
   "c2lr4x3": {
-   "bytes": 2499512,
+   "bytes": 2527238,
    "code": "color3",
    "family": "C2LR",
    "instructions": 1050,
@@ -343,7 +353,7 @@
    "status": "ok"
   },
   "c2lr4x4": {
-   "bytes": 2510794,
+   "bytes": 2538520,
    "code": "color3",
    "family": "C2LR",
    "instructions": 1077,
@@ -352,78 +362,128 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor8_4d_j": {
-   "bytes": 2666719,
+  "conveyor4_1L": {
+   "bytes": 2471703,
    "code": "color3",
    "family": "Conveyor",
-   "instructions": 1657,
-   "page": "color3/conveyor8_4d_j.html",
-   "point": "conveyor8_4d_j",
+   "instructions": 1190,
+   "page": "color3/conveyor4_1L.html",
+   "point": "conveyor4_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor9_3d_j": {
-   "bytes": 2647781,
+  "conveyor4_2L": {
+   "bytes": 2482594,
    "code": "color3",
    "family": "Conveyor",
-   "instructions": 1587,
-   "page": "color3/conveyor9_3d_j.html",
-   "point": "conveyor9_3d_j",
+   "instructions": 1224,
+   "page": "color3/conveyor4_2L.html",
+   "point": "conveyor4_2L",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor8_1L": {
+   "bytes": 2457650,
+   "code": "color3",
+   "family": "Conveyor",
+   "instructions": 1067,
+   "page": "color3/conveyor8_1L.html",
+   "point": "conveyor8_1L",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor8_2L": {
+   "bytes": 2440609,
+   "code": "color3",
+   "family": "Conveyor",
+   "instructions": 951,
+   "page": "color3/conveyor8_2L.html",
+   "point": "conveyor8_2L",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone2_n6": {
-   "bytes": 2373098,
+   "bytes": 2397804,
    "code": "color3",
    "family": "Cyclone",
-   "instructions": 948,
+   "instructions": 922,
    "page": "color3/cyclone2_n6.html",
    "point": "cyclone2_n6",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone4_n3": {
-   "bytes": 2373197,
+   "bytes": 2371791,
    "code": "color3",
    "family": "Cyclone",
-   "instructions": 829,
+   "instructions": 668,
    "page": "color3/cyclone4_n3.html",
    "point": "cyclone4_n3",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone6_n3": {
-   "bytes": 2533638,
+   "bytes": 2644683,
    "code": "color3",
    "family": "Cyclone",
-   "instructions": 1124,
+   "instructions": 1014,
    "page": "color3/cyclone6_n3.html",
    "point": "cyclone6_n3",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone8_n2": {
-   "bytes": 2544359,
+   "bytes": 2841069,
    "code": "color3",
    "family": "Cyclone",
-   "instructions": 1076,
+   "instructions": 1087,
    "page": "color3/cyclone8_n2.html",
    "point": "cyclone8_n2",
    "rules_failed": [],
    "status": "ok"
   },
+  "grid3x3": {
+   "bytes": 2464412,
+   "code": "color3",
+   "family": "Grid",
+   "instructions": 929,
+   "page": "color3/grid3x3.html",
+   "point": "grid3x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid4x3": {
+   "bytes": 2469734,
+   "code": "color3",
+   "family": "Grid",
+   "instructions": 909,
+   "page": "color3/grid4x3.html",
+   "point": "grid4x3",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid4x4": {
+   "bytes": 2476240,
+   "code": "color3",
+   "family": "Grid",
+   "instructions": 909,
+   "page": "color3/grid4x4.html",
+   "point": "grid4x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "helios98": {
-   "bytes": 5908668,
+   "bytes": 5168263,
    "code": "color3",
    "family": "Helios",
-   "instructions": 9058,
+   "instructions": 7444,
    "page": "color3/helios98.html",
    "point": "helios98",
    "rules_failed": [],
    "status": "ok"
   },
   "wise_h3_2x2": {
-   "bytes": 2564705,
+   "bytes": 2591740,
    "code": "color3",
    "family": "WISE",
    "instructions": 1117,
@@ -433,7 +493,7 @@
    "status": "ok"
   },
   "wise_h3_3x2": {
-   "bytes": 2597134,
+   "bytes": 2623876,
    "code": "color3",
    "family": "WISE",
    "instructions": 1183,
@@ -443,7 +503,7 @@
    "status": "ok"
   },
   "wise_h3_3x3": {
-   "bytes": 2563771,
+   "bytes": 2590062,
    "code": "color3",
    "family": "WISE",
    "instructions": 1053,
@@ -453,7 +513,7 @@
    "status": "ok"
   },
   "wise_h5_2x2": {
-   "bytes": 2520398,
+   "bytes": 2547153,
    "code": "color3",
    "family": "WISE",
    "instructions": 988,
@@ -463,7 +523,7 @@
    "status": "ok"
   },
   "wise_h5_3x2": {
-   "bytes": 2570202,
+   "bytes": 2596524,
    "code": "color3",
    "family": "WISE",
    "instructions": 1068,
@@ -473,7 +533,7 @@
    "status": "ok"
   },
   "wise_h7_2x1": {
-   "bytes": 2637613,
+   "bytes": 2664661,
    "code": "color3",
    "family": "WISE",
    "instructions": 1319,
@@ -483,7 +543,7 @@
    "status": "ok"
   },
   "wise_h7_2x2": {
-   "bytes": 2580903,
+   "bytes": 2607378,
    "code": "color3",
    "family": "WISE",
    "instructions": 1122,
@@ -495,7 +555,7 @@
  },
  "color5": {
   "c2lr5x4": {
-   "bytes": 6055770,
+   "bytes": 6083496,
    "code": "color5",
    "family": "C2LR",
    "instructions": 4055,
@@ -505,7 +565,7 @@
    "status": "ok"
   },
   "c2lr5x5": {
-   "bytes": 6038612,
+   "bytes": 6066338,
    "code": "color5",
    "family": "C2LR",
    "instructions": 3987,
@@ -515,7 +575,7 @@
    "status": "ok"
   },
   "c2lr6x5": {
-   "bytes": 5928197,
+   "bytes": 5955923,
    "code": "color5",
    "family": "C2LR",
    "instructions": 3787,
@@ -525,7 +585,7 @@
    "status": "ok"
   },
   "c2lr6x6": {
-   "bytes": 5942238,
+   "bytes": 5969965,
    "code": "color5",
    "family": "C2LR",
    "instructions": 3778,
@@ -535,7 +595,7 @@
    "status": "ok"
   },
   "c2lr7x6": {
-   "bytes": 6024818,
+   "bytes": 6052545,
    "code": "color5",
    "family": "C2LR",
    "instructions": 3895,
@@ -545,7 +605,7 @@
    "status": "ok"
   },
   "c2lr7x7": {
-   "bytes": 5216724,
+   "bytes": 5244451,
    "code": "color5",
    "family": "C2LR",
    "instructions": 2490,
@@ -554,98 +614,158 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor24_12d_j": {
-   "bytes": 7979696,
+  "conveyor10_1L": {
+   "bytes": 5957342,
    "code": "color5",
    "family": "Conveyor",
-   "instructions": 11457,
-   "page": "color5/conveyor24_12d_j.html",
-   "point": "conveyor24_12d_j",
+   "instructions": 6367,
+   "page": "color5/conveyor10_1L.html",
+   "point": "conveyor10_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor27_9d_j": {
-   "bytes": 8705071,
+  "conveyor10_2L": {
+   "bytes": 6151915,
    "code": "color5",
    "family": "Conveyor",
-   "instructions": 13748,
-   "page": "color5/conveyor27_9d_j.html",
-   "point": "conveyor27_9d_j",
+   "instructions": 7310,
+   "page": "color5/conveyor10_2L.html",
+   "point": "conveyor10_2L",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor20_1L": {
+   "bytes": 6546818,
+   "code": "color5",
+   "family": "Conveyor",
+   "instructions": 7717,
+   "page": "color5/conveyor20_1L.html",
+   "point": "conveyor20_1L",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "conveyor20_2L": {
+   "bytes": 5925600,
+   "code": "color5",
+   "family": "Conveyor",
+   "instructions": 6115,
+   "page": "color5/conveyor20_2L.html",
+   "point": "conveyor20_2L",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone12_n3": {
-   "bytes": 7123190,
+   "bytes": 7621701,
    "code": "color5",
    "family": "Cyclone",
-   "instructions": 5623,
+   "instructions": 5169,
    "page": "color5/cyclone12_n3.html",
    "point": "cyclone12_n3",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone20_n2": {
-   "bytes": 9373186,
+   "bytes": 14133901,
    "code": "color5",
    "family": "Cyclone",
-   "instructions": 6694,
+   "instructions": 6713,
    "page": "color5/cyclone20_n2.html",
    "point": "cyclone20_n2",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone2_n15": {
-   "bytes": 5491628,
+   "bytes": 5536888,
    "code": "color5",
    "family": "Cyclone",
-   "instructions": 5410,
+   "instructions": 5335,
    "page": "color5/cyclone2_n15.html",
    "point": "cyclone2_n15",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone4_n8": {
-   "bytes": 5961545,
+   "bytes": 6173904,
    "code": "color5",
    "family": "Cyclone",
-   "instructions": 5779,
+   "instructions": 5660,
    "page": "color5/cyclone4_n8.html",
    "point": "cyclone4_n8",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone6_n6": {
-   "bytes": 6721017,
+   "bytes": 7118291,
    "code": "color5",
    "family": "Cyclone",
-   "instructions": 6262,
+   "instructions": 6168,
    "page": "color5/cyclone6_n6.html",
    "point": "cyclone6_n6",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone8_n5": {
-   "bytes": 6589807,
+   "bytes": 7451129,
    "code": "color5",
    "family": "Cyclone",
-   "instructions": 5757,
+   "instructions": 5487,
    "page": "color5/cyclone8_n5.html",
    "point": "cyclone8_n5",
    "rules_failed": [],
    "status": "ok"
   },
+  "grid5x4": {
+   "bytes": 5353246,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 3621,
+   "page": "color5/grid5x4.html",
+   "point": "grid5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x5": {
+   "bytes": 5281231,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 3350,
+   "page": "color5/grid6x5.html",
+   "point": "grid6x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x6": {
+   "bytes": 5357557,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 3501,
+   "page": "color5/grid6x6.html",
+   "point": "grid6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x7": {
+   "bytes": 5352204,
+   "code": "color5",
+   "family": "Grid",
+   "instructions": 3443,
+   "page": "color5/grid7x7.html",
+   "point": "grid7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "helios98": {
-   "bytes": 20969801,
+   "bytes": 20462379,
    "code": "color5",
    "family": "Helios",
-   "instructions": 49688,
+   "instructions": 48081,
    "page": "color5/helios98.html",
    "point": "helios98",
    "rules_failed": [],
    "status": "ok"
   },
   "wise_h3_4x3": {
-   "bytes": 5893661,
+   "bytes": 5919501,
    "code": "color5",
    "family": "WISE",
    "instructions": 4337,
@@ -655,7 +775,7 @@
    "status": "ok"
   },
   "wise_h3_4x4": {
-   "bytes": 6049468,
+   "bytes": 6074699,
    "code": "color5",
    "family": "WISE",
    "instructions": 4679,
@@ -665,7 +785,7 @@
    "status": "ok"
   },
   "wise_h3_5x4": {
-   "bytes": 6100587,
+   "bytes": 6125209,
    "code": "color5",
    "family": "WISE",
    "instructions": 4776,
@@ -675,7 +795,7 @@
    "status": "ok"
   },
   "wise_h3_5x5": {
-   "bytes": 5859262,
+   "bytes": 5883117,
    "code": "color5",
    "family": "WISE",
    "instructions": 4099,
@@ -685,7 +805,7 @@
    "status": "ok"
   },
   "wise_h5_3x3": {
-   "bytes": 6038059,
+   "bytes": 6063720,
    "code": "color5",
    "family": "WISE",
    "instructions": 4744,
@@ -695,7 +815,7 @@
    "status": "ok"
   },
   "wise_h5_4x3": {
-   "bytes": 6127208,
+   "bytes": 6152208,
    "code": "color5",
    "family": "WISE",
    "instructions": 4899,
@@ -705,7 +825,7 @@
    "status": "ok"
   },
   "wise_h5_4x4": {
-   "bytes": 6236690,
+   "bytes": 6260801,
    "code": "color5",
    "family": "WISE",
    "instructions": 5204,
@@ -715,7 +835,7 @@
    "status": "ok"
   },
   "wise_h7_3x2": {
-   "bytes": 6544070,
+   "bytes": 6569972,
    "code": "color5",
    "family": "WISE",
    "instructions": 6101,
@@ -725,7 +845,7 @@
    "status": "ok"
   },
   "wise_h7_3x3": {
-   "bytes": 6428159,
+   "bytes": 6453190,
    "code": "color5",
    "family": "WISE",
    "instructions": 5706,
@@ -735,7 +855,7 @@
    "status": "ok"
   },
   "wise_h7_4x3": {
-   "bytes": 6409672,
+   "bytes": 6433832,
    "code": "color5",
    "family": "WISE",
    "instructions": 5621,
@@ -747,7 +867,7 @@
  },
  "color7": {
   "c2lr10x9": {
-   "bytes": 14184982,
+   "bytes": 14212711,
    "code": "color7",
    "family": "C2LR",
    "instructions": 7767,
@@ -757,7 +877,7 @@
    "status": "ok"
   },
   "c2lr7x6": {
-   "bytes": 14338167,
+   "bytes": 14365894,
    "code": "color7",
    "family": "C2LR",
    "instructions": 8070,
@@ -767,7 +887,7 @@
    "status": "ok"
   },
   "c2lr7x7": {
-   "bytes": 14024302,
+   "bytes": 14052029,
    "code": "color7",
    "family": "C2LR",
    "instructions": 7711,
@@ -777,7 +897,7 @@
    "status": "ok"
   },
   "c2lr8x7": {
-   "bytes": 14350553,
+   "bytes": 14378280,
    "code": "color7",
    "family": "C2LR",
    "instructions": 8093,
@@ -787,7 +907,7 @@
    "status": "ok"
   },
   "c2lr8x8": {
-   "bytes": 13884016,
+   "bytes": 13911743,
    "code": "color7",
    "family": "C2LR",
    "instructions": 7553,
@@ -797,7 +917,7 @@
    "status": "ok"
   },
   "c2lr9x8": {
-   "bytes": 14066500,
+   "bytes": 14094227,
    "code": "color7",
    "family": "C2LR",
    "instructions": 7692,
@@ -807,7 +927,7 @@
    "status": "ok"
   },
   "c2lr9x9": {
-   "bytes": 13739564,
+   "bytes": 13767291,
    "code": "color7",
    "family": "C2LR",
    "instructions": 7319,
@@ -816,118 +936,128 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor36_18d_j": {
-   "bytes": 17618513,
+  "conveyor20_1L": {
+   "bytes": 16025073,
    "code": "color7",
    "family": "Conveyor",
-   "instructions": 31642,
-   "page": "color7/conveyor36_18d_j.html",
-   "point": "conveyor36_18d_j",
+   "instructions": 21230,
+   "page": "color7/conveyor20_1L.html",
+   "point": "conveyor20_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor36_24d_j": {
-   "bytes": 16909728,
+  "conveyor20_2L": {
+   "bytes": 15341695,
    "code": "color7",
    "family": "Conveyor",
-   "instructions": 25047,
-   "page": "color7/conveyor36_24d_j.html",
-   "point": "conveyor36_24d_j",
+   "instructions": 21198,
+   "page": "color7/conveyor20_2L.html",
+   "point": "conveyor20_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor45_18d_j": {
-   "bytes": 19319679,
+  "conveyor38_1L": {
+   "bytes": 16764678,
    "code": "color7",
    "family": "Conveyor",
-   "instructions": 43022,
-   "page": "color7/conveyor45_18d_j.html",
-   "point": "conveyor45_18d_j",
+   "instructions": 22461,
+   "page": "color7/conveyor38_1L.html",
+   "point": "conveyor38_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor48_24d_j": {
-   "bytes": 18040612,
+  "conveyor38_2L": {
+   "bytes": 14994620,
    "code": "color7",
    "family": "Conveyor",
-   "instructions": 33252,
-   "page": "color7/conveyor48_24d_j.html",
-   "point": "conveyor48_24d_j",
+   "instructions": 18119,
+   "page": "color7/conveyor38_2L.html",
+   "point": "conveyor38_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone12_n6": {
-   "bytes": 17509021,
+  "cyclone18_n4": {
+   "bytes": 22121792,
    "code": "color7",
    "family": "Cyclone",
-   "instructions": 16659,
-   "page": "color7/cyclone12_n6.html",
-   "point": "cyclone12_n6",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone22_n3": {
-   "bytes": 21312126,
-   "code": "color7",
-   "family": "Cyclone",
-   "instructions": 15317,
-   "page": "color7/cyclone22_n3.html",
-   "point": "cyclone22_n3",
+   "instructions": 15255,
+   "page": "color7/cyclone18_n4.html",
+   "point": "cyclone18_n4",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone2_n28": {
-   "bytes": 12848666,
+   "bytes": 12831560,
    "code": "color7",
    "family": "Cyclone",
-   "instructions": 15897,
+   "instructions": 15622,
    "page": "color7/cyclone2_n28.html",
    "point": "cyclone2_n28",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone38_n2": {
-   "bytes": 33290605,
-   "code": "color7",
-   "family": "Cyclone",
-   "instructions": 18887,
-   "page": "color7/cyclone38_n2.html",
-   "point": "cyclone38_n2",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone4_n15": {
-   "bytes": 14175697,
-   "code": "color7",
-   "family": "Cyclone",
-   "instructions": 16628,
-   "page": "color7/cyclone4_n15.html",
-   "point": "cyclone4_n15",
-   "rules_failed": [],
-   "status": "ok"
-  },
   "cyclone6_n10": {
-   "bytes": 14909586,
+   "bytes": 14882375,
    "code": "color7",
    "family": "Cyclone",
-   "instructions": 15929,
+   "instructions": 15547,
    "page": "color7/cyclone6_n10.html",
    "point": "cyclone6_n10",
    "rules_failed": [],
    "status": "ok"
   },
+  "grid10x9": {
+   "bytes": 11362650,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 6699,
+   "page": "color7/grid10x9.html",
+   "point": "grid10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x6": {
+   "bytes": 11164478,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 6425,
+   "page": "color7/grid7x6.html",
+   "point": "grid7x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x7": {
+   "bytes": 11524023,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 7278,
+   "page": "color7/grid8x7.html",
+   "point": "grid8x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x8": {
+   "bytes": 11008653,
+   "code": "color7",
+   "family": "Grid",
+   "instructions": 5736,
+   "page": "color7/grid9x8.html",
+   "point": "grid9x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "helios98": {
-   "bytes": 54336965,
+   "bytes": 54354958,
    "code": "color7",
    "family": "Helios",
-   "instructions": 177392,
+   "instructions": 177370,
    "page": "color7/helios98.html",
    "point": "helios98",
    "rules_failed": [],
    "status": "ok"
   },
   "wise_h3_5x5": {
-   "bytes": 13863709,
+   "bytes": 13887564,
    "code": "color7",
    "family": "WISE",
    "instructions": 11895,
@@ -937,7 +1067,7 @@
    "status": "ok"
   },
   "wise_h3_6x5": {
-   "bytes": 14046425,
+   "bytes": 14069513,
    "code": "color7",
    "family": "WISE",
    "instructions": 12349,
@@ -947,7 +1077,7 @@
    "status": "ok"
   },
   "wise_h3_7x6": {
-   "bytes": 14324306,
+   "bytes": 14345544,
    "code": "color7",
    "family": "WISE",
    "instructions": 12911,
@@ -957,7 +1087,7 @@
    "status": "ok"
   },
   "wise_h3_7x7": {
-   "bytes": 13817037,
+   "bytes": 13837192,
    "code": "color7",
    "family": "WISE",
    "instructions": 11586,
@@ -967,7 +1097,7 @@
    "status": "ok"
   },
   "wise_h5_4x4": {
-   "bytes": 14647719,
+   "bytes": 14671830,
    "code": "color7",
    "family": "WISE",
    "instructions": 14075,
@@ -977,7 +1107,7 @@
    "status": "ok"
   },
   "wise_h5_5x4": {
-   "bytes": 15143316,
+   "bytes": 15166538,
    "code": "color7",
    "family": "WISE",
    "instructions": 15240,
@@ -987,7 +1117,7 @@
    "status": "ok"
   },
   "wise_h5_5x5": {
-   "bytes": 15052327,
+   "bytes": 15074432,
    "code": "color7",
    "family": "WISE",
    "instructions": 14861,
@@ -997,7 +1127,7 @@
    "status": "ok"
   },
   "wise_h5_6x5": {
-   "bytes": 15203173,
+   "bytes": 15224161,
    "code": "color7",
    "family": "WISE",
    "instructions": 15213,
@@ -1007,7 +1137,7 @@
    "status": "ok"
   },
   "wise_h7_3x3": {
-   "bytes": 16784042,
+   "bytes": 16809073,
    "code": "color7",
    "family": "WISE",
    "instructions": 19848,
@@ -1017,7 +1147,7 @@
    "status": "ok"
   },
   "wise_h7_4x3": {
-   "bytes": 15986315,
+   "bytes": 16010475,
    "code": "color7",
    "family": "WISE",
    "instructions": 17555,
@@ -1027,7 +1157,7 @@
    "status": "ok"
   },
   "wise_h7_4x4": {
-   "bytes": 16313903,
+   "bytes": 16336894,
    "code": "color7",
    "family": "WISE",
    "instructions": 18335,
@@ -1037,7 +1167,7 @@
    "status": "ok"
   },
   "wise_h7_5x4": {
-   "bytes": 15597580,
+   "bytes": 15619402,
    "code": "color7",
    "family": "WISE",
    "instructions": 16437,
@@ -1049,7 +1179,7 @@
  },
  "hgp58": {
   "c2lr10x10": {
-   "bytes": 12422428,
+   "bytes": 12450157,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5679,
@@ -1059,7 +1189,7 @@
    "status": "ok"
   },
   "c2lr10x9": {
-   "bytes": 12651417,
+   "bytes": 12679144,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5844,
@@ -1069,7 +1199,7 @@
    "status": "ok"
   },
   "c2lr11x10": {
-   "bytes": 12448826,
+   "bytes": 12476555,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5658,
@@ -1079,7 +1209,7 @@
    "status": "ok"
   },
   "c2lr11x11": {
-   "bytes": 12600695,
+   "bytes": 12628424,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5736,
@@ -1089,7 +1219,7 @@
    "status": "ok"
   },
   "c2lr12x11": {
-   "bytes": 12477964,
+   "bytes": 12505693,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5601,
@@ -1099,7 +1229,7 @@
    "status": "ok"
   },
   "c2lr12x12": {
-   "bytes": 12612283,
+   "bytes": 12640012,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5721,
@@ -1109,7 +1239,7 @@
    "status": "ok"
   },
   "c2lr13x12": {
-   "bytes": 12305338,
+   "bytes": 12333067,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5471,
@@ -1119,7 +1249,7 @@
    "status": "ok"
   },
   "c2lr8x8": {
-   "bytes": 12650532,
+   "bytes": 12678257,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5894,
@@ -1129,7 +1259,7 @@
    "status": "ok"
   },
   "c2lr9x8": {
-   "bytes": 12258428,
+   "bytes": 12286153,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5581,
@@ -1139,7 +1269,7 @@
    "status": "ok"
   },
   "c2lr9x9": {
-   "bytes": 12612588,
+   "bytes": 12640313,
    "code": "hgp58",
    "family": "C2LR",
    "instructions": 5835,
@@ -1148,88 +1278,108 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor84_42d_j": {
-   "bytes": 15718286,
+  "conveyor30_2L": {
+   "bytes": 13098382,
    "code": "hgp58",
    "family": "Conveyor",
-   "instructions": 25229,
-   "page": "hgp58/conveyor84_42d_j.html",
-   "point": "conveyor84_42d_j",
+   "instructions": 15366,
+   "page": "hgp58/conveyor30_2L.html",
+   "point": "conveyor30_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor84_56d_j": {
-   "bytes": 14888235,
+  "conveyor58_1L": {
+   "bytes": 16746567,
    "code": "hgp58",
    "family": "Conveyor",
-   "instructions": 18626,
-   "page": "hgp58/conveyor84_56d_j.html",
-   "point": "conveyor84_56d_j",
+   "instructions": 17087,
+   "page": "hgp58/conveyor58_1L.html",
+   "point": "conveyor58_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone12_n9": {
-   "bytes": 15591800,
+  "conveyor58_2L": {
+   "bytes": 15002037,
    "code": "hgp58",
-   "family": "Cyclone",
-   "instructions": 13722,
-   "page": "hgp58/cyclone12_n9.html",
-   "point": "cyclone12_n9",
+   "family": "Conveyor",
+   "instructions": 16842,
+   "page": "hgp58/conveyor58_2L.html",
+   "point": "conveyor58_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone20_n6": {
-   "bytes": 19724220,
+  "cyclone14_n8": {
+   "bytes": 16293565,
    "code": "hgp58",
    "family": "Cyclone",
-   "instructions": 14079,
-   "page": "hgp58/cyclone20_n6.html",
-   "point": "cyclone20_n6",
+   "instructions": 12342,
+   "page": "hgp58/cyclone14_n8.html",
+   "point": "cyclone14_n8",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone34_n4": {
-   "bytes": 25074482,
+  "cyclone42_n3": {
+   "bytes": 32310156,
    "code": "hgp58",
    "family": "Cyclone",
-   "instructions": 14385,
-   "page": "hgp58/cyclone34_n4.html",
-   "point": "cyclone34_n4",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone4_n26": {
-   "bytes": 11468040,
-   "code": "hgp58",
-   "family": "Cyclone",
-   "instructions": 13006,
-   "page": "hgp58/cyclone4_n26.html",
-   "point": "cyclone4_n26",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone58_n2": {
-   "bytes": 38096491,
-   "code": "hgp58",
-   "family": "Cyclone",
-   "instructions": 13106,
-   "page": "hgp58/cyclone58_n2.html",
-   "point": "cyclone58_n2",
+   "instructions": 12830,
+   "page": "hgp58/cyclone42_n3.html",
+   "point": "cyclone42_n3",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone6_n17": {
-   "bytes": 13296495,
+   "bytes": 13272125,
    "code": "hgp58",
    "family": "Cyclone",
-   "instructions": 13744,
+   "instructions": 13478,
    "page": "hgp58/cyclone6_n17.html",
    "point": "cyclone6_n17",
    "rules_failed": [],
    "status": "ok"
   },
+  "grid10x9": {
+   "bytes": 8935507,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4538,
+   "page": "hgp58/grid10x9.html",
+   "point": "grid10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid11x11": {
+   "bytes": 9094228,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4970,
+   "page": "hgp58/grid11x11.html",
+   "point": "grid11x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid13x12": {
+   "bytes": 9043483,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 4591,
+   "page": "hgp58/grid13x12.html",
+   "point": "grid13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x8": {
+   "bytes": 9172610,
+   "code": "hgp58",
+   "family": "Grid",
+   "instructions": 5533,
+   "page": "hgp58/grid8x8.html",
+   "point": "grid8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "wise_h3_10x10": {
-   "bytes": 11288232,
+   "bytes": 11300469,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 9385,
@@ -1239,7 +1389,7 @@
    "status": "ok"
   },
   "wise_h3_7x6": {
-   "bytes": 11251401,
+   "bytes": 11272637,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 10122,
@@ -1249,7 +1399,7 @@
    "status": "ok"
   },
   "wise_h3_8x7": {
-   "bytes": 11246530,
+   "bytes": 11265600,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 9925,
@@ -1259,7 +1409,7 @@
    "status": "ok"
   },
   "wise_h3_9x9": {
-   "bytes": 11165905,
+   "bytes": 11181094,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 9339,
@@ -1269,7 +1419,7 @@
    "status": "ok"
   },
   "wise_h5_5x5": {
-   "bytes": 11884472,
+   "bytes": 11906575,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 12001,
@@ -1279,7 +1429,7 @@
    "status": "ok"
   },
   "wise_h5_6x6": {
-   "bytes": 11832525,
+   "bytes": 11852166,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 11665,
@@ -1289,7 +1439,7 @@
    "status": "ok"
   },
   "wise_h5_7x6": {
-   "bytes": 11839868,
+   "bytes": 11858164,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 11515,
@@ -1299,7 +1449,7 @@
    "status": "ok"
   },
   "wise_h5_8x7": {
-   "bytes": 11776065,
+   "bytes": 11791215,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 11115,
@@ -1309,7 +1459,7 @@
    "status": "ok"
   },
   "wise_h7_4x4": {
-   "bytes": 13209408,
+   "bytes": 13232397,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 15667,
@@ -1319,7 +1469,7 @@
    "status": "ok"
   },
   "wise_h7_5x5": {
-   "bytes": 12822385,
+   "bytes": 12842738,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 14371,
@@ -1329,7 +1479,7 @@
    "status": "ok"
   },
   "wise_h7_6x5": {
-   "bytes": 12795170,
+   "bytes": 12814056,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 14229,
@@ -1339,7 +1489,7 @@
    "status": "ok"
   },
   "wise_h7_7x6": {
-   "bytes": 12553080,
+   "bytes": 12568436,
    "code": "hgp58",
    "family": "WISE",
    "instructions": 13261,
@@ -1351,7 +1501,7 @@
  },
  "surface3": {
   "c2lr4x4": {
-   "bytes": 2333382,
+   "bytes": 2361091,
    "code": "surface3",
    "family": "C2LR",
    "instructions": 425,
@@ -1361,7 +1511,7 @@
    "status": "ok"
   },
   "c2lr5x4": {
-   "bytes": 2281308,
+   "bytes": 2309017,
    "code": "surface3",
    "family": "C2LR",
    "instructions": 298,
@@ -1371,7 +1521,7 @@
    "status": "ok"
   },
   "c2lr5x5": {
-   "bytes": 2323385,
+   "bytes": 2351094,
    "code": "surface3",
    "family": "C2LR",
    "instructions": 370,
@@ -1381,7 +1531,7 @@
    "status": "ok"
   },
   "c2lr6x5": {
-   "bytes": 2331491,
+   "bytes": 2359200,
    "code": "surface3",
    "family": "C2LR",
    "instructions": 370,
@@ -1390,98 +1540,118 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor12_8d_j": {
-   "bytes": 2702299,
+  "conveyor10_1L": {
+   "bytes": 2401320,
    "code": "surface3",
    "family": "Conveyor",
-   "instructions": 1563,
-   "page": "surface3/conveyor12_8d_j.html",
-   "point": "conveyor12_8d_j",
+   "instructions": 670,
+   "page": "surface3/conveyor10_1L.html",
+   "point": "conveyor10_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor16_8d_j": {
-   "bytes": 2816530,
+  "conveyor10_2L": {
+   "bytes": 2396125,
    "code": "surface3",
    "family": "Conveyor",
-   "instructions": 1923,
-   "page": "surface3/conveyor16_8d_j.html",
-   "point": "conveyor16_8d_j",
+   "instructions": 571,
+   "page": "surface3/conveyor10_2L.html",
+   "point": "conveyor10_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor22_11d_j": {
-   "bytes": 2818565,
+  "conveyor6_2L": {
+   "bytes": 2504497,
    "code": "surface3",
    "family": "Conveyor",
-   "instructions": 1877,
-   "page": "surface3/conveyor22_11d_j.html",
-   "point": "conveyor22_11d_j",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone10_n2": {
-   "bytes": 2709668,
-   "code": "surface3",
-   "family": "Cyclone",
-   "instructions": 1040,
-   "page": "surface3/cyclone10_n2.html",
-   "point": "cyclone10_n2",
+   "instructions": 1090,
+   "page": "surface3/conveyor6_2L.html",
+   "point": "conveyor6_2L",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone2_n9": {
-   "bytes": 2458431,
+   "bytes": 2468828,
    "code": "surface3",
    "family": "Cyclone",
-   "instructions": 1080,
+   "instructions": 1003,
    "page": "surface3/cyclone2_n9.html",
    "point": "cyclone2_n9",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone4_n5": {
-   "bytes": 2524239,
+   "bytes": 2529682,
    "code": "surface3",
    "family": "Cyclone",
-   "instructions": 1093,
+   "instructions": 989,
    "page": "surface3/cyclone4_n5.html",
    "point": "cyclone4_n5",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone6_n4": {
-   "bytes": 2686957,
-   "code": "surface3",
-   "family": "Cyclone",
-   "instructions": 1240,
-   "page": "surface3/cyclone6_n4.html",
-   "point": "cyclone6_n4",
-   "rules_failed": [],
-   "status": "ok"
-  },
   "cyclone8_n3": {
-   "bytes": 2703500,
+   "bytes": 2724785,
    "code": "surface3",
    "family": "Cyclone",
-   "instructions": 1014,
+   "instructions": 972,
    "page": "surface3/cyclone8_n3.html",
    "point": "cyclone8_n3",
    "rules_failed": [],
    "status": "ok"
   },
+  "grid4x4": {
+   "bytes": 2469978,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 771,
+   "page": "surface3/grid4x4.html",
+   "point": "grid4x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid5x4": {
+   "bytes": 2492917,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 821,
+   "page": "surface3/grid5x4.html",
+   "point": "grid5x4",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid5x5": {
+   "bytes": 2508118,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 829,
+   "page": "surface3/grid5x5.html",
+   "point": "grid5x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x5": {
+   "bytes": 2507315,
+   "code": "surface3",
+   "family": "Grid",
+   "instructions": 800,
+   "page": "surface3/grid6x5.html",
+   "point": "grid6x5",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "helios98": {
-   "bytes": 6010841,
+   "bytes": 5586367,
    "code": "surface3",
    "family": "Helios",
-   "instructions": 8056,
+   "instructions": 7274,
    "page": "surface3/helios98.html",
    "point": "helios98",
    "rules_failed": [],
    "status": "ok"
   },
   "wise_h3_3x3": {
-   "bytes": 2491477,
+   "bytes": 2517751,
    "code": "surface3",
    "family": "WISE",
    "instructions": 650,
@@ -1491,7 +1661,7 @@
    "status": "ok"
   },
   "wise_h3_4x3": {
-   "bytes": 2570150,
+   "bytes": 2595973,
    "code": "surface3",
    "family": "WISE",
    "instructions": 830,
@@ -1501,7 +1671,7 @@
    "status": "ok"
   },
   "wise_h3_4x4": {
-   "bytes": 2563119,
+   "bytes": 2588333,
    "code": "surface3",
    "family": "WISE",
    "instructions": 758,
@@ -1511,7 +1681,7 @@
    "status": "ok"
   },
   "wise_h5_2x2": {
-   "bytes": 2568894,
+   "bytes": 2595632,
    "code": "surface3",
    "family": "WISE",
    "instructions": 923,
@@ -1521,7 +1691,7 @@
    "status": "ok"
   },
   "wise_h5_3x2": {
-   "bytes": 2532982,
+   "bytes": 2559287,
    "code": "surface3",
    "family": "WISE",
    "instructions": 774,
@@ -1531,7 +1701,7 @@
    "status": "ok"
   },
   "wise_h5_3x3": {
-   "bytes": 2572874,
+   "bytes": 2598518,
    "code": "surface3",
    "family": "WISE",
    "instructions": 829,
@@ -1541,7 +1711,7 @@
    "status": "ok"
   },
   "wise_h7_2x2": {
-   "bytes": 2659313,
+   "bytes": 2685771,
    "code": "surface3",
    "family": "WISE",
    "instructions": 1140,
@@ -1551,7 +1721,7 @@
    "status": "ok"
   },
   "wise_h7_3x2": {
-   "bytes": 2616225,
+   "bytes": 2642110,
    "code": "surface3",
    "family": "WISE",
    "instructions": 963,
@@ -1563,7 +1733,7 @@
  },
  "surface5": {
   "c2lr6x6": {
-   "bytes": 5370021,
+   "bytes": 5397731,
    "code": "surface5",
    "family": "C2LR",
    "instructions": 1761,
@@ -1573,7 +1743,7 @@
    "status": "ok"
   },
   "c2lr7x6": {
-   "bytes": 5320114,
+   "bytes": 5347824,
    "code": "surface5",
    "family": "C2LR",
    "instructions": 1733,
@@ -1583,7 +1753,7 @@
    "status": "ok"
   },
   "c2lr7x7": {
-   "bytes": 5131123,
+   "bytes": 5158833,
    "code": "surface5",
    "family": "C2LR",
    "instructions": 1471,
@@ -1593,7 +1763,7 @@
    "status": "ok"
   },
   "c2lr8x7": {
-   "bytes": 5171464,
+   "bytes": 5199174,
    "code": "surface5",
    "family": "C2LR",
    "instructions": 1480,
@@ -1603,7 +1773,7 @@
    "status": "ok"
   },
   "c2lr8x8": {
-   "bytes": 5168053,
+   "bytes": 5195763,
    "code": "surface5",
    "family": "C2LR",
    "instructions": 1461,
@@ -1613,7 +1783,7 @@
    "status": "ok"
   },
   "c2lr9x8": {
-   "bytes": 5402979,
+   "bytes": 5430689,
    "code": "surface5",
    "family": "C2LR",
    "instructions": 1752,
@@ -1623,7 +1793,7 @@
    "status": "ok"
   },
   "c2lr9x9": {
-   "bytes": 5317009,
+   "bytes": 5344719,
    "code": "surface5",
    "family": "C2LR",
    "instructions": 1613,
@@ -1632,108 +1802,138 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor32_32d_j": {
-   "bytes": 5801726,
+  "conveyor14_2L": {
+   "bytes": 5910516,
    "code": "surface5",
    "family": "Conveyor",
-   "instructions": 4062,
-   "page": "surface5/conveyor32_32d_j.html",
-   "point": "conveyor32_32d_j",
+   "instructions": 5477,
+   "page": "surface5/conveyor14_2L.html",
+   "point": "conveyor14_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor36_24d_j": {
-   "bytes": 7392943,
+  "conveyor26_1L": {
+   "bytes": 5940970,
    "code": "surface5",
    "family": "Conveyor",
-   "instructions": 8916,
-   "page": "surface5/conveyor36_24d_j.html",
-   "point": "conveyor36_24d_j",
+   "instructions": 4417,
+   "page": "surface5/conveyor26_1L.html",
+   "point": "conveyor26_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor48_24d_j": {
-   "bytes": 8186347,
+  "conveyor26_2L": {
+   "bytes": 5635289,
    "code": "surface5",
    "family": "Conveyor",
-   "instructions": 10715,
-   "page": "surface5/conveyor48_24d_j.html",
-   "point": "conveyor48_24d_j",
+   "instructions": 3975,
+   "page": "surface5/conveyor26_2L.html",
+   "point": "conveyor26_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor48_32d_j": {
-   "bytes": 6807029,
-   "code": "surface5",
-   "family": "Conveyor",
-   "instructions": 6661,
-   "page": "surface5/conveyor48_32d_j.html",
-   "point": "conveyor48_32d_j",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone10_n6": {
-   "bytes": 7423874,
+  "cyclone12_n5": {
+   "bytes": 7643525,
    "code": "surface5",
    "family": "Cyclone",
-   "instructions": 6051,
-   "page": "surface5/cyclone10_n6.html",
-   "point": "cyclone10_n6",
+   "instructions": 5231,
+   "page": "surface5/cyclone12_n5.html",
+   "point": "cyclone12_n5",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone16_n4": {
-   "bytes": 8592851,
+  "cyclone24_n3": {
+   "bytes": 10024419,
    "code": "surface5",
    "family": "Cyclone",
-   "instructions": 6189,
-   "page": "surface5/cyclone16_n4.html",
-   "point": "cyclone16_n4",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone26_n2": {
-   "bytes": 10220562,
-   "code": "surface5",
-   "family": "Cyclone",
-   "instructions": 5400,
-   "page": "surface5/cyclone26_n2.html",
-   "point": "cyclone26_n2",
+   "instructions": 5076,
+   "page": "surface5/cyclone24_n3.html",
+   "point": "cyclone24_n3",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone2_n25": {
-   "bytes": 5626149,
+   "bytes": 5625667,
    "code": "surface5",
    "family": "Cyclone",
-   "instructions": 5617,
+   "instructions": 5479,
    "page": "surface5/cyclone2_n25.html",
    "point": "cyclone2_n25",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone4_n13": {
-   "bytes": 5924289,
+   "bytes": 5909213,
    "code": "surface5",
    "family": "Cyclone",
-   "instructions": 5465,
+   "instructions": 5217,
    "page": "surface5/cyclone4_n13.html",
    "point": "cyclone4_n13",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone6_n9": {
-   "bytes": 6502830,
+   "bytes": 6513706,
    "code": "surface5",
    "family": "Cyclone",
-   "instructions": 5539,
+   "instructions": 5378,
    "page": "surface5/cyclone6_n9.html",
    "point": "cyclone6_n9",
    "rules_failed": [],
    "status": "ok"
   },
+  "cyclone8_n7": {
+   "bytes": 6897463,
+   "code": "surface5",
+   "family": "Cyclone",
+   "instructions": 5429,
+   "page": "surface5/cyclone8_n7.html",
+   "point": "cyclone8_n7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid6x6": {
+   "bytes": 4987909,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 2262,
+   "page": "surface5/grid6x6.html",
+   "point": "grid6x6",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid7x7": {
+   "bytes": 5053986,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 2315,
+   "page": "surface5/grid7x7.html",
+   "point": "grid7x7",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x8": {
+   "bytes": 5051648,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 2266,
+   "page": "surface5/grid8x8.html",
+   "point": "grid8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid9x9": {
+   "bytes": 5074663,
+   "code": "surface5",
+   "family": "Grid",
+   "instructions": 2261,
+   "page": "surface5/grid9x9.html",
+   "point": "grid9x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "helios98": {
-   "bytes": 25416289,
+   "bytes": 25439119,
    "code": "surface5",
    "family": "Helios",
    "instructions": 56058,
@@ -1743,7 +1943,7 @@
    "status": "ok"
   },
   "wise_h3_5x4": {
-   "bytes": 6092997,
+   "bytes": 6117602,
    "code": "surface5",
    "family": "WISE",
    "instructions": 4623,
@@ -1753,7 +1953,7 @@
    "status": "ok"
   },
   "wise_h3_6x5": {
-   "bytes": 5649605,
+   "bytes": 5672676,
    "code": "surface5",
    "family": "WISE",
    "instructions": 3345,
@@ -1763,7 +1963,7 @@
    "status": "ok"
   },
   "wise_h3_6x6": {
-   "bytes": 5684765,
+   "bytes": 5706911,
    "code": "surface5",
    "family": "WISE",
    "instructions": 3373,
@@ -1773,7 +1973,7 @@
    "status": "ok"
   },
   "wise_h3_7x7": {
-   "bytes": 6050805,
+   "bytes": 6070943,
    "code": "surface5",
    "family": "WISE",
    "instructions": 4185,
@@ -1783,7 +1983,7 @@
    "status": "ok"
   },
   "wise_h5_4x3": {
-   "bytes": 6742485,
+   "bytes": 6767468,
    "code": "surface5",
    "family": "WISE",
    "instructions": 6407,
@@ -1793,7 +1993,7 @@
    "status": "ok"
   },
   "wise_h5_4x4": {
-   "bytes": 6045020,
+   "bytes": 6069114,
    "code": "surface5",
    "family": "WISE",
    "instructions": 4522,
@@ -1803,7 +2003,7 @@
    "status": "ok"
   },
   "wise_h5_5x4": {
-   "bytes": 6233583,
+   "bytes": 6256788,
    "code": "surface5",
    "family": "WISE",
    "instructions": 4917,
@@ -1813,7 +2013,7 @@
    "status": "ok"
   },
   "wise_h5_5x5": {
-   "bytes": 5921406,
+   "bytes": 5943494,
    "code": "surface5",
    "family": "WISE",
    "instructions": 4061,
@@ -1823,7 +2023,7 @@
    "status": "ok"
   },
   "wise_h7_3x3": {
-   "bytes": 7036751,
+   "bytes": 7061765,
    "code": "surface5",
    "family": "WISE",
    "instructions": 7234,
@@ -1833,7 +2033,7 @@
    "status": "ok"
   },
   "wise_h7_4x3": {
-   "bytes": 6962575,
+   "bytes": 6986718,
    "code": "surface5",
    "family": "WISE",
    "instructions": 6940,
@@ -1843,7 +2043,7 @@
    "status": "ok"
   },
   "wise_h7_4x4": {
-   "bytes": 6399182,
+   "bytes": 6422156,
    "code": "surface5",
    "family": "WISE",
    "instructions": 5335,
@@ -1853,7 +2053,7 @@
    "status": "ok"
   },
   "wise_h7_5x4": {
-   "bytes": 6491412,
+   "bytes": 6513217,
    "code": "surface5",
    "family": "WISE",
    "instructions": 5503,
@@ -1865,7 +2065,7 @@
  },
  "surface7": {
   "c2lr10x10": {
-   "bytes": 12896428,
+   "bytes": 12924142,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3512,
@@ -1875,7 +2075,7 @@
    "status": "ok"
   },
   "c2lr10x9": {
-   "bytes": 12456748,
+   "bytes": 12484460,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3218,
@@ -1885,7 +2085,7 @@
    "status": "ok"
   },
   "c2lr11x10": {
-   "bytes": 12241494,
+   "bytes": 12269208,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3026,
@@ -1895,7 +2095,7 @@
    "status": "ok"
   },
   "c2lr11x11": {
-   "bytes": 12306688,
+   "bytes": 12334402,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3087,
@@ -1905,7 +2105,7 @@
    "status": "ok"
   },
   "c2lr12x11": {
-   "bytes": 12357323,
+   "bytes": 12385037,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3101,
@@ -1915,7 +2115,7 @@
    "status": "ok"
   },
   "c2lr12x12": {
-   "bytes": 12139636,
+   "bytes": 12167350,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 2887,
@@ -1925,7 +2125,7 @@
    "status": "ok"
   },
   "c2lr13x12": {
-   "bytes": 12449309,
+   "bytes": 12477023,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3097,
@@ -1935,7 +2135,7 @@
    "status": "ok"
   },
   "c2lr8x8": {
-   "bytes": 12814034,
+   "bytes": 12841744,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3513,
@@ -1945,7 +2145,7 @@
    "status": "ok"
   },
   "c2lr9x8": {
-   "bytes": 12501378,
+   "bytes": 12529088,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3295,
@@ -1955,7 +2155,7 @@
    "status": "ok"
   },
   "c2lr9x9": {
-   "bytes": 12224839,
+   "bytes": 12252549,
    "code": "surface7",
    "family": "C2LR",
    "instructions": 3076,
@@ -1964,108 +2164,138 @@
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor64_64d_j": {
-   "bytes": 14330595,
+  "conveyor26_2L": {
+   "bytes": 15705120,
    "code": "surface7",
    "family": "Conveyor",
-   "instructions": 11617,
-   "page": "surface7/conveyor64_64d_j.html",
-   "point": "conveyor64_64d_j",
+   "instructions": 16283,
+   "page": "surface7/conveyor26_2L.html",
+   "point": "conveyor26_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor72_48d_j": {
-   "bytes": 17797846,
+  "conveyor50_1L": {
+   "bytes": 13737224,
    "code": "surface7",
    "family": "Conveyor",
-   "instructions": 24220,
-   "page": "surface7/conveyor72_48d_j.html",
-   "point": "conveyor72_48d_j",
+   "instructions": 8647,
+   "page": "surface7/conveyor50_1L.html",
+   "point": "conveyor50_1L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor96_48d_j": {
-   "bytes": 19750301,
+  "conveyor50_2L": {
+   "bytes": 12076094,
    "code": "surface7",
    "family": "Conveyor",
-   "instructions": 35478,
-   "page": "surface7/conveyor96_48d_j.html",
-   "point": "conveyor96_48d_j",
+   "instructions": 6868,
+   "page": "surface7/conveyor50_2L.html",
+   "point": "conveyor50_2L",
    "rules_failed": [],
    "status": "ok"
   },
-  "conveyor96_64d_j": {
-   "bytes": 18227172,
-   "code": "surface7",
-   "family": "Conveyor",
-   "instructions": 19274,
-   "page": "surface7/conveyor96_64d_j.html",
-   "point": "conveyor96_64d_j",
-   "rules_failed": [],
-   "status": "ok"
-  },
-  "cyclone10_n10": {
-   "bytes": 17830228,
+  "cyclone12_n9": {
+   "bytes": 18704103,
    "code": "surface7",
    "family": "Cyclone",
-   "instructions": 16010,
-   "page": "surface7/cyclone10_n10.html",
-   "point": "cyclone10_n10",
+   "instructions": 15016,
+   "page": "surface7/cyclone12_n9.html",
+   "point": "cyclone12_n9",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone18_n6": {
-   "bytes": 22298990,
+  "cyclone16_n7": {
+   "bytes": 21075225,
    "code": "surface7",
    "family": "Cyclone",
-   "instructions": 16620,
-   "page": "surface7/cyclone18_n6.html",
-   "point": "cyclone18_n6",
+   "instructions": 15357,
+   "page": "surface7/cyclone16_n7.html",
+   "point": "cyclone16_n7",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone30_n4": {
-   "bytes": 28893008,
+  "cyclone24_n5": {
+   "bytes": 25219536,
    "code": "surface7",
    "family": "Cyclone",
-   "instructions": 17154,
-   "page": "surface7/cyclone30_n4.html",
-   "point": "cyclone30_n4",
+   "instructions": 14804,
+   "page": "surface7/cyclone24_n5.html",
+   "point": "cyclone24_n5",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "cyclone48_n3": {
+   "bytes": 38333261,
+   "code": "surface7",
+   "family": "Cyclone",
+   "instructions": 14571,
+   "page": "surface7/cyclone48_n3.html",
+   "point": "cyclone48_n3",
    "rules_failed": [],
    "status": "ok"
   },
   "cyclone4_n25": {
-   "bytes": 14620767,
+   "bytes": 14596167,
    "code": "surface7",
    "family": "Cyclone",
-   "instructions": 16442,
+   "instructions": 16019,
    "page": "surface7/cyclone4_n25.html",
    "point": "cyclone4_n25",
    "rules_failed": [],
    "status": "ok"
   },
-  "cyclone50_n2": {
-   "bytes": 38692226,
-   "code": "surface7",
-   "family": "Cyclone",
-   "instructions": 14671,
-   "page": "surface7/cyclone50_n2.html",
-   "point": "cyclone50_n2",
-   "rules_failed": [],
-   "status": "ok"
-  },
   "cyclone6_n17": {
-   "bytes": 15627026,
+   "bytes": 15596622,
    "code": "surface7",
    "family": "Cyclone",
-   "instructions": 15782,
+   "instructions": 15388,
    "page": "surface7/cyclone6_n17.html",
    "point": "cyclone6_n17",
    "rules_failed": [],
    "status": "ok"
   },
+  "grid10x9": {
+   "bytes": 10699683,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 4839,
+   "page": "surface7/grid10x9.html",
+   "point": "grid10x9",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid11x11": {
+   "bytes": 12015532,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 8639,
+   "page": "surface7/grid11x11.html",
+   "point": "grid11x11",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid13x12": {
+   "bytes": 10740607,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 4538,
+   "page": "surface7/grid13x12.html",
+   "point": "grid13x12",
+   "rules_failed": [],
+   "status": "ok"
+  },
+  "grid8x8": {
+   "bytes": 11533377,
+   "code": "surface7",
+   "family": "Grid",
+   "instructions": 7440,
+   "page": "surface7/grid8x8.html",
+   "point": "grid8x8",
+   "rules_failed": [],
+   "status": "ok"
+  },
   "wise_h3_10x9": {
-   "bytes": 13495421,
+   "bytes": 13509198,
    "code": "surface7",
    "family": "WISE",
    "instructions": 10740,
@@ -2075,7 +2305,7 @@
    "status": "ok"
   },
   "wise_h3_6x6": {
-   "bytes": 15061270,
+   "bytes": 15083416,
    "code": "surface7",
    "family": "WISE",
    "instructions": 14434,
@@ -2085,7 +2315,7 @@
    "status": "ok"
   },
   "wise_h3_7x7": {
-   "bytes": 14753087,
+   "bytes": 14773225,
    "code": "surface7",
    "family": "WISE",
    "instructions": 14583,
@@ -2095,7 +2325,7 @@
    "status": "ok"
   },
   "wise_h3_9x8": {
-   "bytes": 14895061,
+   "bytes": 14911634,
    "code": "surface7",
    "family": "WISE",
    "instructions": 14593,
@@ -2105,7 +2335,7 @@
    "status": "ok"
   },
   "wise_h5_5x5": {
-   "bytes": 16071829,
+   "bytes": 16093917,
    "code": "surface7",
    "family": "WISE",
    "instructions": 18143,
@@ -2115,7 +2345,7 @@
    "status": "ok"
   },
   "wise_h5_6x6": {
-   "bytes": 14853485,
+   "bytes": 14873111,
    "code": "surface7",
    "family": "WISE",
    "instructions": 14854,
@@ -2125,7 +2355,7 @@
    "status": "ok"
   },
   "wise_h5_7x6": {
-   "bytes": 15550984,
+   "bytes": 15569265,
    "code": "surface7",
    "family": "WISE",
    "instructions": 16702,
@@ -2135,7 +2365,7 @@
    "status": "ok"
   },
   "wise_h5_8x7": {
-   "bytes": 14492981,
+   "bytes": 14508116,
    "code": "surface7",
    "family": "WISE",
    "instructions": 13482,
@@ -2145,7 +2375,7 @@
    "status": "ok"
   },
   "wise_h7_4x4": {
-   "bytes": 17750157,
+   "bytes": 17773131,
    "code": "surface7",
    "family": "WISE",
    "instructions": 26868,
@@ -2155,7 +2385,7 @@
    "status": "ok"
   },
   "wise_h7_5x4": {
-   "bytes": 17198065,
+   "bytes": 17219870,
    "code": "surface7",
    "family": "WISE",
    "instructions": 23162,
@@ -2165,7 +2395,7 @@
    "status": "ok"
   },
   "wise_h7_6x5": {
-   "bytes": 16968492,
+   "bytes": 16987363,
    "code": "surface7",
    "family": "WISE",
    "instructions": 20806,
@@ -2175,7 +2405,7 @@
    "status": "ok"
   },
   "wise_h7_6x6": {
-   "bytes": 15374733,
+   "bytes": 15391839,
    "code": "surface7",
    "family": "WISE",
    "instructions": 16046,
