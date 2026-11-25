@@ -169,10 +169,10 @@ class ResultsMixin:
                 chosen = gate_sets.resolve(params["gate_set"])
             except ValueError as exc:
                 raise WorkspaceError("bad_request", str(exc), status=422) from None
-            if kind not in ("compile", "run", "ler"):
+            if kind not in ("compile", "run", "ler", "submit"):
                 raise WorkspaceError("bad_request", f"a {kind} job takes no gate_set: it is an option of compile, "
-                                                    "run and ler (a design is entered on a board with the programme "
-                                                    "it adopted: compile that one in the set wanted)", status=422)
+                                                    "run, ler and submit (an evaluation grades the programme the "
+                                                    "design adopted, in whatever set that one is)", status=422)
             if chosen == gate_sets.DEFAULT:
                 params.pop("gate_set")
             else:
@@ -668,10 +668,12 @@ class ResultsMixin:
 
     def submit_design(self, actor: Mapping, *, design: str = "main", board: str | None = None,
                       profile: str = "reference", origin_prompt_id: str | None = None,
-                      request_id: str | None = None, title: str = "", rules=None) -> dict:
+                      request_id: str | None = None, title: str = "", rules=None,
+                      gate_set: str | None = None) -> dict:
         """What a person means by "submit this design to that board": compile the board's circuit for
-        the design (unless its program already is that), adopt it as the design's final program,
-        freeze, grade.  One job; the submission is listed at once and follows it."""
+        the design (unless its program already is that, in `gate_set`), adopt it as the design's final
+        program, freeze, grade.  One job; the submission is listed at once and follows it.  `gate_set`
+        (qccd.ir.gate_sets; the default when None) is the native set the program is compiled to."""
         from .core import WorkspaceError
         rel = self.board(board)
         branch = self.resolve_draft(design)
@@ -680,7 +682,8 @@ class ResultsMixin:
         rules_doc = self.rules_choice(rules)          # refused now, not halfway through the job
         job = self.start_job(actor, "submit", {"branch": branch, "board": rel.id, "profile": profile,
                                                "title": title[:200],
-                                               **({"rules": rules_doc["text"]} if rules_doc else {})},
+                                               **({"rules": rules_doc["text"]} if rules_doc else {}),
+                                               **({"gate_set": gate_set} if gate_set else {})},
                              request_id=request_id, origin_prompt_id=origin_prompt_id)
         return {"job_id": job["job_id"], "design": self.design_title(self.branch(branch)), "board": rel.title,
                 "status": job["status"], "duplicate": job.get("duplicate", False),
@@ -698,12 +701,19 @@ class ResultsMixin:
         head = self.head(branch)
         fp = head.state.final_program or {}
         r = self.replayed(branch, head.revision)
+        from ..ir import gate_sets
+        wanted = params.get("gate_set") or gate_sets.DEFAULT
         fresh = (fp.get("artifact") and fp.get("circuit_digest") == rel.manifest["circuit"]["digest"]
-                 and fp.get("compiled_for") == r.arch_digest() and has_stage_evidence(self, fp))
+                 and fp.get("compiled_for") == r.arch_digest() and has_stage_evidence(self, fp)
+                 and self._program_gate_set(fp) == wanted)
         rev = head.revision
         compiled = reused = None
         if not fresh:
-            reused = self._run_to_adopt(branch, rel, r.arch_digest(), head.revision)
+            # a run's program is reused only in the default set: a run records no other
+            reused = (self._run_to_adopt(branch, rel, r.arch_digest(), head.revision)
+                      if wanted == gate_sets.DEFAULT else None)
+            if reused is not None and self._program_gate_set(reused["adopt_with"]) != wanted:
+                reused = None
             if reused is not None:
                 adopt = reused["adopt_with"]
                 self._progress(jid, "adopt", f"adopting the program the run compiled for this design "
@@ -732,6 +742,17 @@ class ResultsMixin:
                 "submission_id": out["submission_id"], "grading_job": out["job_id"], "revision": rev,
                 "compiled": bool(compiled), "from_run": (reused or {}).get("run_id"),
                 "board": rel.title, "design": out["design"]}
+
+    def _program_gate_set(self, ref: Mapping) -> str | None:
+        """The gate set of an adopted (or adoptable) program, read off its programme and certificate
+        (`gate_sets.derive`); None when it cannot be read or they disagree."""
+        from ..ir import gate_sets
+        try:
+            prog = json.loads(self.get_artifact(ref["artifact"]))
+            cert = json.loads(self.get_artifact(ref["certificate"])) if ref.get("certificate") else None
+        except Exception:                                   # noqa: BLE001 -- unreadable: not reusable
+            return None
+        return gate_sets.derive(prog, cert)
 
     def _run_to_adopt(self, branch: str, rel, arch_digest: str, revision: int) -> dict | None:
         """A finished run that compiled this board's circuit for this very machine: its program, its
@@ -820,7 +841,9 @@ class ResultsMixin:
                         "stale": s["stale"], "eligible": (rep.get("eligibility") or {}).get("eligible"),
                         "metrics": {k: v.get("value") for k, v in (rep.get("metrics") or {}).items()},
                         "rank_by": rep.get("rank_by"), "evaluator": (rep.get("evaluator") or {}).get("version"),
-                        "created_at": s["created_at"], "label": s["label"]})
+                        "created_at": s["created_at"], "label": s["label"],
+                        # the native gate set, only when not the default (the report names none then)
+                        **({"gate_set": rep["gate_set"]} if rep.get("gate_set") else {})})
         return out
 
     def _board_title(self, release_id: str) -> str:

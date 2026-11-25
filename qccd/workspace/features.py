@@ -185,7 +185,8 @@ def _inspect_run(be, a: dict):
 
 
 def _submit_local(be, a: dict):
-    body = {k: a[k] for k in ("design", "board", "profile", "request_id", "origin_prompt_id", "title", "rules") if k in a}
+    body = {k: a[k] for k in ("design", "board", "profile", "request_id", "origin_prompt_id", "title", "rules",
+                              "gate_set") if k in a}
     if "design" not in body and "board" not in body:          # the older form: an adopted program, as it is
         body = {k: a[k] for k in ("branch", "revision", "profile", "request_id", "origin_prompt_id", "title")
                 if k in a}
@@ -555,9 +556,11 @@ FEATURES: tuple[Feature, ...] = (
         "board's own; else a rule set the website ships by name (qccd_list_rules), a .rules file in the "
         "workspace, or the text of one (the rule language: `include \"standard\"`, `drop R20, R21`, rules of "
         "its own). An entry under rules other than the board's is graded by them and listed on the leaderboard "
-        "with what it drops and adds, behind the board's own ranking.",
+        "with what it drops and adds, behind the board's own ranking. gate_set (with board; default ms): the "
+        "native gate set the board's circuit is compiled to -- " + _GATE_SET + " The entry is listed with it.",
         _obj({"design": _S, "board": _S, "profile": {"type": "string", "enum": ["draft", "reference"]},
-              "request_id": _S, "origin_prompt_id": _S, "title": _S, "branch": _S, "revision": _I, "rules": _S}),
+              "request_id": _S, "origin_prompt_id": _S, "title": _S, "branch": _S, "revision": _I, "rules": _S,
+              "gate_set": {"type": "string", "enum": ["ms", "rzz"]}}),
         _submit_local, ("POST /api/submissions",), cli=("submit",), job_kinds=("submit",), group="boards"),
     Feature(
         "qccd_submit_official",

@@ -892,12 +892,12 @@ function gateSetWords(gs) {
   var x = GATE_SETS.filter(function (g) { return g[0] === gs; })[0];
   return 'gate set ' + (x ? gs + ' (R, VZ, ' + x[2] + ')' : gs);
 }
-function gateSetPick() {
-  return h('select', { id: 'qcl-gateset', cls: 'qcl-sel',
-                       title: 'the native gate set Compile only lowers the board\'s circuit to: MS (R, VZ and the entangling pulse MS; the default) ' +
+function gateSetPick(id) {
+  return h('select', { id: id || 'qcl-gateset', cls: 'qcl-sel',
+                       title: 'the native gate set Compile only, Submit and Test on this board lower the board\'s circuit to: MS (R, VZ and the entangling pulse MS; the default) ' +
                               'or RZZ (R, VZ and the entangling pulse RZZ = exp(-i theta/2 Z(x)Z); Quantinuum\'s set). QCCDCert, the verified ' +
                               'compiler, lowers to MS only, so a program in RZZ is compiled by qccdc_cli (or the C2LR router on a C2LR lattice)',
-                       on: { change: function (e) { S.gateSet = e.target.value; localSet('qccd.compile.gate_set', S.gateSet); renderBody(); } } },
+                       on: { change: function (e) { S.gateSet = e.target.value; localSet('qccd.compile.gate_set', S.gateSet); renderBody(); renderBoard(); } } },
            GATE_SETS.map(function (g) { var o = h('option', { value: g[0], text: g[1] }); if (g[0] === S.gateSet) o.selected = true; return o; }));
 }
 
@@ -1150,7 +1150,7 @@ function renderResults(b) {
   b.appendChild(h('div', { cls: 'qcl-row' }, [
     h('span', { cls: 'qcl-note', text: 'Leaderboard' }), pick,
     btn('Submit ' + draftName(S.branch) + ' to this board', function () {
-      api('POST', '/api/submissions', { design: S.branch, board: S.pickBoard, profile: 'reference', request_id: rid('sub') }).then(function (r) {
+      api('POST', '/api/submissions', withGateSet({ design: S.branch, board: S.pickBoard, profile: 'reference', request_id: rid('sub') })).then(function (r) {
         if (!r.ok) { notice('Not submitted: ' + (r.error || {}).message, 'bad'); return; }
         notice('Submitting ' + r.data.design + ' to ' + r.data.board + ': compiling its circuit onto the design, then grading. ' +
                'It appears below when graded (a local result, not published).');
@@ -1160,8 +1160,8 @@ function renderResults(b) {
   b.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-note', text: 'Gate set' }), gateSetPick()]));
   if (S.gateSet !== 'ms')
     b.appendChild(h('div', { id: 'qcl-gateset-note', cls: 'qcl-note', text: 'RZZ: QCCDCert, the verified compiler, lowers to MS only, ' +
-      'so a program in RZZ is compiled by qccdc_cli (or the C2LR router), never by QCCDCert. Submit grades the program the design ' +
-      'adopted: press Adopt compiled program after compiling, or Submit compiles again in MS.' }));
+      'so a program in RZZ is compiled by qccdc_cli (or the C2LR router), never by QCCDCert. Compile only, Submit and Test on ' +
+      'this board all compile in RZZ, and the entry is listed with its gate set.' }));
   b.appendChild(h('div', { cls: 'qcl-row' }, [
     btn('Compile only', function () {
       api('POST', '/api/jobs', { kind: 'compile', params: withGateSet({ branch: S.branch, board: S.pickBoard }), request_id: rid('compile') }).then(function (r) {
@@ -1358,7 +1358,7 @@ function signOut() {
 }
 function testOnBoard() {
   if (!B.board) return;
-  var body = { design: S.branch, board: B.board, profile: 'reference', request_id: rid('test') };
+  var body = withGateSet({ design: S.branch, board: B.board, profile: 'reference', request_id: rid('test') });
   if (B.rules) body.rules = B.rules;                     // a rule set of the design's own; none: the board's
   api('POST', '/api/submissions', body).then(function (r) {
     if (!r.ok) { notice('Not tested: ' + ((r.error || {}).message || 'error'), 'bad'); return; }
@@ -1494,6 +1494,8 @@ function renderBoard() {
   body.appendChild(h('div', { cls: 'qcl-bsec', text: '1 · Your design' }));
   body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Design' }),
     h('b', { text: des.name || draftName(S.branch) }), h('span', { cls: 'qcl-note', text: 'r' + (des.revision !== undefined ? des.revision : '?') + ' · switch designs in the chat\'s design menu' })]));
+  // the native gate set Test on this board compiles the board's circuit to (the same choice as the Results tab's)
+  body.appendChild(h('div', { cls: 'qcl-row' }, [h('span', { cls: 'qcl-blabel', text: 'Gate set' }), gateSetPick('qcl-bgateset')]));
   var line, cls = '';
   if (!t) line = 'Not tested on this board yet.';
   else if (t.state === 'running') { line = 'Testing: ' + (t.progress || 'compiling the board\'s circuit onto the design') + '…'; cls = 'busy'; }

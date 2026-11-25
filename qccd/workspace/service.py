@@ -886,7 +886,7 @@ def create_app(state: ServiceState) -> FastAPI:
             return ws.submit_design(actor, design=b.get("design") or b.get("branch") or "main", board=b.get("board"),
                                     profile=b.get("profile", "reference"), origin_prompt_id=b.get("origin_prompt_id"),
                                     request_id=b.get("request_id"), title=str(b.get("title", "")),
-                                    rules=b.get("rules"))
+                                    rules=b.get("rules"), gate_set=b.get("gate_set"))
         return ws.submit_local(actor, branch=b.get("branch", "main"), revision=b.get("revision"),
                                profile=b.get("profile", "reference"), origin_prompt_id=b.get("origin_prompt_id"),
                                request_id=b.get("request_id"), title=str(b.get("title", "")), rules=b.get("rules"))

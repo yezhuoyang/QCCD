@@ -434,6 +434,8 @@ def cmd_submit(a) -> int:
         body = {"profile": a.profile, "board": a.board, "design": a.design or "main"}
         if a.rules:
             body["rules"] = a.rules
+        if a.gate_set != "ms":
+            body["gate_set"] = a.gate_set
         t = _call(info, "POST", "/api/submissions", body)
         print(f"submitting {t['design']} to {t['board']} (compile, adopt, freeze, grade)"
               + (f" under the rules {a.rules}" if a.rules else ""))
@@ -1035,6 +1037,8 @@ def build_parser() -> argparse.ArgumentParser:
             q.add_argument("--gate-set", default="ms", choices=["ms", "rzz"], help=GATE_SET_HELP)
         if name == "submit":
             q.add_argument("--local", action="store_true")
+            q.add_argument("--gate-set", default="ms", choices=["ms", "rzz"],
+                           help=GATE_SET_HELP + "; with --board, the set the board's circuit is compiled to")
             q.add_argument("--rules", default=None,
                            help="the rule set the design is entered under: a shipped one by name (e.g. jones), a "
                                 ".rules file in the workspace, or the board's own (default)")

@@ -128,6 +128,35 @@ def test_one_call_submits_a_design_to_a_board_and_another_board_compiles_again(t
 
 
 @needs_toolchain
+def test_a_submission_compiles_in_the_gate_set_it_names_and_is_graded_in_it(tmp_path):
+    """Submit with gate_set rzz: the board's circuit is compiled to R, VZ and RZZ, the entry is graded
+    in that set and says so; submitting again in rzz reuses it, and in ms compiles again."""
+    from qccd.ir import gate_sets
+    if gate_sets.binary_refusal(TC.qccdc, "rzz"):
+        pytest.skip("this qccdc has no --gate-set: install a release that has it")
+    ws = Workspace.init(tmp_path / "ws")
+    d = ws.create_candidate(ME, title="Little ring")
+    ws.apply_change_set({"branch": d["name"], "expected_revision": 0, "request_id": "ring", "mode": "apply",
+                         "operations": [{"type": "construct", "generator": "ring",
+                                         "params": {"width": 8, "height": 2, "verticals": 8, "corners": "site"}}]}, ME)
+    j = _wait(ws, ws.submit_design(AGENT, design="Little ring", board="repetition code", gate_set="rzz")["job_id"])
+    assert j["status"] == "succeeded" and j["result"]["compiled"], j
+    g = _wait(ws, j["result"]["grading_job"])
+    assert g["status"] == "succeeded" and g["result"]["eligible"], g["result"]
+    fp = ws.head(d["name"]).state.final_program
+    assert ws._program_gate_set(fp) == "rzz"
+    assert ws.submissions()[0].get("gate_set") == "rzz"
+    again = _wait(ws, ws.submit_design(AGENT, design="Little ring", board="repetition code", gate_set="rzz")["job_id"])
+    assert again["status"] == "succeeded" and not again["result"]["compiled"]       # already in rzz
+    ms = _wait(ws, ws.submit_design(AGENT, design="Little ring", board="repetition code")["job_id"])
+    assert ms["status"] == "succeeded" and ms["result"]["compiled"]                  # back to the default: again
+    assert ws._program_gate_set(ws.head(d["name"]).state.final_program) == "ms"
+    with pytest.raises(WorkspaceError, match="takes no gate_set"):
+        ws.start_job(AGENT, "evaluate", {"branch": d["name"], "gate_set": "rzz"})
+    ws.close()
+
+
+@needs_toolchain
 def test_the_chat_follows_a_submission_to_its_verdict_on_one_card(tmp_path):
     """A live agent polled a BB grade 14 times over 11 minutes, one model call each, while the chat
     stayed busy (2026-09-26).  The chat's card follows a submission from its compile to the verdict by
