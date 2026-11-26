@@ -128,6 +128,15 @@ the `include snippets/qccd-official.conf;` line and `nginx -t && systemctl reloa
 The site file as it was before the include was added is
 `/root/qccd.academy.nginx.bak-20260923-000848`.
 
+**Deployed** 2026-11-26 04:33 UTC, `qccd-official:4440ec7`: every design page names its gate set (a
+Gate set counter in the head, the set on the Hardware program line), and every leaderboard surface
+and reproduce zip names every entry's gate set, MS too. Derived from `qccd-official:9ac563f` on the
+droplet, COPY only (`qccd/`, `arch/`, `Compiler/bridge` from the git archive of `4440ec7`, 1169 files
+== image); qccdc `9a761f289e00`, qcheck and compose unchanged. Census in `/root/qccd-4440ec7`: the
+rules stage over all 86 stored submissions identical in both images; full grades of a GHZ entry, the
+rzz smoke `os_3dc12022c95973c4` and a Goal 3 surface3 entry identical. `worker redraw` drew all 86
+entry pages (0 failed). Rollback: `*.bak-9ac563f`.
+
 **Deployed** 2026-11-25 05:24 UTC, `qccd-official:9ac563f`: the native gate set is a declared
 property of an entry. A bundle names `manifest.gate_set` when its program is in `rzz` (R, VZ and
 RZZ, Quantinuum's set; `ms`, the default, by naming none); the grader checks that the program's
